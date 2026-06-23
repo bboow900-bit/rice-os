@@ -1,0 +1,350 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#29a861">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="稲作OS">
+  <link rel="manifest" href="manifest.webmanifest?v=20260623_pwa1">
+  <link rel="apple-touch-icon" href="assets/icons/icon-192.png">
+  <title>稲作OS Stable</title>
+  <link rel="stylesheet" href="assets/css/app.css?v=20260623_pwa1">
+</head>
+<body>
+  <header class="app-header">
+    <div>
+      <p class="eyebrow">🌾 稲作管理OS</p>
+      <h1>稲作OS Stable</h1>
+      <p class="header-copy">圃場カルテを中心に、小梅・作業・生育ログ・去年比較をつなげる安定版 <span class="version-badge">PWA1</span></p>
+    </div>
+    <div class="header-status">
+      <span id="saveStatus">保存準備中</span>
+      <span id="todayLabel"></span>
+    </div>
+  </header>
+
+  <div class="app-shell">
+    <nav class="side-nav" aria-label="画面切替">
+      <button class="nav-item active" data-screen="home"><span class="nav-icon">🌸</span><span class="nav-label">ホーム</span></button>
+      <button class="nav-item" data-screen="recipes"><span class="nav-icon">🌱</span><span class="nav-label">栽培レシピ</span></button>
+      <button class="nav-item" data-screen="fields"><span class="nav-icon">🗺</span><span class="nav-label">圃場マスター</span></button>
+      <button class="nav-item" data-screen="field-work"><span class="nav-icon">🌾</span><span class="nav-label">作業入力</span></button>
+      <button class="nav-item" data-screen="growth"><span class="nav-icon">🔍</span><span class="nav-label">生育ログ</span></button>
+      <button class="nav-item" data-screen="photos"><span class="nav-icon">📷</span><span class="nav-label">写真</span></button>
+      <button class="nav-item" data-screen="other-work"><span class="nav-icon">🧺</span><span class="nav-label">その他</span></button>
+      <button class="nav-item" data-screen="annual"><span class="nav-icon">🗓</span><span class="nav-label">年間履歴</span></button>
+      <button class="nav-item" data-screen="materials"><span class="nav-icon">🧪</span><span class="nav-label">資材</span></button>
+      <button class="nav-item" data-screen="results"><span class="nav-icon">📈</span><span class="nav-label">結果</span></button>
+      <button class="nav-item" data-screen="data"><span class="nav-icon">💾</span><span class="nav-label">データ</span></button>
+    </nav>
+
+    <main class="content">
+      <section class="screen active" id="screen-home" data-title="ホーム / 小梅アシスタント">
+        <div class="home-hero">
+          <div>
+            <p class="eyebrow">🌸 小梅アシスタント</p>
+            <h2>今日の圃場カルテ</h2>
+            <p>固定メモを読んで、やること・やらないこと・去年同時期を圃場ごとに並べます。</p>
+          </div>
+          <div class="hero-actions">
+            <button class="secondary" data-action="install-pwa">ホーム画面に追加</button>
+            <button class="secondary" data-action="refresh-home">更新</button>
+          </div>
+        </div>
+
+        <div class="quick-grid">
+          <button class="quick-button yellow" data-work-shortcut="草刈り">🌿<span>草刈り</span></button>
+          <button class="quick-button blue" data-work-shortcut="溝切り">🛠<span>溝切り</span></button>
+          <button class="quick-button pink" data-work-shortcut="除草剤">💊<span>除草剤</span></button>
+          <button class="quick-button green" data-jump-screen="growth">🔍<span>生育ログ</span></button>
+        </div>
+
+        <div class="mobile-screen-menu">
+          <div class="section-title">
+            <h3>管理メニュー</h3>
+            <span class="muted">レシピ・台帳・結果</span>
+          </div>
+          <div class="menu-grid">
+            <button data-jump-screen="recipes">🌱<span>栽培レシピ</span></button>
+            <button data-jump-screen="fields">🗺<span>圃場マスター</span></button>
+            <button data-jump-screen="photos">📷<span>写真</span></button>
+            <button data-jump-screen="other-work">🧺<span>その他作業</span></button>
+            <button data-jump-screen="materials">🧪<span>資材台帳</span></button>
+            <button data-jump-screen="results">📈<span>品種結果</span></button>
+          </div>
+        </div>
+
+        <div class="screen-head compact-head">
+          <div>
+            <p class="eyebrow">Dashboard</p>
+            <h2>全体状況</h2>
+          </div>
+        </div>
+        <div class="kpi-grid" id="homeKpis"></div>
+        <div class="section-band">
+          <div class="section-title">
+            <h3>小梅の診断カード</h3>
+            <span id="homeSummary" class="muted"></span>
+          </div>
+          <div class="field-card-grid" id="komumeCards"></div>
+        </div>
+      </section>
+
+      <section class="screen" id="screen-recipes" data-title="栽培レシピ">
+        <div class="screen-head">
+          <div>
+            <p class="eyebrow">品種別</p>
+            <h2>栽培レシピ</h2>
+          </div>
+          <button class="primary" data-action="add-variety">品種を追加</button>
+        </div>
+        <div id="recipeList"></div>
+      </section>
+
+      <section class="screen" id="screen-fields" data-title="圃場マスター">
+        <div class="screen-head">
+          <div>
+            <p class="eyebrow">圃場別</p>
+            <h2>圃場マスター</h2>
+          </div>
+          <button class="primary" data-action="add-field">圃場を追加</button>
+        </div>
+        <div id="fieldList"></div>
+      </section>
+
+      <section class="screen" id="screen-field-work" data-title="圃場作業入力">
+        <div class="screen-head">
+          <div>
+            <p class="eyebrow">記録</p>
+            <h2 id="fieldWorkHeading">圃場作業入力</h2>
+          </div>
+          <button class="secondary" data-action="reset-field-work">入力をリセット</button>
+        </div>
+        <form class="form-grid" id="fieldWorkForm">
+          <input type="hidden" id="editFieldWorkId">
+          <label>日付<input id="fwDate" type="date" required></label>
+          <label>作業名<select id="fwName"></select></label>
+          <label>作業時間<input id="fwHours" placeholder="例：2時間30分"></label>
+          <label>機械<input id="fwMachine" placeholder="例：田植機、草刈機"></label>
+          <label>資材<input id="fwMaterial" placeholder="例：除草剤、肥料"></label>
+          <label>使用量<input id="fwAmount" placeholder="例：1kg、1袋"></label>
+          <label>天気<input id="fwWeather" placeholder="例：晴れ / 平均24℃ / 降水0mm"></label>
+          <input type="hidden" id="fwWeatherAutoJson">
+          <div class="weather-panel wide">
+            <div>
+              <b>作業日の気候</b>
+              <p id="fwWeatherStatus">位置情報を設定すると、作業日の天気・気温・降水量を自動取得します。</p>
+            </div>
+            <div class="weather-search">
+              <label>地名で設定
+                <input id="weatherPlace" placeholder="例：郡山市、会津若松市">
+              </label>
+            </div>
+            <div class="weather-actions">
+              <button class="secondary" type="button" data-action="use-current-location">現在地を使う</button>
+              <button class="secondary" type="button" data-action="search-weather-place">地名検索</button>
+              <button class="secondary" type="button" data-action="set-weather-location">位置を手入力</button>
+              <button class="secondary" type="button" data-action="fetch-work-weather">天気取得</button>
+            </div>
+          </div>
+          <label class="wide">対象圃場<div class="select-grid" id="fwFields"></div></label>
+          <label class="wide">メモ<textarea id="fwMemo"></textarea></label>
+          <div class="form-actions wide">
+            <button class="primary" type="submit">圃場作業を保存</button>
+          </div>
+        </form>
+        <div class="section-title">
+          <h3>最近の圃場作業</h3>
+          <span class="muted" id="fieldWorkCount"></span>
+        </div>
+        <div id="fieldWorkList"></div>
+      </section>
+
+      <section class="screen" id="screen-growth" data-title="生育ログ">
+        <div class="screen-head">
+          <div>
+            <p class="eyebrow">観察</p>
+            <h2 id="growthHeading">生育ログ</h2>
+          </div>
+          <button class="secondary" data-action="reset-growth">入力をリセット</button>
+        </div>
+        <form class="form-grid" id="growthForm">
+          <input type="hidden" id="editGrowthId">
+          <label>日付<input id="gDate" type="date" required></label>
+          <label>圃場<select id="gField"></select></label>
+          <label>葉色<select id="gLeaf"></select></label>
+          <label>雑草<select id="gWeed"></select></label>
+          <label>ガス<select id="gGas"></select></label>
+          <label>水<select id="gWater"></select></label>
+          <label>写真メモ<input id="gPhoto" placeholder="写真名やメモ"></label>
+          <label>写真ファイル<input id="gPhotoFile" type="file" accept="image/*"></label>
+          <div class="wide preview-row">
+            <img id="gPhotoPreview" class="photo-preview hidden" alt="">
+            <button class="secondary" type="button" data-action="clear-growth-photo">写真を外す</button>
+          </div>
+          <label class="wide">メモ<textarea id="gMemo"></textarea></label>
+          <div class="form-actions wide">
+            <button class="primary" type="submit">生育ログを保存</button>
+          </div>
+        </form>
+        <div class="section-title">
+          <h3>生育タイムライン</h3>
+          <span class="muted" id="growthCount"></span>
+        </div>
+        <div id="growthTimeline" class="timeline small-timeline"></div>
+      </section>
+
+      <section class="screen" id="screen-photos" data-title="写真タイムライン">
+        <div class="screen-head">
+          <div>
+            <p class="eyebrow">写真</p>
+            <h2>写真タイムライン</h2>
+          </div>
+          <label class="compact-label">圃場<select id="photoField"></select></label>
+        </div>
+        <div class="photo-grid" id="photoTimeline"></div>
+        <div class="section-band">
+          <div class="section-title">
+            <h3>去年同時期</h3>
+            <span class="muted" id="photoCompareRange"></span>
+          </div>
+          <div id="photoCompare" class="photo-grid compact"></div>
+        </div>
+      </section>
+
+      <section class="screen" id="screen-other-work" data-title="その他作業">
+        <div class="screen-head">
+          <div>
+            <p class="eyebrow">圃場外</p>
+            <h2 id="otherWorkHeading">その他作業</h2>
+          </div>
+          <button class="secondary" data-action="reset-other-work">入力をリセット</button>
+        </div>
+        <form class="form-grid" id="otherWorkForm">
+          <input type="hidden" id="editOtherWorkId">
+          <label>日付<input id="owDate" type="date" required></label>
+          <label>作業名<select id="owName"></select></label>
+          <label>数量<input id="owQuantity" placeholder="例：苗箱80枚"></label>
+          <label>作業時間<input id="owHours" placeholder="例：1.5時間"></label>
+          <label class="wide">対象品種<div class="select-grid" id="owVarieties"></div></label>
+          <label class="wide">関連圃場<div class="select-grid" id="owFields"></div></label>
+          <label class="wide">メモ<textarea id="owMemo"></textarea></label>
+          <div class="form-actions wide">
+            <button class="primary" type="submit">その他作業を保存</button>
+          </div>
+        </form>
+        <div id="otherWorkList"></div>
+      </section>
+
+      <section class="screen" id="screen-annual" data-title="年間履歴">
+        <div class="screen-head">
+          <div>
+            <p class="eyebrow">履歴</p>
+            <h2>年間履歴</h2>
+          </div>
+          <div class="filter-row">
+            <label class="compact-label">年度<select id="annualYear"></select></label>
+            <label class="compact-label">圃場<select id="annualField"></select></label>
+            <label class="check-label"><input id="showLastYear" type="checkbox"> 去年同時期</label>
+          </div>
+        </div>
+        <div class="timeline" id="annualTimeline"></div>
+      </section>
+
+      <section class="screen" id="screen-materials" data-title="資材台帳">
+        <div class="screen-head">
+          <div>
+            <p class="eyebrow">資材</p>
+            <h2>資材台帳</h2>
+          </div>
+        </div>
+        <form class="form-grid" id="materialForm">
+          <label>年度<input id="mSeason" type="number"></label>
+          <label>区分<select id="mCategory"></select></label>
+          <label>資材名<input id="mName" required></label>
+          <label>納品日<input id="mDeliveryDate" type="date"></label>
+          <label>注文量<input id="mOrdered"></label>
+          <label>使用量<input id="mUsed"></label>
+          <label>残量<input id="mRemaining"></label>
+          <label class="wide">来年メモ<textarea id="mMemo"></textarea></label>
+          <div class="form-actions wide">
+            <button class="primary" type="submit">資材を保存</button>
+          </div>
+        </form>
+        <div id="materialList"></div>
+      </section>
+
+      <section class="screen" id="screen-results" data-title="品種結果">
+        <div class="screen-head">
+          <div>
+            <p class="eyebrow">結果</p>
+            <h2>品種結果</h2>
+          </div>
+        </div>
+        <form class="form-grid" id="resultForm">
+          <label>年度<input id="rSeason" type="number"></label>
+          <label>品種<select id="rVariety"></select></label>
+          <label>面積(a)<input id="rAreaA" type="number" step="0.1"></label>
+          <label>収量<input id="rYield" placeholder="例：30kg袋 120本"></label>
+          <label>等級<input id="rGrade" placeholder="例：1等"></label>
+          <label>販売額<input id="rSales"></label>
+          <label class="wide">品質<textarea id="rQuality"></textarea></label>
+          <label class="wide">来年への反省<textarea id="rReflection"></textarea></label>
+          <div class="form-actions wide">
+            <button class="primary" type="submit">品種結果を保存</button>
+          </div>
+        </form>
+        <div id="resultList"></div>
+      </section>
+
+      <section class="screen" id="screen-data" data-title="データ管理">
+        <div class="screen-head">
+          <div>
+            <p class="eyebrow">保存と復元</p>
+            <h2>データ管理</h2>
+          </div>
+        </div>
+        <div class="data-actions">
+          <button class="primary" data-action="export-json">JSONバックアップ保存</button>
+          <label class="file-button">JSONを選択<input id="importFile" type="file" accept=".json,application/json"></label>
+          <button class="secondary" data-action="import-json">JSON復元</button>
+          <button class="secondary" data-action="import-legacy">旧版データ取り込み</button>
+          <button class="secondary" data-action="restore-backup">直前バックアップ復旧</button>
+        </div>
+        <div class="data-status" id="dataStatus"></div>
+        <div class="section-title">
+          <h3>保存内容</h3>
+          <span class="muted">現在のブラウザ内データ</span>
+        </div>
+        <textarea id="dataSnapshot" readonly></textarea>
+      </section>
+    </main>
+  </div>
+
+  <div id="toast" class="toast hidden" role="status"></div>
+
+  <script src="assets/js/core/utils.js?v=20260623_pwa1"></script>
+  <script src="assets/js/core/schema.js?v=20260623_pwa1"></script>
+  <script src="assets/js/core/storage.js?v=20260623_pwa1"></script>
+  <script src="assets/js/core/state.js?v=20260623_pwa1"></script>
+  <script src="assets/js/core/weather.js?v=20260623_pwa1"></script>
+  <script src="assets/js/core/pwa.js?v=20260623_pwa1"></script>
+  <script src="assets/js/screens/home.js?v=20260623_pwa1"></script>
+  <script src="assets/js/screens/recipes.js?v=20260623_pwa1"></script>
+  <script src="assets/js/screens/fields.js?v=20260623_pwa1"></script>
+  <script src="assets/js/screens/field-work.js?v=20260623_pwa1"></script>
+  <script src="assets/js/screens/growth.js?v=20260623_pwa1"></script>
+  <script src="assets/js/screens/photos.js?v=20260623_pwa1"></script>
+  <script src="assets/js/screens/other-work.js?v=20260623_pwa1"></script>
+  <script src="assets/js/screens/annual.js?v=20260623_pwa1"></script>
+  <script src="assets/js/screens/materials.js?v=20260623_pwa1"></script>
+  <script src="assets/js/screens/results.js?v=20260623_pwa1"></script>
+  <script src="assets/js/screens/data.js?v=20260623_pwa1"></script>
+  <script src="assets/js/app.js?v=20260623_pwa1"></script>
+</body>
+</html>
