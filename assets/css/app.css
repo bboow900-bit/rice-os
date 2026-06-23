@@ -2448,6 +2448,19 @@ label {
   gap: 8px;
 }
 
+.sheet-field-select {
+  display: grid;
+  gap: 5px;
+  margin: 4px 0 10px;
+  padding: 0 2px;
+}
+
+.sheet-field-select select {
+  margin-top: 0;
+  background: #f8fbf5;
+  font-weight: 900;
+}
+
 .sheet-actions button {
   min-height: 54px;
   background: #f7fbf5;
@@ -2531,7 +2544,7 @@ label {
   }
 }
 
-/* KARTE5: first visual pass, cheerful daily-use feel without data changes. */
+/* KARTE6: first visual pass, cheerful daily-use feel without data changes. */
 .karte-hero {
   position: relative;
   min-height: 176px;
@@ -2580,7 +2593,7 @@ label {
   font-weight: 800;
 }
 
-/* KARTE5: home screen follows the supplied calendar/timeline/record mock. */
+/* KARTE6: home screen follows the supplied calendar/timeline/record mock. */
 .visual-app-board {
   display: grid;
   gap: 12px;
@@ -2626,6 +2639,31 @@ label {
   border-radius: 999px;
   background: rgba(255, 244, 183, 0.94);
   color: #193419;
+}
+
+.visual-home-field {
+  display: inline-grid;
+  grid-template-columns: auto minmax(116px, 1fr);
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 4px 6px 4px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.visual-home-field select {
+  min-height: 28px;
+  margin: 0;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 999px;
+  color: #193419;
+  font-size: 12px;
+  font-weight: 900;
 }
 
 .visual-three-panel {
@@ -3355,6 +3393,12 @@ label {
 
   .visual-top-summary > div:last-child {
     justify-content: center;
+  }
+
+  .visual-home-field {
+    grid-template-columns: 1fr;
+    width: min(100%, 230px);
+    border-radius: 8px;
   }
 
   .visual-three-panel {

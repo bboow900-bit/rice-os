@@ -6,6 +6,7 @@
   const state = RiceOS.state;
 
   let selectedDate = U.today();
+  let selectedFieldId = "";
 
   function entryHtml(entry) {
     return `
@@ -20,12 +21,15 @@
 
   function render() {
     U.$("sheetDateTitle").textContent = `${U.fd(selectedDate)} の記録`;
+    renderFieldSelect();
     const rows = RiceOS.calendar.entriesForDate(selectedDate);
     U.$("sheetEntries").innerHTML = rows.length ? rows.map(entryHtml).join("") : '<div class="empty">この日の記録はまだありません。</div>';
   }
 
-  function open(date) {
+  function open(date, fieldId) {
     selectedDate = date || U.today();
+    if (fieldId) selectedFieldId = fieldId;
+    if (!selectedFieldId) selectedFieldId = firstFieldId();
     render();
     const sheet = U.$("dateSheet");
     sheet.classList.remove("hidden");
@@ -42,40 +46,68 @@
     return state.activeFields()[0] && state.activeFields()[0].fieldId || "";
   }
 
+  function activeFieldId() {
+    const value = U.$("sheetField") && U.$("sheetField").value || selectedFieldId || firstFieldId();
+    selectedFieldId = value;
+    return value;
+  }
+
+  function renderFieldSelect() {
+    const fields = state.activeFields();
+    if (!selectedFieldId && fields[0]) selectedFieldId = fields[0].fieldId;
+    U.setOptions(U.$("sheetField"), fields.map((field) => ({
+      value: field.fieldId,
+      label: field.name
+    })), selectedFieldId);
+  }
+
   function addSchedule() {
     const title = prompt("予定名を入力してください", "作業予定");
     if (title === null) return;
     const memo = prompt("メモがあれば入力してください", "") || "";
     state.saveSchedule({
       date: selectedDate,
-      fieldIds: firstFieldId() ? [firstFieldId()] : [],
+      fieldIds: activeFieldId() ? [activeFieldId()] : [],
       scheduleType: title,
       title,
       memo
     });
+    close();
+  }
+
+  function openScreen(screen, callback) {
+    close();
+    RiceOS.app.show(screen);
+    if (typeof callback === "function") callback(activeFieldId());
   }
 
   function bind() {
     U.$$("#dateSheet [data-sheet-close]").forEach((el) => el.addEventListener("click", close));
+    U.$("sheetField").addEventListener("change", () => {
+      selectedFieldId = U.$("sheetField").value;
+    });
     U.$("dateSheet").addEventListener("click", (event) => {
       const button = event.target.closest("[data-sheet-add]");
       if (!button) return;
       const action = button.dataset.sheetAdd;
-      close();
       if (action === "growth") {
-        RiceOS.app.show("growth");
-        RiceOS.screens.growth.prefillDate(selectedDate, firstFieldId());
+        openScreen("growth", (fieldId) => RiceOS.screens.growth.prefillDate(selectedDate, fieldId));
       } else if (action === "work") {
-        RiceOS.app.show("field-work");
-        RiceOS.screens.fieldWork.prefillDate(selectedDate, firstFieldId());
+        openScreen("field-work", (fieldId) => RiceOS.screens.fieldWork.prefillDate(selectedDate, fieldId));
+      } else if (action === "dry") {
+        openScreen("dry-period", (fieldId) => RiceOS.screens.dryPeriod.prefillDate(selectedDate, fieldId));
+      } else if (action === "irrigation") {
+        openScreen("irrigation", (fieldId) => RiceOS.screens.irrigation.prefillDate(selectedDate, fieldId));
       } else if (action === "material") {
-        RiceOS.app.show("materials");
+        openScreen("materials");
       } else if (action === "schedule") {
         addSchedule();
       } else if (action === "harvest") {
-        RiceOS.app.show("results");
+        openScreen("results");
       } else if (action === "shipment") {
-        RiceOS.app.show("results");
+        openScreen("results");
+      } else if (action === "photo") {
+        openScreen("growth", (fieldId) => RiceOS.screens.growth.prefillDate(selectedDate, fieldId));
       }
     });
   }

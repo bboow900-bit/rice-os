@@ -7,6 +7,7 @@
 
   let homeMonth = RiceOS.calendar.monthStart(U.today());
   let homeDate = U.today();
+  let homeFieldId = "";
 
   function fieldLabel(field) {
     if (!field) return "圃場未設定";
@@ -15,7 +16,17 @@
   }
 
   function currentField() {
-    return state.activeFields()[0] || state.fields()[0] || null;
+    if (homeFieldId && state.field(homeFieldId)) return state.field(homeFieldId);
+    const field = state.activeFields()[0] || state.fields()[0] || null;
+    homeFieldId = field ? field.fieldId : "";
+    return field;
+  }
+
+  function homeFieldOptions() {
+    const current = currentField();
+    return state.activeFields().map((field) => `
+      <option value="${U.attr(field.fieldId)}" ${current && current.fieldId === field.fieldId ? "selected" : ""}>${U.escapeHTML(field.name)}</option>
+    `).join("");
   }
 
   function areaText() {
@@ -106,7 +117,9 @@
   }
 
   function growthRows() {
+    const field = currentField();
     return state.data().growthLogs
+      .filter((log) => !field || log.fieldId === field.fieldId)
       .slice()
       .sort((a, b) => String(b.date).localeCompare(String(a.date)))
       .slice(0, 5);
@@ -275,6 +288,7 @@
           <span>田んぼの記録・比較・管理アプリ</span>
         </div>
         <div>
+          <label class="visual-home-field">表示圃場<select data-home-field>${homeFieldOptions()}</select></label>
           <span>管理面積 ${U.escapeHTML(areaText())}</span>
           <span>圃場 ${U.escapeHTML(String(state.fields().length))}枚</span>
           <span>品種 ${U.escapeHTML(String(state.varieties().length))}</span>
@@ -298,13 +312,13 @@
 
   function openAddTarget(target) {
     if (!target) return;
+    const field = currentField();
     if (target === "calendar") {
       RiceOS.app.show("calendar");
-      if (RiceOS.bottomSheet) RiceOS.bottomSheet.open(homeDate);
+      if (RiceOS.bottomSheet) RiceOS.bottomSheet.open(homeDate, field && field.fieldId);
       return;
     }
     RiceOS.app.show(target);
-    const field = currentField();
     if (target === "growth" && RiceOS.screens.growth) RiceOS.screens.growth.prefillDate(homeDate, field && field.fieldId);
     if (target === "field-work" && RiceOS.screens.fieldWork) RiceOS.screens.fieldWork.prefillDate(homeDate, field && field.fieldId);
     if (target === "dry-period" && RiceOS.screens.dryPeriod) RiceOS.screens.dryPeriod.prefillDate(homeDate, field && field.fieldId);
@@ -322,15 +336,23 @@
       if (dateButton) {
         homeDate = dateButton.dataset.homeDate;
         render();
-        if (RiceOS.bottomSheet) RiceOS.bottomSheet.open(homeDate);
+        if (RiceOS.bottomSheet) RiceOS.bottomSheet.open(homeDate, currentField() && currentField().fieldId);
         return;
       }
       if (event.target.closest("[data-home-open-date]")) {
-        if (RiceOS.bottomSheet) RiceOS.bottomSheet.open(homeDate);
+        if (RiceOS.bottomSheet) RiceOS.bottomSheet.open(homeDate, currentField() && currentField().fieldId);
         return;
       }
+      const fieldSelect = event.target.closest("[data-home-field]");
+      if (fieldSelect) return;
       const addButton = event.target.closest("[data-home-add]");
       if (addButton) openAddTarget(addButton.dataset.homeAdd);
+    });
+    U.$("homeVisualDashboard").addEventListener("change", (event) => {
+      const select = event.target.closest("[data-home-field]");
+      if (!select) return;
+      homeFieldId = select.value;
+      render();
     });
   }
 
