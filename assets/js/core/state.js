@@ -379,13 +379,13 @@
         if (normalized.startDate) d.fields[fieldIndex].intermittentStartDate = normalized.startDate;
         if (normalized.targetDays) d.fields[fieldIndex].intermittentIntervalDays = normalized.targetDays;
       }
-    }, "間断灌水を保存しました");
+    }, "水管理を保存しました");
   }
 
   function deleteIrrigation(irrigationId) {
     mutate((d) => {
       d.irrigations = (d.irrigations || []).filter((item) => item.irrigationId !== irrigationId);
-    }, "間断灌水を削除しました");
+    }, "水管理を削除しました");
   }
 
   function markJsonExported() {

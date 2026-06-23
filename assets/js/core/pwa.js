@@ -34,7 +34,7 @@
 
     if (!canUseServiceWorker()) return;
 
-    navigator.serviceWorker.register("./service-worker.js?v=20260624_karte3")
+    navigator.serviceWorker.register("./service-worker.js?v=20260624_karte4")
       .then((registration) => {
         registration.update();
       })
@@ -64,7 +64,7 @@
       return false;
     }
     await showNotification("稲作カルテの通知を有効にしました", {
-      body: "中干し・間断灌水の目安日が近いとき、アプリを開いたタイミングで通知します。",
+      body: "中干し・間断灌水・湿潤灌漑の目安日が近いとき、アプリを開いたタイミングで通知します。",
       tag: "rice-os-notification-enabled"
     });
     return true;

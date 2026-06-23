@@ -45,7 +45,7 @@
 
   function resetForm() {
     const field = state.field(firstFieldId());
-    U.$("irrigationHeading").textContent = "灌水期間";
+    U.$("irrigationHeading").textContent = "間断灌水/湿潤灌漑";
     U.$("editIrrigationId").value = "";
     U.$("irrigationDate").value = U.today();
     U.$("irrigationMethod").value = "間断灌水";
@@ -69,7 +69,7 @@
   }
 
   function fillEdit(item) {
-    U.$("irrigationHeading").textContent = "灌水期間を編集";
+    U.$("irrigationHeading").textContent = "間断灌水/湿潤灌漑を編集";
     U.$("editIrrigationId").value = item.irrigationId;
     U.$("irrigationMethod").value = item.method || "間断灌水";
     U.$("irrigationField").value = item.fieldId;

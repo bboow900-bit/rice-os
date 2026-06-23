@@ -7,12 +7,12 @@
   const state = RiceOS.state;
 
   const KIND_META = {
-    fieldWork: { label: "作業", className: "work" },
-    growth: { label: "生育", className: "growth" },
-    dry: { label: "中干し", className: "water" },
-    irrigation: { label: "水管理", className: "water" },
-    schedule: { label: "予定", className: "schedule" },
-    other: { label: "その他", className: "other" }
+    fieldWork: { label: "作業", className: "work", icon: "作" },
+    growth: { label: "生育", className: "growth", icon: "生" },
+    dry: { label: "中干し", className: "water", icon: "水" },
+    irrigation: { label: "水管理", className: "water", icon: "水" },
+    schedule: { label: "予定", className: "schedule", icon: "予" },
+    other: { label: "その他", className: "other", icon: "他" }
   };
 
   function unique(values) {
@@ -79,6 +79,7 @@
       kind,
       kindLabel: meta.label,
       kindClass: meta.className,
+      kindIcon: meta.icon,
       id: values.id,
       date: values.date || "",
       season: values.season || U.season(values.date),
@@ -228,6 +229,18 @@
     return text ? `<span class="annual-chip ${tone || ""}">${U.escapeHTML(text)}</span>` : "";
   }
 
+  function dateBlock(date) {
+    const d = new Date(`${date}T00:00:00`);
+    if (Number.isNaN(d.getTime())) {
+      return { main: date || "未設定", sub: "" };
+    }
+    const weekdays = ["日", "月", "火", "水", "木", "金", "土"];
+    return {
+      main: `${d.getMonth() + 1}/${d.getDate()}`,
+      sub: `${d.getFullYear()}(${weekdays[d.getDay()]})`
+    };
+  }
+
   function renderDapChips(row) {
     const labels = dapLabels(row.fieldIds, row.date);
     if (!labels.length) return "";
@@ -241,6 +254,7 @@
     return `
       <article class="annual-entry annual-${U.attr(row.kindClass)}">
         <div class="annual-entry-main">
+          <span class="annual-kind-icon">${U.escapeHTML(row.kindIcon || row.kindLabel.slice(0, 1))}</span>
           <span class="kind-badge">${U.escapeHTML(row.kindLabel)}</span>
           <div class="annual-entry-title">
             <b>${showDate ? `${U.escapeHTML(U.fd(row.date))} ` : ""}${U.escapeHTML(row.title)}</b>
@@ -283,23 +297,30 @@
   function renderDayCards(rows, options = {}) {
     return groupRowsByDate(rows).map(([date, items], index) => {
       const dayHours = totalHours(items);
-      const dap = dapLabels(items[0].fieldIds, date)[0] || "";
-      const open = options.openAll || index < 8;
+      const dap = dapLabels(items.flatMap((item) => item.fieldIds), date)[0] || "";
+      const parts = dateBlock(date);
+      const kinds = unique(items.map((item) => item.kindLabel)).slice(0, 3).join("・");
       return `
-        <details class="annual-day-card" ${open ? "open" : ""}>
-          <summary class="annual-day-head">
-            <span class="annual-date">${U.escapeHTML(U.fd(date) || date)}</span>
-            <span class="annual-day-meta">
+        <article class="annual-day-card ${options.compact ? "compact" : ""}">
+          <div class="annual-day-head">
+            <div class="annual-date-block">
+              <span class="annual-date-main">${U.escapeHTML(parts.main)}</span>
+              <span class="annual-date-sub">${U.escapeHTML(parts.sub)}</span>
+            </div>
+            <div class="annual-day-overview">
+              <b>${U.escapeHTML(kinds || "記録")}</b>
+              <span>${U.escapeHTML(compactFieldLabel(items))}</span>
+            </div>
+            <div class="annual-day-meta">
               ${chip(`${items.length}件`, "count")}
               ${dayHours ? chip(U.formatHours(dayHours), "hours") : ""}
-              ${chip(compactFieldLabel(items), "field")}
               ${dap ? chip(dap, "dap") : ""}
-            </span>
-          </summary>
+            </div>
+          </div>
           <div class="annual-entry-list">
             ${items.map((row) => renderEntry(row, false)).join("")}
           </div>
-        </details>
+        </article>
       `;
     }).join("");
   }
@@ -344,7 +365,7 @@
           <h3>去年同時期</h3>
           <span class="muted">${U.escapeHTML(U.fd(range.start))} - ${U.escapeHTML(U.fd(range.end))}</span>
         </div>
-        ${same.length ? renderDayCards(same, { openAll: true }) : '<div class="empty">去年同時期の記録はありません。</div>'}
+        ${same.length ? renderDayCards(same, { compact: true }) : '<div class="empty">去年同時期の記録はありません。</div>'}
       </div>
     `;
   }

@@ -1278,37 +1278,78 @@ label {
 }
 
 .annual-day-card {
+  position: relative;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: #fff;
+  background: linear-gradient(135deg, #ffffff, #fbfff7);
   box-shadow: var(--shadow);
   overflow: hidden;
 }
 
+.annual-day-card::before {
+  content: "";
+  position: absolute;
+  left: 39px;
+  top: 68px;
+  bottom: 14px;
+  width: 3px;
+  border-radius: 999px;
+  background: #b7dfb5;
+}
+
 .annual-day-head {
   display: grid;
-  grid-template-columns: minmax(118px, auto) 1fr;
+  grid-template-columns: 70px minmax(0, 1fr) auto;
   align-items: center;
   gap: 10px;
-  min-height: 58px;
+  min-height: 66px;
   padding: 12px;
-  cursor: pointer;
-  list-style: none;
+  border-bottom: 1px solid rgba(220, 227, 215, 0.82);
+  background: rgba(255, 255, 255, 0.72);
 }
 
-.annual-day-head::-webkit-details-marker {
-  display: none;
+.annual-date-block {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  gap: 1px;
+  width: 56px;
+  min-height: 56px;
+  border: 3px solid #dff1d7;
+  border-radius: 8px;
+  background: #2f7d52;
+  color: #fff;
+  box-shadow: 0 5px 14px rgba(47, 125, 82, 0.18);
 }
 
-.annual-day-head::before {
-  content: "";
-  display: none;
-}
-
-.annual-date {
-  color: var(--ink);
-  font-size: 15px;
+.annual-date-main {
+  font-size: 18px;
   font-weight: 1000;
+  line-height: 1;
+}
+
+.annual-date-sub {
+  font-size: 10px;
+  font-weight: 850;
+  opacity: 0.9;
+}
+
+.annual-day-overview {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.annual-day-overview b {
+  font-size: 15px;
+}
+
+.annual-day-overview span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  overflow-wrap: anywhere;
 }
 
 .annual-day-meta,
@@ -1319,9 +1360,11 @@ label {
 }
 
 .annual-entry-list {
+  position: relative;
+  z-index: 1;
   display: grid;
   gap: 8px;
-  padding: 0 10px 10px;
+  padding: 10px 10px 12px 70px;
 }
 
 .annual-entry {
@@ -1356,7 +1399,7 @@ label {
 
 .annual-entry-main {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 8px;
 }
@@ -1384,6 +1427,43 @@ label {
   height: 48px;
   border-radius: 8px;
   object-fit: cover;
+}
+
+.annual-kind-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: #eef3ea;
+  color: var(--primary-dark);
+  font-size: 13px;
+  font-weight: 1000;
+}
+
+.annual-work .annual-kind-icon {
+  background: #fff1dc;
+  color: #965516;
+}
+
+.annual-growth .annual-kind-icon {
+  background: #e6f6e6;
+  color: #22763d;
+}
+
+.annual-water .annual-kind-icon {
+  background: #e7f0fb;
+  color: #2b5f94;
+}
+
+.annual-schedule .annual-kind-icon {
+  background: #fff6d7;
+  color: #886705;
+}
+
+.annual-other .annual-kind-icon {
+  background: #f2eee8;
+  color: #665749;
 }
 
 .kind-badge,
@@ -1438,12 +1518,30 @@ label {
   }
 
   .annual-day-head {
-    grid-template-columns: 1fr;
-    gap: 7px;
+    grid-template-columns: 58px minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  .annual-day-meta {
+    grid-column: 1 / -1;
+    padding-left: 66px;
+  }
+
+  .annual-day-card::before {
+    left: 34px;
+  }
+
+  .annual-date-block {
+    width: 50px;
+    min-height: 50px;
+  }
+
+  .annual-entry-list {
+    padding-left: 62px;
   }
 
   .annual-entry-main {
-    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-columns: auto auto minmax(0, 1fr);
   }
 
   .annual-thumb {
@@ -2433,7 +2531,7 @@ label {
   }
 }
 
-/* KARTE3: first visual pass, cheerful daily-use feel without data changes. */
+/* KARTE4: first visual pass, cheerful daily-use feel without data changes. */
 .karte-hero {
   position: relative;
   min-height: 176px;
