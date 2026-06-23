@@ -103,13 +103,11 @@
     const year = U.$("annualYear").value || String(new Date().getFullYear());
     const fieldId = U.$("annualField").value || "all";
     const kind = U.$("annualKind").value || "all";
-    const worker = String(U.$("annualWorker").value || "").trim();
     return rows.filter((row) => {
       const yearOk = year === "all" || String(row.season) === String(year);
       const fieldOk = fieldId === "all" || (row.fieldIds || []).includes(fieldId);
       const kindOk = kind === "all" || row.kind === kind;
-      const workerOk = !worker || String(row.worker || "").includes(worker);
-      return yearOk && fieldOk && kindOk && workerOk;
+      return yearOk && fieldOk && kindOk;
     });
   }
 
@@ -287,7 +285,6 @@
 
   function bind() {
     ["annualYear", "annualField", "annualKind", "annualView", "showLastYear"].forEach((id) => U.$(id).addEventListener("change", render));
-    U.$("annualWorker").addEventListener("input", render);
     U.$("annualTimeline").addEventListener("click", (event) => {
       const button = event.target.closest("[data-annual-action]");
       if (!button) return;

@@ -2158,11 +2158,250 @@ label {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .stack-form .form-grid.dense,
+  .record-body .form-grid.dense,
+  .record-body .inline-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
   .sheet-actions {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .compare-pair {
     grid-template-columns: 1fr;
+  }
+}
+
+/* KARTE2: first visual pass, cheerful daily-use feel without data changes. */
+.karte-hero {
+  position: relative;
+  min-height: 176px;
+  overflow: hidden;
+  border: 0;
+  background:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.9) 0%, rgba(255, 255, 255, 0.72) 45%, rgba(255, 255, 255, 0.18) 100%),
+    url("../images/rice-hero-karte2.jpg") center / cover no-repeat;
+}
+
+.karte-hero::after {
+  content: "";
+  position: absolute;
+  inset: auto -20px -42px auto;
+  width: 180px;
+  height: 180px;
+  border-radius: 50%;
+  background: rgba(255, 241, 166, 0.6);
+  pointer-events: none;
+}
+
+.karte-hero > * {
+  position: relative;
+  z-index: 1;
+}
+
+.karte-hero .eyebrow {
+  display: inline-flex;
+  align-items: center;
+  min-height: 27px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.82);
+  color: #1f6f46;
+}
+
+.karte-hero h2 {
+  margin-top: 10px;
+  color: #143b25;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.65);
+}
+
+.karte-hero p:not(.eyebrow) {
+  max-width: 26rem;
+  color: #36543c;
+  font-weight: 800;
+}
+
+.hero-actions .secondary {
+  background: rgba(255, 255, 255, 0.88);
+  color: #1f6f46;
+}
+
+.quick-button {
+  position: relative;
+  overflow: hidden;
+  min-height: 82px;
+  isolation: isolate;
+}
+
+.quick-button::after {
+  content: "";
+  position: absolute;
+  inset: auto -24px -32px auto;
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.48);
+  z-index: -1;
+}
+
+.quick-button.green {
+  background: linear-gradient(135deg, #d8f8de, #9de987);
+}
+
+.quick-button.yellow {
+  background: linear-gradient(135deg, #fff1a6, #ffd166);
+}
+
+.quick-button.orange {
+  background: linear-gradient(135deg, #ffe2bd, #ffad5c);
+}
+
+.quick-button.blue {
+  background: linear-gradient(135deg, #dff1ff, #8ed0ff);
+}
+
+.dashboard-grid .panel:nth-child(1) {
+  background: linear-gradient(135deg, #ffffff, #fff8d9);
+}
+
+.dashboard-grid .panel:nth-child(2) {
+  background: linear-gradient(135deg, #ffffff, #edfbe9);
+}
+
+.dashboard-grid .panel:nth-child(3) {
+  background: linear-gradient(135deg, #ffffff, #eff6ff);
+}
+
+.dashboard-grid .panel:nth-child(4) {
+  background: linear-gradient(135deg, #ffffff, #fff0f6);
+}
+
+.calendar-week {
+  min-height: 28px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 1000;
+  text-align: center;
+}
+
+.calendar-day {
+  min-height: 92px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(247, 251, 245, 0.96));
+}
+
+.calendar-day.muted-day {
+  opacity: 0.45;
+}
+
+.calendar-day > span:first-child {
+  font-size: 13px;
+  font-weight: 1000;
+}
+
+.day-markers {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.day-markers i {
+  display: block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.day-markers .mark-schedule {
+  background: var(--blue);
+}
+
+.day-markers .mark-growth {
+  background: var(--primary);
+}
+
+.day-markers .mark-work {
+  background: #f28a26;
+}
+
+.day-markers .mark-water {
+  background: var(--purple);
+}
+
+.day-markers em {
+  font-style: normal;
+  font-size: 12px;
+}
+
+.stack-form .form-grid.dense,
+.record-body .form-grid.dense,
+.record-body .inline-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.stack-form .form-grid.dense label,
+.record-body .form-grid.dense label,
+.record-body .inline-grid label {
+  min-width: 0;
+}
+
+.stack-form .form-grid.dense input,
+.stack-form .form-grid.dense select,
+.record-body .form-grid.dense input,
+.record-body .form-grid.dense select {
+  padding-left: 10px;
+  padding-right: 10px;
+}
+
+@media (max-width: 900px) {
+  .karte-hero {
+    min-height: 188px;
+    text-align: left;
+  }
+
+  .hero-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .quick-button {
+    min-height: 74px;
+  }
+
+  .screen form.form-grid,
+  .stack-form .form-grid.dense,
+  .record-body .form-grid.dense,
+  .record-body .inline-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .screen form.form-grid .wide,
+  .stack-form .wide,
+  .record-body .wide {
+    grid-column: 1 / -1;
+  }
+
+  .stack-form .form-grid.dense,
+  .record-body .form-grid.dense,
+  .screen form.form-grid {
+    gap: 8px;
+  }
+
+  .stack-form .form-grid.dense label,
+  .record-body .form-grid.dense label,
+  .screen form.form-grid label {
+    font-size: 12px;
+  }
+
+  .stack-form .form-grid.dense input,
+  .stack-form .form-grid.dense select,
+  .record-body .form-grid.dense input,
+  .record-body .form-grid.dense select,
+  .screen form.form-grid input,
+  .screen form.form-grid select {
+    min-height: 42px;
+    padding: 9px 9px;
   }
 }

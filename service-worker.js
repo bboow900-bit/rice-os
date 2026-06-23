@@ -1,5 +1,5 @@
-const CACHE_NAME = "rice-karte-20260624-1";
-const APP_VERSION = "20260624_karte1";
+const CACHE_NAME = "rice-karte-20260624-2";
+const APP_VERSION = "20260624_karte2";
 
 const APP_SHELL = [
   "./",
@@ -7,6 +7,7 @@ const APP_SHELL = [
   `./mobile.html?v=${APP_VERSION}`,
   `./manifest.webmanifest?v=${APP_VERSION}`,
   `./assets/css/app.css?v=${APP_VERSION}`,
+  "./assets/images/rice-hero-karte2.jpg",
   `./assets/js/core/utils.js?v=${APP_VERSION}`,
   `./assets/js/core/schema.js?v=${APP_VERSION}`,
   `./assets/js/core/storage.js?v=${APP_VERSION}`,

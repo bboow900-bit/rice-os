@@ -10,17 +10,17 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="稲作カルテ">
-  <link rel="manifest" href="manifest.webmanifest?v=20260624_karte1">
+  <link rel="manifest" href="manifest.webmanifest?v=20260624_karte2">
   <link rel="apple-touch-icon" href="assets/icons/icon-192.png">
   <title>稲作カルテ</title>
-  <link rel="stylesheet" href="assets/css/app.css?v=20260624_karte1">
+  <link rel="stylesheet" href="assets/css/app.css?v=20260624_karte2">
 </head>
 <body>
   <header class="app-header">
     <div>
       <p class="eyebrow">田んぼの記録・比較・管理アプリ</p>
       <h1>稲作カルテ</h1>
-      <p class="header-copy">カレンダー、生育タイムライン、写真比較、年間履歴で来年へ残す <span class="version-badge">KARTE1</span></p>
+      <p class="header-copy">田んぼの今日を残して、来年の自分が助かる記録帳 <span class="version-badge">KARTE2</span></p>
     </div>
     <div class="header-status">
       <span id="saveStatus">保存準備中</span>
@@ -49,9 +49,9 @@
       <section class="screen active" id="screen-home" data-title="農業ダッシュボード">
         <div class="karte-hero">
           <div>
-            <p class="eyebrow">農業ダッシュボード</p>
-            <h2>今日の記録入口</h2>
-            <p>予定、最近の作業、去年同時期、写真比較をここに集約します。</p>
+            <p class="eyebrow">今日の田んぼ</p>
+            <h2>見たことを、すぐ残す</h2>
+            <p>予定、最近の作業、去年同時期、写真比較をひと目で見られるようにします。</p>
           </div>
           <div class="hero-actions">
             <button class="secondary" data-action="install-pwa">ホーム画面に追加</button>
@@ -357,7 +357,6 @@
             <label class="compact-label">年度<select id="annualYear"></select></label>
             <label class="compact-label">圃場<select id="annualField"></select></label>
             <label class="compact-label">種類<select id="annualKind"></select></label>
-            <label class="compact-label">作業者<input id="annualWorker" placeholder="自分 / 外注"></label>
             <label class="compact-label">表示<select id="annualView"></select></label>
             <label class="check-label"><input id="showLastYear" type="checkbox"> 去年同時期</label>
           </div>
@@ -555,29 +554,29 @@
 
   <div id="toast" class="toast hidden" role="status"></div>
 
-  <script src="assets/js/core/utils.js?v=20260624_karte1"></script>
-  <script src="assets/js/core/schema.js?v=20260624_karte1"></script>
-  <script src="assets/js/core/storage.js?v=20260624_karte1"></script>
-  <script src="assets/js/core/state.js?v=20260624_karte1"></script>
-  <script src="assets/js/core/calendar.js?v=20260624_karte1"></script>
-  <script src="assets/js/core/alerts.js?v=20260624_karte1"></script>
-  <script src="assets/js/core/weather.js?v=20260624_karte1"></script>
-  <script src="assets/js/core/pwa.js?v=20260624_karte1"></script>
-  <script src="assets/js/screens/home.js?v=20260624_karte1"></script>
-  <script src="assets/js/screens/calendar.js?v=20260624_karte1"></script>
-  <script src="assets/js/screens/bottom-sheet.js?v=20260624_karte1"></script>
-  <script src="assets/js/screens/recipes.js?v=20260624_karte1"></script>
-  <script src="assets/js/screens/fields.js?v=20260624_karte1"></script>
-  <script src="assets/js/screens/field-work.js?v=20260624_karte1"></script>
-  <script src="assets/js/screens/growth.js?v=20260624_karte1"></script>
-  <script src="assets/js/screens/dry-period.js?v=20260624_karte1"></script>
-  <script src="assets/js/screens/irrigation.js?v=20260624_karte1"></script>
-  <script src="assets/js/screens/photos.js?v=20260624_karte1"></script>
-  <script src="assets/js/screens/other-work.js?v=20260624_karte1"></script>
-  <script src="assets/js/screens/annual.js?v=20260624_karte1"></script>
-  <script src="assets/js/screens/materials.js?v=20260624_karte1"></script>
-  <script src="assets/js/screens/results.js?v=20260624_karte1"></script>
-  <script src="assets/js/screens/data.js?v=20260624_karte1"></script>
-  <script src="assets/js/app.js?v=20260624_karte1"></script>
+  <script src="assets/js/core/utils.js?v=20260624_karte2"></script>
+  <script src="assets/js/core/schema.js?v=20260624_karte2"></script>
+  <script src="assets/js/core/storage.js?v=20260624_karte2"></script>
+  <script src="assets/js/core/state.js?v=20260624_karte2"></script>
+  <script src="assets/js/core/calendar.js?v=20260624_karte2"></script>
+  <script src="assets/js/core/alerts.js?v=20260624_karte2"></script>
+  <script src="assets/js/core/weather.js?v=20260624_karte2"></script>
+  <script src="assets/js/core/pwa.js?v=20260624_karte2"></script>
+  <script src="assets/js/screens/home.js?v=20260624_karte2"></script>
+  <script src="assets/js/screens/calendar.js?v=20260624_karte2"></script>
+  <script src="assets/js/screens/bottom-sheet.js?v=20260624_karte2"></script>
+  <script src="assets/js/screens/recipes.js?v=20260624_karte2"></script>
+  <script src="assets/js/screens/fields.js?v=20260624_karte2"></script>
+  <script src="assets/js/screens/field-work.js?v=20260624_karte2"></script>
+  <script src="assets/js/screens/growth.js?v=20260624_karte2"></script>
+  <script src="assets/js/screens/dry-period.js?v=20260624_karte2"></script>
+  <script src="assets/js/screens/irrigation.js?v=20260624_karte2"></script>
+  <script src="assets/js/screens/photos.js?v=20260624_karte2"></script>
+  <script src="assets/js/screens/other-work.js?v=20260624_karte2"></script>
+  <script src="assets/js/screens/annual.js?v=20260624_karte2"></script>
+  <script src="assets/js/screens/materials.js?v=20260624_karte2"></script>
+  <script src="assets/js/screens/results.js?v=20260624_karte2"></script>
+  <script src="assets/js/screens/data.js?v=20260624_karte2"></script>
+  <script src="assets/js/app.js?v=20260624_karte2"></script>
 </body>
 </html>
