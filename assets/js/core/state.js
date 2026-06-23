@@ -143,6 +143,18 @@
           if (fieldIndex >= 0) d.fields[fieldIndex].plantingDate = normalized.date;
         });
       }
+      if (normalized.workName === "中干し開始") {
+        normalized.fieldIds.forEach((fieldId) => {
+          const fieldIndex = d.fields.findIndex((f) => f.fieldId === fieldId);
+          if (fieldIndex >= 0 && !d.fields[fieldIndex].drainageStartDate) d.fields[fieldIndex].drainageStartDate = normalized.date;
+        });
+      }
+      if (normalized.workName === "中干し終了") {
+        normalized.fieldIds.forEach((fieldId) => {
+          const fieldIndex = d.fields.findIndex((f) => f.fieldId === fieldId);
+          if (fieldIndex >= 0 && !d.fields[fieldIndex].intermittentStartDate) d.fields[fieldIndex].intermittentStartDate = normalized.date;
+        });
+      }
     }, "圃場作業を保存しました");
   }
 
@@ -155,13 +167,15 @@
   function saveGrowthLog(record) {
     mutate((d) => {
       const date = record.date || U.today();
+      const leafColorScore = String(record.leafColorScore || RiceOS.schema.leafColorScoreFromText(record.leafColor || ""));
       const normalized = {
         logId: record.logId || U.id("growth", date),
         type: "growthLog",
         date,
         season: U.season(date),
         fieldId: record.fieldId || "",
-        leafColor: record.leafColor || "-",
+        leafColorScore,
+        leafColor: leafColorScore ? RiceOS.schema.leafColorLabel(leafColorScore) : (record.leafColor || "-"),
         weed: record.weed || "-",
         gas: record.gas || "-",
         water: record.water || "-",
@@ -257,6 +271,28 @@
     }, "天気取得位置を保存しました");
   }
 
+  function markJsonExported() {
+    mutate((d) => {
+      d.meta = d.meta || {};
+      d.meta.lastJsonExportAt = U.now();
+    }, "JSONバックアップ日を記録しました");
+  }
+
+  function markNotificationCheck() {
+    mutate((d) => {
+      d.meta = d.meta || {};
+      d.meta.lastNotificationCheck = U.today();
+    }, "通知確認日を記録しました");
+  }
+
+  function undoLastSave() {
+    const restored = storage.restoreBackup();
+    if (!restored) return null;
+    cache = restored;
+    emit("直前バックアップに戻しました");
+    return cache;
+  }
+
   function fieldWorksFor(fieldId) {
     return data().fieldWorks.filter((w) => (w.fieldIds || []).includes(fieldId));
   }
@@ -296,6 +332,9 @@
     saveMaterial,
     saveResult,
     updateWeatherLocation,
+    markJsonExported,
+    markNotificationCheck,
+    undoLastSave,
     fieldWorksFor,
     growthLogsFor,
     lastFieldWork,

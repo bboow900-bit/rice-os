@@ -46,6 +46,10 @@
     varietyId: "",
     areaA: 0,
     plantingDate: "",
+    drainageStartDate: "",
+    drainageTargetDays: "7",
+    intermittentStartDate: "",
+    intermittentIntervalDays: "3",
     fixedMemo: "",
     memo: "",
     status: "使用中",
@@ -172,6 +176,13 @@
 
   const MATERIAL_CATEGORIES = ["肥料", "除草剤", "防除", "種籾", "育苗", "燃料", "袋・出荷", "その他"];
   const GROWTH_LEVELS = ["-", "少ない", "普通", "多い", "注意"];
+  const LEAF_COLOR_LEVELS = [
+    { value: "1", label: "1 薄い", text: "薄い", tone: "bad" },
+    { value: "2", label: "2 やや薄い", text: "やや薄い", tone: "warn" },
+    { value: "3", label: "3 標準", text: "標準", tone: "ok" },
+    { value: "4", label: "4 やや濃い", text: "やや濃い", tone: "info" },
+    { value: "5", label: "5 濃い", text: "濃い", tone: "purple" }
+  ];
   const WATER_LEVELS = ["-", "浅水", "普通", "深水", "落水", "干し気味", "水不足"];
 
   function canonicalId(prefix, value, fallbackName) {
@@ -208,8 +219,31 @@
     f.varietyId = String(f.varietyId || fallbackVarietyId || "");
     f.areaA = U.number(f.areaA, 0);
     f.status = String(f.status || "使用中");
+    f.drainageStartDate = String(f.drainageStartDate || "");
+    f.drainageTargetDays = String(f.drainageTargetDays || "");
+    f.intermittentStartDate = String(f.intermittentStartDate || "");
+    f.intermittentIntervalDays = String(f.intermittentIntervalDays || "");
     f.sortOrder = U.number(f.sortOrder, index * 10);
     return f;
+  }
+
+  function leafColorScoreFromText(value) {
+    const text = String(value || "").trim();
+    if (!text || text === "-") return "";
+    const numeric = text.match(/[1-5]/);
+    if (numeric) return numeric[0];
+    if (text.includes("やや薄")) return "2";
+    if (text.includes("薄")) return "1";
+    if (text.includes("標準") || text.includes("普通")) return "3";
+    if (text.includes("やや濃")) return "4";
+    if (text.includes("濃") || text.includes("多い")) return "5";
+    if (text.includes("注意")) return "5";
+    return "";
+  }
+
+  function leafColorLabel(score) {
+    const found = LEAF_COLOR_LEVELS.find((level) => String(level.value) === String(score));
+    return found ? found.label : "-";
   }
 
   function normalizeFieldWork(input) {
@@ -237,13 +271,15 @@
   function normalizeGrowthLog(input) {
     const g = input || {};
     const date = String(g.date || U.today());
+    const leafColorScore = String(g.leafColorScore || leafColorScoreFromText(g.leafColor || g.leaf));
     return {
       logId: String(g.logId || g.id || U.id("growth", date)),
       type: "growthLog",
       date,
       season: U.number(g.season, U.season(date)),
       fieldId: String(g.fieldId || ""),
-      leafColor: String(g.leafColor || g.leaf || "-"),
+      leafColorScore,
+      leafColor: leafColorScore ? leafColorLabel(leafColorScore) : String(g.leafColor || g.leaf || "-"),
       weed: String(g.weed || "-"),
       gas: String(g.gas || "-"),
       water: String(g.water || "-"),
@@ -390,6 +426,8 @@
         createdAt: source.meta && source.meta.createdAt || source.createdAt || U.now(),
         updatedAt: U.now(),
         importedFrom: source.meta && source.meta.importedFrom || source.importedFrom || "",
+        lastJsonExportAt: source.meta && source.meta.lastJsonExportAt || "",
+        lastNotificationCheck: source.meta && source.meta.lastNotificationCheck || "",
         weatherLocation: source.meta && source.meta.weatherLocation || source.weatherLocation || null
       }
     };
@@ -429,7 +467,10 @@
     OTHER_WORK_NAMES,
     MATERIAL_CATEGORIES,
     GROWTH_LEVELS,
+    LEAF_COLOR_LEVELS,
     WATER_LEVELS,
+    leafColorLabel,
+    leafColorScoreFromText,
     normalize,
     emptyData,
     phase

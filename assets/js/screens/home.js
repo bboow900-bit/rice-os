@@ -102,10 +102,11 @@
     const thisYearWorks = data.fieldWorks.filter((w) => U.number(w.season) === year);
     const hours = thisYearWorks.reduce((sum, w) => sum + U.parseWorkHours(w.hours), 0);
     const area = state.fields().reduce((sum, f) => sum + U.number(f.areaA), 0);
+    const alertCount = RiceOS.alerts.todayFocusItems().filter((item) => ["urgent", "warn"].includes(item.priority)).length;
     U.$("homeKpis").innerHTML = [
       ["管理面積", `${Math.round(area * 10) / 10}a`, "ok"],
       ["圃場", `${state.fields().length}枚`, "info"],
-      ["品種", `${state.varieties().length}品種`, "purple"],
+      ["今日の注意", `${alertCount}件`, alertCount ? "bad" : "purple"],
       ["今年の作業時間", U.formatHours(hours), "warn"]
     ].map(([label, value, tone]) => `
       <div class="kpi">
@@ -121,7 +122,8 @@
     const lastWork = state.lastFieldWork(field.fieldId);
     const lastGrowth = state.lastGrowthLog(field.fieldId);
     const diag = diagnosisFor(field);
-    const lastYear = lastYearRows(field.fieldId);
+    const komume = RiceOS.alerts.komumeForField(field, diag);
+    const lastYear = komume.lastYear.length ? komume.lastYear : lastYearRows(field.fieldId);
     const skipCount = diag.filter((item) => item.skip).length;
 
     return `
@@ -138,9 +140,24 @@
               <span class="pill">${U.escapeHTML(field.status || "使用中")}</span>
             </div>
           </div>
-          <span class="pill ${skipCount ? "purple" : "ok"}">${skipCount ? `除外${skipCount}` : "通常"}</span>
+          <span class="pill ${komume.tone}">${U.escapeHTML(komume.priorityLabel)}</span>
         </div>
         <div class="field-card-body diagnosis">
+          <div class="diag-block komume-opinion">
+            <b>小梅の見立て</b>
+            <div class="opinion-text">${U.escapeHTML(komume.opinion)}</div>
+            <div class="mini-note">
+              ${komume.notes.slice(1, 3).map((note) => `<span>${U.escapeHTML(note)}</span>`).join("")}
+            </div>
+          </div>
+          <div class="diag-block">
+            <b>今日やること</b>
+            ${komume.doNow.length ? komume.doNow.slice(0, 4).map((item) => `<span class="pill warn">${U.escapeHTML(item)}</span>`).join("") : '<span class="pill ok">急ぎなし</span>'}
+          </div>
+          <div class="diag-block">
+            <b>水管理</b>
+            ${komume.water.length ? komume.water.map((item) => `<div class="water-alert ${U.attr(item.priority)}"><b>${U.escapeHTML(item.title)}</b><span>${U.escapeHTML(item.message)}</span></div>`).join("") : '<span class="pill">水管理予定なし</span>'}
+          </div>
           <div class="diag-block">
             <b>固定メモ</b>
             <div>${fixedMemoPills(field)}</div>
@@ -155,11 +172,13 @@
                 </div>
               `).join("")}
             </div>
+            ${komume.avoid.length ? `<div class="avoid-list"><b>固定メモで除外</b>${komume.avoid.map((item) => `<span class="pill">${U.escapeHTML(item)}</span>`).join("")}</div>` : ""}
           </div>
           <div class="diag-block">
             <b>直近</b>
             <span class="pill info">作業 ${lastWork ? `${U.fd(lastWork.date)} ${lastWork.workName}` : "なし"}</span>
             <span class="pill purple">生育 ${lastGrowth ? `${U.fd(lastGrowth.date)} 葉色:${lastGrowth.leafColor}` : "なし"}</span>
+            ${komume.leafScore ? `<span class="leaf-meter tone-${U.attr(komume.leafTone)}"><span style="width:${U.attr(String(U.number(komume.leafScore, 0) * 20))}%"></span></span>` : ""}
           </div>
           <div class="diag-block">
             <b>去年同時期</b>
@@ -170,6 +189,7 @@
           <button class="secondary" data-home-action="field" data-field-id="${U.attr(field.fieldId)}">カルテ編集</button>
           <button class="secondary" data-home-action="work" data-field-id="${U.attr(field.fieldId)}">作業入力</button>
           <button class="secondary" data-home-action="growth" data-field-id="${U.attr(field.fieldId)}">生育入力</button>
+          <button class="secondary" data-home-action="calendar" data-field-id="${U.attr(field.fieldId)}">水予定</button>
         </div>
       </article>
     `;
@@ -177,11 +197,25 @@
 
   function render() {
     renderKpis();
+    renderTodayFocus();
     const fields = state.activeFields();
     U.$("homeSummary").textContent = `${fields.length}圃場`;
     U.$("komumeCards").innerHTML = fields.length
       ? fields.map(renderCard).join("")
       : '<div class="empty">使用中の圃場がありません。</div>';
+  }
+
+  function renderTodayFocus() {
+    const el = U.$("todayFocus");
+    if (!el) return;
+    const items = RiceOS.alerts.todayFocusItems().slice(0, 8);
+    el.innerHTML = items.length ? items.map((item) => `
+      <div class="focus-item ${U.attr(item.priority)}">
+        <span class="pill ${U.attr(RiceOS.alerts.toneForPriority(item.priority))}">${U.escapeHTML(RiceOS.alerts.priorityLabel(item.priority))}</span>
+        <b>${U.escapeHTML(item.fieldName || item.title)}</b>
+        <span>${U.escapeHTML(item.message)}</span>
+      </div>
+    `).join("") : '<div class="empty">今日の水管理アラートや記録漏れはありません。</div>';
   }
 
   function bind() {
@@ -198,6 +232,10 @@
       if (action === "growth") {
         RiceOS.app.show("growth");
         RiceOS.screens.growth.prefillField(fieldId);
+      }
+      if (action === "calendar") {
+        const field = state.field(fieldId);
+        if (field) RiceOS.alerts.downloadFieldCalendar(field);
       }
     });
   }

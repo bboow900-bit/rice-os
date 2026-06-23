@@ -44,6 +44,18 @@
     return "";
   }
 
+  function learnedPreset(workName) {
+    const recent = state.data().fieldWorks
+      .filter((work) => work.workName === workName)
+      .sort((a, b) => String(b.date).localeCompare(String(a.date)))[0];
+    if (!recent) return {};
+    return {
+      machine: recent.machine || "",
+      material: recent.material || "",
+      amount: recent.amount || ""
+    };
+  }
+
   function setAutoValue(id, value) {
     const el = U.$(id);
     if (!value || !el) return;
@@ -55,8 +67,10 @@
 
   function applyWorkPreset(workName) {
     const preset = WORK_PRESETS[workName] || {};
-    setAutoValue("fwMachine", preset.machine || "");
-    setAutoValue("fwMaterial", recommendedMaterial(workName));
+    const learned = learnedPreset(workName);
+    setAutoValue("fwMachine", preset.machine || learned.machine || "");
+    setAutoValue("fwMaterial", recommendedMaterial(workName) || learned.material || "");
+    setAutoValue("fwAmount", learned.amount || "");
   }
 
   function prefillWorkName(workName) {
@@ -131,6 +145,7 @@
           </div>
           <div class="record-actions">
             <button class="secondary" data-work-action="edit" data-id="${U.attr(work.workId)}">編集</button>
+            <button class="secondary" data-work-action="duplicate" data-id="${U.attr(work.workId)}">複製</button>
             <button class="danger" data-work-action="delete" data-id="${U.attr(work.workId)}">削除</button>
           </div>
         </article>
@@ -274,6 +289,22 @@
       if (!work) return;
       if (button.dataset.workAction === "delete") {
         if (confirm("この圃場作業を削除しますか？")) state.deleteFieldWork(id);
+        return;
+      }
+      if (button.dataset.workAction === "duplicate") {
+        resetForm();
+        U.$("fieldWorkHeading").textContent = "圃場作業を複製";
+        U.$("fwDate").value = U.today();
+        U.$("fwName").value = work.workName;
+        U.$("fwHours").value = work.hours || "";
+        U.$("fwMachine").value = work.machine || "";
+        U.$("fwMaterial").value = work.material || "";
+        U.$("fwAmount").value = work.amount || "";
+        U.$("fwWeather").value = "";
+        U.$("fwWeatherAutoJson").value = "";
+        U.$("fwMemo").value = work.memo || "";
+        setSelectedFieldIds(work.fieldIds || []);
+        window.scrollTo({ top: 0, behavior: "smooth" });
         return;
       }
       U.$("fieldWorkHeading").textContent = "圃場作業を編集";

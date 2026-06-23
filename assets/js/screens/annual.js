@@ -63,11 +63,54 @@
   function filterRows(rows) {
     const year = U.$("annualYear").value || String(new Date().getFullYear());
     const fieldId = U.$("annualField").value || "all";
+    const kind = U.$("annualKind").value || "all";
     return rows.filter((row) => {
       const yearOk = year === "all" || String(row.season) === String(year);
       const fieldOk = fieldId === "all" || (row.fieldIds || []).includes(fieldId);
-      return yearOk && fieldOk;
+      const kindOk = kind === "all" || row.kind === kind;
+      return yearOk && fieldOk && kindOk;
     });
+  }
+
+  function compactFieldLabel(rows) {
+    const names = Array.from(new Set(rows.flatMap((row) => (row.fieldIds || []).map((id) => state.field(id) && state.field(id).name).filter(Boolean))));
+    if (!names.length) return "圃場なし";
+    if (names.length <= 3) return names.join("・");
+    return `${names.slice(0, 3).join("・")} ほか${names.length - 3}`;
+  }
+
+  function renderCompactRow(row) {
+    const dap = row.kind === "fieldWork" || row.kind === "growth" ? workDap(row.fieldIds, row.date) : "";
+    return `
+      <div class="compact-history-row ${U.attr(row.kind)}">
+        <b>${U.escapeHTML(row.name)}</b>
+        <span>${U.escapeHTML(row.target || "対象なし")}</span>
+        ${row.hours ? `<span class="pill warn">時間 ${U.escapeHTML(row.hours)}</span>` : ""}
+        ${dap ? `<span class="pill purple">${U.escapeHTML(dap)}</span>` : ""}
+        ${row.detail ? `<small>${U.escapeHTML(row.detail)}</small>` : ""}
+      </div>
+    `;
+  }
+
+  function renderCompactTimeline(rows) {
+    const groups = new Map();
+    rows.forEach((row) => {
+      const key = row.date || "date-none";
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(row);
+    });
+    return Array.from(groups.entries()).map(([date, items], index) => `
+      <details class="day-group" ${index < 3 ? "open" : ""}>
+        <summary>
+          <b>${U.escapeHTML(U.fd(date) || date)}</b>
+          <span class="pill info">${items.length}件</span>
+          <span class="muted">${U.escapeHTML(compactFieldLabel(items))}</span>
+        </summary>
+        <div class="day-group-body">
+          ${items.map(renderCompactRow).join("")}
+        </div>
+      </details>
+    `).join("");
   }
 
   function renderRow(row) {
@@ -94,6 +137,7 @@
   }
 
   function renderTimeline(rows) {
+    if ((U.$("annualView").value || "compact") === "compact") return renderCompactTimeline(rows);
     let currentMonth = "";
     let currentPhase = "";
     return rows.map((row) => {
@@ -127,7 +171,7 @@
           <h3>去年同時期</h3>
           <span class="muted">${U.escapeHTML(U.fd(range.start))} - ${U.escapeHTML(U.fd(range.end))}</span>
         </div>
-        ${same.length ? same.map(renderRow).join("") : '<div class="empty">去年同時期の記録はありません。</div>'}
+        ${same.length ? renderCompactTimeline(same) : '<div class="empty">去年同時期の記録はありません。</div>'}
       </div>
     `;
   }
@@ -138,6 +182,16 @@
     const sorted = Array.from(years).sort((a, b) => Number(b) - Number(a));
     U.setOptions(U.$("annualYear"), [{ value: "all", label: "すべて" }, ...sorted.map((year) => ({ value: year, label: year }))], U.$("annualYear").value || String(new Date().getFullYear()));
     U.setOptions(U.$("annualField"), [{ value: "all", label: "全圃場" }, ...state.fields().map((field) => ({ value: field.fieldId, label: field.name }))], U.$("annualField").value || "all");
+    U.setOptions(U.$("annualKind"), [
+      { value: "all", label: "すべて" },
+      { value: "fieldWork", label: "圃場作業" },
+      { value: "growth", label: "生育ログ" },
+      { value: "other", label: "その他作業" }
+    ], U.$("annualKind").value || "all");
+    U.setOptions(U.$("annualView"), [
+      { value: "compact", label: "日付で折りたたみ" },
+      { value: "detail", label: "詳細一覧" }
+    ], U.$("annualView").value || "compact");
   }
 
   function render() {
@@ -149,7 +203,7 @@
   }
 
   function bind() {
-    ["annualYear", "annualField", "showLastYear"].forEach((id) => U.$(id).addEventListener("change", render));
+    ["annualYear", "annualField", "annualKind", "annualView", "showLastYear"].forEach((id) => U.$(id).addEventListener("change", render));
   }
 
   RiceOS.screens = RiceOS.screens || {};

@@ -135,7 +135,8 @@
       otherWorks: d.otherWorks.length,
       materials: d.materials.length,
       varietyResults: d.varietyResults.length,
-      updatedAt: d.meta && d.meta.updatedAt || ""
+      updatedAt: d.meta && d.meta.updatedAt || "",
+      lastJsonExportAt: d.meta && d.meta.lastJsonExportAt || ""
     };
   }
 

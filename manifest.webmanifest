@@ -3,7 +3,7 @@
   "short_name": "稲作OS",
   "description": "圃場カルテ、小梅アシスタント、作業入力、生育ログ、年間履歴を管理する稲作管理アプリ。",
   "lang": "ja",
-  "start_url": "index.html?v=20260623_pwa1&source=pwa",
+  "start_url": "index.html?v=20260623_all1&source=pwa",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",

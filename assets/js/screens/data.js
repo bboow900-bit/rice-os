@@ -22,7 +22,8 @@
       ["圃場作業", `${info.fieldWorks}件`],
       ["生育ログ", `${info.growthLogs}件`],
       ["その他作業", `${info.otherWorks}件`],
-      ["資材/結果", `${info.materials}/${info.varietyResults}`]
+      ["資材/結果", `${info.materials}/${info.varietyResults}`],
+      ["最終JSON保存", info.lastJsonExportAt ? U.fd(String(info.lastJsonExportAt).slice(0, 10)) : "記録なし"]
     ].map(([label, value]) => `
       <div class="kpi">
         <div class="label">${U.escapeHTML(label)}</div>
@@ -75,10 +76,18 @@
   }
 
   function bind() {
-    document.querySelector('[data-action="export-json"]').addEventListener("click", () => storage.exportJson(state.data()));
+    document.querySelector('[data-action="export-json"]').addEventListener("click", () => {
+      state.markJsonExported();
+      storage.exportJson(state.data());
+    });
     document.querySelector('[data-action="import-json"]').addEventListener("click", importJson);
     document.querySelector('[data-action="import-legacy"]').addEventListener("click", importLegacy);
     document.querySelector('[data-action="restore-backup"]').addEventListener("click", restoreBackup);
+    document.querySelector('[data-action="undo-last-save"]').addEventListener("click", () => {
+      if (!confirm("直前バックアップへ戻しますか？")) return;
+      const restored = state.undoLastSave();
+      if (!restored) alert("直前バックアップがありません。");
+    });
   }
 
   RiceOS.screens = RiceOS.screens || {};

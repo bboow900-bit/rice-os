@@ -11,7 +11,7 @@
     U.$("editGrowthId").value = "";
     U.$("gDate").value = U.today();
     if (state.activeFields()[0]) U.$("gField").value = state.activeFields()[0].fieldId;
-    U.$("gLeaf").value = "-";
+    U.$("gLeaf").value = "3";
     U.$("gWeed").value = "-";
     U.$("gGas").value = "-";
     U.$("gWater").value = "-";
@@ -30,7 +30,7 @@
 
   function renderOptions() {
     U.setOptions(U.$("gField"), state.activeFields().map((f) => ({ value: f.fieldId, label: f.name })), U.$("gField").value);
-    U.setOptions(U.$("gLeaf"), S.GROWTH_LEVELS, U.$("gLeaf").value || "-");
+    U.setOptions(U.$("gLeaf"), S.LEAF_COLOR_LEVELS.map((level) => ({ value: level.value, label: level.label })), U.$("gLeaf").value || "3");
     U.setOptions(U.$("gWeed"), S.GROWTH_LEVELS, U.$("gWeed").value || "-");
     U.setOptions(U.$("gGas"), S.GROWTH_LEVELS, U.$("gGas").value || "-");
     U.setOptions(U.$("gWater"), S.WATER_LEVELS, U.$("gWater").value || "-");
@@ -42,10 +42,12 @@
     U.$("growthTimeline").innerHTML = rows.length ? rows.map((log) => {
       const field = state.field(log.fieldId);
       const dap = U.daysAfterPlanting(field, log.date);
+      const leafScore = RiceOS.alerts.leafScore(log);
       return `
         <div class="timeline-item growth">
           <b>${U.escapeHTML(U.fd(log.date))} ${U.escapeHTML(field && field.name || "")}</b>
           ${dap !== "" ? `<span class="pill warn">田植後${U.escapeHTML(String(dap))}日</span>` : ""}
+          ${leafScore ? `<span class="leaf-meter tone-${U.attr(RiceOS.alerts.leafTone(leafScore))}" title="葉色${U.attr(S.leafColorLabel(leafScore))}"><span style="width:${U.attr(String(U.number(leafScore, 0) * 20))}%"></span></span>` : ""}
           ${log.photoData ? '<span class="pill info">写真あり</span>' : log.photo ? '<span class="pill info">写真メモあり</span>' : ""}
           <br>
           <span class="muted">葉色:${U.escapeHTML(log.leafColor)} / 雑草:${U.escapeHTML(log.weed)} / ガス:${U.escapeHTML(log.gas)} / 水:${U.escapeHTML(log.water)}</span>
@@ -71,7 +73,7 @@
     U.$("editGrowthId").value = log.logId;
     U.$("gDate").value = log.date;
     U.$("gField").value = log.fieldId;
-    U.$("gLeaf").value = log.leafColor || "-";
+    U.$("gLeaf").value = log.leafColorScore || S.leafColorScoreFromText(log.leafColor) || "3";
     U.$("gWeed").value = log.weed || "-";
     U.$("gGas").value = log.gas || "-";
     U.$("gWater").value = log.water || "-";
@@ -110,7 +112,8 @@
         logId: U.$("editGrowthId").value,
         date: U.$("gDate").value,
         fieldId: U.$("gField").value,
-        leafColor: U.$("gLeaf").value,
+        leafColorScore: U.$("gLeaf").value,
+        leafColor: S.leafColorLabel(U.$("gLeaf").value),
         weed: U.$("gWeed").value,
         gas: U.$("gGas").value,
         water: U.$("gWater").value,

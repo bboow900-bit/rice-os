@@ -87,6 +87,25 @@
       if (RiceOS.pwa) RiceOS.pwa.promptInstall();
     });
 
+    U.$$('[data-action="enable-notifications"]').forEach((button) => {
+      button.addEventListener("click", async () => {
+        if (!RiceOS.pwa) return;
+        const ok = await RiceOS.pwa.requestNotifications();
+        if (ok && RiceOS.alerts) {
+          const count = await RiceOS.pwa.notifyDueAlerts(RiceOS.alerts.notificationAlerts());
+          U.toast(count ? `${count}件の通知を出しました` : "通知を有効にしました");
+        }
+      });
+    });
+
+    const updateButton = document.querySelector('[data-action="force-update"]');
+    if (updateButton) {
+      updateButton.addEventListener("click", () => {
+        if (RiceOS.pwa) RiceOS.pwa.forceUpdate();
+        else location.reload();
+      });
+    }
+
     U.$$("[data-jump-screen]").forEach((button) => {
       button.addEventListener("click", () => show(button.dataset.jumpScreen));
     });
@@ -118,10 +137,12 @@
     window.addEventListener("riceos:datachange", (event) => {
       markSaved(event.detail && event.detail.message);
       renderAll();
+      if (RiceOS.pwa && RiceOS.alerts) RiceOS.pwa.notifyDueAlerts(RiceOS.alerts.notificationAlerts());
       U.toast(event.detail && event.detail.message || "保存しました");
     });
     initializeFormDefaults();
     show(activeScreen);
+    if (RiceOS.pwa && RiceOS.alerts) RiceOS.pwa.notifyDueAlerts(RiceOS.alerts.notificationAlerts());
     markSaved("保存準備完了");
   }
 

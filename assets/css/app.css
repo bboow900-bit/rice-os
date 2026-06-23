@@ -1061,6 +1061,139 @@ label {
   background: #f4f5f1;
 }
 
+.today-focus {
+  display: grid;
+  gap: 8px;
+}
+
+.focus-item,
+.water-alert,
+.compact-history-row {
+  display: grid;
+  gap: 4px;
+  padding: 10px;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(31, 48, 37, 0.08);
+}
+
+.focus-item.urgent,
+.water-alert.urgent {
+  background: var(--red-soft);
+}
+
+.focus-item.warn,
+.water-alert.warn {
+  background: var(--amber-soft);
+}
+
+.focus-item.watch,
+.water-alert.watch {
+  background: var(--blue-soft);
+}
+
+.komume-opinion {
+  background: linear-gradient(135deg, #fff, #f3fff3);
+}
+
+.opinion-text {
+  color: #243726;
+  font-weight: 850;
+  line-height: 1.55;
+}
+
+.mini-note,
+.avoid-list {
+  display: grid;
+  gap: 4px;
+  margin-top: 7px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.leaf-meter {
+  display: inline-flex;
+  width: 74px;
+  height: 16px;
+  margin: 4px 6px 2px 0;
+  border-radius: 999px;
+  background: #eef2eb;
+  vertical-align: middle;
+  overflow: hidden;
+}
+
+.leaf-meter span {
+  display: block;
+  min-width: 10%;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--primary);
+}
+
+.leaf-meter.tone-bad span {
+  background: var(--red);
+}
+
+.leaf-meter.tone-warn span {
+  background: #d5a900;
+}
+
+.leaf-meter.tone-info span {
+  background: var(--blue);
+}
+
+.leaf-meter.tone-purple span {
+  background: var(--purple);
+}
+
+.record-actions.single-action {
+  grid-template-columns: 1fr;
+}
+
+.day-group {
+  border: 0;
+  border-radius: 22px;
+  background: #fff;
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.day-group summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 12px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.day-group summary::-webkit-details-marker {
+  display: none;
+}
+
+.day-group summary::before {
+  content: "▶";
+  color: var(--primary-dark);
+  font-size: 12px;
+}
+
+.day-group[open] summary::before {
+  content: "▼";
+}
+
+.day-group-body {
+  display: grid;
+  gap: 8px;
+  padding: 0 12px 12px;
+}
+
+.compact-history-row small {
+  color: var(--muted);
+  line-height: 1.45;
+}
+
 .timeline {
   gap: 8px;
   border-left: 6px solid #62c877;
@@ -1598,5 +1731,4 @@ label {
   #dataSnapshot {
     min-height: 220px;
   }
-}
 }

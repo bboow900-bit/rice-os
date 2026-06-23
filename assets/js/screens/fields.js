@@ -44,6 +44,10 @@
               <select data-field-id="${U.attr(field.fieldId)}" data-field-field="status">${statusOptions(field.status)}</select>
             </label>
             ${input(field, "plantingDate", "田植日", "date")}
+            ${input(field, "drainageStartDate", "中干し開始日", "date")}
+            ${input(field, "drainageTargetDays", "中干し目安日数", "number")}
+            ${input(field, "intermittentStartDate", "間断灌水開始日", "date")}
+            ${input(field, "intermittentIntervalDays", "間断灌水の確認間隔（日）", "number")}
             ${input(field, "sortOrder", "表示順", "number")}
             ${input(field, "waterHabit", "水の癖")}
             ${input(field, "weedRisk", "雑草の癖")}
@@ -54,6 +58,9 @@
               <textarea data-field-id="${U.attr(field.fieldId)}" data-field-field="memo">${U.escapeHTML(field.memo || "")}</textarea>
             </label>
           </div>
+        </div>
+        <div class="record-actions single-action">
+          <button class="secondary" type="button" data-field-action="calendar" data-field-id="${U.attr(field.fieldId)}">水管理をカレンダー登録</button>
         </div>
       </article>
     `;
@@ -70,6 +77,14 @@
       const key = el.dataset.fieldField;
       const value = ["areaA", "sortOrder"].includes(key) ? U.number(el.value, 0) : el.value;
       state.updateField(el.dataset.fieldId, { [key]: value });
+    });
+
+    U.$("fieldList").addEventListener("click", (event) => {
+      const button = event.target.closest("[data-field-action]");
+      if (!button) return;
+      const field = state.field(button.dataset.fieldId);
+      if (!field) return;
+      if (button.dataset.fieldAction === "calendar") RiceOS.alerts.downloadFieldCalendar(field);
     });
   }
 
