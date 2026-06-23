@@ -78,13 +78,16 @@
       show("fields");
     });
 
-    document.querySelector('[data-action="refresh-home"]').addEventListener("click", () => {
-      RiceOS.screens.home.render();
-      U.toast("更新しました");
-    });
-
-    document.querySelector('[data-action="install-pwa"]').addEventListener("click", () => {
-      if (RiceOS.pwa) RiceOS.pwa.promptInstall();
+    document.addEventListener("click", (event) => {
+      const action = event.target.closest("[data-action]");
+      if (!action) return;
+      if (action.dataset.action === "refresh-home") {
+        RiceOS.screens.home.render();
+        U.toast("更新しました");
+      }
+      if (action.dataset.action === "install-pwa" && RiceOS.pwa) {
+        RiceOS.pwa.promptInstall();
+      }
     });
 
     U.$$('[data-action="enable-notifications"]').forEach((button) => {
