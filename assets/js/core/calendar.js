@@ -83,7 +83,7 @@
         record: x
       });
     });
-    (d.dryPeriods || []).filter((x) => x.date === date || x.startDate === date || x.endDate === date).forEach((x) => {
+    (d.dryPeriods || []).filter((x) => x.date === date || x.startDate === date || x.endDate === date || x.actualEndDate === date).forEach((x) => {
       entries.push({
         kind: "dry",
         tone: "water",
@@ -94,13 +94,13 @@
         record: x
       });
     });
-    (d.irrigations || []).filter((x) => x.date === date || x.startDate === date || x.endDate === date).forEach((x) => {
+    (d.irrigations || []).filter((x) => x.date === date || x.startDate === date || x.endDate === date || x.actualEndDate === date).forEach((x) => {
       entries.push({
         kind: "irrigation",
         tone: "water",
-        title: "間断灌水",
+        title: x.method || "間断灌水",
         subtitle: fieldName(x.fieldId),
-        memo: x.status || "",
+        memo: [x.periodStatus || "", x.status || ""].filter(Boolean).join(" / "),
         record: x
       });
     });
@@ -112,7 +112,8 @@
     const entries = [
       ...d.fieldWorks.map((x) => ({ date: x.date, title: x.workName, subtitle: fieldNames(x.fieldIds), kind: "work", record: x })),
       ...d.growthLogs.map((x) => ({ date: x.date, title: "生育ログ", subtitle: fieldName(x.fieldId), kind: "growth", hasPhoto: Boolean(x.photoData || x.photo), record: x })),
-      ...(d.dryPeriods || []).map((x) => ({ date: x.date, title: "中干し", subtitle: fieldName(x.fieldId), kind: "water", hasPhoto: Boolean(x.photoData || x.photo), record: x }))
+      ...(d.dryPeriods || []).map((x) => ({ date: x.date, title: "中干し", subtitle: fieldName(x.fieldId), kind: "water", hasPhoto: Boolean(x.photoData || x.photo), record: x })),
+      ...(d.irrigations || []).map((x) => ({ date: x.date, title: x.method || "間断灌水", subtitle: fieldName(x.fieldId), kind: "water", record: x }))
     ];
     return entries.sort((a, b) => String(b.date).localeCompare(String(a.date))).slice(0, limit || 6);
   }

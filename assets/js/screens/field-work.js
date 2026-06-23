@@ -99,11 +99,23 @@
     }).join("");
   }
 
+  function syncWorkerPreset() {
+    const value = U.$("fwWorker") ? U.$("fwWorker").value : "";
+    U.$$("[data-worker-preset]").forEach((button) => {
+      button.classList.toggle("active", button.dataset.workerPreset === value);
+    });
+  }
+
+  function setWorker(value) {
+    if (U.$("fwWorker")) U.$("fwWorker").value = value || "";
+    syncWorkerPreset();
+  }
+
   function resetForm() {
     U.$("fieldWorkHeading").textContent = "圃場作業入力";
     U.$("editFieldWorkId").value = "";
     U.$("fwDate").value = U.today();
-    if (U.$("fwWorker")) U.$("fwWorker").value = "自分";
+    setWorker("自分");
     U.$("fwName").value = "田植え";
     U.$("fwHours").value = "";
     U.$("fwMachine").value = "";
@@ -141,7 +153,7 @@
     U.$("editFieldWorkId").value = work.workId;
     U.$("fwDate").value = work.date;
     U.$("fwName").value = work.workName;
-    if (U.$("fwWorker")) U.$("fwWorker").value = work.worker || "";
+    setWorker(work.worker || "");
     U.$("fwHours").value = work.hours || "";
     U.$("fwMachine").value = work.machine || "";
     U.$("fwMaterial").value = work.material || "";
@@ -199,6 +211,7 @@
   function render() {
     U.setOptions(U.$("fwName"), S.FIELD_WORK_NAMES, U.$("fwName").value || "田植え");
     renderFieldCards();
+    syncWorkerPreset();
     renderList();
   }
 
@@ -288,6 +301,13 @@
     });
 
     U.$("fwName").addEventListener("change", () => applyWorkPreset(U.$("fwName").value));
+    U.$$("[data-worker-preset]").forEach((button) => {
+      button.addEventListener("click", () => setWorker(button.dataset.workerPreset));
+    });
+    if (U.$("fwWorker")) {
+      U.$("fwWorker").addEventListener("input", syncWorkerPreset);
+      U.$("fwWorker").addEventListener("change", syncWorkerPreset);
+    }
 
     if (U.$("fwPhotoFile")) {
       U.$("fwPhotoFile").addEventListener("change", async (event) => {
@@ -356,22 +376,22 @@
       if (button.dataset.workAction === "duplicate") {
         resetForm();
         U.$("fieldWorkHeading").textContent = "圃場作業を複製";
-      U.$("fwDate").value = U.today();
-      U.$("fwName").value = work.workName;
-      if (U.$("fwWorker")) U.$("fwWorker").value = work.worker || "自分";
-      U.$("fwHours").value = work.hours || "";
+        U.$("fwDate").value = U.today();
+        U.$("fwName").value = work.workName;
+        setWorker(work.worker || "自分");
+        U.$("fwHours").value = work.hours || "";
         U.$("fwMachine").value = work.machine || "";
         U.$("fwMaterial").value = work.material || "";
         U.$("fwAmount").value = work.amount || "";
-      U.$("fwWeather").value = "";
-      U.$("fwWeatherAutoJson").value = "";
-      if (U.$("fwPhoto")) U.$("fwPhoto").value = work.photo || "";
-      if (U.$("fwPhotoPreview")) {
-        U.$("fwPhotoPreview").dataset.photoData = work.photoData || "";
-        U.$("fwPhotoPreview").src = work.photoData || "";
-        U.$("fwPhotoPreview").classList.toggle("hidden", !work.photoData);
-      }
-      U.$("fwMemo").value = work.memo || "";
+        U.$("fwWeather").value = "";
+        U.$("fwWeatherAutoJson").value = "";
+        if (U.$("fwPhoto")) U.$("fwPhoto").value = work.photo || "";
+        if (U.$("fwPhotoPreview")) {
+          U.$("fwPhotoPreview").dataset.photoData = work.photoData || "";
+          U.$("fwPhotoPreview").src = work.photoData || "";
+          U.$("fwPhotoPreview").classList.toggle("hidden", !work.photoData);
+        }
+        U.$("fwMemo").value = work.memo || "";
         setSelectedFieldIds(work.fieldIds || []);
         window.scrollTo({ top: 0, behavior: "smooth" });
         return;
@@ -380,7 +400,7 @@
       U.$("editFieldWorkId").value = work.workId;
       U.$("fwDate").value = work.date;
       U.$("fwName").value = work.workName;
-      if (U.$("fwWorker")) U.$("fwWorker").value = work.worker || "";
+      setWorker(work.worker || "");
       U.$("fwHours").value = work.hours || "";
       U.$("fwMachine").value = work.machine || "";
       U.$("fwMaterial").value = work.material || "";

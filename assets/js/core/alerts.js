@@ -45,45 +45,90 @@
     return level ? level.tone : "";
   }
 
+  function isCompletedPeriod(record) {
+    return Boolean(record && (record.actualEndDate || record.status === "完了" || record.periodStatus === "完了"));
+  }
+
+  function latestByStart(records) {
+    return (records || []).slice().sort((a, b) => {
+      const left = String(b.startDate || b.date || "");
+      const right = String(a.startDate || a.date || "");
+      return left.localeCompare(right);
+    })[0] || null;
+  }
+
+  function periodEndAlert(field, options, today) {
+    const date = today || U.today();
+    const startDate = options.startDate || "";
+    const targetDays = U.number(options.targetDays, 0);
+    const endDate = options.endDate || (startDate && targetDays > 0 ? U.dateAddDays(startDate, targetDays) : "");
+    if (!startDate || !endDate) return null;
+    const remaining = U.daysBetween(date, endDate);
+    if (remaining === "") return null;
+    let priority = "watch";
+    let message = `${options.title}終了目安まであと${remaining}日`;
+    if (remaining === 1) {
+      priority = "warn";
+      message = `${options.title}終了目安は明日です`;
+    } else if (remaining === 0) {
+      priority = "urgent";
+      message = `今日が${options.title}終了目安です`;
+    } else if (remaining < 0) {
+      priority = "urgent";
+      message = `${options.title}終了目安を${Math.abs(remaining)}日過ぎています`;
+    } else if (remaining <= 3) {
+      priority = "warn";
+    }
+    return {
+      key: `${options.type}:${field.fieldId}:${endDate}:${startDate}`,
+      type: options.type,
+      fieldId: field.fieldId,
+      title: options.title,
+      message,
+      date: endDate,
+      remaining,
+      priority,
+      notify: remaining <= 1
+    };
+  }
+
   function waterAlertsForField(field, today) {
     const date = today || U.today();
     const alerts = [];
+    const d = state().data();
 
-    const drainageDays = U.number(field.drainageTargetDays, 0);
-    if (field.drainageStartDate && drainageDays > 0) {
-      const endDate = U.dateAddDays(field.drainageStartDate, drainageDays);
-      const remaining = U.daysBetween(date, endDate);
-      if (remaining !== "") {
-        let priority = "watch";
-        let message = `中干し終了目安まであと${remaining}日`;
-        if (remaining === 1) {
-          priority = "warn";
-          message = "中干し終了目安は明日です";
-        } else if (remaining === 0) {
-          priority = "urgent";
-          message = "今日が中干し終了目安です";
-        } else if (remaining < 0) {
-          priority = "urgent";
-          message = `中干し終了目安を${Math.abs(remaining)}日過ぎています`;
-        } else if (remaining <= 3) {
-          priority = "warn";
-        }
-        alerts.push({
-          key: `drainage:${field.fieldId}:${endDate}`,
-          type: "drainage",
-          fieldId: field.fieldId,
-          title: "中干し",
-          message,
-          date: endDate,
-          remaining,
-          priority,
-          notify: remaining <= 1
-        });
-      }
+    const latestDry = latestByStart((d.dryPeriods || []).filter((item) => item.fieldId === field.fieldId && item.startDate));
+    const drySource = latestDry || { startDate: field.drainageStartDate, targetDays: field.drainageTargetDays };
+    if (!isCompletedPeriod(latestDry)) {
+      const alert = periodEndAlert(field, {
+        type: "drainage",
+        title: "中干し",
+        startDate: drySource.startDate,
+        endDate: drySource.endDate,
+        targetDays: drySource.targetDays
+      }, date);
+      if (alert) alerts.push(alert);
     }
 
+    const irrigationRecords = (d.irrigations || []).filter((item) => item.fieldId === field.fieldId && item.startDate);
+    const latestIrrigation = latestByStart(irrigationRecords);
+    const activeIrrigations = irrigationRecords
+      .filter((item) => !isCompletedPeriod(item))
+      .sort((a, b) => String(a.startDate || a.date || "").localeCompare(String(b.startDate || b.date || "")));
+    activeIrrigations.forEach((item) => {
+      const title = item.method || "間断灌水";
+      const alert = periodEndAlert(field, {
+        type: item.method === "湿潤灌漑" ? "wet-irrigation" : "intermittent",
+        title,
+        startDate: item.startDate,
+        endDate: item.endDate,
+        targetDays: item.targetDays
+      }, date);
+      if (alert) alerts.push(alert);
+    });
+
     const intervalDays = U.number(field.intermittentIntervalDays, 0);
-    if (field.intermittentStartDate && intervalDays > 0) {
+    if (!activeIrrigations.length && !isCompletedPeriod(latestIrrigation) && field.intermittentStartDate && intervalDays > 0) {
       const elapsed = U.daysBetween(field.intermittentStartDate, date);
       if (elapsed !== "") {
         let nextDate = field.intermittentStartDate;

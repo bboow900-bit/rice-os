@@ -1151,6 +1151,79 @@ label {
   grid-template-columns: 1fr;
 }
 
+.worker-preset {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.chip-button {
+  min-height: 34px;
+  padding: 6px 8px;
+  border-color: var(--line-strong);
+  background: #f9fbf6;
+  font-size: 13px;
+}
+
+.chip-button.active {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: #fff;
+  box-shadow: 0 3px 10px rgba(47, 125, 82, 0.18);
+}
+
+#annualTimeline.timeline {
+  display: grid;
+  gap: 12px;
+  border-left: 0;
+  padding-left: 0;
+}
+
+.annual-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.annual-summary-card {
+  display: grid;
+  gap: 4px;
+  min-height: 72px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: var(--shadow);
+}
+
+.annual-summary-card span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.annual-summary-card b {
+  font-size: 21px;
+  line-height: 1.15;
+}
+
+.annual-summary-card.green {
+  background: linear-gradient(135deg, #fff, #e7f6ea);
+}
+
+.annual-summary-card.amber {
+  background: linear-gradient(135deg, #fff, #fff1cc);
+}
+
+.annual-summary-card.blue {
+  background: linear-gradient(135deg, #fff, #e7f0fb);
+}
+
+.annual-summary-card.purple {
+  background: linear-gradient(135deg, #fff, #f0eafa);
+}
+
 .day-group {
   border: 0;
   border-radius: 22px;
@@ -1192,6 +1265,192 @@ label {
 .compact-history-row small {
   color: var(--muted);
   line-height: 1.45;
+}
+
+.annual-lastyear-panel {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #dce7d5;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #ffffff, #f7fbf0);
+  box-shadow: var(--shadow);
+}
+
+.annual-day-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.annual-day-head {
+  display: grid;
+  grid-template-columns: minmax(118px, auto) 1fr;
+  align-items: center;
+  gap: 10px;
+  min-height: 58px;
+  padding: 12px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.annual-day-head::-webkit-details-marker {
+  display: none;
+}
+
+.annual-day-head::before {
+  content: "";
+  display: none;
+}
+
+.annual-date {
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 1000;
+}
+
+.annual-day-meta,
+.annual-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.annual-entry-list {
+  display: grid;
+  gap: 8px;
+  padding: 0 10px 10px;
+}
+
+.annual-entry {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-left-width: 6px;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.annual-entry.annual-work {
+  border-left-color: #d7792a;
+}
+
+.annual-entry.annual-growth {
+  border-left-color: #3ca557;
+}
+
+.annual-entry.annual-water {
+  border-left-color: #3f75b5;
+}
+
+.annual-entry.annual-schedule {
+  border-left-color: #d2a01c;
+}
+
+.annual-entry.annual-other {
+  border-left-color: #8a7a68;
+}
+
+.annual-entry-main {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.annual-entry-title {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.annual-entry-title b,
+.annual-entry-title span {
+  overflow-wrap: anywhere;
+}
+
+.annual-entry-title span,
+.annual-detail {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.annual-thumb {
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
+  object-fit: cover;
+}
+
+.kind-badge,
+.annual-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  padding: 5px 8px;
+  border-radius: 999px;
+  background: #eef3ea;
+  color: #2e3a2d;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.kind-badge {
+  background: var(--primary);
+  color: #fff;
+}
+
+.annual-chip.hours {
+  background: var(--amber-soft);
+  color: #6d4c00;
+}
+
+.annual-chip.worker,
+.annual-chip.done {
+  background: var(--primary-soft);
+  color: var(--primary-dark);
+}
+
+.annual-chip.status,
+.annual-chip.field {
+  background: var(--blue-soft);
+  color: #284f78;
+}
+
+.annual-chip.dap {
+  background: var(--purple-soft);
+  color: #5c3f82;
+}
+
+.annual-chip.count,
+.annual-chip.muted {
+  background: #eef1ec;
+  color: var(--muted);
+}
+
+@media (max-width: 900px) {
+  .annual-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .annual-day-head {
+    grid-template-columns: 1fr;
+    gap: 7px;
+  }
+
+  .annual-entry-main {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .annual-thumb {
+    grid-column: 1 / -1;
+    width: 100%;
+    height: 92px;
+  }
 }
 
 .timeline {
@@ -2174,7 +2433,7 @@ label {
   }
 }
 
-/* KARTE2: first visual pass, cheerful daily-use feel without data changes. */
+/* KARTE3: first visual pass, cheerful daily-use feel without data changes. */
 .karte-hero {
   position: relative;
   min-height: 176px;

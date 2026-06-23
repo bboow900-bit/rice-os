@@ -18,18 +18,40 @@
   function setEndFromDays() {
     const start = U.$("dryStartDate").value;
     const days = U.number(U.$("dryTargetDays").value, 0);
-    if (start && days > 0 && !U.$("editDryId").value) {
+    if (start && days > 0) {
       U.$("dryEndDate").value = U.dateAddDays(start, days);
     }
+  }
+
+  function setDaysFromEnd() {
+    const start = U.$("dryStartDate").value;
+    const end = U.$("dryEndDate").value;
+    const days = U.daysBetween(start, end);
+    if (days !== "" && days >= 0) U.$("dryTargetDays").value = String(days);
+  }
+
+  function periodStats(startDate, plannedEndDate, actualEndDate) {
+    const planned = startDate && plannedEndDate ? U.daysBetween(startDate, plannedEndDate) : "";
+    const actual = startDate && actualEndDate ? U.daysBetween(startDate, actualEndDate) : "";
+    const diff = planned !== "" && actual !== "" ? actual - planned : "";
+    return { planned, actual, diff };
+  }
+
+  function diffLabel(diff) {
+    if (diff === "") return "";
+    if (diff === 0) return "予定どおり";
+    return diff > 0 ? `+${diff}日` : `${diff}日`;
   }
 
   function renderTargetCompare() {
     const field = currentField();
     const start = U.$("dryStartDate").value;
     const end = U.$("dryEndDate").value;
+    const actualEnd = U.$("dryActualEndDate").value;
     const observed = U.$("dryDate").value || U.today();
     const elapsed = start ? U.daysBetween(start, observed) : "";
     const remaining = end ? U.daysBetween(observed, end) : "";
+    const stats = periodStats(start, end, actualEnd);
     const crack = U.$("dryCrackCm").value || "-";
     const sink = U.$("drySinkCm").value || "-";
     U.$("dryTargetCompare").innerHTML = `
@@ -39,6 +61,7 @@
         <span>沈み込み 目標 ${U.escapeHTML(field && field.targetSinkCm || "-")}cm / 現在 ${U.escapeHTML(sink)}cm</span>
         ${elapsed !== "" ? `<span>中干し ${U.escapeHTML(String(elapsed))}日目</span>` : ""}
         ${remaining !== "" ? `<span class="${remaining <= 1 ? "warn-text" : ""}">終了目安まであと ${U.escapeHTML(String(remaining))}日</span>` : ""}
+        ${stats.actual !== "" ? `<span>予定${U.escapeHTML(String(stats.planned))}日 / 実績${U.escapeHTML(String(stats.actual))}日 / ${U.escapeHTML(diffLabel(stats.diff))}</span>` : ""}
       </div>
     `;
   }
@@ -53,6 +76,8 @@
     U.$("dryTargetDays").value = field && field.drainageTargetDays || "7";
     U.$("dryEndDate").value = "";
     setEndFromDays();
+    U.$("dryActualEndDate").value = "";
+    U.$("dryStatus").value = "実施中";
     U.$("dryCrackCm").value = "";
     U.$("drySinkCm").value = "";
     U.$("drySurface").value = "-";
@@ -69,6 +94,7 @@
   function renderOptions() {
     const fieldValue = U.$("dryField").value || firstFieldId();
     U.setOptions(U.$("dryField"), state.activeFields().map((field) => ({ value: field.fieldId, label: field.name })), fieldValue);
+    U.setOptions(U.$("dryStatus"), S.WATER_PERIOD_STATUS, U.$("dryStatus").value || "実施中");
     U.setOptions(U.$("drySurface"), S.DRY_SURFACE_LEVELS, U.$("drySurface").value || "-");
     U.setOptions(U.$("dryGas"), S.DRY_GAS_LEVELS, U.$("dryGas").value || "-");
   }
@@ -80,7 +106,9 @@
     U.$("dryDate").value = item.date;
     U.$("dryStartDate").value = item.startDate || "";
     U.$("dryEndDate").value = item.endDate || "";
+    U.$("dryActualEndDate").value = item.actualEndDate || "";
     U.$("dryTargetDays").value = item.targetDays || "";
+    U.$("dryStatus").value = item.status || (item.actualEndDate ? "完了" : "実施中");
     U.$("dryCrackCm").value = item.crackCm || "";
     U.$("drySinkCm").value = item.sinkCm || "";
     U.$("drySurface").value = item.surface || "-";
@@ -101,14 +129,17 @@
       const field = state.field(item.fieldId);
       const elapsed = item.startDate ? U.daysBetween(item.startDate, item.date) : "";
       const remaining = item.endDate ? U.daysBetween(item.date, item.endDate) : "";
+      const stats = periodStats(item.startDate, item.endDate, item.actualEndDate);
       return `
         <article class="record water-record">
           <div class="record-head">
             <div>
               <b>${U.escapeHTML(U.fd(item.date))} 中干し</b><br>
               <span class="pill info">${U.escapeHTML(field && field.name || "圃場")}</span>
+              <span class="pill ok">${U.escapeHTML(item.status || (item.actualEndDate ? "完了" : "実施中"))}</span>
               ${elapsed !== "" ? `<span class="pill ok">${U.escapeHTML(String(elapsed))}日目</span>` : ""}
               ${remaining !== "" ? `<span class="pill warn">終了目安まで${U.escapeHTML(String(remaining))}日</span>` : ""}
+              ${stats.actual !== "" ? `<span class="pill purple">予定${U.escapeHTML(String(stats.planned))}日 / 実績${U.escapeHTML(String(stats.actual))}日 / ${U.escapeHTML(diffLabel(stats.diff))}</span>` : ""}
             </div>
           </div>
           <div class="record-body">
@@ -161,8 +192,10 @@
         dryPeriodId: U.$("editDryId").value,
         fieldId: U.$("dryField").value,
         date: U.$("dryDate").value,
+        status: U.$("dryStatus").value,
         startDate: U.$("dryStartDate").value,
         endDate: U.$("dryEndDate").value,
+        actualEndDate: U.$("dryActualEndDate").value,
         targetDays: U.$("dryTargetDays").value,
         crackCm: U.$("dryCrackCm").value,
         sinkCm: U.$("drySinkCm").value,
@@ -202,12 +235,18 @@
       fillEdit(item);
     });
 
-    ["dryField", "dryDate", "dryCrackCm", "drySinkCm", "drySurface", "dryGas"].forEach((id) => U.$(id).addEventListener("change", renderTargetCompare));
+    ["dryField", "dryDate", "dryActualEndDate", "dryStatus", "dryCrackCm", "drySinkCm", "drySurface", "dryGas"].forEach((id) => U.$(id).addEventListener("change", () => {
+      if (id === "dryActualEndDate" && U.$("dryActualEndDate").value) U.$("dryStatus").value = "完了";
+      renderTargetCompare();
+    }));
     ["dryStartDate", "dryTargetDays"].forEach((id) => U.$(id).addEventListener("change", () => {
       setEndFromDays();
       renderTargetCompare();
     }));
-    U.$("dryEndDate").addEventListener("change", renderTargetCompare);
+    U.$("dryEndDate").addEventListener("change", () => {
+      setDaysFromEnd();
+      renderTargetCompare();
+    });
 
     document.querySelector('[data-action="reset-dry"]').addEventListener("click", resetForm);
     document.querySelector('[data-action="clear-dry-photo"]').addEventListener("click", () => {

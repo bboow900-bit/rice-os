@@ -152,6 +152,19 @@
     const d = S.normalize(data);
     const rows = [["種類", "日付", "年度", "圃場", "作業者", "名称", "時間", "資材", "数量", "葉数", "分げつ", "草丈", "葉色", "メモ"]];
     const fieldName = (id) => (d.fields.find((f) => f.fieldId === id) || {}).name || "";
+    const periodText = (x) => {
+      const planned = x.startDate && x.endDate ? U.daysBetween(x.startDate, x.endDate) : "";
+      const actual = x.startDate && x.actualEndDate ? U.daysBetween(x.startDate, x.actualEndDate) : "";
+      const diff = planned !== "" && actual !== "" ? actual - planned : "";
+      return [
+        `開始${x.startDate || ""}`,
+        `完了予定${x.endDate || ""}`,
+        x.actualEndDate ? `実完了${x.actualEndDate}` : "",
+        planned !== "" ? `予定${planned}日` : "",
+        actual !== "" ? `実績${actual}日` : "",
+        diff !== "" ? `差分${diff > 0 ? "+" : ""}${diff}日` : ""
+      ].filter(Boolean).join(" ");
+    };
     d.fieldWorks.forEach((w) => rows.push([
       "圃場作業",
       w.date,
@@ -197,23 +210,23 @@
       "",
       "",
       "",
-      `ひび${x.crackCm || ""}cm 沈み${x.sinkCm || ""}cm`,
+      `${x.status || ""} ひび${x.crackCm || ""}cm 沈み${x.sinkCm || ""}cm ${periodText(x)}`,
       x.memo || ""
     ]));
     (d.irrigations || []).forEach((x) => rows.push([
-      "間断灌水",
+      x.method || "間断灌水",
       x.date,
       x.season,
       fieldName(x.fieldId),
       "",
-      x.status || "間断灌水",
+      x.method || "間断灌水",
       "",
       "",
       "",
       "",
       "",
       "",
-      `開始${x.startDate || ""} 終了予定${x.endDate || ""}`,
+      `${x.periodStatus || ""} ${x.status || ""} ${periodText(x)}`,
       x.memo || ""
     ]));
     (d.schedules || []).forEach((s) => rows.push([

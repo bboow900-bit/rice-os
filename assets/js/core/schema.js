@@ -4,7 +4,7 @@
   const RiceOS = window.RiceOS = window.RiceOS || {};
   const U = RiceOS.utils;
 
-  const SCHEMA_VERSION = 9;
+  const SCHEMA_VERSION = 10;
   const STORE_KEY = "rice_os_v8_stable";
   const BACKUP_KEY = "rice_os_v8_stable_backup";
   const LEGACY_STORES = [
@@ -197,6 +197,8 @@
   const DRY_SURFACE_LEVELS = ["-", "湿っている", "やや乾いている", "乾いている"];
   const DRY_GAS_LEVELS = ["-", "多い", "少しあり", "ほとんど無し", "無し"];
   const IRRIGATION_STATUS = ["入水中", "落水中"];
+  const WATER_PERIOD_STATUS = ["予定中", "実施中", "完了"];
+  const IRRIGATION_TYPES = ["間断灌水", "湿潤灌漑"];
 
   function canonicalId(prefix, value, fallbackName) {
     const raw = String(value || fallbackName || "").trim();
@@ -402,8 +404,10 @@
       date,
       season: U.number(d.season, U.season(date)),
       fieldId: String(d.fieldId || ""),
+      status: String(d.status || (d.actualEndDate ? "完了" : "実施中")),
       startDate: String(d.startDate || d.drainageStartDate || ""),
       endDate: String(d.endDate || d.expectedEndDate || ""),
+      actualEndDate: String(d.actualEndDate || ""),
       targetDays: String(d.targetDays || d.drainageTargetDays || ""),
       crackCm: String(d.crackCm || ""),
       sinkCm: String(d.sinkCm || ""),
@@ -426,8 +430,11 @@
       date,
       season: U.number(i.season, U.season(date)),
       fieldId: String(i.fieldId || ""),
+      method: String(i.method || i.irrigationType || "間断灌水"),
+      periodStatus: String(i.periodStatus || (i.actualEndDate ? "完了" : "実施中")),
       startDate: String(i.startDate || ""),
       endDate: String(i.endDate || ""),
+      actualEndDate: String(i.actualEndDate || ""),
       targetDays: String(i.targetDays || ""),
       status: String(i.status || "入水中"),
       memo: String(i.memo || ""),
@@ -609,6 +616,8 @@
     DRY_SURFACE_LEVELS,
     DRY_GAS_LEVELS,
     IRRIGATION_STATUS,
+    WATER_PERIOD_STATUS,
+    IRRIGATION_TYPES,
     leafColorLabel,
     leafColorScoreFromText,
     normalize,
