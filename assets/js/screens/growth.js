@@ -11,6 +11,9 @@
     U.$("editGrowthId").value = "";
     U.$("gDate").value = U.today();
     if (state.activeFields()[0]) U.$("gField").value = state.activeFields()[0].fieldId;
+    if (U.$("gLeafCount")) U.$("gLeafCount").value = "";
+    if (U.$("gTillerCount")) U.$("gTillerCount").value = "";
+    if (U.$("gPlantHeight")) U.$("gPlantHeight").value = "";
     U.$("gLeaf").value = "3";
     U.$("gWeed").value = "-";
     U.$("gGas").value = "-";
@@ -28,8 +31,25 @@
     U.$("gField").value = fieldId;
   }
 
+  function prefillDate(date, fieldId) {
+    resetForm();
+    U.$("gDate").value = date || U.today();
+    if (fieldId) U.$("gField").value = fieldId;
+  }
+
   function renderOptions() {
     U.setOptions(U.$("gField"), state.activeFields().map((f) => ({ value: f.fieldId, label: f.name })), U.$("gField").value);
+    if (U.$("growthFilterField")) {
+      U.setOptions(U.$("growthFilterField"), [{ value: "all", label: "全圃場" }, ...state.activeFields().map((f) => ({ value: f.fieldId, label: f.name }))], U.$("growthFilterField").value || "all");
+    }
+    if (U.$("growthRange")) {
+      U.setOptions(U.$("growthRange"), [
+        { value: "day", label: "日" },
+        { value: "week", label: "週" },
+        { value: "month", label: "月" },
+        { value: "season", label: "シーズン" }
+      ], U.$("growthRange").value || "season");
+    }
     U.setOptions(U.$("gLeaf"), S.LEAF_COLOR_LEVELS.map((level) => ({ value: level.value, label: level.label })), U.$("gLeaf").value || "3");
     U.setOptions(U.$("gWeed"), S.GROWTH_LEVELS, U.$("gWeed").value || "-");
     U.setOptions(U.$("gGas"), S.GROWTH_LEVELS, U.$("gGas").value || "-");
@@ -37,20 +57,37 @@
   }
 
   function renderTimeline() {
-    const rows = state.data().growthLogs.slice().sort((a, b) => String(b.date).localeCompare(String(a.date))).slice(0, 60);
+    const fieldFilter = U.$("growthFilterField") ? U.$("growthFilterField").value || "all" : "all";
+    const range = U.$("growthRange") ? U.$("growthRange").value || "season" : "season";
+    let rows = state.data().growthLogs.slice();
+    if (fieldFilter !== "all") rows = rows.filter((log) => log.fieldId === fieldFilter);
+    if (range === "day") rows = rows.filter((log) => log.date === U.today());
+    if (range === "week") rows = rows.filter((log) => U.daysSince(log.date) !== "" && U.daysSince(log.date) <= 7);
+    if (range === "month") rows = rows.filter((log) => U.daysSince(log.date) !== "" && U.daysSince(log.date) <= 31);
+    rows = rows.sort((a, b) => String(b.date).localeCompare(String(a.date))).slice(0, 80);
     U.$("growthCount").textContent = `${state.data().growthLogs.length}件`;
     U.$("growthTimeline").innerHTML = rows.length ? rows.map((log) => {
       const field = state.field(log.fieldId);
+      const variety = field ? state.variety(field.varietyId) : null;
       const dap = U.daysAfterPlanting(field, log.date);
       const leafScore = RiceOS.alerts.leafScore(log);
+      const target = variety && variety.targetTillers || "";
       return `
-        <div class="timeline-item growth">
-          <b>${U.escapeHTML(U.fd(log.date))} ${U.escapeHTML(field && field.name || "")}</b>
+        <div class="growth-card">
+          <div class="growth-date">
+            <b>${U.escapeHTML(U.fd(log.date))}</b>
+            <span>${U.escapeHTML(field && field.name || "")}</span>
+          </div>
           ${dap !== "" ? `<span class="pill warn">田植後${U.escapeHTML(String(dap))}日</span>` : ""}
           ${leafScore ? `<span class="leaf-meter tone-${U.attr(RiceOS.alerts.leafTone(leafScore))}" title="葉色${U.attr(S.leafColorLabel(leafScore))}"><span style="width:${U.attr(String(U.number(leafScore, 0) * 20))}%"></span></span>` : ""}
           ${log.photoData ? '<span class="pill info">写真あり</span>' : log.photo ? '<span class="pill info">写真メモあり</span>' : ""}
-          <br>
-          <span class="muted">葉色:${U.escapeHTML(log.leafColor)} / 雑草:${U.escapeHTML(log.weed)} / ガス:${U.escapeHTML(log.gas)} / 水:${U.escapeHTML(log.water)}</span>
+          <div class="metric-row">
+            <span>葉数 <b>${U.escapeHTML(log.leafCount || "-")}</b></span>
+            <span>分げつ <b>${U.escapeHTML(log.tillerCount || "-")}</b></span>
+            <span>草丈 <b>${U.escapeHTML(log.plantHeightCm || "-")}</b>cm</span>
+          </div>
+          ${target && log.tillerCount ? `<div class="target-note">分げつ目標 ${U.escapeHTML(target)} / 現在 ${U.escapeHTML(log.tillerCount)}本</div>` : ""}
+          <span class="muted">葉色:${U.escapeHTML(log.leafColor)} / 雑草:${U.escapeHTML(log.weed)} / ガス:${U.escapeHTML(log.gas)} / 水管理:${U.escapeHTML(log.water)}</span>
           ${log.photoData ? `<img class="thumb" src="${U.attr(log.photoData)}" alt="">` : ""}
           ${log.photo && !log.photoData ? `<div>写真: ${U.escapeHTML(log.photo)}</div>` : ""}
           ${log.memo ? `<div>${U.escapeHTML(log.memo)}</div>` : ""}
@@ -73,6 +110,9 @@
     U.$("editGrowthId").value = log.logId;
     U.$("gDate").value = log.date;
     U.$("gField").value = log.fieldId;
+    if (U.$("gLeafCount")) U.$("gLeafCount").value = log.leafCount || "";
+    if (U.$("gTillerCount")) U.$("gTillerCount").value = log.tillerCount || "";
+    if (U.$("gPlantHeight")) U.$("gPlantHeight").value = log.plantHeightCm || "";
     U.$("gLeaf").value = log.leafColorScore || S.leafColorScoreFromText(log.leafColor) || "3";
     U.$("gWeed").value = log.weed || "-";
     U.$("gGas").value = log.gas || "-";
@@ -84,6 +124,11 @@
     U.$("gPhotoPreview").src = log.photoData || "";
     U.$("gPhotoPreview").classList.toggle("hidden", !log.photoData);
     window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function editLog(logId) {
+    const log = state.data().growthLogs.find((item) => item.logId === logId);
+    if (log) fillEdit(log);
   }
 
   function bind() {
@@ -112,6 +157,9 @@
         logId: U.$("editGrowthId").value,
         date: U.$("gDate").value,
         fieldId: U.$("gField").value,
+        leafCount: U.$("gLeafCount") ? U.$("gLeafCount").value : "",
+        tillerCount: U.$("gTillerCount") ? U.$("gTillerCount").value : "",
+        plantHeightCm: U.$("gPlantHeight") ? U.$("gPlantHeight").value : "",
         leafColorScore: U.$("gLeaf").value,
         leafColor: S.leafColorLabel(U.$("gLeaf").value),
         weed: U.$("gWeed").value,
@@ -138,6 +186,8 @@
     });
 
     document.querySelector('[data-action="reset-growth"]').addEventListener("click", resetForm);
+    if (U.$("growthFilterField")) U.$("growthFilterField").addEventListener("change", renderTimeline);
+    if (U.$("growthRange")) U.$("growthRange").addEventListener("change", renderTimeline);
     document.querySelector('[data-action="clear-growth-photo"]').addEventListener("click", () => {
       U.$("gPhotoFile").value = "";
       U.$("gPhotoPreview").src = "";
@@ -147,5 +197,5 @@
   }
 
   RiceOS.screens = RiceOS.screens || {};
-  RiceOS.screens.growth = { render, bind, resetForm, prefillField };
+  RiceOS.screens.growth = { render, bind, resetForm, prefillField, prefillDate, editLog };
 })();

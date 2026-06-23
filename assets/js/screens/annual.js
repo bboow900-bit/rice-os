@@ -18,7 +18,7 @@
     return (ids || []).map((id) => {
       const field = state.field(id);
       const dap = U.daysAfterPlanting(field, date);
-      return dap === "" ? "" : `${field.name}:田植後${dap}日`;
+      return dap === "" || !field ? "" : `${field.name}:田植後${dap}日`;
     }).filter(Boolean).join(" / ");
   }
 
@@ -30,10 +30,11 @@
       date: w.date,
       season: w.season,
       name: w.workName,
+      worker: w.worker || "",
       fieldIds: w.fieldIds || [],
       target: fieldNames(w.fieldIds),
       hours: w.hours || "",
-      detail: [w.material ? `資材:${w.material} ${w.amount || ""}` : "", w.memo || ""].filter(Boolean).join(" / ")
+      detail: [w.machine ? `機械:${w.machine}` : "", w.material ? `資材:${w.material} ${w.amount || ""}` : "", w.weather ? `天気:${w.weather}` : "", w.memo || ""].filter(Boolean).join(" / ")
     }));
     const growth = d.growthLogs.map((g) => ({
       kind: "growth",
@@ -41,10 +42,47 @@
       date: g.date,
       season: g.season,
       name: "生育ログ",
+      worker: "",
       fieldIds: [g.fieldId],
       target: fieldNames([g.fieldId]),
       hours: "",
-      detail: `葉色:${g.leafColor} / 雑草:${g.weed} / ガス:${g.gas} / 水:${g.water}${g.memo ? ` / ${g.memo}` : ""}`
+      detail: `葉数:${g.leafCount || "-"} / 分げつ:${g.tillerCount || "-"} / 草丈:${g.plantHeightCm || "-"}cm / 葉色:${g.leafColor} / 雑草:${g.weed} / ガス:${g.gas} / 水:${g.water}${g.memo ? ` / ${g.memo}` : ""}`
+    }));
+    const dry = (d.dryPeriods || []).map((item) => ({
+      kind: "dry",
+      id: item.dryPeriodId,
+      date: item.date,
+      season: item.season,
+      name: "中干し",
+      worker: "",
+      fieldIds: [item.fieldId],
+      target: fieldNames([item.fieldId]),
+      hours: "",
+      detail: `ひび:${item.crackCm || "-"}cm / 沈み込み:${item.sinkCm || "-"}cm / 田面:${item.surface || "-"} / ガス:${item.gas || "-"}${item.memo ? ` / ${item.memo}` : ""}`
+    }));
+    const irrigation = (d.irrigations || []).map((item) => ({
+      kind: "irrigation",
+      id: item.irrigationId,
+      date: item.date,
+      season: item.season,
+      name: "間断灌水",
+      worker: "",
+      fieldIds: [item.fieldId],
+      target: fieldNames([item.fieldId]),
+      hours: "",
+      detail: `${item.status || "-"} / 開始:${item.startDate || "-"} / 終了予定:${item.endDate || "-"}${item.memo ? ` / ${item.memo}` : ""}`
+    }));
+    const schedules = (d.schedules || []).map((item) => ({
+      kind: "schedule",
+      id: item.scheduleId,
+      date: item.date,
+      season: item.season,
+      name: item.title || item.scheduleType || "予定",
+      worker: "",
+      fieldIds: item.fieldIds || [],
+      target: fieldNames(item.fieldIds),
+      hours: "",
+      detail: [item.scheduleType || "", item.status || "", item.memo || ""].filter(Boolean).join(" / ")
     }));
     const other = d.otherWorks.map((o) => ({
       kind: "other",
@@ -52,23 +90,26 @@
       date: o.date,
       season: o.season,
       name: o.workName,
+      worker: "",
       fieldIds: o.relatedFieldIds || [],
       target: varietyNames(o.varietyIds) || fieldNames(o.relatedFieldIds) || "その他",
       hours: o.hours || "",
       detail: [o.quantity ? `数量:${o.quantity}` : "", o.memo || ""].filter(Boolean).join(" / ")
     }));
-    return [...fieldWorks, ...growth, ...other].sort((a, b) => String(a.date).localeCompare(String(b.date)));
+    return [...fieldWorks, ...growth, ...dry, ...irrigation, ...schedules, ...other].sort((a, b) => String(a.date).localeCompare(String(b.date)));
   }
 
   function filterRows(rows) {
     const year = U.$("annualYear").value || String(new Date().getFullYear());
     const fieldId = U.$("annualField").value || "all";
     const kind = U.$("annualKind").value || "all";
+    const worker = String(U.$("annualWorker").value || "").trim();
     return rows.filter((row) => {
       const yearOk = year === "all" || String(row.season) === String(year);
       const fieldOk = fieldId === "all" || (row.fieldIds || []).includes(fieldId);
       const kindOk = kind === "all" || row.kind === kind;
-      return yearOk && fieldOk && kindOk;
+      const workerOk = !worker || String(row.worker || "").includes(worker);
+      return yearOk && fieldOk && kindOk && workerOk;
     });
   }
 
@@ -80,14 +121,19 @@
   }
 
   function renderCompactRow(row) {
-    const dap = row.kind === "fieldWork" || row.kind === "growth" ? workDap(row.fieldIds, row.date) : "";
+    const dap = ["fieldWork", "growth", "dry", "irrigation"].includes(row.kind) ? workDap(row.fieldIds, row.date) : "";
     return `
       <div class="compact-history-row ${U.attr(row.kind)}">
         <b>${U.escapeHTML(row.name)}</b>
         <span>${U.escapeHTML(row.target || "対象なし")}</span>
+        ${row.worker ? `<span class="pill ok">${U.escapeHTML(row.worker)}</span>` : ""}
         ${row.hours ? `<span class="pill warn">時間 ${U.escapeHTML(row.hours)}</span>` : ""}
         ${dap ? `<span class="pill purple">${U.escapeHTML(dap)}</span>` : ""}
         ${row.detail ? `<small>${U.escapeHTML(row.detail)}</small>` : ""}
+        <div class="inline-actions">
+          <button class="secondary" data-annual-action="edit" data-kind="${U.attr(row.kind)}" data-id="${U.attr(row.id)}">編集</button>
+          <button class="danger" data-annual-action="delete" data-kind="${U.attr(row.kind)}" data-id="${U.attr(row.id)}">削除</button>
+        </div>
       </div>
     `;
   }
@@ -100,7 +146,7 @@
       groups.get(key).push(row);
     });
     return Array.from(groups.entries()).map(([date, items], index) => `
-      <details class="day-group" ${index < 3 ? "open" : ""}>
+      <details class="day-group" ${index < 5 ? "open" : ""}>
         <summary>
           <b>${U.escapeHTML(U.fd(date) || date)}</b>
           <span class="pill info">${items.length}件</span>
@@ -113,22 +159,13 @@
     `).join("");
   }
 
-  function renderRow(row) {
-    const dap = row.kind === "fieldWork" || row.kind === "growth" ? workDap(row.fieldIds, row.date) : "";
-    if (row.kind === "growth") {
-      return `
-        <div class="timeline-item growth">
-          <b>${U.escapeHTML(U.fd(row.date))} 生育ログ</b>
-          <span class="pill info">${U.escapeHTML(row.target)}</span>
-          ${dap ? `<span class="pill warn">${U.escapeHTML(dap)}</span>` : ""}
-          <br><span class="muted">${U.escapeHTML(row.detail)}</span>
-        </div>
-      `;
-    }
+  function renderDetailRow(row) {
+    const dap = ["fieldWork", "growth", "dry", "irrigation"].includes(row.kind) ? workDap(row.fieldIds, row.date) : "";
     return `
       <div class="timeline-item">
         <b>${U.escapeHTML(U.fd(row.date))} ${U.escapeHTML(row.name)}</b><br>
         <span class="pill info">${U.escapeHTML(row.target || "対象なし")}</span>
+        ${row.worker ? `<span class="pill ok">${U.escapeHTML(row.worker)}</span>` : ""}
         ${row.hours ? `<span class="pill warn">時間 ${U.escapeHTML(row.hours)}</span>` : ""}
         ${dap ? `<span class="pill purple">${U.escapeHTML(dap)}</span>` : ""}
         ${row.detail ? `<div>${U.escapeHTML(row.detail)}</div>` : ""}
@@ -153,7 +190,7 @@
         currentPhase = phase;
         head += `<div class="timeline-phase">${U.escapeHTML(phase)}</div>`;
       }
-      return head + renderRow(row);
+      return head + renderDetailRow(row);
     }).join("");
   }
 
@@ -186,6 +223,9 @@
       { value: "all", label: "すべて" },
       { value: "fieldWork", label: "圃場作業" },
       { value: "growth", label: "生育ログ" },
+      { value: "dry", label: "中干し" },
+      { value: "irrigation", label: "間断灌水" },
+      { value: "schedule", label: "予定" },
       { value: "other", label: "その他作業" }
     ], U.$("annualKind").value || "all");
     U.setOptions(U.$("annualView"), [
@@ -202,8 +242,58 @@
     U.$("annualTimeline").innerHTML = renderLastYear(rows) + timeline;
   }
 
+  function editRow(kind, id) {
+    if (kind === "fieldWork" && RiceOS.screens.fieldWork && RiceOS.screens.fieldWork.editWork) {
+      RiceOS.app.show("field-work");
+      RiceOS.screens.fieldWork.editWork(id);
+      return;
+    }
+    if (kind === "growth" && RiceOS.screens.growth && RiceOS.screens.growth.editLog) {
+      RiceOS.app.show("growth");
+      RiceOS.screens.growth.editLog(id);
+      return;
+    }
+    if (kind === "dry" && RiceOS.screens.dryPeriod && RiceOS.screens.dryPeriod.editDry) {
+      RiceOS.app.show("dry-period");
+      RiceOS.screens.dryPeriod.editDry(id);
+      return;
+    }
+    if (kind === "irrigation" && RiceOS.screens.irrigation && RiceOS.screens.irrigation.editIrrigation) {
+      RiceOS.app.show("irrigation");
+      RiceOS.screens.irrigation.editIrrigation(id);
+      return;
+    }
+    if (kind === "schedule") {
+      const item = (state.data().schedules || []).find((row) => row.scheduleId === id);
+      if (!item) return;
+      const title = prompt("予定名", item.title || "");
+      if (title === null) return;
+      const memo = prompt("メモ", item.memo || "");
+      if (memo === null) return;
+      state.saveSchedule({ ...item, title, memo });
+    }
+  }
+
+  function deleteRow(kind, id) {
+    const ok = confirm("この記録を削除しますか？");
+    if (!ok) return;
+    if (kind === "fieldWork") state.deleteFieldWork(id);
+    if (kind === "growth") state.deleteGrowthLog(id);
+    if (kind === "dry") state.deleteDryPeriod(id);
+    if (kind === "irrigation") state.deleteIrrigation(id);
+    if (kind === "schedule") state.deleteSchedule(id);
+    if (kind === "other") state.deleteOtherWork(id);
+  }
+
   function bind() {
     ["annualYear", "annualField", "annualKind", "annualView", "showLastYear"].forEach((id) => U.$(id).addEventListener("change", render));
+    U.$("annualWorker").addEventListener("input", render);
+    U.$("annualTimeline").addEventListener("click", (event) => {
+      const button = event.target.closest("[data-annual-action]");
+      if (!button) return;
+      if (button.dataset.annualAction === "edit") editRow(button.dataset.kind, button.dataset.id);
+      if (button.dataset.annualAction === "delete") deleteRow(button.dataset.kind, button.dataset.id);
+    });
   }
 
   RiceOS.screens = RiceOS.screens || {};

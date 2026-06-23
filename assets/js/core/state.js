@@ -124,12 +124,15 @@
         season: U.season(date),
         fieldIds: record.fieldIds || [],
         workName: record.workName || "その他",
+        worker: record.worker || "",
         hours: record.hours || "",
         machine: record.machine || "",
         material: record.material || "",
         amount: record.amount || "",
         weather: record.weather || "",
         weatherAuto: record.weatherAuto || null,
+        photo: record.photo || "",
+        photoData: record.photoData || "",
         memo: record.memo || "",
         createdAt: record.createdAt || U.now(),
         updatedAt: U.now()
@@ -174,6 +177,9 @@
         date,
         season: U.season(date),
         fieldId: record.fieldId || "",
+        leafCount: record.leafCount || "",
+        tillerCount: record.tillerCount || "",
+        plantHeightCm: record.plantHeightCm || "",
         leafColorScore,
         leafColor: leafColorScore ? RiceOS.schema.leafColorLabel(leafColorScore) : (record.leafColor || "-"),
         weed: record.weed || "-",
@@ -233,6 +239,7 @@
         season: U.number(record.season, new Date().getFullYear()),
         category: record.category || "その他",
         name: record.name || "",
+        carryover: record.carryover || "",
         ordered: record.ordered || "",
         used: record.used || "",
         remaining: record.remaining || "",
@@ -253,9 +260,13 @@
         varietyId: record.varietyId || "",
         areaA: record.areaA || "",
         yield: record.yield || "",
+        yieldPer10a: record.yieldPer10a || "",
         grade: record.grade || "",
+        firstGradeRate: record.firstGradeRate || "",
+        shippedQuantity: record.shippedQuantity || "",
         quality: record.quality || "",
         salesAmount: record.salesAmount || "",
+        salesPer10a: record.salesPer10a || "",
         reflection: record.reflection || "",
         createdAt: record.createdAt || U.now(),
         updatedAt: U.now()
@@ -269,6 +280,107 @@
       d.meta = d.meta || {};
       d.meta.weatherLocation = location;
     }, "天気取得位置を保存しました");
+  }
+
+  function saveSchedule(record) {
+    mutate((d) => {
+      const date = record.date || U.today();
+      const normalized = {
+        scheduleId: record.scheduleId || U.id("schedule", date),
+        type: "schedule",
+        date,
+        season: U.season(date),
+        fieldIds: record.fieldIds || [],
+        scheduleType: record.scheduleType || "作業予定",
+        title: record.title || record.scheduleType || "予定",
+        status: record.status || "予定",
+        memo: record.memo || "",
+        createdAt: record.createdAt || U.now(),
+        updatedAt: U.now()
+      };
+      const index = d.schedules.findIndex((s) => s.scheduleId === normalized.scheduleId);
+      if (index >= 0) d.schedules[index] = { ...d.schedules[index], ...normalized };
+      else d.schedules.push(normalized);
+    }, "予定を保存しました");
+  }
+
+  function deleteSchedule(scheduleId) {
+    mutate((d) => {
+      d.schedules = (d.schedules || []).filter((s) => s.scheduleId !== scheduleId);
+    }, "予定を削除しました");
+  }
+
+  function saveDryPeriod(record) {
+    mutate((d) => {
+      const date = record.date || U.today();
+      const normalized = {
+        dryPeriodId: record.dryPeriodId || U.id("dry", date),
+        type: "dryPeriod",
+        date,
+        season: U.season(date),
+        fieldId: record.fieldId || "",
+        startDate: record.startDate || "",
+        endDate: record.endDate || "",
+        targetDays: record.targetDays || "",
+        crackCm: record.crackCm || "",
+        sinkCm: record.sinkCm || "",
+        surface: record.surface || "",
+        gas: record.gas || "",
+        photo: record.photo || "",
+        photoData: record.photoData || "",
+        memo: record.memo || "",
+        createdAt: record.createdAt || U.now(),
+        updatedAt: U.now()
+      };
+      const index = d.dryPeriods.findIndex((item) => item.dryPeriodId === normalized.dryPeriodId);
+      if (index >= 0) d.dryPeriods[index] = { ...d.dryPeriods[index], ...normalized };
+      else d.dryPeriods.push(normalized);
+      const fieldIndex = d.fields.findIndex((f) => f.fieldId === normalized.fieldId);
+      if (fieldIndex >= 0) {
+        if (normalized.startDate) d.fields[fieldIndex].drainageStartDate = normalized.startDate;
+        if (normalized.targetDays) d.fields[fieldIndex].drainageTargetDays = normalized.targetDays;
+      }
+    }, "中干し記録を保存しました");
+  }
+
+  function deleteDryPeriod(dryPeriodId) {
+    mutate((d) => {
+      d.dryPeriods = (d.dryPeriods || []).filter((item) => item.dryPeriodId !== dryPeriodId);
+    }, "中干し記録を削除しました");
+  }
+
+  function saveIrrigation(record) {
+    mutate((d) => {
+      const date = record.date || U.today();
+      const normalized = {
+        irrigationId: record.irrigationId || U.id("irrigation", date),
+        type: "irrigation",
+        date,
+        season: U.season(date),
+        fieldId: record.fieldId || "",
+        startDate: record.startDate || "",
+        endDate: record.endDate || "",
+        targetDays: record.targetDays || "",
+        status: record.status || "入水中",
+        memo: record.memo || "",
+        createdAt: record.createdAt || U.now(),
+        updatedAt: U.now()
+      };
+      const index = d.irrigations.findIndex((item) => item.irrigationId === normalized.irrigationId);
+      if (index >= 0) d.irrigations[index] = { ...d.irrigations[index], ...normalized };
+      else d.irrigations.push(normalized);
+      const fieldIndex = d.fields.findIndex((f) => f.fieldId === normalized.fieldId);
+      if (fieldIndex >= 0) {
+        if (normalized.startDate) d.fields[fieldIndex].intermittentStartDate = normalized.startDate;
+        if (normalized.targetDays) d.fields[fieldIndex].intermittentIntervalDays = normalized.targetDays;
+      }
+    }, "間断灌水を保存しました");
+  }
+
+  function deleteIrrigation(irrigationId) {
+    mutate((d) => {
+      d.irrigations = (d.irrigations || []).filter((item) => item.irrigationId !== irrigationId);
+    }, "間断灌水を削除しました");
   }
 
   function markJsonExported() {
@@ -301,6 +413,14 @@
     return data().growthLogs.filter((g) => g.fieldId === fieldId);
   }
 
+  function dryPeriodsFor(fieldId) {
+    return (data().dryPeriods || []).filter((d) => d.fieldId === fieldId);
+  }
+
+  function irrigationsFor(fieldId) {
+    return (data().irrigations || []).filter((i) => i.fieldId === fieldId);
+  }
+
   function lastFieldWork(fieldId) {
     return fieldWorksFor(fieldId).slice().sort((a, b) => String(b.date).localeCompare(String(a.date)))[0] || null;
   }
@@ -331,12 +451,20 @@
     deleteOtherWork,
     saveMaterial,
     saveResult,
+    saveSchedule,
+    deleteSchedule,
+    saveDryPeriod,
+    deleteDryPeriod,
+    saveIrrigation,
+    deleteIrrigation,
     updateWeatherLocation,
     markJsonExported,
     markNotificationCheck,
     undoLastSave,
     fieldWorksFor,
     growthLogsFor,
+    dryPeriodsFor,
+    irrigationsFor,
     lastFieldWork,
     lastGrowthLog
   };

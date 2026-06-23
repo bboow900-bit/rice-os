@@ -21,7 +21,8 @@
       ["レシピ/圃場", `${info.varieties}/${info.fields}`],
       ["圃場作業", `${info.fieldWorks}件`],
       ["生育ログ", `${info.growthLogs}件`],
-      ["その他作業", `${info.otherWorks}件`],
+      ["水管理", `${info.dryPeriods || 0}/${info.irrigations || 0}`],
+      ["予定", `${info.schedules || 0}件`],
       ["資材/結果", `${info.materials}/${info.varietyResults}`],
       ["最終JSON保存", info.lastJsonExportAt ? U.fd(String(info.lastJsonExportAt).slice(0, 10)) : "記録なし"]
     ].map(([label, value]) => `
@@ -79,6 +80,9 @@
     document.querySelector('[data-action="export-json"]').addEventListener("click", () => {
       state.markJsonExported();
       storage.exportJson(state.data());
+    });
+    document.querySelector('[data-action="export-csv"]').addEventListener("click", () => {
+      storage.exportCsv(state.data());
     });
     document.querySelector('[data-action="import-json"]').addEventListener("click", importJson);
     document.querySelector('[data-action="import-legacy"]').addEventListener("click", importLegacy);

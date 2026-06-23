@@ -164,59 +164,6 @@
     return null;
   }
 
-  function komumeForField(field, baseSuggestions) {
-    const lastGrowth = state().lastGrowthLog(field.fieldId);
-    const lastGrowthAge = lastGrowth ? U.daysSince(lastGrowth.date) : "";
-    const score = leafScore(lastGrowth);
-    const water = waterAlertsForField(field);
-    const lastYear = lastYearRows(field.fieldId, 10).slice(0, 3);
-    const suggestions = (baseSuggestions || []).slice();
-    const activeSuggestions = suggestions.filter((item) => !item.skip);
-
-    let priority = "ok";
-    if (water.some((item) => item.priority === "urgent")) priority = "urgent";
-    else if (!lastGrowth || lastGrowthAge > 10 || water.some((item) => item.priority === "warn")) priority = "warn";
-    else if (activeSuggestions.length) priority = "watch";
-
-    const notes = [];
-    if (score) {
-      if (score === "1" || score === "2") notes.push(`葉色は${leafText(score)}寄りです。追肥や水管理は品種レシピと去年の流れを見て判断。`);
-      if (score === "3") notes.push("葉色は標準域です。急な追肥より、次の水管理と雑草確認を優先。");
-      if (score === "4" || score === "5") notes.push(`葉色は${leafText(score)}寄りです。追肥は急がず、倒伏リスクと天候を確認。`);
-    } else {
-      notes.push("葉色が未評価です。5段階で記録すると小梅の見立てが安定します。");
-    }
-
-    if (!lastGrowth || lastGrowthAge > 7) {
-      notes.push(lastGrowth ? `生育ログが${lastGrowthAge}日前です。今日の葉色・雑草・水を軽く見ておくと安心。` : "生育ログがまだありません。最初の記録を作ると以後の判断がしやすくなります。");
-    }
-    water.slice(0, 2).forEach((item) => notes.push(item.message));
-    if (lastYear.length) {
-      const row = lastYear[0];
-      notes.push(`去年の同時期は「${row.label}」の記録があります。時期ずれの確認材料にできます。`);
-    }
-
-    const doNow = [
-      ...water.filter((item) => ["urgent", "warn"].includes(item.priority)).map((item) => item.message),
-      ...activeSuggestions.slice(0, 2).map((item) => item.title)
-    ];
-    const avoid = suggestions.filter((item) => item.skip).map((item) => item.title);
-
-    return {
-      priority,
-      priorityLabel: priorityLabel(priority),
-      tone: toneForPriority(priority),
-      opinion: notes[0] || "大きな抜けは見当たりません。記録を続けるだけで判断精度が上がります。",
-      notes,
-      doNow,
-      avoid,
-      water,
-      lastYear,
-      leafScore: score,
-      leafTone: leafTone(score)
-    };
-  }
-
   function todayFocusItems() {
     const d = state().data();
     const items = [];
@@ -337,7 +284,6 @@
     waterAlertsForField,
     lastYearRows,
     backupAlert,
-    komumeForField,
     todayFocusItems,
     notificationAlerts,
     calendarEventsForField,

@@ -4,7 +4,7 @@
   const RiceOS = window.RiceOS = window.RiceOS || {};
   const U = RiceOS.utils;
 
-  const SCHEMA_VERSION = 8;
+  const SCHEMA_VERSION = 9;
   const STORE_KEY = "rice_os_v8_stable";
   const BACKUP_KEY = "rice_os_v8_stable_backup";
   const LEGACY_STORES = [
@@ -37,6 +37,7 @@
     topDressingAmount: "",
     topDressingTiming: "",
     pestControlPlan: "",
+    targetTillers: "18〜22本",
     memo: ""
   };
 
@@ -50,6 +51,13 @@
     drainageTargetDays: "7",
     intermittentStartDate: "",
     intermittentIntervalDays: "3",
+    soilType: "",
+    waterHolding: "",
+    drainage: "",
+    commonWeeds: [],
+    fieldFeatures: [],
+    targetCrackCm: "1〜2",
+    targetSinkCm: "2〜4",
     fixedMemo: "",
     memo: "",
     status: "使用中",
@@ -174,7 +182,7 @@
     "その他"
   ];
 
-  const MATERIAL_CATEGORIES = ["肥料", "除草剤", "防除", "種籾", "育苗", "燃料", "袋・出荷", "その他"];
+  const MATERIAL_CATEGORIES = ["種籾", "肥料", "除草剤", "防除剤", "燃料", "米袋", "部品", "その他"];
   const GROWTH_LEVELS = ["-", "少ない", "普通", "多い", "注意"];
   const LEAF_COLOR_LEVELS = [
     { value: "1", label: "1 薄い", text: "薄い", tone: "bad" },
@@ -184,6 +192,11 @@
     { value: "5", label: "5 濃い", text: "濃い", tone: "purple" }
   ];
   const WATER_LEVELS = ["-", "浅水", "普通", "深水", "落水", "干し気味", "水不足"];
+  const WORKERS = ["自分", "外注"];
+  const SCHEDULE_TYPES = ["中干し予定", "追肥予定", "防除予定", "作業予定", "資材使用", "収穫", "出荷"];
+  const DRY_SURFACE_LEVELS = ["-", "湿っている", "やや乾いている", "乾いている"];
+  const DRY_GAS_LEVELS = ["-", "多い", "少しあり", "ほとんど無し", "無し"];
+  const IRRIGATION_STATUS = ["入水中", "落水中"];
 
   function canonicalId(prefix, value, fallbackName) {
     const raw = String(value || fallbackName || "").trim();
@@ -223,6 +236,13 @@
     f.drainageTargetDays = String(f.drainageTargetDays || "");
     f.intermittentStartDate = String(f.intermittentStartDate || "");
     f.intermittentIntervalDays = String(f.intermittentIntervalDays || "");
+    f.soilType = String(f.soilType || "");
+    f.waterHolding = String(f.waterHolding || "");
+    f.drainage = String(f.drainage || "");
+    f.commonWeeds = ensureArray(f.commonWeeds).map(String);
+    f.fieldFeatures = ensureArray(f.fieldFeatures).map(String);
+    f.targetCrackCm = String(f.targetCrackCm || "");
+    f.targetSinkCm = String(f.targetSinkCm || "");
     f.sortOrder = U.number(f.sortOrder, index * 10);
     return f;
   }
@@ -256,12 +276,15 @@
       season: U.number(w.season, U.season(date)),
       fieldIds: ensureArray(w.fieldIds).length ? ensureArray(w.fieldIds).map(String) : (w.fieldId ? [String(w.fieldId)] : []),
       workName: String(w.workName || w.name || "その他"),
+      worker: String(w.worker || ""),
       hours: String(w.hours || ""),
       machine: String(w.machine || ""),
       material: String(w.material || ""),
       amount: String(w.amount || ""),
       weather: String(w.weather || ""),
       weatherAuto: w.weatherAuto && typeof w.weatherAuto === "object" ? w.weatherAuto : null,
+      photo: String(w.photo || ""),
+      photoData: String(w.photoData || ""),
       memo: String(w.memo || ""),
       createdAt: String(w.createdAt || U.now()),
       updatedAt: String(w.updatedAt || U.now())
@@ -278,6 +301,9 @@
       date,
       season: U.number(g.season, U.season(date)),
       fieldId: String(g.fieldId || ""),
+      leafCount: String(g.leafCount || ""),
+      tillerCount: String(g.tillerCount || ""),
+      plantHeightCm: String(g.plantHeightCm || g.plantHeight || ""),
       leafColorScore,
       leafColor: leafColorScore ? leafColorLabel(leafColorScore) : String(g.leafColor || g.leaf || "-"),
       weed: String(g.weed || "-"),
@@ -317,6 +343,7 @@
       season: U.number(m.season, new Date().getFullYear()),
       category: String(m.category || "その他"),
       name: String(m.name || ""),
+      carryover: String(m.carryover || ""),
       ordered: String(m.ordered || ""),
       used: String(m.used || ""),
       remaining: String(m.remaining || ""),
@@ -335,12 +362,94 @@
       varietyId: String(r.varietyId || ""),
       areaA: String(r.areaA || ""),
       yield: String(r.yield || ""),
+      yieldPer10a: String(r.yieldPer10a || ""),
       grade: String(r.grade || ""),
+      firstGradeRate: String(r.firstGradeRate || ""),
+      shippedQuantity: String(r.shippedQuantity || r.shipped || ""),
       quality: String(r.quality || ""),
       salesAmount: String(r.salesAmount || r.sales || ""),
+      salesPer10a: String(r.salesPer10a || ""),
       reflection: String(r.reflection || ""),
       createdAt: String(r.createdAt || U.now()),
       updatedAt: String(r.updatedAt || U.now())
+    };
+  }
+
+  function normalizeSchedule(input) {
+    const s = input || {};
+    const date = String(s.date || U.today());
+    return {
+      scheduleId: String(s.scheduleId || s.id || U.id("schedule", date)),
+      type: "schedule",
+      date,
+      season: U.number(s.season, U.season(date)),
+      fieldIds: ensureArray(s.fieldIds).map(String),
+      scheduleType: String(s.scheduleType || s.kind || "作業予定"),
+      title: String(s.title || s.workName || s.scheduleType || "予定"),
+      status: String(s.status || "予定"),
+      memo: String(s.memo || ""),
+      createdAt: String(s.createdAt || U.now()),
+      updatedAt: String(s.updatedAt || U.now())
+    };
+  }
+
+  function normalizeDryPeriod(input) {
+    const d = input || {};
+    const date = String(d.date || d.observedDate || d.startDate || U.today());
+    return {
+      dryPeriodId: String(d.dryPeriodId || d.id || U.id("dry", date)),
+      type: "dryPeriod",
+      date,
+      season: U.number(d.season, U.season(date)),
+      fieldId: String(d.fieldId || ""),
+      startDate: String(d.startDate || d.drainageStartDate || ""),
+      endDate: String(d.endDate || d.expectedEndDate || ""),
+      targetDays: String(d.targetDays || d.drainageTargetDays || ""),
+      crackCm: String(d.crackCm || ""),
+      sinkCm: String(d.sinkCm || ""),
+      surface: String(d.surface || ""),
+      gas: String(d.gas || ""),
+      photo: String(d.photo || ""),
+      photoData: String(d.photoData || ""),
+      memo: String(d.memo || ""),
+      createdAt: String(d.createdAt || U.now()),
+      updatedAt: String(d.updatedAt || U.now())
+    };
+  }
+
+  function normalizeIrrigation(input) {
+    const i = input || {};
+    const date = String(i.date || i.startDate || U.today());
+    return {
+      irrigationId: String(i.irrigationId || i.id || U.id("irrigation", date)),
+      type: "irrigation",
+      date,
+      season: U.number(i.season, U.season(date)),
+      fieldId: String(i.fieldId || ""),
+      startDate: String(i.startDate || ""),
+      endDate: String(i.endDate || ""),
+      targetDays: String(i.targetDays || ""),
+      status: String(i.status || "入水中"),
+      memo: String(i.memo || ""),
+      createdAt: String(i.createdAt || U.now()),
+      updatedAt: String(i.updatedAt || U.now())
+    };
+  }
+
+  function normalizeShipment(input) {
+    const s = input || {};
+    const date = String(s.date || U.today());
+    return {
+      shipmentId: String(s.shipmentId || s.id || U.id("shipment", date)),
+      type: "shipment",
+      date,
+      season: U.number(s.season, U.season(date)),
+      varietyId: String(s.varietyId || ""),
+      quantity: String(s.quantity || ""),
+      amount: String(s.amount || ""),
+      memo: String(s.memo || ""),
+      createdAt: String(s.createdAt || U.now()),
+      updatedAt: String(s.updatedAt || U.now())
     };
   }
 
@@ -411,6 +520,20 @@
     const otherWorks = dedupeBy(ensureArray(source.otherWorks || source.generalWorks).map(normalizeOtherWork), "otherWorkId");
     const materials = dedupeBy(ensureArray(source.materials).map(normalizeMaterial), "materialId");
     const varietyResults = dedupeBy(ensureArray(source.varietyResults).map(normalizeResult), "resultId");
+    const schedules = dedupeBy(ensureArray(source.schedules).map(normalizeSchedule), "scheduleId").map((s) => ({
+      ...s,
+      fieldIds: ensureArray(s.fieldIds).filter((id) => fieldIds.has(id))
+    }));
+    const dryPeriods = dedupeBy(ensureArray(source.dryPeriods).map(normalizeDryPeriod), "dryPeriodId").map((d) => ({
+      ...d,
+      fieldId: fieldIds.has(d.fieldId) ? d.fieldId : (fields[0] && fields[0].fieldId) || ""
+    }));
+    const irrigations = dedupeBy(ensureArray(source.irrigations).map(normalizeIrrigation), "irrigationId").map((i) => ({
+      ...i,
+      fieldId: fieldIds.has(i.fieldId) ? i.fieldId : (fields[0] && fields[0].fieldId) || ""
+    }));
+    const shipments = dedupeBy(ensureArray(source.shipments).map(normalizeShipment), "shipmentId");
+    const workers = Array.from(new Set([...WORKERS, ...ensureArray(source.workers).map(String), ...fieldWorks.map((w) => w.worker).filter(Boolean)]));
 
     return {
       schemaVersion: SCHEMA_VERSION,
@@ -418,11 +541,18 @@
       fields,
       fieldWorks,
       growthLogs,
+      dryPeriods,
+      irrigations,
+      schedules,
       otherWorks,
       materials,
       varietyResults,
+      shipments,
+      photos: ensureArray(source.photos),
+      workers,
       meta: {
-        app: "稲作OS Stable",
+        app: "稲作カルテ",
+        appName: "稲作カルテ",
         createdAt: source.meta && source.meta.createdAt || source.createdAt || U.now(),
         updatedAt: U.now(),
         importedFrom: source.meta && source.meta.importedFrom || source.importedFrom || "",
@@ -439,9 +569,14 @@
       fields: U.clone(DEFAULT_FIELDS),
       fieldWorks: [],
       growthLogs: [],
+      dryPeriods: [],
+      irrigations: [],
+      schedules: [],
       otherWorks: [],
       materials: [],
-      varietyResults: []
+      varietyResults: [],
+      shipments: [],
+      workers: U.clone(WORKERS)
     });
   }
 
@@ -469,6 +604,11 @@
     GROWTH_LEVELS,
     LEAF_COLOR_LEVELS,
     WATER_LEVELS,
+    WORKERS,
+    SCHEDULE_TYPES,
+    DRY_SURFACE_LEVELS,
+    DRY_GAS_LEVELS,
+    IRRIGATION_STATUS,
     leafColorLabel,
     leafColorScoreFromText,
     normalize,

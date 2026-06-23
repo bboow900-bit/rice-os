@@ -32,7 +32,7 @@
       button.classList.toggle("active", button.dataset.screen === screenId);
     });
     const section = U.$(`screen-${screenId}`);
-    if (section) document.title = `${section.dataset.title || "稲作OS"} - 稲作OS Stable`;
+    if (section) document.title = `${section.dataset.title || "稲作カルテ"} - 稲作カルテ`;
     const mod = screenModule(screenId);
     if (mod && typeof mod.render === "function") mod.render();
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -122,6 +122,8 @@
     renderAll();
     if (RiceOS.screens.fieldWork) RiceOS.screens.fieldWork.resetForm();
     if (RiceOS.screens.growth) RiceOS.screens.growth.resetForm();
+    if (RiceOS.screens.dryPeriod) RiceOS.screens.dryPeriod.resetForm();
+    if (RiceOS.screens.irrigation) RiceOS.screens.irrigation.resetForm();
     if (RiceOS.screens.otherWork) RiceOS.screens.otherWork.resetForm();
     if (RiceOS.screens.materials) RiceOS.screens.materials.resetForm();
     if (RiceOS.screens.results) RiceOS.screens.results.resetForm();

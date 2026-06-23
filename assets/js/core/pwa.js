@@ -34,7 +34,7 @@
 
     if (!canUseServiceWorker()) return;
 
-    navigator.serviceWorker.register("./service-worker.js?v=20260623_all1")
+    navigator.serviceWorker.register("./service-worker.js?v=20260624_karte1")
       .then((registration) => {
         registration.update();
       })
@@ -63,7 +63,7 @@
       alert("通知が許可されませんでした。Chromeのサイト設定から通知を許可できます。");
       return false;
     }
-    await showNotification("稲作OSの通知を有効にしました", {
+    await showNotification("稲作カルテの通知を有効にしました", {
       body: "中干し・間断灌水の目安日が近いとき、アプリを開いたタイミングで通知します。",
       tag: "rice-os-notification-enabled"
     });
@@ -108,7 +108,7 @@
     for (const alert of alerts) {
       const key = alert.key || `${alert.type}:${alert.fieldId || ""}:${alert.date || today}`;
       if (sent[today][key]) continue;
-      await showNotification(`稲作OS: ${alert.title || "確認"}`, {
+      await showNotification(`稲作カルテ: ${alert.title || "確認"}`, {
         body: `${alert.fieldName ? `${alert.fieldName}: ` : ""}${alert.message || ""}`,
         tag: key,
         renotify: false
@@ -128,7 +128,7 @@
     }
     if ("caches" in window) {
       const keys = await caches.keys();
-      await Promise.all(keys.filter((key) => key.startsWith("rice-os-")).map((key) => caches.delete(key)));
+      await Promise.all(keys.filter((key) => key.startsWith("rice-os-") || key.startsWith("rice-karte-")).map((key) => caches.delete(key)));
     }
     location.reload();
   }

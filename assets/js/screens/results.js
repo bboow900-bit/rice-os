@@ -10,8 +10,11 @@
     if (state.varieties()[0]) U.$("rVariety").value = state.varieties()[0].varietyId;
     U.$("rAreaA").value = "";
     U.$("rYield").value = "";
-    U.$("rGrade").value = "";
+    U.$("rYieldPer10a").value = "";
+    U.$("rFirstGradeRate").value = "";
+    U.$("rShipped").value = "";
     U.$("rSales").value = "";
+    U.$("rSalesPer10a").value = "";
     U.$("rQuality").value = "";
     U.$("rReflection").value = "";
   }
@@ -25,13 +28,18 @@
           <div class="record-head">
             <div>
               <b>${U.escapeHTML(r.season)} ${U.escapeHTML(variety && variety.name || "品種未設定")}</b><br>
-              ${r.areaA ? `<span class="pill info">面積 ${U.escapeHTML(r.areaA)}a</span>` : ""}
+              ${r.areaA ? `<span class="pill info">作付 ${U.escapeHTML(r.areaA)}a</span>` : ""}
               ${r.yield ? `<span class="pill ok">収量 ${U.escapeHTML(r.yield)}</span>` : ""}
-              ${r.grade ? `<span class="pill warn">等級 ${U.escapeHTML(r.grade)}</span>` : ""}
+              ${r.yieldPer10a ? `<span class="pill ok">10a ${U.escapeHTML(r.yieldPer10a)}</span>` : ""}
+              ${r.firstGradeRate ? `<span class="pill warn">1等米率 ${U.escapeHTML(r.firstGradeRate)}</span>` : ""}
             </div>
           </div>
           <div class="record-body">
-            ${r.salesAmount ? `<div>販売額: ${U.escapeHTML(r.salesAmount)}</div>` : ""}
+            <div class="metric-row">
+              <span>売渡 <b>${U.escapeHTML(r.shippedQuantity || "-")}</b></span>
+              <span>販売額 <b>${U.escapeHTML(r.salesAmount || "-")}</b></span>
+              <span>10a販売額 <b>${U.escapeHTML(r.salesPer10a || "-")}</b></span>
+            </div>
             ${r.quality ? `<div>品質: ${U.escapeHTML(r.quality)}</div>` : ""}
             ${r.reflection ? `<div>${U.escapeHTML(r.reflection)}</div>` : ""}
           </div>
@@ -54,8 +62,11 @@
         varietyId: U.$("rVariety").value,
         areaA: U.$("rAreaA").value,
         yield: U.$("rYield").value,
-        grade: U.$("rGrade").value,
+        yieldPer10a: U.$("rYieldPer10a").value,
+        firstGradeRate: U.$("rFirstGradeRate").value,
+        shippedQuantity: U.$("rShipped").value,
         salesAmount: U.$("rSales").value,
+        salesPer10a: U.$("rSalesPer10a").value,
         quality: U.$("rQuality").value,
         reflection: U.$("rReflection").value
       });

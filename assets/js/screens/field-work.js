@@ -103,6 +103,7 @@
     U.$("fieldWorkHeading").textContent = "圃場作業入力";
     U.$("editFieldWorkId").value = "";
     U.$("fwDate").value = U.today();
+    if (U.$("fwWorker")) U.$("fwWorker").value = "自分";
     U.$("fwName").value = "田植え";
     U.$("fwHours").value = "";
     U.$("fwMachine").value = "";
@@ -112,12 +113,51 @@
     U.$("fwWeatherAutoJson").value = "";
     U.$("fwWeatherStatus").textContent = "位置情報を設定すると、作業日の天気・気温・降水量を自動取得します。";
     U.$("fwMemo").value = "";
+    if (U.$("fwPhoto")) U.$("fwPhoto").value = "";
+    if (U.$("fwPhotoFile")) U.$("fwPhotoFile").value = "";
+    if (U.$("fwPhotoPreview")) {
+      U.$("fwPhotoPreview").src = "";
+      U.$("fwPhotoPreview").dataset.photoData = "";
+      U.$("fwPhotoPreview").classList.add("hidden");
+    }
     setSelectedFieldIds([]);
   }
 
   function prefillField(fieldId) {
     resetForm();
     setSelectedFieldIds([fieldId]);
+  }
+
+  function prefillDate(date, fieldId) {
+    resetForm();
+    U.$("fwDate").value = date || U.today();
+    if (fieldId) setSelectedFieldIds([fieldId]);
+  }
+
+  function editWork(workId) {
+    const work = state.data().fieldWorks.find((item) => item.workId === workId);
+    if (!work) return;
+    U.$("fieldWorkHeading").textContent = "圃場作業を編集";
+    U.$("editFieldWorkId").value = work.workId;
+    U.$("fwDate").value = work.date;
+    U.$("fwName").value = work.workName;
+    if (U.$("fwWorker")) U.$("fwWorker").value = work.worker || "";
+    U.$("fwHours").value = work.hours || "";
+    U.$("fwMachine").value = work.machine || "";
+    U.$("fwMaterial").value = work.material || "";
+    U.$("fwAmount").value = work.amount || "";
+    U.$("fwWeather").value = work.weather || "";
+    U.$("fwWeatherAutoJson").value = work.weatherAuto ? JSON.stringify(work.weatherAuto) : "";
+    if (U.$("fwPhoto")) U.$("fwPhoto").value = work.photo || "";
+    if (U.$("fwPhotoPreview")) {
+      U.$("fwPhotoPreview").dataset.photoData = work.photoData || "";
+      U.$("fwPhotoPreview").src = work.photoData || "";
+      U.$("fwPhotoPreview").classList.toggle("hidden", !work.photoData);
+    }
+    U.$("fwWeatherStatus").textContent = work.weatherAuto ? `${work.weatherAuto.source || "自動取得"}: ${work.weatherAuto.summary || work.weather}` : "必要なら作業日の天気を取得してください。";
+    U.$("fwMemo").value = work.memo || "";
+    setSelectedFieldIds(work.fieldIds || []);
+    window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
   function renderList() {
@@ -132,6 +172,7 @@
             <div>
               <b>${U.escapeHTML(U.fd(work.date))} ${U.escapeHTML(work.workName)}</b><br>
               <span class="pill info">${U.escapeHTML(fieldNames || "圃場なし")}</span>
+              ${work.worker ? `<span class="pill ok">${U.escapeHTML(work.worker)}</span>` : ""}
               ${work.hours ? `<span class="pill warn">${U.escapeHTML(work.hours)}</span>` : ""}
               ${dap ? `<span class="pill purple">${U.escapeHTML(dap)}</span>` : ""}
             </div>
@@ -140,6 +181,8 @@
               ${work.machine ? `<div>機械: ${U.escapeHTML(work.machine)}</div>` : ""}
               ${work.material ? `<div>資材: ${U.escapeHTML(work.material)} ${U.escapeHTML(work.amount || "")}</div>` : ""}
               ${work.weather ? `<div>天気: ${U.escapeHTML(work.weather)}</div>` : ""}
+              ${work.photoData ? `<img class="thumb" src="${U.attr(work.photoData)}" alt="">` : ""}
+              ${work.photo && !work.photoData ? `<div>写真: ${U.escapeHTML(work.photo)}</div>` : ""}
               ${work.weatherAuto ? `<div class="muted">自動取得: ${U.escapeHTML(work.weatherAuto.source || "")} / ${U.escapeHTML(work.weatherAuto.label || "")}</div>` : ""}
               ${work.memo ? `<div>${U.escapeHTML(work.memo)}</div>` : ""}
           </div>
@@ -246,6 +289,22 @@
 
     U.$("fwName").addEventListener("change", () => applyWorkPreset(U.$("fwName").value));
 
+    if (U.$("fwPhotoFile")) {
+      U.$("fwPhotoFile").addEventListener("change", async (event) => {
+        const file = event.target.files && event.target.files[0];
+        if (!file) return;
+        try {
+          const dataUrl = await U.imageFileToDataUrl(file);
+          U.$("fwPhotoPreview").src = dataUrl;
+          U.$("fwPhotoPreview").dataset.photoData = dataUrl;
+          U.$("fwPhotoPreview").classList.remove("hidden");
+          if (!U.$("fwPhoto").value) U.$("fwPhoto").value = file.name || "写真あり";
+        } catch (error) {
+          alert(error.message);
+        }
+      });
+    }
+
     ["fwMachine", "fwMaterial", "fwAmount", "fwWeather"].forEach((id) => {
       U.$(id).addEventListener("input", () => {
         U.$(id).dataset.autoFilled = "0";
@@ -270,12 +329,15 @@
         date: U.$("fwDate").value,
         workName: U.$("fwName").value,
         fieldIds: ids,
+        worker: U.$("fwWorker") ? U.$("fwWorker").value : "",
         hours: U.$("fwHours").value,
         machine: U.$("fwMachine").value,
         material: U.$("fwMaterial").value,
         amount: U.$("fwAmount").value,
         weather: U.$("fwWeather").value,
         weatherAuto: weatherAutoValue(),
+        photo: U.$("fwPhoto") ? U.$("fwPhoto").value : "",
+        photoData: U.$("fwPhotoPreview") ? U.$("fwPhotoPreview").dataset.photoData || "" : "",
         memo: U.$("fwMemo").value
       });
       resetForm();
@@ -294,15 +356,22 @@
       if (button.dataset.workAction === "duplicate") {
         resetForm();
         U.$("fieldWorkHeading").textContent = "圃場作業を複製";
-        U.$("fwDate").value = U.today();
-        U.$("fwName").value = work.workName;
-        U.$("fwHours").value = work.hours || "";
+      U.$("fwDate").value = U.today();
+      U.$("fwName").value = work.workName;
+      if (U.$("fwWorker")) U.$("fwWorker").value = work.worker || "自分";
+      U.$("fwHours").value = work.hours || "";
         U.$("fwMachine").value = work.machine || "";
         U.$("fwMaterial").value = work.material || "";
         U.$("fwAmount").value = work.amount || "";
-        U.$("fwWeather").value = "";
-        U.$("fwWeatherAutoJson").value = "";
-        U.$("fwMemo").value = work.memo || "";
+      U.$("fwWeather").value = "";
+      U.$("fwWeatherAutoJson").value = "";
+      if (U.$("fwPhoto")) U.$("fwPhoto").value = work.photo || "";
+      if (U.$("fwPhotoPreview")) {
+        U.$("fwPhotoPreview").dataset.photoData = work.photoData || "";
+        U.$("fwPhotoPreview").src = work.photoData || "";
+        U.$("fwPhotoPreview").classList.toggle("hidden", !work.photoData);
+      }
+      U.$("fwMemo").value = work.memo || "";
         setSelectedFieldIds(work.fieldIds || []);
         window.scrollTo({ top: 0, behavior: "smooth" });
         return;
@@ -311,12 +380,19 @@
       U.$("editFieldWorkId").value = work.workId;
       U.$("fwDate").value = work.date;
       U.$("fwName").value = work.workName;
+      if (U.$("fwWorker")) U.$("fwWorker").value = work.worker || "";
       U.$("fwHours").value = work.hours || "";
       U.$("fwMachine").value = work.machine || "";
       U.$("fwMaterial").value = work.material || "";
       U.$("fwAmount").value = work.amount || "";
       U.$("fwWeather").value = work.weather || "";
       U.$("fwWeatherAutoJson").value = work.weatherAuto ? JSON.stringify(work.weatherAuto) : "";
+      if (U.$("fwPhoto")) U.$("fwPhoto").value = work.photo || "";
+      if (U.$("fwPhotoPreview")) {
+        U.$("fwPhotoPreview").dataset.photoData = work.photoData || "";
+        U.$("fwPhotoPreview").src = work.photoData || "";
+        U.$("fwPhotoPreview").classList.toggle("hidden", !work.photoData);
+      }
       U.$("fwWeatherStatus").textContent = work.weatherAuto ? `${work.weatherAuto.source || "自動取得"}: ${work.weatherAuto.summary || work.weather}` : "必要なら作業日の天気を取得してください。";
       U.$("fwMemo").value = work.memo || "";
       setSelectedFieldIds(work.fieldIds || []);
@@ -324,6 +400,14 @@
     });
 
     document.querySelector('[data-action="reset-field-work"]').addEventListener("click", resetForm);
+    if (document.querySelector('[data-action="clear-work-photo"]')) {
+      document.querySelector('[data-action="clear-work-photo"]').addEventListener("click", () => {
+        U.$("fwPhotoFile").value = "";
+        U.$("fwPhotoPreview").src = "";
+        U.$("fwPhotoPreview").dataset.photoData = "";
+        U.$("fwPhotoPreview").classList.add("hidden");
+      });
+    }
     document.querySelector('[data-action="use-current-location"]').addEventListener("click", useCurrentLocation);
     document.querySelector('[data-action="search-weather-place"]').addEventListener("click", searchWeatherPlace);
     document.querySelector('[data-action="set-weather-location"]').addEventListener("click", setWeatherLocationManually);
@@ -331,5 +415,5 @@
   }
 
   RiceOS.screens = RiceOS.screens || {};
-  RiceOS.screens.fieldWork = { render, bind, resetForm, prefillField, prefillWorkName, daysText };
+  RiceOS.screens.fieldWork = { render, bind, resetForm, prefillField, prefillDate, prefillWorkName, editWork, daysText };
 })();
