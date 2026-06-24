@@ -863,6 +863,127 @@ h3 {
   }
 }
 
+/* KARTE10: calendar edit flow and richer daily-use polish. */
+#screen-calendar .calendar-grid {
+  padding: 10px;
+  border: 1px solid rgba(214, 229, 207, 0.9);
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(246, 251, 242, 0.92)),
+    #fff;
+  box-shadow: var(--shadow);
+}
+
+#screen-calendar .panel {
+  border: 1px solid rgba(214, 229, 207, 0.9);
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(247, 252, 243, 0.96)),
+    #fff;
+}
+
+.calendar-day {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(221, 233, 216, 0.9);
+  box-shadow: 0 4px 12px rgba(31, 48, 37, 0.08);
+}
+
+.calendar-day.selected {
+  border-color: var(--primary);
+  background: linear-gradient(180deg, #f4fff0, #e3f8df);
+  box-shadow: 0 8px 18px rgba(41, 168, 97, 0.18);
+}
+
+.calendar-day.today:not(.selected) {
+  border-color: #e8bf45;
+  background: linear-gradient(180deg, #fff8cf, #fff2a8);
+}
+
+.mini-card {
+  position: relative;
+  border: 1px solid rgba(221, 233, 216, 0.9);
+  border-left: 6px solid #91a889;
+  background: linear-gradient(135deg, #ffffff, #f8fbf5);
+}
+
+.mini-card.schedule {
+  border-left-color: var(--blue);
+}
+
+.mini-card.work {
+  border-left-color: #e68632;
+}
+
+.mini-card.growth {
+  border-left-color: var(--primary);
+}
+
+.mini-card.dry,
+.mini-card.irrigation {
+  border-left-color: var(--purple);
+}
+
+.mini-card b,
+.mini-card span,
+.mini-card small {
+  overflow-wrap: anywhere;
+}
+
+.mini-card > b {
+  font-size: 14px;
+}
+
+.mini-card > span,
+.mini-card > small {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.record-actions.mini-actions {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+  padding: 4px 0 0;
+}
+
+.record-actions.mini-actions button {
+  min-height: 34px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  font-size: 12px;
+}
+
+.sheet-panel {
+  border: 1px solid rgba(218, 230, 212, 0.9);
+  background:
+    linear-gradient(180deg, #ffffff 0%, #f8fbf4 100%);
+}
+
+.sheet-actions button {
+  position: relative;
+  align-content: center;
+  border-color: #dfead9;
+  background: linear-gradient(135deg, #ffffff, #f2fbef);
+  color: #24412d;
+  overflow: hidden;
+}
+
+@media (max-width: 900px) {
+  #screen-calendar .calendar-grid {
+    padding: 7px;
+    gap: 5px;
+  }
+
+  .calendar-day {
+    min-height: 66px;
+    padding: 6px;
+  }
+
+  .record-actions.mini-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 @media (max-width: 720px) {
   body {
     font-size: 14px;
@@ -944,10 +1065,7 @@ h3 {
 
 body {
   padding-bottom: 18px;
-  background:
-    radial-gradient(circle at 0% 0%, rgba(255, 242, 168, 0.82) 0 17%, transparent 18%),
-    radial-gradient(circle at 100% 4%, rgba(223, 241, 255, 0.86) 0 15%, transparent 16%),
-    linear-gradient(180deg, #f5fff2 0%, #edf8ff 58%, #fff9ef 100%);
+  background: linear-gradient(180deg, #f5fff2 0%, #edf8ff 58%, #fff9ef 100%);
 }
 
 button {
@@ -3063,7 +3181,7 @@ label {
   }
 }
 
-/* KARTE9: first visual pass, cheerful daily-use feel without data changes. */
+/* KARTE10: first visual pass, cheerful daily-use feel without data changes. */
 .karte-hero {
   position: relative;
   min-height: 176px;
@@ -3112,7 +3230,7 @@ label {
   font-weight: 800;
 }
 
-/* KARTE9: home screen follows the supplied calendar/timeline/record mock. */
+/* KARTE10: home screen follows the supplied calendar/timeline/record mock. */
 .visual-app-board {
   display: grid;
   gap: 12px;
@@ -4021,5 +4139,145 @@ label {
   .screen form.form-grid select {
     min-height: 42px;
     padding: 9px 9px;
+  }
+}
+
+/* KARTE10: final calendar and date-sheet polish. */
+#screen-calendar .screen-head {
+  align-items: center;
+  padding: 12px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #075b31 0%, #159447 100%);
+  color: #fff;
+  box-shadow: 0 12px 28px rgba(7, 91, 49, 0.2);
+}
+
+#screen-calendar .screen-head .eyebrow,
+#screen-calendar .screen-head .muted {
+  color: rgba(255, 255, 255, 0.82);
+}
+
+#screen-calendar .panel {
+  border: 1px solid rgba(42, 118, 63, 0.12);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(247, 252, 242, 0.96));
+  box-shadow: 0 12px 32px rgba(31, 48, 37, 0.08);
+}
+
+#screen-calendar .calendar-grid {
+  gap: 6px;
+  padding: 8px;
+  border-radius: 8px;
+  background: linear-gradient(180deg, #f3faef, #ffffff);
+}
+
+#screen-calendar .calendar-day {
+  min-height: 88px;
+  border: 1px solid rgba(42, 118, 63, 0.08);
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(247, 251, 245, 0.96));
+  box-shadow: 0 4px 14px rgba(31, 48, 37, 0.07);
+}
+
+#screen-calendar .calendar-day.today {
+  background: linear-gradient(180deg, #fff7c7, #fffdf2);
+}
+
+#screen-calendar .calendar-day.selected {
+  outline: 3px solid rgba(53, 161, 54, 0.35);
+  background: linear-gradient(180deg, #e9f9e3, #ffffff);
+}
+
+#selectedDateEntries .mini-card,
+#sheetEntries .mini-card {
+  position: relative;
+  gap: 5px;
+  padding: 10px 10px 10px 12px;
+  border: 1px solid rgba(42, 118, 63, 0.1);
+  border-left: 5px solid var(--primary);
+  background: #fff;
+  box-shadow: 0 8px 20px rgba(31, 48, 37, 0.06);
+}
+
+#selectedDateEntries .mini-card.work,
+#sheetEntries .mini-card.work {
+  border-left-color: #f28a26;
+  background: linear-gradient(90deg, rgba(255, 245, 229, 0.95), #fff);
+}
+
+#selectedDateEntries .mini-card.growth,
+#sheetEntries .mini-card.growth {
+  border-left-color: #31a54a;
+  background: linear-gradient(90deg, rgba(238, 250, 232, 0.95), #fff);
+}
+
+#selectedDateEntries .mini-card.schedule,
+#sheetEntries .mini-card.schedule {
+  border-left-color: #2879c9;
+  background: linear-gradient(90deg, rgba(234, 245, 255, 0.95), #fff);
+}
+
+#selectedDateEntries .mini-card.dry,
+#sheetEntries .mini-card.dry,
+#selectedDateEntries .mini-card.irrigation,
+#sheetEntries .mini-card.irrigation {
+  border-left-color: #7b61cc;
+  background: linear-gradient(90deg, rgba(244, 239, 255, 0.95), #fff);
+}
+
+.record-actions.mini-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.record-actions.mini-actions button {
+  min-height: 34px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.sheet-panel {
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(245, 251, 241, 0.98));
+}
+
+.sheet-actions button {
+  border: 1px solid rgba(42, 118, 63, 0.12);
+  border-radius: 8px;
+  background: linear-gradient(180deg, #ffffff, #f3faf0);
+  box-shadow: 0 6px 14px rgba(31, 48, 37, 0.06);
+  color: #17442b;
+  font-weight: 950;
+}
+
+@media (max-width: 720px) {
+  #screen-calendar .screen-head {
+    padding: 10px;
+  }
+
+  #screen-calendar .calendar-grid {
+    gap: 4px;
+    padding: 5px;
+  }
+
+  #screen-calendar .calendar-day {
+    min-height: 66px;
+    padding: 5px;
+  }
+
+  .record-actions.mini-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .sheet-panel {
+    width: min(100% - 12px, 620px);
+    bottom: 6px;
+    padding: 10px;
+    border-radius: 22px 22px 18px 18px;
   }
 }

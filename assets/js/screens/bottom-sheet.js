@@ -9,14 +9,27 @@
   let selectedFieldId = "";
 
   function entryHtml(entry) {
+    const id = RiceOS.recordActions ? RiceOS.recordActions.idFor(entry.kind, entry.record) : "";
     return `
       <div class="mini-card ${U.attr(entry.kind)}">
         <b>${U.escapeHTML(entry.title)}</b>
         <span>${U.escapeHTML(entry.subtitle || "")}</span>
         ${entry.memo ? `<small>${U.escapeHTML(entry.memo)}</small>` : ""}
         ${entry.hasPhoto ? '<span class="pill info">写真あり</span>' : ""}
+        ${id ? `
+          <div class="record-actions mini-actions">
+            <button class="secondary" type="button" data-sheet-action="edit" data-kind="${U.attr(entry.kind)}" data-id="${U.attr(id)}">編集</button>
+            <button class="danger" type="button" data-sheet-action="delete" data-kind="${U.attr(entry.kind)}" data-id="${U.attr(id)}">削除</button>
+          </div>
+        ` : ""}
       </div>
     `;
+  }
+
+  function findEntry(kind, id) {
+    return RiceOS.calendar.entriesForDate(selectedDate).find((entry) => {
+      return RiceOS.recordActions && RiceOS.recordActions.idFor(entry.kind, entry.record) === id && entry.kind === kind;
+    });
   }
 
   function render() {
@@ -87,6 +100,19 @@
       selectedFieldId = U.$("sheetField").value;
     });
     U.$("dateSheet").addEventListener("click", (event) => {
+      const actionButton = event.target.closest("[data-sheet-action]");
+      if (actionButton && RiceOS.recordActions) {
+        const entry = findEntry(actionButton.dataset.kind, actionButton.dataset.id);
+        if (!entry) return;
+        if (actionButton.dataset.sheetAction === "edit") {
+          close();
+          RiceOS.recordActions.edit(entry.kind, entry.record);
+        }
+        if (actionButton.dataset.sheetAction === "delete") {
+          if (RiceOS.recordActions.remove(entry.kind, entry.record)) render();
+        }
+        return;
+      }
       const button = event.target.closest("[data-sheet-add]");
       if (!button) return;
       const action = button.dataset.sheetAdd;

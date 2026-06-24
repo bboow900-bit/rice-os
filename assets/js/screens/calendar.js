@@ -32,14 +32,27 @@
   }
 
   function entryHtml(entry) {
+    const id = RiceOS.recordActions ? RiceOS.recordActions.idFor(entry.kind, entry.record) : "";
     return `
       <div class="mini-card ${U.attr(entry.kind)}">
         <b>${U.escapeHTML(entry.title)}</b>
         <span>${U.escapeHTML(entry.subtitle || "")}</span>
         ${entry.memo ? `<small>${U.escapeHTML(entry.memo)}</small>` : ""}
         ${entry.hasPhoto ? '<span class="pill info">写真あり</span>' : ""}
+        ${id ? `
+          <div class="record-actions mini-actions">
+            <button class="secondary" type="button" data-calendar-action="edit" data-kind="${U.attr(entry.kind)}" data-id="${U.attr(id)}">編集</button>
+            <button class="danger" type="button" data-calendar-action="delete" data-kind="${U.attr(entry.kind)}" data-id="${U.attr(id)}">削除</button>
+          </div>
+        ` : ""}
       </div>
     `;
+  }
+
+  function findEntry(kind, id) {
+    return RiceOS.calendar.entriesForDate(selectedDate).find((entry) => {
+      return RiceOS.recordActions && RiceOS.recordActions.idFor(entry.kind, entry.record) === id && entry.kind === kind;
+    });
   }
 
   function renderSelected() {
@@ -64,6 +77,19 @@
       selectedDate = day.dataset.date;
       render();
       if (RiceOS.bottomSheet) RiceOS.bottomSheet.open(selectedDate);
+    });
+    U.$("selectedDateEntries").addEventListener("click", (event) => {
+      const button = event.target.closest("[data-calendar-action]");
+      if (!button || !RiceOS.recordActions) return;
+      const entry = findEntry(button.dataset.kind, button.dataset.id);
+      if (!entry) return;
+      if (button.dataset.calendarAction === "edit") {
+        RiceOS.recordActions.edit(entry.kind, entry.record);
+        render();
+      }
+      if (button.dataset.calendarAction === "delete") {
+        if (RiceOS.recordActions.remove(entry.kind, entry.record)) render();
+      }
     });
     document.querySelectorAll("[data-calendar-move]").forEach((button) => {
       button.addEventListener("click", () => {

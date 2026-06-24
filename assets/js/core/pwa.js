@@ -34,7 +34,7 @@
 
     if (!canUseServiceWorker()) return;
 
-    navigator.serviceWorker.register("./service-worker.js?v=20260624_karte9")
+    navigator.serviceWorker.register("./service-worker.js?v=20260624_karte10")
       .then((registration) => {
         registration.update();
       })
