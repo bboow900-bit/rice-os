@@ -202,6 +202,71 @@
     return rows.reduce((sum, row) => sum + U.parseWorkHours(row.hours), 0);
   }
 
+  function roundHours(value) {
+    return Math.round(U.number(value, 0) * 10) / 10;
+  }
+
+  function monthValue(dateText) {
+    const d = new Date(`${dateText}T00:00:00`);
+    if (Number.isNaN(d.getTime())) return { key: "none", label: "日付未設定" };
+    return {
+      key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`,
+      label: `${d.getMonth() + 1}月`
+    };
+  }
+
+  function statItem(map, key, label) {
+    if (!map.has(key)) {
+      map.set(key, { key, label, count: 0, hours: 0, lastDate: "", growth: 0, work: 0, water: 0 });
+    }
+    return map.get(key);
+  }
+
+  function fieldStats(rows) {
+    const map = new Map();
+    rows.forEach((row) => {
+      const ids = unique(row.fieldIds || []);
+      if (!ids.length) return;
+      const perFieldHours = U.parseWorkHours(row.hours) / ids.length;
+      ids.forEach((fieldId) => {
+        const field = state.field(fieldId);
+        const item = statItem(map, fieldId, field && field.name || "圃場未設定");
+        item.count += 1;
+        item.hours += perFieldHours;
+        item.growth += row.kind === "growth" ? 1 : 0;
+        item.work += row.kind === "fieldWork" || row.kind === "other" ? 1 : 0;
+        item.water += row.kind === "dry" || row.kind === "irrigation" ? 1 : 0;
+        if (!item.lastDate || String(row.date).localeCompare(String(item.lastDate)) > 0) item.lastDate = row.date;
+      });
+    });
+    return Array.from(map.values()).sort((a, b) => b.count - a.count || b.hours - a.hours || a.label.localeCompare(b.label));
+  }
+
+  function workTypeStats(rows) {
+    const map = new Map();
+    rows.filter((row) => row.kind === "fieldWork" || row.kind === "other").forEach((row) => {
+      const item = statItem(map, row.title || "作業未設定", row.title || "作業未設定");
+      item.count += 1;
+      item.hours += U.parseWorkHours(row.hours);
+      if (!item.lastDate || String(row.date).localeCompare(String(item.lastDate)) > 0) item.lastDate = row.date;
+    });
+    return Array.from(map.values()).sort((a, b) => b.hours - a.hours || b.count - a.count || a.label.localeCompare(b.label));
+  }
+
+  function monthStats(rows) {
+    const map = new Map();
+    rows.forEach((row) => {
+      const month = monthValue(row.date);
+      const item = statItem(map, month.key, month.label);
+      item.count += 1;
+      item.hours += U.parseWorkHours(row.hours);
+      item.growth += row.kind === "growth" ? 1 : 0;
+      item.work += row.kind === "fieldWork" || row.kind === "other" ? 1 : 0;
+      item.water += row.kind === "dry" || row.kind === "irrigation" ? 1 : 0;
+    });
+    return Array.from(map.values()).sort((a, b) => String(a.key).localeCompare(String(b.key)));
+  }
+
   function summaryCard(label, value, tone) {
     return `
       <div class="annual-summary-card ${tone || ""}">
@@ -221,6 +286,94 @@
         ${summaryCard("作業時間", U.formatHours(totalHours(rows)), "amber")}
         ${summaryCard("対象圃場", `${fields.length}圃場`, "blue")}
         ${summaryCard("水管理 / 生育", `${waterCount} / ${growthCount}`, "purple")}
+      </div>
+    `;
+  }
+
+  function statRow(item, max, options = {}) {
+    const ratio = max ? Math.max(8, Math.round((options.metric(item) / max) * 100)) : 8;
+    return `
+      <div class="annual-stat-row">
+        <div>
+          <b>${U.escapeHTML(item.label)}</b>
+          <span>${U.escapeHTML(options.sub(item))}</span>
+        </div>
+        <i><span style="width:${U.attr(String(ratio))}%"></span></i>
+        <em>${U.escapeHTML(options.value(item))}</em>
+      </div>
+    `;
+  }
+
+  function renderStatList(items, options) {
+    if (!items.length) return `<div class="empty">${U.escapeHTML(options.empty)}</div>`;
+    const max = Math.max(...items.map(options.metric), 0);
+    return items.slice(0, options.limit || 5).map((item) => statRow(item, max, options)).join("");
+  }
+
+  function renderAnalysis(rows) {
+    if (!rows.length) return "";
+    const fields = fieldStats(rows);
+    const works = workTypeStats(rows);
+    const months = monthStats(rows);
+    const workRows = rows.filter((row) => row.kind === "fieldWork" || row.kind === "other");
+    const workHours = totalHours(workRows);
+    const activeDays = unique(workRows.map((row) => row.date)).length;
+    const topWork = works[0];
+    return `
+      <div class="annual-analysis-board">
+        <section class="annual-analysis-card">
+          <div class="section-title compact">
+            <h3>圃場別</h3>
+            <span class="muted">記録が多い順</span>
+          </div>
+          ${renderStatList(fields, {
+            empty: "圃場別の記録はありません。",
+            metric: (item) => item.count,
+            value: (item) => `${item.count}件`,
+            sub: (item) => `${U.formatHours(item.hours)} / 生育${item.growth} / 水${item.water}`,
+            limit: 5
+          })}
+        </section>
+        <section class="annual-analysis-card">
+          <div class="section-title compact">
+            <h3>作業別</h3>
+            <span class="muted">時間が多い順</span>
+          </div>
+          ${renderStatList(works, {
+            empty: "作業時間つきの記録はありません。",
+            metric: (item) => item.hours || item.count,
+            value: (item) => item.hours ? U.formatHours(item.hours) : `${item.count}回`,
+            sub: (item) => `${item.count}回${item.lastDate ? ` / 最新 ${U.fd(item.lastDate)}` : ""}`,
+            limit: 5
+          })}
+        </section>
+        <section class="annual-analysis-card cost">
+          <div class="section-title compact">
+            <h3>作業コスト</h3>
+            <span class="muted">年度内の目安</span>
+          </div>
+          <div class="annual-cost-grid">
+            <span><b>${U.escapeHTML(U.formatHours(workHours))}</b><small>総作業時間</small></span>
+            <span><b>${U.escapeHTML(String(activeDays))}日</b><small>作業日数</small></span>
+            <span><b>${U.escapeHTML(activeDays ? U.formatHours(roundHours(workHours / activeDays)) : "0時間")}</b><small>1日平均</small></span>
+            <span><b>${U.escapeHTML(topWork ? topWork.label : "-")}</b><small>最多時間</small></span>
+          </div>
+        </section>
+        <section class="annual-analysis-card wide">
+          <div class="section-title compact">
+            <h3>月別の流れ</h3>
+            <span class="muted">件数 / 作業時間</span>
+          </div>
+          <div class="annual-month-flow">
+            ${renderStatList(months, {
+              empty: "月別の記録はありません。",
+              metric: (item) => item.count,
+              value: (item) => `${item.count}件`,
+              sub: (item) => `${U.formatHours(item.hours)} / 作業${item.work} / 生育${item.growth} / 水${item.water}`,
+              limit: 12
+            })}
+          </div>
+        </section>
       </div>
     `;
   }
@@ -325,6 +478,56 @@
     }).join("");
   }
 
+  function groupRowsByField(rows) {
+    const groups = new Map();
+    rows.forEach((row) => {
+      const ids = unique(row.fieldIds || []);
+      const keys = ids.length ? ids : ["__none"];
+      keys.forEach((fieldId) => {
+        if (!groups.has(fieldId)) groups.set(fieldId, []);
+        groups.get(fieldId).push(row);
+      });
+    });
+    return Array.from(groups.entries()).sort(([aId, aRows], [bId, bRows]) => {
+      const aName = aId === "__none" ? "対象なし" : (state.field(aId) && state.field(aId).name || "");
+      const bName = bId === "__none" ? "対象なし" : (state.field(bId) && state.field(bId).name || "");
+      return aName.localeCompare(bName) || bRows.length - aRows.length;
+    });
+  }
+
+  function renderFieldCards(rows) {
+    return groupRowsByField(rows).map(([fieldId, items]) => {
+      const field = fieldId === "__none" ? null : state.field(fieldId);
+      const sorted = items.slice().sort((a, b) => String(b.date).localeCompare(String(a.date)));
+      const stats = {
+        hours: totalHours(items),
+        growth: items.filter((row) => row.kind === "growth").length,
+        water: items.filter((row) => row.kind === "dry" || row.kind === "irrigation").length,
+        work: items.filter((row) => row.kind === "fieldWork" || row.kind === "other").length
+      };
+      return `
+        <article class="annual-field-card">
+          <div class="annual-field-head">
+            <div>
+              <b>${U.escapeHTML(field && field.name || "対象なし")}</b>
+              <span>${U.escapeHTML(field && field.areaA ? `${field.areaA}a` : "")}</span>
+            </div>
+            <div class="annual-field-metrics">
+              ${chip(`${items.length}件`, "count")}
+              ${stats.hours ? chip(U.formatHours(stats.hours), "hours") : ""}
+              ${chip(`作業${stats.work}`, "field")}
+              ${chip(`生育${stats.growth}`, "dap")}
+              ${chip(`水${stats.water}`, "status")}
+            </div>
+          </div>
+          <div class="annual-entry-list field-view">
+            ${sorted.slice(0, 12).map((row) => renderEntry(row, true)).join("")}
+          </div>
+        </article>
+      `;
+    }).join("");
+  }
+
   function renderDetailTimeline(rows) {
     let currentMonth = "";
     let currentPhase = "";
@@ -347,6 +550,7 @@
 
   function renderTimeline(rows) {
     if (!rows.length) return '<div class="empty">記録はまだありません。</div>';
+    if ((U.$("annualView").value || "compact") === "field") return renderFieldCards(rows);
     if ((U.$("annualView").value || "compact") === "detail") return renderDetailTimeline(rows);
     return renderDayCards(rows);
   }
@@ -387,6 +591,7 @@
     ], U.$("annualKind").value || "all");
     U.setOptions(U.$("annualView"), [
       { value: "compact", label: "日付カード" },
+      { value: "field", label: "圃場別" },
       { value: "detail", label: "詳細一覧" }
     ], U.$("annualView").value || "compact");
   }
@@ -395,7 +600,7 @@
     renderOptions();
     const rows = allRows();
     const filtered = filterRows(rows);
-    U.$("annualTimeline").innerHTML = renderSummary(filtered) + renderLastYear(rows) + renderTimeline(filtered);
+    U.$("annualTimeline").innerHTML = renderSummary(filtered) + renderAnalysis(filtered) + renderLastYear(rows) + renderTimeline(filtered);
   }
 
   function editRow(kind, id) {

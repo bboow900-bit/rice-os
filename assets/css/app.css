@@ -1224,6 +1224,124 @@ label {
   background: linear-gradient(135deg, #fff, #f0eafa);
 }
 
+.annual-analysis-board {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.annual-analysis-card {
+  display: grid;
+  gap: 9px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: var(--shadow);
+}
+
+.annual-analysis-card.cost {
+  background: linear-gradient(135deg, #ffffff, #fff8df);
+}
+
+.annual-analysis-card.wide {
+  grid-column: 1 / -1;
+}
+
+.annual-stat-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 72px auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 42px;
+  padding: 7px 0;
+  border-top: 1px dashed #e1e8dd;
+}
+
+.annual-stat-row:first-of-type {
+  border-top: 0;
+}
+
+.annual-stat-row > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.annual-stat-row b,
+.annual-stat-row span {
+  overflow-wrap: anywhere;
+}
+
+.annual-stat-row b {
+  font-size: 13px;
+}
+
+.annual-stat-row span {
+  color: var(--muted);
+  font-size: 11.5px;
+  font-weight: 800;
+}
+
+.annual-stat-row i {
+  display: block;
+  height: 8px;
+  border-radius: 999px;
+  background: #edf3e9;
+  overflow: hidden;
+}
+
+.annual-stat-row i span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #62a94f, #2f7d52);
+}
+
+.annual-stat-row em {
+  min-width: 42px;
+  color: var(--primary-dark);
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 1000;
+  text-align: right;
+}
+
+.annual-cost-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.annual-cost-grid span {
+  display: grid;
+  gap: 3px;
+  min-height: 58px;
+  padding: 9px;
+  border: 1px solid #eadca6;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.annual-cost-grid b {
+  color: #5a4510;
+  font-size: 18px;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+
+.annual-cost-grid small {
+  color: #7a6624;
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.annual-month-flow {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 12px;
+}
+
 .day-group {
   border: 0;
   border-radius: 22px;
@@ -1284,6 +1402,50 @@ label {
   background: linear-gradient(135deg, #ffffff, #fbfff7);
   box-shadow: var(--shadow);
   overflow: hidden;
+}
+
+.annual-field-card {
+  display: grid;
+  gap: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: linear-gradient(135deg, #ffffff, #f8fbf5);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.annual-field-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  border-bottom: 1px solid rgba(220, 227, 215, 0.82);
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.annual-field-head > div:first-child {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.annual-field-head b {
+  font-size: 17px;
+  overflow-wrap: anywhere;
+}
+
+.annual-field-head span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.annual-field-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
 }
 
 .annual-day-card::before {
@@ -1365,6 +1527,10 @@ label {
   display: grid;
   gap: 8px;
   padding: 10px 10px 12px 70px;
+}
+
+.annual-entry-list.field-view {
+  padding-left: 12px;
 }
 
 .annual-entry {
@@ -1515,6 +1681,23 @@ label {
 @media (max-width: 900px) {
   .annual-summary-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .annual-analysis-board,
+  .annual-month-flow {
+    grid-template-columns: 1fr;
+  }
+
+  .annual-stat-row {
+    grid-template-columns: minmax(0, 1fr) 54px auto;
+  }
+
+  .annual-field-head {
+    grid-template-columns: 1fr;
+  }
+
+  .annual-field-metrics {
+    justify-content: flex-start;
   }
 
   .annual-day-head {
@@ -2660,7 +2843,7 @@ label {
   }
 }
 
-/* KARTE7: first visual pass, cheerful daily-use feel without data changes. */
+/* KARTE8: first visual pass, cheerful daily-use feel without data changes. */
 .karte-hero {
   position: relative;
   min-height: 176px;
@@ -2709,7 +2892,7 @@ label {
   font-weight: 800;
 }
 
-/* KARTE7: home screen follows the supplied calendar/timeline/record mock. */
+/* KARTE8: home screen follows the supplied calendar/timeline/record mock. */
 .visual-app-board {
   display: grid;
   gap: 12px;
