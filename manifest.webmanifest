@@ -3,7 +3,7 @@
   "short_name": "稲作カルテ",
   "description": "圃場カルテ、栽培レシピ、生育記録、写真記録、年間履歴を管理する稲作管理アプリ。",
   "lang": "ja",
-  "start_url": "index.html?v=20260624_karte6&source=pwa",
+  "start_url": "index.html?v=20260624_karte7&source=pwa",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",

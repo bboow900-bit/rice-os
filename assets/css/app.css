@@ -2341,6 +2341,122 @@ label {
   box-shadow: var(--shadow);
 }
 
+.growth-choice-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.growth-choice-grid.five {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.growth-choice-grid.water {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.growth-choice-grid button {
+  min-height: 36px;
+  padding: 6px 4px;
+  border-color: #dfe7db;
+  background: #fff;
+  color: #2f3d2e;
+  font-size: 12px;
+  line-height: 1.12;
+  white-space: normal;
+}
+
+.growth-choice-grid button.active {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(47, 125, 82, 0.18);
+}
+
+.growth-target-panel {
+  margin: -8px 0 14px;
+}
+
+.growth-target-card {
+  display: grid;
+  gap: 8px;
+  padding: 11px;
+  border: 1px solid #e6d79b;
+  border-radius: 8px;
+  background: #fff8dd;
+}
+
+.growth-target-card > div:first-child {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.growth-target-card span,
+.growth-target-card p {
+  margin: 0;
+  color: #665113;
+  font-size: 13px;
+  font-weight: 850;
+}
+
+.growth-target-card i {
+  display: block;
+  height: 9px;
+  border-radius: 999px;
+  background: #eadca6;
+  overflow: hidden;
+}
+
+.growth-target-card i span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: #65a832;
+}
+
+.growth-compare-panel {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.growth-compare-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.growth-compare-card {
+  display: grid;
+  gap: 5px;
+  min-height: 94px;
+  padding: 10px;
+  border: 1px solid #dfe7db;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 3px 12px rgba(31, 48, 37, 0.06);
+}
+
+.growth-compare-card.empty {
+  background: #f8faf5;
+}
+
+.growth-compare-card span,
+.growth-compare-card small {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.growth-compare-card img {
+  width: 100%;
+  max-height: 150px;
+  border-radius: 8px;
+  object-fit: cover;
+}
+
 .growth-date {
   display: flex;
   align-items: center;
@@ -2544,7 +2660,7 @@ label {
   }
 }
 
-/* KARTE6: first visual pass, cheerful daily-use feel without data changes. */
+/* KARTE7: first visual pass, cheerful daily-use feel without data changes. */
 .karte-hero {
   position: relative;
   min-height: 176px;
@@ -2593,7 +2709,7 @@ label {
   font-weight: 800;
 }
 
-/* KARTE6: home screen follows the supplied calendar/timeline/record mock. */
+/* KARTE7: home screen follows the supplied calendar/timeline/record mock. */
 .visual-app-board {
   display: grid;
   gap: 12px;
@@ -3443,6 +3559,16 @@ label {
   }
 
   .visual-tabs {
+    grid-template-columns: 1fr;
+  }
+
+  .growth-choice-grid,
+  .growth-choice-grid.five,
+  .growth-choice-grid.water {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .growth-compare-grid {
     grid-template-columns: 1fr;
   }
 

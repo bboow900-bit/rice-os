@@ -23,6 +23,9 @@
           ${!log.photoData && log.photo ? `<div class="pill info">${U.escapeHTML(log.photo)}</div>` : ""}
           <div class="muted">葉色:${U.escapeHTML(log.leafColor)} / 雑草:${U.escapeHTML(log.weed)} / ガス:${U.escapeHTML(log.gas)} / 水:${U.escapeHTML(log.water)}</div>
           ${log.memo ? `<div>${U.escapeHTML(log.memo)}</div>` : ""}
+          <div class="record-actions single-action">
+            <button class="secondary" type="button" data-photo-action="edit-growth" data-id="${U.attr(log.logId)}">生育ログを編集</button>
+          </div>
         </div>
       </article>
     `;
@@ -54,6 +57,22 @@
 
   function bind() {
     U.$("photoField").addEventListener("change", render);
+    U.$("photoTimeline").addEventListener("click", (event) => {
+      const button = event.target.closest("[data-photo-action]");
+      if (!button) return;
+      if (button.dataset.photoAction === "edit-growth" && RiceOS.screens.growth) {
+        RiceOS.app.show("growth");
+        RiceOS.screens.growth.editLog(button.dataset.id);
+      }
+    });
+    U.$("photoCompare").addEventListener("click", (event) => {
+      const button = event.target.closest("[data-photo-action]");
+      if (!button) return;
+      if (button.dataset.photoAction === "edit-growth" && RiceOS.screens.growth) {
+        RiceOS.app.show("growth");
+        RiceOS.screens.growth.editLog(button.dataset.id);
+      }
+    });
   }
 
   RiceOS.screens = RiceOS.screens || {};

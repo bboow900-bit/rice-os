@@ -6,6 +6,64 @@
   const S = RiceOS.schema;
   const state = RiceOS.state;
 
+  function parseTargetRange(value) {
+    const nums = String(value || "").match(/\d+(?:\.\d+)?/g);
+    if (!nums || !nums.length) return null;
+    const first = U.number(nums[0], 0);
+    const second = nums[1] ? U.number(nums[1], first) : first;
+    return { min: Math.min(first, second), max: Math.max(first, second) };
+  }
+
+  function renderChips(containerId, selectId, options) {
+    const el = U.$(containerId);
+    const select = U.$(selectId);
+    if (!el || !select) return;
+    const value = select.value;
+    el.innerHTML = options.map((opt) => {
+      const item = typeof opt === "string" ? { value: opt, label: opt } : opt;
+      return `<button type="button" class="${String(item.value) === String(value) ? "active" : ""}" data-growth-select="${U.attr(selectId)}" data-growth-value="${U.attr(item.value)}">${U.escapeHTML(item.text || item.label)}</button>`;
+    }).join("");
+  }
+
+  function renderChoiceControls() {
+    renderChips("gLeafChips", "gLeaf", S.LEAF_COLOR_LEVELS.map((level) => ({ value: level.value, label: level.label, text: `${level.value} ${level.text}` })));
+    renderChips("gWeedChips", "gWeed", S.GROWTH_LEVELS);
+    renderChips("gGasChips", "gGas", S.GROWTH_LEVELS);
+    renderChips("gWaterChips", "gWater", S.WATER_LEVELS);
+  }
+
+  function renderTargetPanel() {
+    const el = U.$("growthTargetPanel");
+    if (!el) return;
+    const field = state.field(U.$("gField").value);
+    const variety = field ? state.variety(field.varietyId) : null;
+    const date = U.$("gDate").value || U.today();
+    const dap = U.daysAfterPlanting(field, date);
+    const tillers = U.number(U.$("gTillerCount") && U.$("gTillerCount").value, 0);
+    const target = variety && variety.targetTillers || "";
+    const range = parseTargetRange(target);
+    let targetLine = "分げつ目標は栽培レシピで設定できます。";
+    let pct = 0;
+    if (range && tillers > 0) {
+      pct = Math.max(5, Math.min(100, (tillers / Math.max(1, range.min)) * 100));
+      if (tillers < range.min) targetLine = `目標 ${target} / 現在 ${tillers}本 / あと${Math.round((range.min - tillers) * 10) / 10}本`;
+      else if (tillers <= range.max) targetLine = `目標 ${target} / 現在 ${tillers}本 / 目標圏内`;
+      else targetLine = `目標 ${target} / 現在 ${tillers}本 / 目標より多め`;
+    } else if (target) {
+      targetLine = `目標 ${target} / 分げつ数を入れると差分を表示`;
+    }
+    el.innerHTML = `
+      <div class="growth-target-card">
+        <div>
+          <b>${U.escapeHTML(field && field.name || "圃場")}</b>
+          <span>${U.escapeHTML(variety && variety.name || "品種未設定")}${dap !== "" ? ` / 田植後${U.escapeHTML(String(dap))}日` : ""}</span>
+        </div>
+        <p>${U.escapeHTML(targetLine)}</p>
+        <i><span style="width:${U.attr(String(pct || 18))}%"></span></i>
+      </div>
+    `;
+  }
+
   function resetForm() {
     U.$("growthHeading").textContent = "生育ログ";
     U.$("editGrowthId").value = "";
@@ -24,6 +82,8 @@
     U.$("gPhotoPreview").src = "";
     U.$("gPhotoPreview").dataset.photoData = "";
     U.$("gPhotoPreview").classList.add("hidden");
+    renderChoiceControls();
+    renderTargetPanel();
   }
 
   function prefillField(fieldId) {
@@ -54,6 +114,46 @@
     U.setOptions(U.$("gWeed"), S.GROWTH_LEVELS, U.$("gWeed").value || "-");
     U.setOptions(U.$("gGas"), S.GROWTH_LEVELS, U.$("gGas").value || "-");
     U.setOptions(U.$("gWater"), S.WATER_LEVELS, U.$("gWater").value || "-");
+    renderChoiceControls();
+    renderTargetPanel();
+  }
+
+  function compareCard(label, log) {
+    if (!log) {
+      return `<div class="growth-compare-card empty"><b>${U.escapeHTML(label)}</b><span>記録なし</span></div>`;
+    }
+    const field = state.field(log.fieldId);
+    const dap = U.daysAfterPlanting(field, log.date);
+    return `
+      <div class="growth-compare-card">
+        <b>${U.escapeHTML(label)} ${U.escapeHTML(U.fd(log.date))}</b>
+        <span>${U.escapeHTML(field && field.name || "")}${dap !== "" ? ` / 田植後${U.escapeHTML(String(dap))}日` : ""}</span>
+        <small>分げつ ${U.escapeHTML(log.tillerCount || "-")} / 葉数 ${U.escapeHTML(log.leafCount || "-")} / 草丈 ${U.escapeHTML(log.plantHeightCm || "-")}cm</small>
+        ${log.photoData ? `<img src="${U.attr(log.photoData)}" alt="">` : ""}
+      </div>
+    `;
+  }
+
+  function renderComparePanel() {
+    const panel = U.$("growthComparePanel");
+    if (!panel) return;
+    const fieldId = U.$("growthFilterField") && U.$("growthFilterField").value !== "all" ? U.$("growthFilterField").value : U.$("gField").value;
+    const logs = state.data().growthLogs
+      .filter((log) => !fieldId || log.fieldId === fieldId)
+      .sort((a, b) => String(b.date).localeCompare(String(a.date)));
+    const latest = logs[0];
+    const range = U.lastYearSamePeriod(latest ? latest.date : U.today(), 14);
+    const lastYear = logs.find((log) => U.inDateRange(log.date, range.start, range.end));
+    panel.innerHTML = `
+      <div class="section-title compact">
+        <h3>写真・去年比較</h3>
+        <span class="muted">${U.escapeHTML(U.fd(range.start))} - ${U.escapeHTML(U.fd(range.end))}</span>
+      </div>
+      <div class="growth-compare-grid">
+        ${compareCard("今年", latest)}
+        ${compareCard("去年同時期", lastYear)}
+      </div>
+    `;
   }
 
   function renderTimeline() {
@@ -98,6 +198,7 @@
         </div>
       `;
     }).join("") : '<div class="empty">生育ログはまだありません。</div>';
+    renderComparePanel();
   }
 
   function render() {
@@ -123,6 +224,8 @@
     U.$("gPhotoPreview").dataset.photoData = log.photoData || "";
     U.$("gPhotoPreview").src = log.photoData || "";
     U.$("gPhotoPreview").classList.toggle("hidden", !log.photoData);
+    renderChoiceControls();
+    renderTargetPanel();
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
@@ -132,6 +235,29 @@
   }
 
   function bind() {
+    U.$("growthForm").addEventListener("click", (event) => {
+      const button = event.target.closest("[data-growth-select]");
+      if (!button) return;
+      const select = U.$(button.dataset.growthSelect);
+      if (!select) return;
+      select.value = button.dataset.growthValue;
+      renderChoiceControls();
+      renderTargetPanel();
+    });
+
+    ["gField", "gDate", "gTillerCount", "gLeafCount", "gPlantHeight", "gLeaf", "gWeed", "gGas", "gWater"].forEach((id) => {
+      const el = U.$(id);
+      if (!el) return;
+      el.addEventListener("input", () => {
+        renderChoiceControls();
+        renderTargetPanel();
+      });
+      el.addEventListener("change", () => {
+        renderChoiceControls();
+        renderTargetPanel();
+      });
+    });
+
     U.$("gPhotoFile").addEventListener("change", async (event) => {
       const file = event.target.files && event.target.files[0];
       if (!file) return;
