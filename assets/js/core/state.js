@@ -114,6 +114,37 @@
     }, "圃場マスターを保存しました");
   }
 
+  function matchesWorkName(work, names) {
+    const values = Array.isArray(names) ? names : [names];
+    const workName = String(work && work.workName || "");
+    return values.some((name) => workName === name || workName.includes(name));
+  }
+
+  function fieldWorksByNameFor(fieldId, names) {
+    return data().fieldWorks
+      .filter((work) => (work.fieldIds || []).includes(fieldId) && matchesWorkName(work, names))
+      .sort((a, b) => String(a.date).localeCompare(String(b.date)));
+  }
+
+  function firstFieldWorkDate(fieldId, names) {
+    const work = fieldWorksByNameFor(fieldId, names)[0];
+    return work && work.date || "";
+  }
+
+  function lastFieldWorkDate(fieldId, names) {
+    const rows = fieldWorksByNameFor(fieldId, names);
+    const work = rows[rows.length - 1];
+    return work && work.date || "";
+  }
+
+  function plantingDateForField(fieldId) {
+    return firstFieldWorkDate(fieldId, "田植え");
+  }
+
+  function workDateForField(fieldId, names, mode) {
+    return mode === "last" ? lastFieldWorkDate(fieldId, names) : firstFieldWorkDate(fieldId, names);
+  }
+
   function saveFieldWork(record) {
     mutate((d) => {
       const date = record.date || U.today();
@@ -143,7 +174,14 @@
       if (normalized.workName === "田植え") {
         normalized.fieldIds.forEach((fieldId) => {
           const fieldIndex = d.fields.findIndex((f) => f.fieldId === fieldId);
-          if (fieldIndex >= 0) d.fields[fieldIndex].plantingDate = normalized.date;
+          if (fieldIndex >= 0) {
+            const dates = d.fieldWorks
+              .filter((work) => (work.fieldIds || []).includes(fieldId) && matchesWorkName(work, "田植え"))
+              .map((work) => work.date)
+              .filter(Boolean)
+              .sort();
+            d.fields[fieldIndex].plantingDate = dates[0] || normalized.date;
+          }
         });
       }
       if (normalized.workName === "中干し開始") {
@@ -448,6 +486,9 @@
     updateVariety,
     addField,
     updateField,
+    plantingDateForField,
+    workDateForField,
+    fieldWorksByNameFor,
     saveFieldWork,
     deleteFieldWork,
     saveGrowthLog,

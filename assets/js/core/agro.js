@@ -66,7 +66,8 @@
   function progress(fieldOrId, dateText) {
     const field = fieldOf(fieldOrId);
     const date = dateText || U.today();
-    if (!field || !field.plantingDate) {
+    const plantingDate = field && state().plantingDateForField ? state().plantingDateForField(field.fieldId) : "";
+    if (!field || !plantingDate) {
       return {
         field,
         dap: "",
@@ -77,8 +78,8 @@
         diffText: "前年比 --"
       };
     }
-    const current = sumTemps(field.fieldId, field.plantingDate, date);
-    const previousStart = addYears(field.plantingDate, -1);
+    const current = sumTemps(field.fieldId, plantingDate, date);
+    const previousStart = addYears(plantingDate, -1);
     const previousEnd = addYears(date, -1);
     const previous = sumTemps(field.fieldId, previousStart, previousEnd);
     const diff = current.count && previous.count ? Math.round((current.total - previous.total) * 10) / 10 : "";

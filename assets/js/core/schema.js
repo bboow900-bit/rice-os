@@ -4,7 +4,7 @@
   const RiceOS = window.RiceOS = window.RiceOS || {};
   const U = RiceOS.utils;
 
-  const SCHEMA_VERSION = 10;
+  const SCHEMA_VERSION = 11;
   const STORE_KEY = "rice_os_v8_stable";
   const BACKUP_KEY = "rice_os_v8_stable_backup";
   const LEGACY_STORES = [
@@ -44,6 +44,8 @@
   const DEFAULT_FIELD_FIELDS = {
     fieldId: "",
     name: "",
+    district: "",
+    fieldGroupId: "",
     varietyId: "",
     areaA: 0,
     plantingDate: "",
@@ -51,6 +53,7 @@
     drainageTargetDays: "7",
     intermittentStartDate: "",
     intermittentIntervalDays: "3",
+    wetIrrigationTargetDays: "20",
     soilType: "",
     waterHolding: "",
     drainage: "",
@@ -154,6 +157,10 @@
     "溝切り",
     "中干し開始",
     "中干し終了",
+    "間断灌水開始",
+    "間断灌水終了",
+    "湿潤灌漑開始",
+    "湿潤灌漑終了",
     "追肥",
     "防除",
     "稲刈り",
@@ -231,6 +238,8 @@
     const f = { ...DEFAULT_FIELD_FIELDS, ...(input || {}) };
     f.fieldId = canonicalId("field", f.fieldId || f.id, f.name || `圃場${index + 1}`);
     f.name = String(f.name || `圃場${index + 1}`);
+    f.district = String(f.district || "");
+    f.fieldGroupId = String(f.fieldGroupId || "");
     f.varietyId = String(f.varietyId || fallbackVarietyId || "");
     f.areaA = U.number(f.areaA, 0);
     f.status = String(f.status || "使用中");
@@ -238,6 +247,7 @@
     f.drainageTargetDays = String(f.drainageTargetDays || "");
     f.intermittentStartDate = String(f.intermittentStartDate || "");
     f.intermittentIntervalDays = String(f.intermittentIntervalDays || "");
+    f.wetIrrigationTargetDays = String(f.wetIrrigationTargetDays || "");
     f.soilType = String(f.soilType || "");
     f.waterHolding = String(f.waterHolding || "");
     f.drainage = String(f.drainage || "");
@@ -592,7 +602,7 @@
     if (["種籾注文", "塩水選", "温湯殺菌", "薬剤消毒", "浸種", "催芽", "播種", "育苗管理", "苗箱準備", "育苗土準備"].includes(name)) return "1 種籾・育苗";
     if (["畦塗り・畦管理", "耕起", "基肥・元肥", "代かき"].includes(name)) return "2 田植え前";
     if (["田植え", "補植"].includes(name)) return "3 田植え";
-    if (["入水", "落水", "除草剤", "草刈り", "溝切り", "中干し開始", "中干し終了", "追肥", "防除"].includes(name)) return "4 生育管理";
+    if (["入水", "落水", "除草剤", "草刈り", "溝切り", "中干し開始", "中干し終了", "間断灌水開始", "間断灌水終了", "湿潤灌漑開始", "湿潤灌漑終了", "追肥", "防除"].includes(name)) return "4 生育管理";
     if (["稲刈り"].includes(name)) return "5 収穫";
     if (["乾燥", "籾摺り", "色彩選別", "袋詰め", "等級検査", "出荷", "売上記録"].includes(name)) return "6 調製・出荷";
     return "7 その他";

@@ -135,6 +135,8 @@
     const latestDry = latestByDate(state.dryPeriodsFor(field.fieldId));
     const latestIrrigation = latestByDate(state.irrigationsFor(field.fieldId));
     const dap = U.daysAfterPlanting(field, U.today());
+    const dryStart = state.workDateForField ? state.workDateForField(field.fieldId, "中干し開始") : "";
+    const irrigationStart = state.workDateForField ? state.workDateForField(field.fieldId, "間断灌水開始") : "";
     const fixedMemo = String(field.fixedMemo || "").trim();
     return `
       <div class="field-karte-dashboard">
@@ -151,8 +153,8 @@
         <section class="field-karte-activity">
           ${renderLatestLog("最新作業", latestWork, [latestWork && latestWork.workName, latestWork && latestWork.hours ? `時間 ${latestWork.hours}` : "", latestWork && latestWork.material], "work")}
           ${renderLatestLog("最新生育", latestGrowth, [latestGrowth && `分げつ ${latestGrowth.tillerCount || "-"}`, latestGrowth && `葉数 ${latestGrowth.leafCount || "-"}`, latestGrowth && `草丈 ${latestGrowth.plantHeightCm || "-"}cm`, latestGrowth && `葉色 ${latestGrowth.leafColor || "-"}`], "growth")}
-          ${renderLatestLog("中干し", latestDry || { date: field.drainageStartDate }, [periodLine(latestDry, field.drainageStartDate, field.drainageTargetDays)], "water")}
-          ${renderLatestLog("間断/湿潤", latestIrrigation || { date: field.intermittentStartDate }, [periodLine(latestIrrigation, field.intermittentStartDate, field.intermittentIntervalDays)], "water")}
+          ${renderLatestLog("中干し", latestDry || { date: dryStart }, [periodLine(null, dryStart, field.drainageTargetDays)], "water")}
+          ${renderLatestLog("間断/湿潤", latestIrrigation || { date: irrigationStart }, [periodLine(null, irrigationStart, field.intermittentIntervalDays)], "water")}
         </section>
         <section class="field-karte-photo-panel">
           <div class="section-title compact">
@@ -174,6 +176,7 @@
 
   function renderField(field) {
     const variety = state.variety(field.varietyId);
+    const plantingDate = state.plantingDateForField ? state.plantingDateForField(field.fieldId) : "";
     return `
       <article class="record field-karte">
         <div class="record-head">
@@ -181,7 +184,7 @@
             <div class="field-name">${U.escapeHTML(field.name)}</div>
             <span class="pill ok">${U.escapeHTML(variety && variety.name || "品種未設定")}</span>
             <span class="pill info">${U.escapeHTML(String(field.areaA || 0))}a</span>
-            ${field.plantingDate ? `<span class="pill warn">田植 ${U.escapeHTML(U.fd(field.plantingDate))}</span>` : '<span class="pill bad">田植日未設定</span>'}
+            ${plantingDate ? `<span class="pill warn">田植 ${U.escapeHTML(U.fd(plantingDate))}</span>` : '<span class="pill bad">田植え作業未登録</span>'}
           </div>
         </div>
         ${renderKarteDashboard(field)}
@@ -190,10 +193,10 @@
             <summary>基本情報</summary>
             <div class="form-grid dense inline-grid">
               ${input(field, "name", "圃場名")}
+              ${input(field, "district", "地区")}
               <label>品種<select data-field-id="${U.attr(field.fieldId)}" data-field-field="varietyId">${varietyOptions(field.varietyId)}</select></label>
               ${input(field, "areaA", "面積(a)", "number")}
               <label>状態<select data-field-id="${U.attr(field.fieldId)}" data-field-field="status">${statusOptions(field.status)}</select></label>
-              ${input(field, "plantingDate", "田植日", "date")}
               ${input(field, "sortOrder", "表示順", "number")}
             </div>
           </details>
@@ -216,11 +219,11 @@
             <div class="form-grid dense inline-grid">
               ${input(field, "targetCrackCm", "目標ひび割れ幅(cm)")}
               ${input(field, "targetSinkCm", "目標沈み込み(cm)")}
-              ${input(field, "drainageStartDate", "中干し開始日", "date")}
               ${input(field, "drainageTargetDays", "中干し予定日数", "number")}
-              ${input(field, "intermittentStartDate", "間断灌水開始日", "date")}
               ${input(field, "intermittentIntervalDays", "間断灌水予定日数", "number")}
+              ${input(field, "wetIrrigationTargetDays", "湿潤灌漑予定日数", "number")}
             </div>
+            <div class="hint-text">田植日・中干し開始/終了は作業記録から自動表示します。日付を直す場合は作業記録を編集してください。</div>
           </details>
 
           <details class="form-section">

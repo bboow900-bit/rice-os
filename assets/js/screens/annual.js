@@ -3,8 +3,10 @@
 
   const RiceOS = window.RiceOS = window.RiceOS || {};
   const U = RiceOS.utils;
-  const S = RiceOS.schema;
   const state = RiceOS.state;
+
+  let selectedFieldId = "";
+  let selectedTab = "karte";
 
   const KIND_META = {
     fieldWork: { label: "作業", className: "work", icon: "作" },
@@ -14,6 +16,18 @@
     schedule: { label: "予定", className: "schedule", icon: "予" },
     other: { label: "その他", className: "other", icon: "他" }
   };
+
+  const WORK_ICONS = [
+    [/代かき|耕起|基肥|元肥/, "🚜"],
+    [/田植え|補植/, "🌱"],
+    [/除草|散布/, "🧴"],
+    [/溝切り/, "〰"],
+    [/中干し|落水|入水|間断|湿潤/, "💧"],
+    [/防除/, "噴"],
+    [/草刈り/, "刈"],
+    [/追肥|肥料/, "肥"],
+    [/稲刈り|収穫/, "🌾"]
+  ];
 
   function unique(values) {
     return Array.from(new Set((values || []).filter(Boolean)));
@@ -30,47 +44,14 @@
     return `${names.slice(0, 2).join("・")} ほか${names.length - 2}`;
   }
 
-  function varietyNames(ids) {
-    return unique((ids || []).map((id) => state.variety(id) && state.variety(id).name)).join("・");
+  function varietyName(field) {
+    const variety = field && state.variety(field.varietyId);
+    return variety && variety.name || "品種未設定";
   }
 
-  function dapLabels(ids, date) {
-    return (ids || []).map((id) => {
-      const field = state.field(id);
-      const dap = U.daysAfterPlanting(field, date);
-      return dap === "" || !field ? "" : `${field.name} 田植後${dap}日`;
-    }).filter(Boolean);
-  }
-
-  function periodStats(item) {
-    const planned = item.startDate && item.endDate ? U.daysBetween(item.startDate, item.endDate) : "";
-    const actual = item.startDate && item.actualEndDate ? U.daysBetween(item.startDate, item.actualEndDate) : "";
-    const diff = planned !== "" && actual !== "" ? actual - planned : "";
-    return { planned, actual, diff };
-  }
-
-  function diffText(diff) {
-    if (diff === "") return "";
-    if (diff === 0) return "予定どおり";
-    return `${diff > 0 ? "+" : ""}${diff}日`;
-  }
-
-  function periodParts(item) {
-    const stats = periodStats(item);
-    return [
-      item.startDate ? `開始 ${U.fd(item.startDate)}` : "",
-      item.endDate ? `完了予定 ${U.fd(item.endDate)}` : "",
-      item.actualEndDate ? `実完了 ${U.fd(item.actualEndDate)}` : "",
-      stats.planned !== "" ? `予定${stats.planned}日` : "",
-      stats.actual !== "" ? `実績${stats.actual}日` : "",
-      stats.diff !== "" ? diffText(stats.diff) : ""
-    ].filter(Boolean);
-  }
-
-  function compactParts(parts, max = 4) {
-    const clean = (parts || []).filter(Boolean);
-    if (clean.length <= max) return clean;
-    return [...clean.slice(0, max), `ほか${clean.length - max}`];
+  function workIcon(name) {
+    const found = WORK_ICONS.find(([pattern]) => pattern.test(String(name || "")));
+    return found ? found[1] : "作";
   }
 
   function makeRow(kind, item, values) {
@@ -79,7 +60,7 @@
       kind,
       kindLabel: meta.label,
       kindClass: meta.className,
-      kindIcon: meta.icon,
+      kindIcon: values.kindIcon || meta.icon,
       id: values.id,
       date: values.date || "",
       season: values.season || U.season(values.date),
@@ -91,8 +72,21 @@
       status: values.status || "",
       detailParts: values.detailParts || [],
       photoData: values.photoData || "",
+      photo: values.photo || "",
       raw: item
     };
+  }
+
+  function periodParts(item) {
+    const planned = item.startDate && item.endDate ? U.daysBetween(item.startDate, item.endDate) : "";
+    const actual = item.startDate && item.actualEndDate ? U.daysBetween(item.startDate, item.actualEndDate) : "";
+    return [
+      item.startDate ? `開始 ${U.fd(item.startDate)}` : "",
+      item.endDate ? `予定 ${U.fd(item.endDate)}` : "",
+      item.actualEndDate ? `完了 ${U.fd(item.actualEndDate)}` : "",
+      planned !== "" ? `予定${planned}日` : "",
+      actual !== "" ? `実績${actual}日` : ""
+    ].filter(Boolean);
   }
 
   function allRows() {
@@ -105,7 +99,9 @@
       worker: w.worker || "",
       fieldIds: w.fieldIds || [],
       hours: w.hours || "",
+      kindIcon: workIcon(w.workName),
       photoData: w.photoData || "",
+      photo: w.photo || "",
       detailParts: [
         w.machine ? `機械 ${w.machine}` : "",
         w.material ? `資材 ${w.material} ${w.amount || ""}` : "",
@@ -117,17 +113,17 @@
       id: g.logId,
       date: g.date,
       season: g.season,
-      title: "生育ログ",
+      title: "生育記録",
       fieldIds: [g.fieldId],
       photoData: g.photoData || "",
+      photo: g.photo || "",
       detailParts: [
-        `葉数 ${g.leafCount || "-"}`,
         `分げつ ${g.tillerCount || "-"}`,
-        `草丈 ${g.plantHeightCm || "-"}cm`,
         `葉色 ${g.leafColor || "-"}`,
+        `草丈 ${g.plantHeightCm || "-"}cm`,
+        `葉数 ${g.leafCount || "-"}`,
         `雑草 ${g.weed || "-"}`,
         `ガス ${g.gas || "-"}`,
-        `水 ${g.water || "-"}`,
         g.memo || ""
       ]
     }));
@@ -135,12 +131,12 @@
       id: item.dryPeriodId,
       date: item.date,
       season: item.season,
-      title: "中干し",
+      title: "中干し観察",
       fieldIds: [item.fieldId],
       status: item.status || (item.actualEndDate ? "完了" : "実施中"),
       photoData: item.photoData || "",
+      photo: item.photo || "",
       detailParts: [
-        item.status ? `状態 ${item.status}` : "",
         ...periodParts(item),
         item.crackCm ? `ひび ${item.crackCm}cm` : "",
         item.sinkCm ? `沈み込み ${item.sinkCm}cm` : "",
@@ -153,12 +149,11 @@
       id: item.irrigationId,
       date: item.date,
       season: item.season,
-      title: item.method || "間断灌水",
+      title: item.method || "水管理",
       fieldIds: [item.fieldId],
       status: item.periodStatus || (item.actualEndDate ? "完了" : "実施中"),
       detailParts: [
-        item.periodStatus ? `状態 ${item.periodStatus}` : "",
-        item.status ? `水状態 ${item.status}` : "",
+        item.status ? `状態 ${item.status}` : "",
         ...periodParts(item),
         item.memo || ""
       ]
@@ -170,15 +165,14 @@
       title: item.title || item.scheduleType || "予定",
       fieldIds: item.fieldIds || [],
       status: item.status || "",
-      detailParts: [item.scheduleType || "", item.status || "", item.memo || ""]
+      detailParts: [item.scheduleType || "", item.memo || ""]
     }));
-    const other = d.otherWorks.map((o) => makeRow("other", o, {
+    const other = (d.otherWorks || []).map((o) => makeRow("other", o, {
       id: o.otherWorkId,
       date: o.date,
       season: o.season,
       title: o.workName,
       fieldIds: o.relatedFieldIds || [],
-      target: varietyNames(o.varietyIds) || fieldLabel(o.relatedFieldIds),
       hours: o.hours || "",
       detailParts: [o.quantity ? `数量 ${o.quantity}` : "", o.memo || ""]
     }));
@@ -186,85 +180,21 @@
       .sort((a, b) => String(b.date).localeCompare(String(a.date)) || String(a.title).localeCompare(String(b.title)));
   }
 
-  function filterRows(rows) {
-    const year = U.$("annualYear").value || String(new Date().getFullYear());
-    const fieldId = U.$("annualField").value || "all";
-    const kind = U.$("annualKind").value || "all";
-    return rows.filter((row) => {
-      const yearOk = year === "all" || String(row.season) === String(year);
-      const fieldOk = fieldId === "all" || (row.fieldIds || []).includes(fieldId);
-      const kindOk = kind === "all" || row.kind === kind || (kind === "photo" && row.photoData);
-      return yearOk && fieldOk && kindOk;
-    });
+  function yearValue() {
+    return U.$("annualYear") && U.$("annualYear").value || String(new Date().getFullYear());
+  }
+
+  function rowsForYear(rows) {
+    const year = yearValue();
+    return rows.filter((row) => year === "all" || String(row.season) === String(year));
+  }
+
+  function rowsForField(rows, fieldId) {
+    return rows.filter((row) => (row.fieldIds || []).includes(fieldId));
   }
 
   function totalHours(rows) {
     return rows.reduce((sum, row) => sum + U.parseWorkHours(row.hours), 0);
-  }
-
-  function roundHours(value) {
-    return Math.round(U.number(value, 0) * 10) / 10;
-  }
-
-  function monthValue(dateText) {
-    const d = new Date(`${dateText}T00:00:00`);
-    if (Number.isNaN(d.getTime())) return { key: "none", label: "日付未設定" };
-    return {
-      key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`,
-      label: `${d.getMonth() + 1}月`
-    };
-  }
-
-  function statItem(map, key, label) {
-    if (!map.has(key)) {
-      map.set(key, { key, label, count: 0, hours: 0, lastDate: "", growth: 0, work: 0, water: 0 });
-    }
-    return map.get(key);
-  }
-
-  function fieldStats(rows) {
-    const map = new Map();
-    rows.forEach((row) => {
-      const ids = unique(row.fieldIds || []);
-      if (!ids.length) return;
-      const perFieldHours = U.parseWorkHours(row.hours) / ids.length;
-      ids.forEach((fieldId) => {
-        const field = state.field(fieldId);
-        const item = statItem(map, fieldId, field && field.name || "圃場未設定");
-        item.count += 1;
-        item.hours += perFieldHours;
-        item.growth += row.kind === "growth" ? 1 : 0;
-        item.work += row.kind === "fieldWork" || row.kind === "other" ? 1 : 0;
-        item.water += row.kind === "dry" || row.kind === "irrigation" ? 1 : 0;
-        if (!item.lastDate || String(row.date).localeCompare(String(item.lastDate)) > 0) item.lastDate = row.date;
-      });
-    });
-    return Array.from(map.values()).sort((a, b) => b.count - a.count || b.hours - a.hours || a.label.localeCompare(b.label));
-  }
-
-  function workTypeStats(rows) {
-    const map = new Map();
-    rows.filter((row) => row.kind === "fieldWork" || row.kind === "other").forEach((row) => {
-      const item = statItem(map, row.title || "作業未設定", row.title || "作業未設定");
-      item.count += 1;
-      item.hours += U.parseWorkHours(row.hours);
-      if (!item.lastDate || String(row.date).localeCompare(String(item.lastDate)) > 0) item.lastDate = row.date;
-    });
-    return Array.from(map.values()).sort((a, b) => b.hours - a.hours || b.count - a.count || a.label.localeCompare(b.label));
-  }
-
-  function monthStats(rows) {
-    const map = new Map();
-    rows.forEach((row) => {
-      const month = monthValue(row.date);
-      const item = statItem(map, month.key, month.label);
-      item.count += 1;
-      item.hours += U.parseWorkHours(row.hours);
-      item.growth += row.kind === "growth" ? 1 : 0;
-      item.work += row.kind === "fieldWork" || row.kind === "other" ? 1 : 0;
-      item.water += row.kind === "dry" || row.kind === "irrigation" ? 1 : 0;
-    });
-    return Array.from(map.values()).sort((a, b) => String(a.key).localeCompare(String(b.key)));
   }
 
   function summaryCard(label, value, tone) {
@@ -278,102 +208,265 @@
 
   function renderSummary(rows) {
     const fields = unique(rows.flatMap((row) => row.fieldIds || []));
+    const workCount = rows.filter((row) => row.kind === "fieldWork").length;
     const waterCount = rows.filter((row) => row.kind === "dry" || row.kind === "irrigation").length;
     const growthCount = rows.filter((row) => row.kind === "growth").length;
     return `
       <div class="annual-summary-grid">
-        ${summaryCard("記録", `${rows.length}件`, "green")}
+        ${summaryCard("記録件数", `${rows.length}件`, "green")}
         ${summaryCard("作業時間", U.formatHours(totalHours(rows)), "amber")}
-        ${summaryCard("対象圃場", `${fields.length}圃場`, "blue")}
-        ${summaryCard("水管理 / 生育", `${waterCount} / ${growthCount}`, "purple")}
+        ${summaryCard("対象圃場数", `${fields.length}圃場`, "blue")}
+        ${summaryCard("生育 / 水 / 作業", `${growthCount} / ${waterCount} / ${workCount}`, "purple")}
       </div>
     `;
   }
 
-  function statRow(item, max, options = {}) {
-    const ratio = max ? Math.max(8, Math.round((options.metric(item) / max) * 100)) : 8;
+  function maxDate(values) {
+    return (values || []).filter(Boolean).sort().pop() || "";
+  }
+
+  function fieldRows(fieldId) {
+    return rowsForField(rowsForYear(allRows()), fieldId);
+  }
+
+  function latestDateForField(fieldId) {
+    return maxDate(fieldRows(fieldId).map((row) => row.date));
+  }
+
+  function fieldStatus(field, stats) {
+    if (!stats.total) return { label: "記録なし", tone: "muted" };
+    const planting = state.plantingDateForField ? state.plantingDateForField(field.fieldId) : "";
+    const dap = planting ? U.daysBetween(planting, U.today()) : "";
+    const dryStart = state.workDateForField ? state.workDateForField(field.fieldId, "中干し開始") : "";
+    if (dap !== "" && dap >= 30 && dap <= 50 && !dryStart) return { label: "中干し候補", tone: "warn" };
+    if (!stats.growth) return { label: "生育記録未入力", tone: "warn" };
+    const lastDays = stats.lastDate ? U.daysBetween(stats.lastDate, U.today()) : "";
+    if (lastDays !== "" && lastDays <= 14) return { label: "順調", tone: "ok" };
+    return { label: "要確認", tone: "warn" };
+  }
+
+  function fieldStats(field) {
+    const rows = fieldRows(field.fieldId);
+    return {
+      rows,
+      total: rows.length,
+      work: rows.filter((row) => row.kind === "fieldWork").length,
+      growth: rows.filter((row) => row.kind === "growth").length,
+      water: rows.filter((row) => row.kind === "dry" || row.kind === "irrigation").length,
+      photos: rows.filter((row) => row.photoData || row.photo).length,
+      lastDate: maxDate(rows.map((row) => row.date))
+    };
+  }
+
+  function filteredFields() {
+    const query = String(U.$("annualSearch") && U.$("annualSearch").value || "").trim().toLowerCase();
+    const sort = U.$("annualSort") && U.$("annualSort").value || "updated";
+    const items = state.fields().map((field) => {
+      const stats = fieldStats(field);
+      const status = fieldStatus(field, stats);
+      return { field, stats, status };
+    }).filter(({ field }) => {
+      if (!query) return true;
+      const haystack = [
+        field.name,
+        field.district,
+        varietyName(field)
+      ].join(" ").toLowerCase();
+      return haystack.includes(query);
+    });
+    return items.sort((a, b) => {
+      if (sort === "name") return a.field.name.localeCompare(b.field.name);
+      if (sort === "area") return U.number(b.field.areaA) - U.number(a.field.areaA) || a.field.name.localeCompare(b.field.name);
+      if (sort === "variety") return varietyName(a.field).localeCompare(varietyName(b.field)) || a.field.name.localeCompare(b.field.name);
+      if (sort === "status") return a.status.label.localeCompare(b.status.label) || a.field.name.localeCompare(b.field.name);
+      return String(b.stats.lastDate).localeCompare(String(a.stats.lastDate)) || a.field.name.localeCompare(b.field.name);
+    });
+  }
+
+  function renderFieldPickerCard(item) {
+    const { field, stats, status } = item;
     return `
-      <div class="annual-stat-row">
-        <div>
-          <b>${U.escapeHTML(item.label)}</b>
-          <span>${U.escapeHTML(options.sub(item))}</span>
+      <button type="button" class="annual-field-pick-card status-${U.attr(status.tone)}" data-annual-open-field="${U.attr(field.fieldId)}">
+        <div class="annual-field-plant" aria-hidden="true">稲</div>
+        <div class="annual-field-pick-main">
+          <div class="annual-field-pick-head">
+            <b>${U.escapeHTML(field.name)}</b>
+            <span>${U.escapeHTML(field.areaA ? `${field.areaA}a` : "面積未設定")}</span>
+          </div>
+          <p>${U.escapeHTML(varietyName(field))}${field.district ? ` / ${U.escapeHTML(field.district)}` : ""}</p>
+          <small>最終更新: ${stats.lastDate ? U.escapeHTML(U.fd(stats.lastDate)) : "記録なし"}</small>
+          <div class="annual-field-pick-metrics">
+            <span>生育 ${U.escapeHTML(String(stats.growth))}件</span>
+            <span>水管理 ${U.escapeHTML(String(stats.water))}件</span>
+            <span>作業 ${U.escapeHTML(String(stats.work))}件</span>
+          </div>
         </div>
-        <i><span style="width:${U.attr(String(ratio))}%"></span></i>
-        <em>${U.escapeHTML(options.value(item))}</em>
+        <span class="annual-status-badge ${U.attr(status.tone)}">${U.escapeHTML(status.label)}</span>
+      </button>
+    `;
+  }
+
+  function renderTop(rows) {
+    const fields = filteredFields();
+    return `
+      <div class="annual-v2-top">
+        ${renderSummary(rows)}
+        <section class="annual-field-picker">
+          <div class="section-title compact">
+            <h3>圃場一覧</h3>
+            <span class="muted">圃場を選ぶと履歴へ移動します</span>
+          </div>
+          <div class="annual-field-pick-grid">
+            ${fields.length ? fields.map(renderFieldPickerCard).join("") : '<div class="empty">条件に合う圃場がありません。</div>'}
+          </div>
+        </section>
+        ${renderAnnualFab()}
       </div>
     `;
   }
 
-  function renderStatList(items, options) {
-    if (!items.length) return `<div class="empty">${U.escapeHTML(options.empty)}</div>`;
-    const max = Math.max(...items.map(options.metric), 0);
-    return items.slice(0, options.limit || 5).map((item) => statRow(item, max, options)).join("");
+  function sourceLine(label, date, sourceText, emptyText) {
+    return `
+      <div class="annual-kv-row">
+        <span>${U.escapeHTML(label)}</span>
+        <b>${date ? U.escapeHTML(U.fd(date)) : U.escapeHTML(emptyText || "未登録")}</b>
+        <small>${date ? U.escapeHTML(sourceText || "作業記録") : "作業記録を登録してください"}</small>
+      </div>
+    `;
   }
 
-  function renderAnalysis(rows) {
-    if (!rows.length) return "";
-    const fields = fieldStats(rows);
-    const works = workTypeStats(rows);
-    const months = monthStats(rows);
-    const workRows = rows.filter((row) => row.kind === "fieldWork" || row.kind === "other");
-    const workHours = totalHours(workRows);
-    const activeDays = unique(workRows.map((row) => row.date)).length;
-    const topWork = works[0];
+  function targetLine(label, value) {
     return `
-      <div class="annual-analysis-board">
-        <section class="annual-analysis-card">
+      <div class="annual-kv-row">
+        <span>${U.escapeHTML(label)}</span>
+        <b>${U.escapeHTML(value || "未設定")}</b>
+      </div>
+    `;
+  }
+
+  function fieldInput(field, key, label, type) {
+    return `
+      <label>${U.escapeHTML(label)}
+        <input type="${U.attr(type || "text")}" data-annual-field-edit="${U.attr(key)}" value="${U.attr(field[key] || "")}">
+      </label>
+    `;
+  }
+
+  function optionTags(values, selected) {
+    return values.map((value) => `<option value="${U.attr(value)}" ${String(value) === String(selected || "") ? "selected" : ""}>${U.escapeHTML(value || "未設定")}</option>`).join("");
+  }
+
+  function renderKarteTab(field) {
+    const variety = state.variety(field.varietyId);
+    const planting = state.plantingDateForField ? state.plantingDateForField(field.fieldId) : "";
+    const dryStart = state.workDateForField ? state.workDateForField(field.fieldId, "中干し開始") : "";
+    const dryEnd = state.workDateForField ? state.workDateForField(field.fieldId, "中干し終了") : "";
+    const intermittentStart = state.workDateForField ? state.workDateForField(field.fieldId, "間断灌水開始") : "";
+    const wetStart = state.workDateForField ? state.workDateForField(field.fieldId, "湿潤灌漑開始") : "";
+    return `
+      <div class="annual-field-detail-grid">
+        <section class="annual-field-detail-card">
           <div class="section-title compact">
-            <h3>圃場別</h3>
-            <span class="muted">記録が多い順</span>
+            <h3>圃場カルテ</h3>
+            <span class="muted">この画面でも編集できます</span>
           </div>
-          ${renderStatList(fields, {
-            empty: "圃場別の記録はありません。",
-            metric: (item) => item.count,
-            value: (item) => `${item.count}件`,
-            sub: (item) => `${U.formatHours(item.hours)} / 生育${item.growth} / 水${item.water}`,
-            limit: 5
-          })}
+          <div class="form-grid dense annual-edit-grid">
+            ${fieldInput(field, "name", "圃場名")}
+            ${fieldInput(field, "district", "地区")}
+            <label>品種<select data-annual-field-edit="varietyId">${state.varieties().map((v) => `<option value="${U.attr(v.varietyId)}" ${v.varietyId === field.varietyId ? "selected" : ""}>${U.escapeHTML(v.name)}</option>`).join("")}</select></label>
+            ${fieldInput(field, "areaA", "面積(a)", "number")}
+            <label>状態<select data-annual-field-edit="status">${optionTags(["使用中", "休耕", "終了"], field.status)}</select></label>
+            <label>土質<select data-annual-field-edit="soilType">${optionTags(["", "砂質", "粘土質", "中間", "その他"], field.soilType)}</select></label>
+            <label>水持ち<select data-annual-field-edit="waterHolding">${optionTags(["", "良い", "普通", "悪い"], field.waterHolding)}</select></label>
+            <label>排水性<select data-annual-field-edit="drainage">${optionTags(["", "良い", "普通", "悪い"], field.drainage)}</select></label>
+          </div>
+          <label class="annual-wide-label">固定メモ
+            <textarea data-annual-field-edit="fixedMemo">${U.escapeHTML(field.fixedMemo || "")}</textarea>
+          </label>
         </section>
-        <section class="annual-analysis-card">
+        <section class="annual-field-detail-card">
           <div class="section-title compact">
-            <h3>作業別</h3>
-            <span class="muted">時間が多い順</span>
+            <h3>作業記録からの基準日</h3>
+            <span class="muted">日付はカルテで直接編集しません</span>
           </div>
-          ${renderStatList(works, {
-            empty: "作業時間つきの記録はありません。",
-            metric: (item) => item.hours || item.count,
-            value: (item) => item.hours ? U.formatHours(item.hours) : `${item.count}回`,
-            sub: (item) => `${item.count}回${item.lastDate ? ` / 最新 ${U.fd(item.lastDate)}` : ""}`,
-            limit: 5
-          })}
+          <div class="annual-kv-list">
+            ${sourceLine("田植日", planting, "作業記録: 田植え")}
+            ${sourceLine("中干し開始", dryStart, "作業記録: 中干し開始")}
+            ${sourceLine("中干し終了", dryEnd, "作業記録: 中干し終了")}
+            ${sourceLine("間断灌水開始", intermittentStart, "作業記録: 間断灌水開始")}
+            ${sourceLine("湿潤灌漑開始", wetStart, "作業記録: 湿潤灌漑開始")}
+          </div>
         </section>
-        <section class="annual-analysis-card cost">
+        <section class="annual-field-detail-card">
           <div class="section-title compact">
-            <h3>作業コスト</h3>
-            <span class="muted">年度内の目安</span>
+            <h3>中干し・水管理目標</h3>
+            <span class="muted">判断枠だけ用意</span>
           </div>
-          <div class="annual-cost-grid">
-            <span><b>${U.escapeHTML(U.formatHours(workHours))}</b><small>総作業時間</small></span>
-            <span><b>${U.escapeHTML(String(activeDays))}日</b><small>作業日数</small></span>
-            <span><b>${U.escapeHTML(activeDays ? U.formatHours(roundHours(workHours / activeDays)) : "0時間")}</b><small>1日平均</small></span>
-            <span><b>${U.escapeHTML(topWork ? topWork.label : "-")}</b><small>最多時間</small></span>
+          <div class="annual-kv-list">
+            ${targetLine("目標分げつ数", variety && variety.targetTillers)}
+            ${targetLine("目標ひび割れ幅", field.targetCrackCm ? `${field.targetCrackCm}cm` : "")}
+            ${targetLine("目標沈み込み", field.targetSinkCm ? `${field.targetSinkCm}cm` : "")}
           </div>
-        </section>
-        <section class="annual-analysis-card wide">
-          <div class="section-title compact">
-            <h3>月別の流れ</h3>
-            <span class="muted">件数 / 作業時間</span>
-          </div>
-          <div class="annual-month-flow">
-            ${renderStatList(months, {
-              empty: "月別の記録はありません。",
-              metric: (item) => item.count,
-              value: (item) => `${item.count}件`,
-              sub: (item) => `${U.formatHours(item.hours)} / 作業${item.work} / 生育${item.growth} / 水${item.water}`,
-              limit: 12
-            })}
+          <div class="form-grid dense annual-edit-grid">
+            ${fieldInput(field, "targetCrackCm", "ひび割れ幅(cm)")}
+            ${fieldInput(field, "targetSinkCm", "沈み込み(cm)")}
+            ${fieldInput(field, "drainageTargetDays", "中干し目安日数", "number")}
+            ${fieldInput(field, "intermittentIntervalDays", "間断灌水目安日数", "number")}
+            ${fieldInput(field, "wetIrrigationTargetDays", "湿潤灌漑目安日数", "number")}
           </div>
         </section>
+      </div>
+    `;
+  }
+
+  function photosForField(fieldId) {
+    return [
+      ...state.growthLogsFor(fieldId).map((row) => ({ date: row.date, title: "生育", photoData: row.photoData, photo: row.photo })),
+      ...state.fieldWorksFor(fieldId).map((row) => ({ date: row.date, title: row.workName || "作業", photoData: row.photoData, photo: row.photo })),
+      ...state.dryPeriodsFor(fieldId).map((row) => ({ date: row.date, title: "中干し", photoData: row.photoData, photo: row.photo }))
+    ].filter((row) => row.photoData || row.photo).sort((a, b) => String(b.date).localeCompare(String(a.date)));
+  }
+
+  function dryByDate(fieldId) {
+    const map = new Map();
+    state.dryPeriodsFor(fieldId).forEach((row) => {
+      if (!map.has(row.date)) map.set(row.date, []);
+      map.get(row.date).push(row);
+    });
+    return map;
+  }
+
+  function renderGrowthTab(field) {
+    const dryMap = dryByDate(field.fieldId);
+    const growthRows = state.growthLogsFor(field.fieldId);
+    const dates = unique([
+      ...growthRows.map((row) => row.date),
+      ...state.dryPeriodsFor(field.fieldId).map((row) => row.date)
+    ]).sort((a, b) => String(b).localeCompare(String(a)));
+    if (!dates.length) return '<div class="empty">生育記録はまだありません。</div>';
+    return `
+      <div class="annual-growth-list">
+        ${dates.map((date) => {
+          const growth = growthRows.filter((row) => row.date === date)[0] || null;
+          const dry = (dryMap.get(date) || [])[0] || null;
+          const photo = growth && growth.photoData || dry && dry.photoData || "";
+          return `
+            <article class="annual-growth-row">
+              <div>
+                <b>${U.escapeHTML(U.fd(date))}</b>
+                <span>田植後 ${U.escapeHTML(String(U.daysAfterPlanting(field, date) || "-"))}日</span>
+              </div>
+              <dl>
+                <div><dt>分げつ</dt><dd>${U.escapeHTML(growth && growth.tillerCount || "-")}</dd></div>
+                <div><dt>葉色</dt><dd>${U.escapeHTML(growth && growth.leafColor || "-")}</dd></div>
+                <div><dt>草丈</dt><dd>${U.escapeHTML(growth && growth.plantHeightCm ? `${growth.plantHeightCm}cm` : "-")}</dd></div>
+                <div><dt>ひび</dt><dd>${U.escapeHTML(dry && dry.crackCm ? `${dry.crackCm}cm` : "-")}</dd></div>
+                <div><dt>沈み</dt><dd>${U.escapeHTML(dry && dry.sinkCm ? `${dry.sinkCm}cm` : "-")}</dd></div>
+              </dl>
+              ${photo ? `<img src="${U.attr(photo)}" alt="">` : '<span class="annual-photo-empty">写真なし</span>'}
+            </article>
+          `;
+        }).join("")}
       </div>
     `;
   }
@@ -382,30 +475,14 @@
     return text ? `<span class="annual-chip ${tone || ""}">${U.escapeHTML(text)}</span>` : "";
   }
 
-  function dateBlock(date) {
-    const d = new Date(`${date}T00:00:00`);
-    if (Number.isNaN(d.getTime())) {
-      return { main: date || "未設定", sub: "" };
-    }
-    const weekdays = ["日", "月", "火", "水", "木", "金", "土"];
-    return {
-      main: `${d.getMonth() + 1}/${d.getDate()}`,
-      sub: `${d.getFullYear()}(${weekdays[d.getDay()]})`
-    };
-  }
-
-  function renderDapChips(row) {
-    const labels = dapLabels(row.fieldIds, row.date);
-    const shown = labels.slice(0, 2).map((label) => chip(label, "dap")).join("");
-    const extra = labels.length > 2 ? chip(`ほか${labels.length - 2}`, "muted") : "";
-    const firstFieldId = (row.fieldIds || [])[0];
-    const progress = firstFieldId && RiceOS.agro ? RiceOS.agro.progress(firstFieldId, row.date) : null;
-    const temp = progress ? chip(`積算 ${progress.tempText}`, "temp") : "";
-    return shown + extra + temp;
+  function compactParts(parts, max = 5) {
+    const clean = (parts || []).filter(Boolean);
+    if (clean.length <= max) return clean;
+    return [...clean.slice(0, max), `ほか${clean.length - max}`];
   }
 
   function renderEntry(row, showDate) {
-    const detail = compactParts(row.detailParts, showDate ? 6 : 5).join(" / ");
+    const detail = compactParts(row.detailParts).join(" / ");
     return `
       <article class="annual-entry annual-${U.attr(row.kindClass)}">
         <div class="annual-entry-main">
@@ -421,7 +498,7 @@
           ${row.worker ? chip(row.worker, "worker") : ""}
           ${row.hours ? chip(`時間 ${row.hours}`, "hours") : ""}
           ${row.status ? chip(row.status, row.status === "完了" ? "done" : "status") : ""}
-          ${renderDapChips(row)}
+          ${chip(`田植後 ${U.daysAfterPlanting(state.field((row.fieldIds || [])[0]), row.date) || "-"}日`, "dap")}
         </div>
         ${detail ? `<div class="annual-detail">${U.escapeHTML(detail)}</div>` : ""}
         <div class="inline-actions">
@@ -432,148 +509,78 @@
     `;
   }
 
-  function groupRowsByDate(rows) {
-    const groups = new Map();
-    rows.forEach((row) => {
-      const key = row.date || "日付未設定";
-      if (!groups.has(key)) groups.set(key, []);
-      groups.get(key).push(row);
-    });
-    return Array.from(groups.entries());
+  function renderWorkTab(field) {
+    const rows = rowsForField(rowsForYear(allRows()), field.fieldId)
+      .filter((row) => row.kind === "fieldWork")
+      .sort((a, b) => String(b.date).localeCompare(String(a.date)));
+    if (!rows.length) return '<div class="empty">作業記録はまだありません。</div>';
+    return `<div class="annual-entry-list field-view">${rows.map((row) => renderEntry(row, true)).join("")}</div>`;
   }
 
-  function compactFieldLabel(rows) {
-    const names = unique(rows.flatMap((row) => fieldNameList(row.fieldIds)));
-    if (!names.length) return "対象なし";
-    if (names.length <= 2) return names.join("・");
-    return `${names.slice(0, 2).join("・")} ほか${names.length - 2}`;
-  }
-
-  function renderDayCards(rows, options = {}) {
-    return groupRowsByDate(rows).map(([date, items], index) => {
-      const dayHours = totalHours(items);
-      const dap = dapLabels(items.flatMap((item) => item.fieldIds), date)[0] || "";
-      const parts = dateBlock(date);
-      const kinds = unique(items.map((item) => item.kindLabel)).slice(0, 3).join("・");
-      return `
-        <article class="annual-day-card ${options.compact ? "compact" : ""}">
-          <div class="annual-day-head">
-            <div class="annual-date-block">
-              <span class="annual-date-main">${U.escapeHTML(parts.main)}</span>
-              <span class="annual-date-sub">${U.escapeHTML(parts.sub)}</span>
-            </div>
-            <div class="annual-day-overview">
-              <b>${U.escapeHTML(kinds || "記録")}</b>
-              <span>${U.escapeHTML(compactFieldLabel(items))}</span>
-            </div>
-            <div class="annual-day-meta">
-              ${chip(`${items.length}件`, "count")}
-              ${dayHours ? chip(U.formatHours(dayHours), "hours") : ""}
-              ${dap ? chip(dap, "dap") : ""}
-              ${items[0] && items[0].fieldIds && items[0].fieldIds[0] && RiceOS.agro ? chip(`積算 ${RiceOS.agro.progress(items[0].fieldIds[0], date).tempText}`, "temp") : ""}
-            </div>
-          </div>
-          <div class="annual-entry-list">
-            ${items.map((row) => renderEntry(row, false)).join("")}
-          </div>
-        </article>
-      `;
-    }).join("");
-  }
-
-  function groupRowsByField(rows) {
-    const groups = new Map();
-    rows.forEach((row) => {
-      const ids = unique(row.fieldIds || []);
-      const keys = ids.length ? ids : ["__none"];
-      keys.forEach((fieldId) => {
-        if (!groups.has(fieldId)) groups.set(fieldId, []);
-        groups.get(fieldId).push(row);
-      });
-    });
-    return Array.from(groups.entries()).sort(([aId, aRows], [bId, bRows]) => {
-      const aName = aId === "__none" ? "対象なし" : (state.field(aId) && state.field(aId).name || "");
-      const bName = bId === "__none" ? "対象なし" : (state.field(bId) && state.field(bId).name || "");
-      return aName.localeCompare(bName) || bRows.length - aRows.length;
-    });
-  }
-
-  function renderFieldCards(rows) {
-    return groupRowsByField(rows).map(([fieldId, items]) => {
-      const field = fieldId === "__none" ? null : state.field(fieldId);
-      const sorted = items.slice().sort((a, b) => String(b.date).localeCompare(String(a.date)));
-      const stats = {
-        hours: totalHours(items),
-        growth: items.filter((row) => row.kind === "growth").length,
-        water: items.filter((row) => row.kind === "dry" || row.kind === "irrigation").length,
-        work: items.filter((row) => row.kind === "fieldWork" || row.kind === "other").length
-      };
-      return `
-        <article class="annual-field-card">
-          <div class="annual-field-head">
-            <div>
-              <b>${U.escapeHTML(field && field.name || "対象なし")}</b>
-              <span>${U.escapeHTML(field && field.areaA ? `${field.areaA}a` : "")}</span>
-            </div>
-            <div class="annual-field-metrics">
-              ${chip(`${items.length}件`, "count")}
-              ${stats.hours ? chip(U.formatHours(stats.hours), "hours") : ""}
-              ${chip(`作業${stats.work}`, "field")}
-              ${chip(`生育${stats.growth}`, "dap")}
-              ${chip(`水${stats.water}`, "status")}
-            </div>
-          </div>
-          <div class="annual-entry-list field-view">
-            ${sorted.slice(0, 12).map((row) => renderEntry(row, true)).join("")}
-          </div>
-        </article>
-      `;
-    }).join("");
-  }
-
-  function renderDetailTimeline(rows) {
-    let currentMonth = "";
-    let currentPhase = "";
-    return rows.map((row) => {
-      let head = "";
-      const month = U.monthKey(row.date);
-      const phase = row.kind === "growth" ? "4 生育管理" : S.phase(row.title);
-      if (month !== currentMonth) {
-        currentMonth = month;
-        currentPhase = "";
-        head += `<div class="timeline-month">${U.escapeHTML(month)}</div>`;
-      }
-      if (phase !== currentPhase) {
-        currentPhase = phase;
-        head += `<div class="timeline-phase">${U.escapeHTML(phase)}</div>`;
-      }
-      return head + renderEntry(row, true);
-    }).join("");
-  }
-
-  function renderTimeline(rows) {
-    if (!rows.length) return '<div class="empty">記録はまだありません。</div>';
-    if ((U.$("annualView").value || "compact") === "field") return renderFieldCards(rows);
-    if ((U.$("annualView").value || "compact") === "detail") return renderDetailTimeline(rows);
-    return renderDayCards(rows);
-  }
-
-  function renderLastYear(rows) {
-    if (!U.$("showLastYear").checked) return "";
-    const range = U.lastYearSamePeriod(U.today(), 14);
-    const fieldId = U.$("annualField").value || "all";
-    const same = rows.filter((row) => {
-      const fieldOk = fieldId === "all" || (row.fieldIds || []).includes(fieldId);
-      return fieldOk && U.inDateRange(row.date, range.start, range.end);
-    });
+  function renderPhotoTab(field) {
+    const photos = photosForField(field.fieldId);
+    if (!photos.length) return '<div class="empty">写真はまだありません。</div>';
     return `
-      <div class="annual-lastyear-panel">
-        <div class="section-title compact">
-          <h3>去年同時期</h3>
-          <span class="muted">${U.escapeHTML(U.fd(range.start))} - ${U.escapeHTML(U.fd(range.end))}</span>
-        </div>
-        ${same.length ? renderDayCards(same, { compact: true }) : '<div class="empty">去年同時期の記録はありません。</div>'}
+      <div class="annual-photo-compare-grid">
+        ${photos.map((photo) => `
+          <article>
+            ${photo.photoData ? `<img src="${U.attr(photo.photoData)}" alt="">` : `<div>${U.escapeHTML(photo.photo || "写真メモ")}</div>`}
+            <b>${U.escapeHTML(photo.title)}</b>
+            <span>${U.escapeHTML(U.fd(photo.date))}</span>
+          </article>
+        `).join("")}
       </div>
+    `;
+  }
+
+  function renderTabs(field) {
+    const tabs = [
+      ["karte", "カルテ"],
+      ["growth", "生育記録"],
+      ["work", "作業記録"],
+      ["photos", "写真"]
+    ];
+    return `
+      <div class="annual-field-tabs">
+        ${tabs.map(([id, label]) => `<button type="button" class="${selectedTab === id ? "active" : ""}" data-annual-tab="${U.attr(id)}">${U.escapeHTML(label)}</button>`).join("")}
+      </div>
+      <div class="annual-field-tab-body">
+        ${selectedTab === "growth" ? renderGrowthTab(field) : ""}
+        ${selectedTab === "work" ? renderWorkTab(field) : ""}
+        ${selectedTab === "photos" ? renderPhotoTab(field) : ""}
+        ${selectedTab === "karte" ? renderKarteTab(field) : ""}
+      </div>
+    `;
+  }
+
+  function renderFieldDetail(field) {
+    const stats = fieldStats(field);
+    const planting = state.plantingDateForField ? state.plantingDateForField(field.fieldId) : "";
+    return `
+      <div class="annual-field-detail">
+        <div class="annual-detail-head">
+          <button type="button" class="secondary icon-button" data-annual-back>‹</button>
+          <div>
+            <span>圃場履歴</span>
+            <h2>${U.escapeHTML(field.name)}</h2>
+            <p>${U.escapeHTML(varietyName(field))} / ${U.escapeHTML(field.areaA ? `${field.areaA}a` : "面積未設定")}${planting ? ` / 田植後${U.escapeHTML(String(U.daysAfterPlanting(field, U.today())))}日` : ""}</p>
+          </div>
+        </div>
+        <div class="annual-field-mini-summary">
+          ${summaryCard("記録", `${stats.total}件`, "green")}
+          ${summaryCard("生育", `${stats.growth}件`, "purple")}
+          ${summaryCard("水管理", `${stats.water}件`, "blue")}
+          ${summaryCard("作業", `${stats.work}件`, "amber")}
+        </div>
+        ${renderTabs(field)}
+        ${renderAnnualFab(field.fieldId)}
+      </div>
+    `;
+  }
+
+  function renderAnnualFab(fieldId) {
+    return `
+      <button type="button" class="annual-fab" data-annual-fab="${U.attr(fieldId || "")}" aria-label="記録を追加">+</button>
     `;
   }
 
@@ -581,48 +588,23 @@
     const years = new Set([String(new Date().getFullYear())]);
     allRows().forEach((row) => years.add(String(row.season)));
     const sorted = Array.from(years).sort((a, b) => Number(b) - Number(a));
-    U.setOptions(U.$("annualYear"), [{ value: "all", label: "すべて" }, ...sorted.map((year) => ({ value: year, label: year }))], U.$("annualYear").value || String(new Date().getFullYear()));
-    U.setOptions(U.$("annualField"), [{ value: "all", label: "全圃場" }, ...state.fields().map((field) => ({ value: field.fieldId, label: field.name }))], U.$("annualField").value || "all");
-    U.setOptions(U.$("annualKind"), [
-      { value: "all", label: "すべて" },
-      { value: "fieldWork", label: "圃場作業" },
-      { value: "growth", label: "生育ログ" },
-      { value: "dry", label: "中干し" },
-      { value: "irrigation", label: "水管理" },
-      { value: "photo", label: "写真" },
-      { value: "schedule", label: "予定" },
-      { value: "other", label: "その他作業" }
-    ], U.$("annualKind").value || "all");
-    U.setOptions(U.$("annualView"), [
-      { value: "compact", label: "日付カード" },
-      { value: "field", label: "圃場別" },
-      { value: "detail", label: "詳細一覧" }
-    ], U.$("annualView").value || "compact");
-    renderKindTabs();
-  }
-
-  function renderKindTabs() {
-    const el = U.$("annualKindTabs");
-    if (!el) return;
-    const value = U.$("annualKind").value || "all";
-    const tabs = [
-      ["all", "全て"],
-      ["fieldWork", "作業"],
-      ["growth", "生育"],
-      ["dry", "中干し"],
-      ["irrigation", "水管理"],
-      ["photo", "写真"]
-    ];
-    el.innerHTML = tabs.map(([kind, label]) => `
-      <button type="button" class="${kind === value ? "active" : ""}" data-annual-kind-tab="${U.attr(kind)}">${U.escapeHTML(label)}</button>
-    `).join("");
+    U.setOptions(U.$("annualYear"), [{ value: "all", label: "全年度" }, ...sorted.map((year) => ({ value: year, label: `${year}年` }))], yearValue());
+    U.setOptions(U.$("annualSort"), [
+      { value: "updated", label: "更新日順" },
+      { value: "name", label: "圃場名順" },
+      { value: "area", label: "面積順" },
+      { value: "variety", label: "品種順" },
+      { value: "status", label: "ステータス順" }
+    ], U.$("annualSort") && U.$("annualSort").value || "updated");
   }
 
   function render() {
     renderOptions();
-    const rows = allRows();
-    const filtered = filterRows(rows);
-    U.$("annualTimeline").innerHTML = renderSummary(filtered) + renderAnalysis(filtered) + renderLastYear(rows) + renderTimeline(filtered);
+    const field = selectedFieldId && state.field(selectedFieldId);
+    const rows = rowsForYear(allRows());
+    const screen = U.$("screen-annual");
+    if (screen) screen.classList.toggle("annual-detail-mode", Boolean(field));
+    U.$("annualTimeline").innerHTML = field ? renderFieldDetail(field) : renderTop(rows);
   }
 
   function editRow(kind, id) {
@@ -668,19 +650,61 @@
     if (kind === "other") state.deleteOtherWork(id);
   }
 
+  function openAdd(fieldId) {
+    const targetFieldId = fieldId || selectedFieldId || (state.activeFields()[0] && state.activeFields()[0].fieldId) || "";
+    if (RiceOS.bottomSheet) {
+      RiceOS.bottomSheet.open(U.today(), targetFieldId);
+      return;
+    }
+    RiceOS.app.show("field-work");
+    if (targetFieldId && RiceOS.screens.fieldWork) RiceOS.screens.fieldWork.prefillDate(U.today(), targetFieldId);
+  }
+
   function bind() {
-    ["annualYear", "annualField", "annualKind", "annualView", "showLastYear"].forEach((id) => U.$(id).addEventListener("change", render));
-    U.$("annualKindTabs").addEventListener("click", (event) => {
-      const button = event.target.closest("[data-annual-kind-tab]");
-      if (!button) return;
-      U.$("annualKind").value = button.dataset.annualKindTab;
-      render();
+    ["annualYear", "annualSearch", "annualSort"].forEach((id) => {
+      const el = U.$(id);
+      if (el) el.addEventListener(id === "annualSearch" ? "input" : "change", render);
     });
     U.$("annualTimeline").addEventListener("click", (event) => {
-      const button = event.target.closest("[data-annual-action]");
-      if (!button) return;
-      if (button.dataset.annualAction === "edit") editRow(button.dataset.kind, button.dataset.id);
-      if (button.dataset.annualAction === "delete") deleteRow(button.dataset.kind, button.dataset.id);
+      const open = event.target.closest("[data-annual-open-field]");
+      if (open) {
+        selectedFieldId = open.dataset.annualOpenField;
+        selectedTab = "karte";
+        render();
+        window.scrollTo({ top: 0, behavior: "smooth" });
+        return;
+      }
+      if (event.target.closest("[data-annual-back]")) {
+        selectedFieldId = "";
+        selectedTab = "karte";
+        render();
+        window.scrollTo({ top: 0, behavior: "smooth" });
+        return;
+      }
+      const tab = event.target.closest("[data-annual-tab]");
+      if (tab) {
+        selectedTab = tab.dataset.annualTab;
+        render();
+        return;
+      }
+      const fab = event.target.closest("[data-annual-fab]");
+      if (fab) {
+        openAdd(fab.dataset.annualFab);
+        return;
+      }
+      const action = event.target.closest("[data-annual-action]");
+      if (action) {
+        if (action.dataset.annualAction === "edit") editRow(action.dataset.kind, action.dataset.id);
+        if (action.dataset.annualAction === "delete") deleteRow(action.dataset.kind, action.dataset.id);
+      }
+    });
+    U.$("annualTimeline").addEventListener("change", (event) => {
+      const el = event.target.closest("[data-annual-field-edit]");
+      if (!el || !selectedFieldId) return;
+      const key = el.dataset.annualFieldEdit;
+      let value = el.value;
+      if (["areaA"].includes(key)) value = U.number(value, 0);
+      state.updateField(selectedFieldId, { [key]: value });
     });
   }
 

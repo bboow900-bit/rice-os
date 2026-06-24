@@ -83,8 +83,12 @@
   }
 
   function daysAfterPlanting(field, dateText) {
-    if (!field || !field.plantingDate || !dateText) return "";
-    return daysBetween(field.plantingDate, dateText);
+    const workDate = field && RiceOS.state && RiceOS.state.plantingDateForField
+      ? RiceOS.state.plantingDateForField(field.fieldId)
+      : "";
+    const plantingDate = workDate || "";
+    if (!field || !plantingDate || !dateText) return "";
+    return daysBetween(plantingDate, dateText);
   }
 
   function daysSince(dateText) {

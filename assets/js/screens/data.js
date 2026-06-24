@@ -5,6 +5,7 @@
   const U = RiceOS.utils;
   const storage = RiceOS.storage;
   const state = RiceOS.state;
+  const APP_VERSION_LABEL = "Ver2.0";
 
   function sizeLabel(bytes) {
     if (bytes < 1024) return `${bytes}B`;
@@ -15,6 +16,7 @@
   function render() {
     const info = storage.info(state.data());
     U.$("dataStatus").innerHTML = [
+      ["アプリバージョン", APP_VERSION_LABEL],
       ["保存キー", info.storeKey],
       ["使用量", sizeLabel(info.bytes)],
       ["直前バックアップ", info.backupBytes ? sizeLabel(info.backupBytes) : "なし"],
