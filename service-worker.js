@@ -1,5 +1,5 @@
-const CACHE_NAME = "rice-karte-20260624-11";
-const APP_VERSION = "20260624_karte11";
+const CACHE_NAME = "rice-karte-20260624-12";
+const APP_VERSION = "20260624_karte12";
 
 const APP_SHELL = [
   "./",
@@ -12,6 +12,7 @@ const APP_SHELL = [
   `./assets/js/core/schema.js?v=${APP_VERSION}`,
   `./assets/js/core/storage.js?v=${APP_VERSION}`,
   `./assets/js/core/state.js?v=${APP_VERSION}`,
+  `./assets/js/core/agro.js?v=${APP_VERSION}`,
   `./assets/js/core/record-actions.js?v=${APP_VERSION}`,
   `./assets/js/core/calendar.js?v=${APP_VERSION}`,
   `./assets/js/core/alerts.js?v=${APP_VERSION}`,

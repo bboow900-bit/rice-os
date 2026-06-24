@@ -59,6 +59,15 @@
   function renderSelected() {
     U.$("selectedDateTitle").textContent = `${U.fd(selectedDate)} の記録`;
     const entries = RiceOS.calendar.entriesForDate(selectedDate);
+    const field = RiceOS.state.activeFields()[0] || RiceOS.state.fields()[0] || null;
+    const progress = field && RiceOS.agro ? RiceOS.agro.progress(field, selectedDate) : null;
+    if (U.$("selectedDateProgress")) {
+      U.$("selectedDateProgress").innerHTML = progress ? `
+        <span>${U.escapeHTML(field.name)}</span>
+        <b>${U.escapeHTML(progress.dap === "" ? "田植日未設定" : `田植後 ${progress.dap}日`)}</b>
+        <b>積算気温 ${U.escapeHTML(progress.tempText)}</b>
+      ` : "";
+    }
     U.$("selectedDateEntries").innerHTML = entries.length ? entries.map(entryHtml).join("") : '<div class="empty">この日の記録はまだありません。</div>';
   }
 

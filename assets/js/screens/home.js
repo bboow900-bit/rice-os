@@ -34,6 +34,25 @@
     return `${Math.round(area * 10) / 10}a`;
   }
 
+  function renderProgressCard() {
+    const field = currentField();
+    const progress = RiceOS.agro ? RiceOS.agro.progress(field, U.today()) : {};
+    const dap = progress.dap === "" ? "田植日未設定" : `田植後 ${progress.dap}日`;
+    return `
+      <div class="visual-heat-card">
+        <div>
+          <b>${U.escapeHTML(fieldLabel(field))}</b>
+          <span>生育進行の目安</span>
+        </div>
+        <div class="visual-heat-metrics">
+          <span><b>${U.escapeHTML(dap)}</b><small>日数</small></span>
+          <span><b>${U.escapeHTML(progress.tempText || "記録待ち")}</b><small>積算気温</small></span>
+          <span><b>${U.escapeHTML(progress.diffText || "前年比 --")}</b><small>前年比較</small></span>
+        </div>
+      </div>
+    `;
+  }
+
   function markerClass(entry) {
     if (entry.kind === "schedule") return "mark-schedule";
     if (entry.kind === "growth") return "mark-growth";
@@ -282,18 +301,22 @@
 
   function renderTopSummary() {
     return `
-      <div class="visual-top-summary">
-        <div>
-          <b>稲作カルテ</b>
+      <section class="visual-home-top">
+        <div class="visual-home-title">
           <span>田んぼの記録・比較・管理アプリ</span>
-        </div>
-        <div>
+          <b>稲作カルテ</b>
           <label class="visual-home-field">表示圃場<select data-home-field>${homeFieldOptions()}</select></label>
-          <span>管理面積 ${U.escapeHTML(areaText())}</span>
-          <span>圃場 ${U.escapeHTML(String(state.fields().length))}枚</span>
-          <span>品種 ${U.escapeHTML(String(state.varieties().length))}</span>
         </div>
-      </div>
+        <div class="visual-home-hero" role="img" aria-label="田んぼの写真">
+          <span>今日の田んぼを、来年の判断材料へ</span>
+        </div>
+        <div class="visual-kpi-row">
+          <span><b>${U.escapeHTML(areaText())}</b><small>管理面積</small></span>
+          <span><b>${U.escapeHTML(String(state.fields().length))}枚</b><small>圃場</small></span>
+          <span><b>${U.escapeHTML(String(state.varieties().length))}</b><small>品種</small></span>
+        </div>
+        ${renderProgressCard()}
+      </section>
     `;
   }
 

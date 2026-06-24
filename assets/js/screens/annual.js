@@ -193,7 +193,7 @@
     return rows.filter((row) => {
       const yearOk = year === "all" || String(row.season) === String(year);
       const fieldOk = fieldId === "all" || (row.fieldIds || []).includes(fieldId);
-      const kindOk = kind === "all" || row.kind === kind;
+      const kindOk = kind === "all" || row.kind === kind || (kind === "photo" && row.photoData);
       return yearOk && fieldOk && kindOk;
     });
   }
@@ -396,10 +396,12 @@
 
   function renderDapChips(row) {
     const labels = dapLabels(row.fieldIds, row.date);
-    if (!labels.length) return "";
     const shown = labels.slice(0, 2).map((label) => chip(label, "dap")).join("");
     const extra = labels.length > 2 ? chip(`ほか${labels.length - 2}`, "muted") : "";
-    return shown + extra;
+    const firstFieldId = (row.fieldIds || [])[0];
+    const progress = firstFieldId && RiceOS.agro ? RiceOS.agro.progress(firstFieldId, row.date) : null;
+    const temp = progress ? chip(`積算 ${progress.tempText}`, "temp") : "";
+    return shown + extra + temp;
   }
 
   function renderEntry(row, showDate) {
@@ -468,6 +470,7 @@
               ${chip(`${items.length}件`, "count")}
               ${dayHours ? chip(U.formatHours(dayHours), "hours") : ""}
               ${dap ? chip(dap, "dap") : ""}
+              ${items[0] && items[0].fieldIds && items[0].fieldIds[0] && RiceOS.agro ? chip(`積算 ${RiceOS.agro.progress(items[0].fieldIds[0], date).tempText}`, "temp") : ""}
             </div>
           </div>
           <div class="annual-entry-list">
@@ -586,6 +589,7 @@
       { value: "growth", label: "生育ログ" },
       { value: "dry", label: "中干し" },
       { value: "irrigation", label: "水管理" },
+      { value: "photo", label: "写真" },
       { value: "schedule", label: "予定" },
       { value: "other", label: "その他作業" }
     ], U.$("annualKind").value || "all");
@@ -594,6 +598,24 @@
       { value: "field", label: "圃場別" },
       { value: "detail", label: "詳細一覧" }
     ], U.$("annualView").value || "compact");
+    renderKindTabs();
+  }
+
+  function renderKindTabs() {
+    const el = U.$("annualKindTabs");
+    if (!el) return;
+    const value = U.$("annualKind").value || "all";
+    const tabs = [
+      ["all", "全て"],
+      ["fieldWork", "作業"],
+      ["growth", "生育"],
+      ["dry", "中干し"],
+      ["irrigation", "水管理"],
+      ["photo", "写真"]
+    ];
+    el.innerHTML = tabs.map(([kind, label]) => `
+      <button type="button" class="${kind === value ? "active" : ""}" data-annual-kind-tab="${U.attr(kind)}">${U.escapeHTML(label)}</button>
+    `).join("");
   }
 
   function render() {
@@ -648,6 +670,12 @@
 
   function bind() {
     ["annualYear", "annualField", "annualKind", "annualView", "showLastYear"].forEach((id) => U.$(id).addEventListener("change", render));
+    U.$("annualKindTabs").addEventListener("click", (event) => {
+      const button = event.target.closest("[data-annual-kind-tab]");
+      if (!button) return;
+      U.$("annualKind").value = button.dataset.annualKindTab;
+      render();
+    });
     U.$("annualTimeline").addEventListener("click", (event) => {
       const button = event.target.closest("[data-annual-action]");
       if (!button) return;
