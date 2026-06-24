@@ -43,6 +43,135 @@
     return `<datalist id="${U.attr(id)}">${values.map((value) => `<option value="${U.attr(value)}"></option>`).join("")}</datalist>`;
   }
 
+  function latestByDate(rows) {
+    return (rows || []).slice().sort((a, b) => String(b.date || b.startDate).localeCompare(String(a.date || a.startDate)))[0] || null;
+  }
+
+  function compactArray(value, emptyText) {
+    const rows = Array.isArray(value) ? value : [];
+    if (!rows.length) return emptyText || "-";
+    return rows.slice(0, 3).join("・") + (rows.length > 3 ? ` ほか${rows.length - 3}` : "");
+  }
+
+  function renderKarteMetric(label, value, tone) {
+    return `
+      <div class="field-karte-metric ${tone || ""}">
+        <span>${U.escapeHTML(label)}</span>
+        <b>${U.escapeHTML(value || "-")}</b>
+      </div>
+    `;
+  }
+
+  function periodLine(item, fallbackStart, fallbackDays) {
+    const start = item && item.startDate || fallbackStart || "";
+    const end = item && item.endDate || (start && fallbackDays ? U.dateAddDays(start, U.number(fallbackDays, 0)) : "");
+    const observed = item && item.date || U.today();
+    const elapsed = start ? U.daysBetween(start, observed) : "";
+    const remaining = end ? U.daysBetween(U.today(), end) : "";
+    if (!start) return "開始日未設定";
+    return [
+      `${elapsed !== "" ? `${elapsed}日目` : "進行中"}`,
+      remaining !== "" ? (remaining >= 0 ? `残り${remaining}日` : `${Math.abs(remaining)}日超過`) : "",
+      end ? `目安 ${U.fd(end)}` : ""
+    ].filter(Boolean).join(" / ");
+  }
+
+  function renderLatestLog(label, row, parts, tone) {
+    if (!row) {
+      return `
+        <div class="field-karte-log empty">
+          <b>${U.escapeHTML(label)}</b>
+          <span>まだ記録がありません</span>
+        </div>
+      `;
+    }
+    return `
+      <div class="field-karte-log ${tone || ""}">
+        <b>${U.escapeHTML(label)} <small>${U.escapeHTML(U.fd(row.date || row.startDate))}</small></b>
+        <span>${U.escapeHTML((parts || []).filter(Boolean).join(" / "))}</span>
+      </div>
+    `;
+  }
+
+  function photosForField(fieldId) {
+    const photos = [
+      ...state.growthLogsFor(fieldId).map((row) => ({ date: row.date, photoData: row.photoData, photo: row.photo, title: "生育" })),
+      ...state.fieldWorksFor(fieldId).map((row) => ({ date: row.date, photoData: row.photoData, photo: row.photo, title: row.workName || "作業" })),
+      ...state.dryPeriodsFor(fieldId).map((row) => ({ date: row.date, photoData: row.photoData, photo: row.photo, title: "中干し" }))
+    ].filter((row) => row.photoData || row.photo);
+    return photos.sort((a, b) => String(b.date).localeCompare(String(a.date))).slice(0, 4);
+  }
+
+  function renderPhotoStrip(field) {
+    const photos = photosForField(field.fieldId);
+    if (!photos.length) return '<div class="field-photo-strip empty">写真はまだありません</div>';
+    return `
+      <div class="field-photo-strip">
+        ${photos.map((photo) => `
+          <div>
+            ${photo.photoData ? `<img src="${U.attr(photo.photoData)}" alt="">` : `<span>${U.escapeHTML(photo.photo || "写真メモ")}</span>`}
+            <small>${U.escapeHTML(photo.title)} / ${U.escapeHTML(U.fd(photo.date))}</small>
+          </div>
+        `).join("")}
+      </div>
+    `;
+  }
+
+  function renderFeatureTags(field) {
+    const tags = [
+      field.soilType,
+      field.waterHolding ? `水持ち:${field.waterHolding}` : "",
+      field.drainage ? `水捌け:${field.drainage}` : "",
+      ...(Array.isArray(field.fieldFeatures) ? field.fieldFeatures : []),
+      ...(Array.isArray(field.commonWeeds) ? field.commonWeeds.map((weed) => `雑草:${weed}`) : [])
+    ].filter(Boolean);
+    return tags.length ? tags.slice(0, 8).map((tag) => `<span>${U.escapeHTML(tag)}</span>`).join("") : '<span>特徴未設定</span>';
+  }
+
+  function renderKarteDashboard(field) {
+    const variety = state.variety(field.varietyId);
+    const latestWork = state.lastFieldWork(field.fieldId);
+    const latestGrowth = state.lastGrowthLog(field.fieldId);
+    const latestDry = latestByDate(state.dryPeriodsFor(field.fieldId));
+    const latestIrrigation = latestByDate(state.irrigationsFor(field.fieldId));
+    const dap = U.daysAfterPlanting(field, U.today());
+    const fixedMemo = String(field.fixedMemo || "").trim();
+    return `
+      <div class="field-karte-dashboard">
+        <section class="field-karte-overview">
+          <div class="field-karte-metrics">
+            ${renderKarteMetric("品種", variety && variety.name || "未設定", "green")}
+            ${renderKarteMetric("田植後", dap !== "" ? `${dap}日` : "田植日未設定", "amber")}
+            ${renderKarteMetric("面積", `${field.areaA || 0}a`, "blue")}
+            ${renderKarteMetric("分げつ目標", variety && variety.targetTillers || "未設定", "purple")}
+          </div>
+          <div class="field-karte-tags">${renderFeatureTags(field)}</div>
+          ${fixedMemo ? `<div class="field-fixed-note"><b>固定メモ</b><span>${U.escapeHTML(fixedMemo)}</span></div>` : ""}
+        </section>
+        <section class="field-karte-activity">
+          ${renderLatestLog("最新作業", latestWork, [latestWork && latestWork.workName, latestWork && latestWork.hours ? `時間 ${latestWork.hours}` : "", latestWork && latestWork.material], "work")}
+          ${renderLatestLog("最新生育", latestGrowth, [latestGrowth && `分げつ ${latestGrowth.tillerCount || "-"}`, latestGrowth && `葉数 ${latestGrowth.leafCount || "-"}`, latestGrowth && `草丈 ${latestGrowth.plantHeightCm || "-"}cm`, latestGrowth && `葉色 ${latestGrowth.leafColor || "-"}`], "growth")}
+          ${renderLatestLog("中干し", latestDry || { date: field.drainageStartDate }, [periodLine(latestDry, field.drainageStartDate, field.drainageTargetDays)], "water")}
+          ${renderLatestLog("間断/湿潤", latestIrrigation || { date: field.intermittentStartDate }, [periodLine(latestIrrigation, field.intermittentStartDate, field.intermittentIntervalDays)], "water")}
+        </section>
+        <section class="field-karte-photo-panel">
+          <div class="section-title compact">
+            <h3>写真</h3>
+            <span class="muted">${U.escapeHTML(compactArray(field.commonWeeds, "雑草未設定"))}</span>
+          </div>
+          ${renderPhotoStrip(field)}
+        </section>
+        <div class="field-karte-actions">
+          <button class="secondary" type="button" data-field-action="add-work" data-field-id="${U.attr(field.fieldId)}">作業</button>
+          <button class="secondary" type="button" data-field-action="add-growth" data-field-id="${U.attr(field.fieldId)}">生育</button>
+          <button class="secondary" type="button" data-field-action="add-dry" data-field-id="${U.attr(field.fieldId)}">中干し</button>
+          <button class="secondary" type="button" data-field-action="add-irrigation" data-field-id="${U.attr(field.fieldId)}">間断/湿潤</button>
+          <button class="secondary" type="button" data-field-action="photos" data-field-id="${U.attr(field.fieldId)}">写真一覧</button>
+        </div>
+      </div>
+    `;
+  }
+
   function renderField(field) {
     const variety = state.variety(field.varietyId);
     return `
@@ -55,6 +184,7 @@
             ${field.plantingDate ? `<span class="pill warn">田植 ${U.escapeHTML(U.fd(field.plantingDate))}</span>` : '<span class="pill bad">田植日未設定</span>'}
           </div>
         </div>
+        ${renderKarteDashboard(field)}
         <div class="record-body">
           <details class="form-section" open>
             <summary>基本情報</summary>
@@ -141,7 +271,29 @@
       if (!button) return;
       const field = state.field(button.dataset.fieldId);
       if (!field) return;
-      if (button.dataset.fieldAction === "calendar") RiceOS.alerts.downloadFieldCalendar(field);
+      const action = button.dataset.fieldAction;
+      if (action === "calendar") RiceOS.alerts.downloadFieldCalendar(field);
+      if (action === "add-work" && RiceOS.screens.fieldWork) {
+        RiceOS.app.show("field-work");
+        RiceOS.screens.fieldWork.prefillDate(U.today(), field.fieldId);
+      }
+      if (action === "add-growth" && RiceOS.screens.growth) {
+        RiceOS.app.show("growth");
+        RiceOS.screens.growth.prefillDate(U.today(), field.fieldId);
+      }
+      if (action === "add-dry" && RiceOS.screens.dryPeriod) {
+        RiceOS.app.show("dry-period");
+        RiceOS.screens.dryPeriod.prefillDate(U.today(), field.fieldId);
+      }
+      if (action === "add-irrigation" && RiceOS.screens.irrigation) {
+        RiceOS.app.show("irrigation");
+        RiceOS.screens.irrigation.prefillDate(U.today(), field.fieldId);
+      }
+      if (action === "photos" && RiceOS.screens.photos) {
+        RiceOS.app.show("photos");
+        if (U.$("photoField")) U.$("photoField").value = field.fieldId;
+        RiceOS.screens.photos.render();
+      }
     });
   }
 

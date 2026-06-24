@@ -335,6 +335,212 @@ h3 {
   font-size: 13px;
 }
 
+.field-karte-dashboard {
+  display: grid;
+  gap: 12px;
+  padding: 13px;
+  border-bottom: 1px solid var(--line);
+  background: linear-gradient(135deg, #fbfff7 0%, #f5fbff 100%);
+}
+
+.field-karte-overview {
+  display: grid;
+  gap: 10px;
+}
+
+.field-karte-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.field-karte-metric {
+  display: grid;
+  gap: 4px;
+  min-height: 58px;
+  padding: 9px;
+  border: 1px solid rgba(216, 227, 211, 0.9);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.field-karte-metric span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.field-karte-metric b {
+  font-size: 15px;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.field-karte-metric.green {
+  background: #eff9e8;
+}
+
+.field-karte-metric.amber {
+  background: #fff5d8;
+}
+
+.field-karte-metric.blue {
+  background: #eaf5ff;
+}
+
+.field-karte-metric.purple {
+  background: #f2ecff;
+}
+
+.field-karte-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.field-karte-tags span {
+  display: inline-flex;
+  min-height: 26px;
+  align-items: center;
+  padding: 5px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.76);
+  color: #344132;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.field-fixed-note {
+  display: grid;
+  gap: 4px;
+  padding: 9px 10px;
+  border-left: 5px solid var(--amber);
+  border-radius: 8px;
+  background: #fff8df;
+}
+
+.field-fixed-note b {
+  color: #604900;
+  font-size: 12px;
+}
+
+.field-fixed-note span {
+  color: #4e4320;
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.field-karte-activity {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.field-karte-log {
+  display: grid;
+  gap: 4px;
+  min-height: 58px;
+  padding: 9px 10px;
+  border: 1px solid rgba(216, 227, 211, 0.9);
+  border-left: 5px solid #8fa78b;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.84);
+}
+
+.field-karte-log.work {
+  border-left-color: #d7792a;
+}
+
+.field-karte-log.growth {
+  border-left-color: #3ca557;
+}
+
+.field-karte-log.water {
+  border-left-color: #3f75b5;
+}
+
+.field-karte-log.empty {
+  background: rgba(247, 250, 245, 0.78);
+}
+
+.field-karte-log b {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.field-karte-log small,
+.field-karte-log span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.45;
+}
+
+.field-karte-photo-panel {
+  display: grid;
+  gap: 8px;
+}
+
+.field-photo-strip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.field-photo-strip.empty {
+  display: block;
+  padding: 10px;
+  border: 1px dashed #cddbc7;
+  border-radius: 8px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 850;
+  text-align: center;
+}
+
+.field-photo-strip div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.field-photo-strip img,
+.field-photo-strip div > span {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  border-radius: 8px;
+  background: #edf3e9;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 850;
+  object-fit: cover;
+  overflow: hidden;
+}
+
+.field-photo-strip small {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.field-karte-actions {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.field-karte-actions button {
+  min-height: 38px;
+  padding: 7px 6px;
+  font-size: 12px;
+}
+
 .title-line {
   display: flex;
   flex-wrap: wrap;
@@ -1938,6 +2144,20 @@ label {
     white-space: normal;
   }
 
+  .field-karte-dashboard {
+    padding: 11px;
+  }
+
+  .field-karte-metrics,
+  .field-karte-activity,
+  .field-photo-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .field-karte-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .form-grid {
     padding: 12px;
     gap: 10px;
@@ -2843,7 +3063,7 @@ label {
   }
 }
 
-/* KARTE8: first visual pass, cheerful daily-use feel without data changes. */
+/* KARTE9: first visual pass, cheerful daily-use feel without data changes. */
 .karte-hero {
   position: relative;
   min-height: 176px;
@@ -2892,7 +3112,7 @@ label {
   font-weight: 800;
 }
 
-/* KARTE8: home screen follows the supplied calendar/timeline/record mock. */
+/* KARTE9: home screen follows the supplied calendar/timeline/record mock. */
 .visual-app-board {
   display: grid;
   gap: 12px;
