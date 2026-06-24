@@ -171,33 +171,51 @@
       const variety = field ? state.variety(field.varietyId) : null;
       const dap = U.daysAfterPlanting(field, log.date);
       const leafScore = RiceOS.alerts.leafScore(log);
+      const score = Math.max(1, Math.min(5, Math.round(U.number(leafScore, 3))));
       const target = variety && variety.targetTillers || "";
+      const photo = log.photoData || "";
+      const targetText = target && log.tillerCount ? `分げつ目標 ${target} / 現在 ${log.tillerCount}本` : "";
       return `
-        <div class="growth-card">
+        <article class="growth-card timeline-card">
           <div class="growth-date">
             <b>${U.escapeHTML(U.fd(log.date))}</b>
-            <span>${U.escapeHTML(field && field.name || "")}</span>
+            <span>${U.escapeHTML(field && field.name || "圃場")}</span>
           </div>
-          ${dap !== "" ? `<span class="pill warn">田植後${U.escapeHTML(String(dap))}日</span>` : ""}
-          ${leafScore ? `<span class="leaf-meter tone-${U.attr(RiceOS.alerts.leafTone(leafScore))}" title="葉色${U.attr(S.leafColorLabel(leafScore))}"><span style="width:${U.attr(String(U.number(leafScore, 0) * 20))}%"></span></span>` : ""}
-          ${log.photoData ? '<span class="pill info">写真あり</span>' : log.photo ? '<span class="pill info">写真メモあり</span>' : ""}
-          <div class="metric-row">
-            <span>葉数 <b>${U.escapeHTML(log.leafCount || "-")}</b></span>
-            <span>分げつ <b>${U.escapeHTML(log.tillerCount || "-")}</b></span>
-            <span>草丈 <b>${U.escapeHTML(log.plantHeightCm || "-")}</b>cm</span>
+          <div class="timeline-card-body">
+            <div class="timeline-card-head">
+              <div>
+                <b>葉色：${U.escapeHTML(log.leafColor || S.leafColorLabel(score))}</b>
+                <span>${U.escapeHTML(variety && variety.name || "品種未設定")}${dap !== "" ? ` / 田植後${U.escapeHTML(String(dap))}日` : ""}</span>
+              </div>
+              ${photo ? '<span class="pill info">写真あり</span>' : log.photo ? '<span class="pill info">写真メモあり</span>' : ""}
+            </div>
+            <div class="timeline-leaves" aria-label="葉色${U.attr(String(score))}">
+              ${"●".repeat(score)}${"○".repeat(Math.max(0, 5 - score))}
+            </div>
+            <div class="metric-row timeline-metrics">
+              <span>葉数 <b>${U.escapeHTML(log.leafCount || "-")}</b></span>
+              <span>分げつ <b>${U.escapeHTML(log.tillerCount || "-")}</b></span>
+              <span>草丈 <b>${U.escapeHTML(log.plantHeightCm || "-")}</b>cm</span>
+            </div>
+            <div class="timeline-status-row">
+              <span>雑草 ${U.escapeHTML(log.weed || "-")}</span>
+              <span>ガス ${U.escapeHTML(log.gas || "-")}</span>
+              <span>水 ${U.escapeHTML(log.water || "-")}</span>
+            </div>
+            ${targetText ? `<div class="target-note">${U.escapeHTML(targetText)}</div>` : ""}
+            ${log.memo ? `<p class="timeline-memo">${U.escapeHTML(log.memo)}</p>` : ""}
+            ${log.photo && !photo ? `<small class="muted">写真: ${U.escapeHTML(log.photo)}</small>` : ""}
           </div>
-          ${target && log.tillerCount ? `<div class="target-note">分げつ目標 ${U.escapeHTML(target)} / 現在 ${U.escapeHTML(log.tillerCount)}本</div>` : ""}
-          <span class="muted">葉色:${U.escapeHTML(log.leafColor)} / 雑草:${U.escapeHTML(log.weed)} / ガス:${U.escapeHTML(log.gas)} / 水管理:${U.escapeHTML(log.water)}</span>
-          ${log.photoData ? `<img class="thumb" src="${U.attr(log.photoData)}" alt="">` : ""}
-          ${log.photo && !log.photoData ? `<div>写真: ${U.escapeHTML(log.photo)}</div>` : ""}
-          ${log.memo ? `<div>${U.escapeHTML(log.memo)}</div>` : ""}
-          <div class="record-actions">
+          <div class="growth-photo-frame ${photo ? "" : "empty"}">
+            ${photo ? `<img src="${U.attr(photo)}" alt="">` : "<span>写真</span>"}
+          </div>
+          <div class="record-actions timeline-actions">
             <button class="secondary" data-growth-action="edit" data-id="${U.attr(log.logId)}">編集</button>
             <button class="danger" data-growth-action="delete" data-id="${U.attr(log.logId)}">削除</button>
           </div>
-        </div>
+        </article>
       `;
-    }).join("") : '<div class="empty">生育ログはまだありません。</div>';
+    }).join("") : '<div class="empty timeline-empty"><b>まだ生育ログはありません。</b><span>記録を追加すると、写真・葉色・分げつ・草丈がタイムラインで並びます。</span></div>';
     renderComparePanel();
   }
 

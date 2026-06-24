@@ -21,12 +21,13 @@
     const entries = RiceOS.calendar.entriesForDate(date);
     const hasPhoto = entries.some((entry) => entry.hasPhoto);
     return `
-      <button class="calendar-day ${today ? "today" : ""} ${inMonth ? "" : "muted-day"} ${selectedDate === date ? "selected" : ""}" data-date="${U.attr(date)}">
-        <span>${d.getDate()}</span>
+      <button class="calendar-day ${today ? "today" : ""} ${inMonth ? "" : "muted-day"} ${entries.length ? "has-entries" : ""} ${selectedDate === date ? "selected" : ""}" data-date="${U.attr(date)}">
+        <span class="day-number">${d.getDate()}</span>
         <div class="day-markers">
           ${entries.slice(0, 4).map((entry) => `<i class="${markerClass(entry)}"></i>`).join("")}
-          ${hasPhoto ? '<em>📷</em>' : ""}
+          ${hasPhoto ? '<em>写</em>' : ""}
         </div>
+        ${entries.length ? `<strong class="entry-count">${entries.length}件</strong>` : ""}
       </button>
     `;
   }
