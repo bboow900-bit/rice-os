@@ -7,6 +7,8 @@
 
   let selectedFieldId = "";
   let selectedTab = "karte";
+  let annualSearchValue = "";
+  let annualSortValue = "updated";
 
   const KIND_META = {
     fieldWork: { label: "作業", className: "work", icon: "作" },
@@ -52,6 +54,17 @@
   function workIcon(name) {
     const found = WORK_ICONS.find(([pattern]) => pattern.test(String(name || "")));
     return found ? found[1] : "作";
+  }
+
+  function workIconClass(name) {
+    const text = String(name || "");
+    if (/田植え|補植/.test(text)) return "planter";
+    if (/除草|散布|防除/.test(text)) return "sprayer";
+    if (/溝切り|中干し|落水|入水|間断|湿潤/.test(text)) return "water";
+    if (/肥料|基肥|元肥|追肥/.test(text)) return "fertilizer";
+    if (/稲刈り|収穫/.test(text)) return "harvest";
+    if (/代かき|耕起|草刈り/.test(text)) return "tractor";
+    return "other";
   }
 
   function makeRow(kind, item, values) {
@@ -212,12 +225,20 @@
     const waterCount = rows.filter((row) => row.kind === "dry" || row.kind === "irrigation").length;
     const growthCount = rows.filter((row) => row.kind === "growth").length;
     return `
-      <div class="annual-summary-grid">
-        ${summaryCard("記録件数", `${rows.length}件`, "green")}
-        ${summaryCard("作業時間", U.formatHours(totalHours(rows)), "amber")}
-        ${summaryCard("対象圃場数", `${fields.length}圃場`, "blue")}
-        ${summaryCard("生育 / 水 / 作業", `${growthCount} / ${waterCount} / ${workCount}`, "purple")}
-      </div>
+      <section class="annual-summary-board">
+        <div>
+          <b>${U.escapeHTML(yearValue() === "all" ? "全年度のサマリー" : `${yearValue()}年のサマリー`)}</b>
+          <span>1月1日〜12月31日</span>
+        </div>
+        <div class="annual-summary-grid">
+          ${summaryCard("記録件数", `${rows.length}件`, "green")}
+          ${summaryCard("作業時間", U.formatHours(totalHours(rows)), "amber")}
+          ${summaryCard("対象圃場数", `${fields.length}圃場`, "blue")}
+          ${summaryCard("生育記録数", `${growthCount}件`, "purple")}
+          ${summaryCard("水管理記録数", `${waterCount}件`, "blue")}
+          ${summaryCard("作業記録数", `${workCount}件`, "amber")}
+        </div>
+      </section>
     `;
   }
 
@@ -259,8 +280,8 @@
   }
 
   function filteredFields() {
-    const query = String(U.$("annualSearch") && U.$("annualSearch").value || "").trim().toLowerCase();
-    const sort = U.$("annualSort") && U.$("annualSort").value || "updated";
+    const query = String(U.$("annualSearch") ? U.$("annualSearch").value : annualSearchValue).trim().toLowerCase();
+    const sort = U.$("annualSort") ? U.$("annualSort").value : annualSortValue;
     const items = state.fields().map((field) => {
       const stats = fieldStats(field);
       const status = fieldStatus(field, stats);
@@ -285,20 +306,23 @@
 
   function renderFieldPickerCard(item) {
     const { field, stats, status } = item;
+    const last = stats.lastDate ? U.fd(stats.lastDate) : "記録なし";
     return `
       <button type="button" class="annual-field-pick-card status-${U.attr(status.tone)}" data-annual-open-field="${U.attr(field.fieldId)}">
-        <div class="annual-field-plant" aria-hidden="true">稲</div>
+        <div class="annual-field-plant" aria-hidden="true"><span></span></div>
         <div class="annual-field-pick-main">
           <div class="annual-field-pick-head">
-            <b>${U.escapeHTML(field.name)}</b>
-            <span>${U.escapeHTML(field.areaA ? `${field.areaA}a` : "面積未設定")}</span>
+            <div>
+              <b>${U.escapeHTML(field.name)}</b>
+              <em>${U.escapeHTML(varietyName(field))}</em>
+            </div>
+            <strong>${U.escapeHTML(field.areaA ? `${field.areaA}a` : "面積未設定")}</strong>
           </div>
-          <p>${U.escapeHTML(varietyName(field))}${field.district ? ` / ${U.escapeHTML(field.district)}` : ""}</p>
-          <small>最終更新: ${stats.lastDate ? U.escapeHTML(U.fd(stats.lastDate)) : "記録なし"}</small>
+          <small>最終更新：${U.escapeHTML(last)}${field.district ? ` / ${U.escapeHTML(field.district)}` : ""}</small>
           <div class="annual-field-pick-metrics">
-            <span>生育 ${U.escapeHTML(String(stats.growth))}件</span>
-            <span>水管理 ${U.escapeHTML(String(stats.water))}件</span>
-            <span>作業 ${U.escapeHTML(String(stats.work))}件</span>
+            <span class="growth">生育 ${U.escapeHTML(String(stats.growth))}件</span>
+            <span class="water">水管理 ${U.escapeHTML(String(stats.water))}件</span>
+            <span class="work">作業 ${U.escapeHTML(String(stats.work))}件</span>
           </div>
         </div>
         <span class="annual-status-badge ${U.attr(status.tone)}">${U.escapeHTML(status.label)}</span>
@@ -314,7 +338,11 @@
         <section class="annual-field-picker">
           <div class="section-title compact">
             <h3>圃場一覧</h3>
-            <span class="muted">圃場を選ぶと履歴へ移動します</span>
+            <span class="muted">圃場を選ぶと履歴へ移動</span>
+          </div>
+          <div class="filter-row annual-filter-row annual-picker-controls">
+            <label class="compact-label annual-search-label">検索<input id="annualSearch" placeholder="圃場名・品種で検索" value="${U.attr(annualSearchValue)}"></label>
+            <label class="compact-label">並び替え<select id="annualSort"></select></label>
           </div>
           <div class="annual-field-pick-grid">
             ${fields.length ? fields.map(renderFieldPickerCard).join("") : '<div class="empty">条件に合う圃場がありません。</div>'}
@@ -365,10 +393,10 @@
     const wetStart = state.workDateForField ? state.workDateForField(field.fieldId, "湿潤灌漑開始") : "";
     return `
       <div class="annual-field-detail-grid">
-        <section class="annual-field-detail-card">
-          <div class="section-title compact">
+        <section class="annual-field-detail-card annual-karte-card">
+          <div class="section-title compact annual-card-title">
             <h3>圃場カルテ</h3>
-            <span class="muted">この画面でも編集できます</span>
+            <span class="annual-card-rice" aria-hidden="true"></span>
           </div>
           <div class="form-grid dense annual-edit-grid">
             ${fieldInput(field, "name", "圃場名")}
@@ -384,7 +412,7 @@
             <textarea data-annual-field-edit="fixedMemo">${U.escapeHTML(field.fixedMemo || "")}</textarea>
           </label>
         </section>
-        <section class="annual-field-detail-card">
+        <section class="annual-field-detail-card annual-target-card">
           <div class="section-title compact">
             <h3>作業記録からの基準日</h3>
             <span class="muted">日付はカルテで直接編集しません</span>
@@ -397,7 +425,7 @@
             ${sourceLine("湿潤灌漑開始", wetStart, "作業記録: 湿潤灌漑開始")}
           </div>
         </section>
-        <section class="annual-field-detail-card">
+        <section class="annual-field-detail-card annual-target-card">
           <div class="section-title compact">
             <h3>中干し・水管理目標</h3>
             <span class="muted">判断枠だけ用意</span>
@@ -484,15 +512,16 @@
   function renderEntry(row, showDate) {
     const detail = compactParts(row.detailParts).join(" / ");
     return `
-      <article class="annual-entry annual-${U.attr(row.kindClass)}">
-        <div class="annual-entry-main">
-          <span class="annual-kind-icon">${U.escapeHTML(row.kindIcon || row.kindLabel.slice(0, 1))}</span>
-          <span class="kind-badge">${U.escapeHTML(row.kindLabel)}</span>
+      <article class="annual-entry annual-${U.attr(row.kindClass)} annual-work-card">
+        <div class="annual-entry-main annual-work-main">
+          <span class="annual-kind-icon ${row.kind === "fieldWork" ? `annual-work-icon annual-work-icon-${U.attr(workIconClass(row.title))}` : ""}">${U.escapeHTML(row.kindIcon || row.kindLabel.slice(0, 1))}</span>
           <div class="annual-entry-title">
-            <b>${showDate ? `${U.escapeHTML(U.fd(row.date))} ` : ""}${U.escapeHTML(row.title)}</b>
-            <span>${U.escapeHTML(row.target || "対象なし")}</span>
+            <time>${showDate ? U.escapeHTML(U.fd(row.date)) : ""}</time>
+            <b>${U.escapeHTML(row.title)}</b>
+            <span>${U.escapeHTML(detail || row.target || "対象なし")}</span>
           </div>
           ${row.photoData ? `<img class="annual-thumb" src="${U.attr(row.photoData)}" alt="">` : ""}
+          <button type="button" class="annual-work-more" aria-label="操作">…</button>
         </div>
         <div class="annual-chip-row">
           ${row.worker ? chip(row.worker, "worker") : ""}
@@ -500,8 +529,7 @@
           ${row.status ? chip(row.status, row.status === "完了" ? "done" : "status") : ""}
           ${chip(`田植後 ${U.daysAfterPlanting(state.field((row.fieldIds || [])[0]), row.date) || "-"}日`, "dap")}
         </div>
-        ${detail ? `<div class="annual-detail">${U.escapeHTML(detail)}</div>` : ""}
-        <div class="inline-actions">
+        <div class="inline-actions annual-work-actions">
           <button class="secondary" data-annual-action="edit" data-kind="${U.attr(row.kind)}" data-id="${U.attr(row.id)}">編集</button>
           <button class="danger" data-annual-action="delete" data-kind="${U.attr(row.kind)}" data-id="${U.attr(row.id)}">削除</button>
         </div>
@@ -554,23 +582,17 @@
   }
 
   function renderFieldDetail(field) {
-    const stats = fieldStats(field);
     const planting = state.plantingDateForField ? state.plantingDateForField(field.fieldId) : "";
     return `
       <div class="annual-field-detail">
         <div class="annual-detail-head">
-          <button type="button" class="secondary icon-button" data-annual-back>‹</button>
+          <button type="button" class="annual-detail-back" data-annual-back aria-label="戻る">‹</button>
           <div>
             <span>圃場履歴</span>
             <h2>${U.escapeHTML(field.name)}</h2>
             <p>${U.escapeHTML(varietyName(field))} / ${U.escapeHTML(field.areaA ? `${field.areaA}a` : "面積未設定")}${planting ? ` / 田植後${U.escapeHTML(String(U.daysAfterPlanting(field, U.today())))}日` : ""}</p>
           </div>
-        </div>
-        <div class="annual-field-mini-summary">
-          ${summaryCard("記録", `${stats.total}件`, "green")}
-          ${summaryCard("生育", `${stats.growth}件`, "purple")}
-          ${summaryCard("水管理", `${stats.water}件`, "blue")}
-          ${summaryCard("作業", `${stats.work}件`, "amber")}
+          <button type="button" class="annual-detail-menu" aria-label="メニュー">…</button>
         </div>
         ${renderTabs(field)}
         ${renderAnnualFab(field.fieldId)}
@@ -589,13 +611,18 @@
     allRows().forEach((row) => years.add(String(row.season)));
     const sorted = Array.from(years).sort((a, b) => Number(b) - Number(a));
     U.setOptions(U.$("annualYear"), [{ value: "all", label: "全年度" }, ...sorted.map((year) => ({ value: year, label: `${year}年` }))], yearValue());
+    renderSortOptions();
+  }
+
+  function renderSortOptions() {
+    if (!U.$("annualSort")) return;
     U.setOptions(U.$("annualSort"), [
       { value: "updated", label: "更新日順" },
       { value: "name", label: "圃場名順" },
       { value: "area", label: "面積順" },
       { value: "variety", label: "品種順" },
       { value: "status", label: "ステータス順" }
-    ], U.$("annualSort") && U.$("annualSort").value || "updated");
+    ], annualSortValue);
   }
 
   function render() {
@@ -605,6 +632,7 @@
     const screen = U.$("screen-annual");
     if (screen) screen.classList.toggle("annual-detail-mode", Boolean(field));
     U.$("annualTimeline").innerHTML = field ? renderFieldDetail(field) : renderTop(rows);
+    renderSortOptions();
   }
 
   function editRow(kind, id) {
@@ -661,10 +689,8 @@
   }
 
   function bind() {
-    ["annualYear", "annualSearch", "annualSort"].forEach((id) => {
-      const el = U.$(id);
-      if (el) el.addEventListener(id === "annualSearch" ? "input" : "change", render);
-    });
+    const year = U.$("annualYear");
+    if (year) year.addEventListener("change", render);
     U.$("annualTimeline").addEventListener("click", (event) => {
       const open = event.target.closest("[data-annual-open-field]");
       if (open) {
@@ -698,7 +724,18 @@
         if (action.dataset.annualAction === "delete") deleteRow(action.dataset.kind, action.dataset.id);
       }
     });
+    U.$("annualTimeline").addEventListener("input", (event) => {
+      if (event.target && event.target.id === "annualSearch") {
+        annualSearchValue = event.target.value;
+        render();
+      }
+    });
     U.$("annualTimeline").addEventListener("change", (event) => {
+      if (event.target && event.target.id === "annualSort") {
+        annualSortValue = event.target.value || "updated";
+        render();
+        return;
+      }
       const el = event.target.closest("[data-annual-field-edit]");
       if (!el || !selectedFieldId) return;
       const key = el.dataset.annualFieldEdit;

@@ -10,10 +10,10 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="稲作カルテ">
-  <link rel="manifest" href="manifest.webmanifest?v=20260625_ver20">
+  <link rel="manifest" href="manifest.webmanifest?v=20260625_ver22">
   <link rel="apple-touch-icon" href="assets/icons/icon-192.png">
   <title>稲作カルテ</title>
-  <link rel="stylesheet" href="assets/css/app.css?v=20260625_ver20">
+  <link rel="stylesheet" href="assets/css/app.css?v=20260625_ver22">
 </head>
 <body>
   <header class="app-header">
@@ -31,18 +31,19 @@
   <div class="app-shell">
     <nav class="side-nav" aria-label="画面切替">
       <button class="nav-item active" data-screen="home"><span class="nav-icon">⌂</span><span class="nav-label">ホーム</span></button>
+      <button class="nav-item" data-screen="fields"><span class="nav-icon">♙</span><span class="nav-label">圃場管理</span></button>
+      <button class="nav-item" data-screen="annual"><span class="nav-icon">▣</span><span class="nav-label">年間履歴</span></button>
+      <button class="nav-item" data-screen="notices"><span class="nav-icon">🔔</span><span class="nav-label">お知らせ</span></button>
+      <button class="nav-item" data-screen="data"><span class="nav-icon">⚙</span><span class="nav-label">設定</span></button>
       <button class="nav-item" data-screen="calendar"><span class="nav-icon">□</span><span class="nav-label">カレンダー</span></button>
       <button class="nav-item" data-screen="field-work"><span class="nav-icon">＋</span><span class="nav-label">作業入力</span></button>
-      <button class="nav-item" data-screen="annual"><span class="nav-icon">≡</span><span class="nav-label">年間履歴</span></button>
       <button class="nav-item" data-screen="materials"><span class="nav-icon">▣</span><span class="nav-label">資材台帳</span></button>
       <button class="nav-item" data-screen="growth"><span class="nav-icon">♧</span><span class="nav-label">生育</span></button>
       <button class="nav-item" data-screen="dry-period"><span class="nav-icon">〰</span><span class="nav-label">中干し</span></button>
       <button class="nav-item" data-screen="irrigation"><span class="nav-icon">≈</span><span class="nav-label">間断/湿潤</span></button>
-      <button class="nav-item" data-screen="fields"><span class="nav-icon">◇</span><span class="nav-label">圃場</span></button>
       <button class="nav-item" data-screen="recipes"><span class="nav-icon">※</span><span class="nav-label">レシピ</span></button>
       <button class="nav-item" data-screen="photos"><span class="nav-icon">▧</span><span class="nav-label">写真</span></button>
       <button class="nav-item" data-screen="results"><span class="nav-icon">¥</span><span class="nav-label">結果</span></button>
-      <button class="nav-item" data-screen="data"><span class="nav-icon">↧</span><span class="nav-label">データ</span></button>
     </nav>
 
     <main class="content">
@@ -309,16 +310,10 @@
       </section>
 
       <section class="screen" id="screen-annual" data-title="年間履歴">
-        <div class="screen-head">
-          <div>
-            <p class="eyebrow">検索・分析・振り返り</p>
-            <h2>年間履歴</h2>
-          </div>
-          <div class="filter-row annual-filter-row">
-            <label class="compact-label">年度<select id="annualYear"></select></label>
-            <label class="compact-label annual-search-label">検索<input id="annualSearch" placeholder="圃場・品種"></label>
-            <label class="compact-label">並び替え<select id="annualSort"></select></label>
-          </div>
+        <div class="screen-head annual-phone-head">
+          <h2>年間履歴</h2>
+          <label class="annual-year-button"><span>▣</span><select id="annualYear"></select></label>
+          <button class="secondary icon-button annual-menu-button" type="button" aria-label="メニュー">☰</button>
         </div>
         <div class="timeline" id="annualTimeline"></div>
       </section>
@@ -458,11 +453,22 @@
         <div id="resultList"></div>
       </section>
 
-      <section class="screen" id="screen-data" data-title="データ管理">
+      <section class="screen" id="screen-notices" data-title="お知らせ">
         <div class="screen-head">
           <div>
-            <p class="eyebrow">保存と復元</p>
-            <h2>データ管理</h2>
+            <p class="eyebrow">通知・確認</p>
+            <h2>お知らせ</h2>
+          </div>
+          <button class="secondary" data-action="enable-notifications">通知を許可</button>
+        </div>
+        <div id="noticeList" class="notice-list"></div>
+      </section>
+
+      <section class="screen" id="screen-data" data-title="設定">
+        <div class="screen-head">
+          <div>
+            <p class="eyebrow">設定・保存と復元</p>
+            <h2>設定</h2>
           </div>
         </div>
         <div class="data-actions">
@@ -517,31 +523,32 @@
 
   <div id="toast" class="toast hidden" role="status"></div>
 
-  <script src="assets/js/core/utils.js?v=20260625_ver20"></script>
-  <script src="assets/js/core/schema.js?v=20260625_ver20"></script>
-  <script src="assets/js/core/storage.js?v=20260625_ver20"></script>
-  <script src="assets/js/core/state.js?v=20260625_ver20"></script>
-  <script src="assets/js/core/agro.js?v=20260625_ver20"></script>
-  <script src="assets/js/core/record-actions.js?v=20260625_ver20"></script>
-  <script src="assets/js/core/calendar.js?v=20260625_ver20"></script>
-  <script src="assets/js/core/alerts.js?v=20260625_ver20"></script>
-  <script src="assets/js/core/weather.js?v=20260625_ver20"></script>
-  <script src="assets/js/core/pwa.js?v=20260625_ver20"></script>
-  <script src="assets/js/screens/home.js?v=20260625_ver20"></script>
-  <script src="assets/js/screens/calendar.js?v=20260625_ver20"></script>
-  <script src="assets/js/screens/bottom-sheet.js?v=20260625_ver20"></script>
-  <script src="assets/js/screens/recipes.js?v=20260625_ver20"></script>
-  <script src="assets/js/screens/fields.js?v=20260625_ver20"></script>
-  <script src="assets/js/screens/field-work.js?v=20260625_ver20"></script>
-  <script src="assets/js/screens/growth.js?v=20260625_ver20"></script>
-  <script src="assets/js/screens/dry-period.js?v=20260625_ver20"></script>
-  <script src="assets/js/screens/irrigation.js?v=20260625_ver20"></script>
-  <script src="assets/js/screens/photos.js?v=20260625_ver20"></script>
-  <script src="assets/js/screens/other-work.js?v=20260625_ver20"></script>
-  <script src="assets/js/screens/annual.js?v=20260625_ver20"></script>
-  <script src="assets/js/screens/materials.js?v=20260625_ver20"></script>
-  <script src="assets/js/screens/results.js?v=20260625_ver20"></script>
-  <script src="assets/js/screens/data.js?v=20260625_ver20"></script>
-  <script src="assets/js/app.js?v=20260625_ver20"></script>
+  <script src="assets/js/core/utils.js?v=20260625_ver22"></script>
+  <script src="assets/js/core/schema.js?v=20260625_ver22"></script>
+  <script src="assets/js/core/storage.js?v=20260625_ver22"></script>
+  <script src="assets/js/core/state.js?v=20260625_ver22"></script>
+  <script src="assets/js/core/agro.js?v=20260625_ver22"></script>
+  <script src="assets/js/core/record-actions.js?v=20260625_ver22"></script>
+  <script src="assets/js/core/calendar.js?v=20260625_ver22"></script>
+  <script src="assets/js/core/alerts.js?v=20260625_ver22"></script>
+  <script src="assets/js/core/weather.js?v=20260625_ver22"></script>
+  <script src="assets/js/core/pwa.js?v=20260625_ver22"></script>
+  <script src="assets/js/screens/home.js?v=20260625_ver22"></script>
+  <script src="assets/js/screens/calendar.js?v=20260625_ver22"></script>
+  <script src="assets/js/screens/bottom-sheet.js?v=20260625_ver22"></script>
+  <script src="assets/js/screens/recipes.js?v=20260625_ver22"></script>
+  <script src="assets/js/screens/fields.js?v=20260625_ver22"></script>
+  <script src="assets/js/screens/field-work.js?v=20260625_ver22"></script>
+  <script src="assets/js/screens/growth.js?v=20260625_ver22"></script>
+  <script src="assets/js/screens/dry-period.js?v=20260625_ver22"></script>
+  <script src="assets/js/screens/irrigation.js?v=20260625_ver22"></script>
+  <script src="assets/js/screens/photos.js?v=20260625_ver22"></script>
+  <script src="assets/js/screens/other-work.js?v=20260625_ver22"></script>
+  <script src="assets/js/screens/annual.js?v=20260625_ver22"></script>
+  <script src="assets/js/screens/materials.js?v=20260625_ver22"></script>
+  <script src="assets/js/screens/results.js?v=20260625_ver22"></script>
+  <script src="assets/js/screens/notices.js?v=20260625_ver22"></script>
+  <script src="assets/js/screens/data.js?v=20260625_ver22"></script>
+  <script src="assets/js/app.js?v=20260625_ver22"></script>
 </body>
 </html>
