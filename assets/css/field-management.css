@@ -342,6 +342,7 @@
     border-radius: 8px !important;
     background: linear-gradient(105deg, #ffffff 0%, #f4ffef 100%) !important;
     box-shadow: 0 4px 10px rgba(45, 72, 39, 0.05) !important;
+    cursor: pointer !important;
   }
 
   .field-group-card.open {
@@ -426,24 +427,120 @@
     color: #1c5c2b !important;
   }
 
-  .field-group-bulk-panel {
+  .field-group-field-panel {
     grid-column: 1 / -1 !important;
     display: grid !important;
-    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
-    gap: 6px !important;
+    gap: 7px !important;
     padding-top: 7px !important;
     border-top: 1px dashed #c9dfbd !important;
   }
 
-  .field-group-bulk-panel button {
-    min-height: 34px !important;
-    padding: 0 4px !important;
+  .field-group-field-panel > b {
+    color: #173b21 !important;
+    font-size: 11px !important;
+    font-weight: 900 !important;
+  }
+
+  .field-group-field-panel > div {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 6px !important;
+  }
+
+  .field-group-field-panel button {
+    display: grid !important;
+    gap: 2px !important;
+    min-height: 42px !important;
+    padding: 6px 7px !important;
     border: 1px solid #b9d8b4 !important;
     border-radius: 7px !important;
     background: #ffffff !important;
     color: #183d22 !important;
-    font-size: 10px !important;
     font-weight: 850 !important;
+    text-align: left !important;
+  }
+
+  .field-group-field-panel button span {
+    color: #101812 !important;
+    font-size: 12px !important;
+    font-weight: 900 !important;
+    line-height: 1.15 !important;
+  }
+
+  .field-group-field-panel button small {
+    color: #526253 !important;
+    font-size: 9px !important;
+    font-weight: 720 !important;
+    line-height: 1.1 !important;
+  }
+
+  .field-master-picker-section {
+    gap: 8px !important;
+  }
+
+  .field-master-picker {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 7px !important;
+  }
+
+  .field-master-picker button {
+    display: grid !important;
+    grid-template-columns: 42px minmax(0, 1fr) !important;
+    grid-template-rows: auto auto !important;
+    column-gap: 7px !important;
+    align-items: center !important;
+    min-height: 60px !important;
+    padding: 7px !important;
+    border: 1px solid #cfe1c8 !important;
+    border-radius: 8px !important;
+    background: rgba(255, 255, 255, 0.94) !important;
+    box-shadow: 0 3px 8px rgba(52, 63, 42, 0.05) !important;
+    text-align: left !important;
+  }
+
+  .field-master-picker button.active {
+    border-color: #2fad46 !important;
+    background: linear-gradient(105deg, #ffffff, #efffeb) !important;
+    box-shadow:
+      inset 0 0 0 1px rgba(47, 173, 70, 0.18),
+      0 4px 10px rgba(47, 173, 70, 0.12) !important;
+  }
+
+  .field-master-picker-rice {
+    grid-row: 1 / span 2 !important;
+    display: grid !important;
+    place-items: center !important;
+    width: 42px !important;
+    height: 42px !important;
+    border-radius: 999px !important;
+    background: #f3f8e8 !important;
+    overflow: hidden !important;
+  }
+
+  .field-master-picker-rice .field-group-rice-img {
+    width: 42px !important;
+    height: 42px !important;
+  }
+
+  .field-master-picker b {
+    overflow: hidden !important;
+    color: #111914 !important;
+    font-size: 13px !important;
+    font-weight: 900 !important;
+    line-height: 1.15 !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+  }
+
+  .field-master-picker small {
+    overflow: hidden !important;
+    color: #526253 !important;
+    font-size: 9px !important;
+    font-weight: 720 !important;
+    line-height: 1.1 !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
   }
 
   #screen-fields .record-grid {
@@ -454,5 +551,21 @@
   #screen-fields .record.field-karte {
     border-radius: 8px !important;
     box-shadow: 0 4px 12px rgba(58, 47, 24, 0.06) !important;
+  }
+
+  #screen-fields .record.field-karte.field-karte-focus {
+    animation: fieldKarteFocusPulse 1.4s ease;
+  }
+}
+
+@keyframes fieldKarteFocusPulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(47, 173, 70, 0.34), 0 4px 12px rgba(58, 47, 24, 0.06);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(47, 173, 70, 0.12), 0 4px 12px rgba(58, 47, 24, 0.06);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(47, 173, 70, 0), 0 4px 12px rgba(58, 47, 24, 0.06);
   }
 }

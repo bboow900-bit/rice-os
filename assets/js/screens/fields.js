@@ -5,6 +5,7 @@
   const U = RiceOS.utils;
   const state = RiceOS.state;
   let activeBulkGroup = "";
+  let activeFieldId = "";
 
   const SOIL_TYPES = ["", "砂質", "粘土質", "中間", "その他"];
   const WATER_LEVELS = ["", "良い", "普通", "悪い"];
@@ -193,9 +194,8 @@
           ${groups.map((group) => {
             const riceStage = riceStageNumberForGroup(group);
             const isOpen = activeBulkGroup === group.name;
-            const fieldIds = group.fields.map((field) => field.fieldId).join(",");
             return `
-            <article class="field-group-card ${isOpen ? "open" : ""}">
+            <article class="field-group-card ${isOpen ? "open" : ""}" data-field-group-card="${U.attr(group.name)}">
               <span class="field-group-rice stage-${U.attr(String(riceStage).padStart(2, "0"))}" aria-hidden="true">${groupRiceImage(riceStage)}</span>
               <div class="field-group-main">
                 <h4>${U.escapeHTML(group.name === "未設定" ? "未設定グループ" : `${group.name}グループ`)}</h4>
@@ -207,11 +207,16 @@
                 <button type="button" data-field-group-action="edit" data-field-group="${U.attr(group.name)}">編集</button>
               </div>
               ${isOpen ? `
-                <div class="field-group-bulk-panel">
-                  <button type="button" data-field-group-bulk="work" data-field-ids="${U.attr(fieldIds)}">作業</button>
-                  <button type="button" data-field-group-bulk="growth" data-field-ids="${U.attr(fieldIds)}">生育</button>
-                  <button type="button" data-field-group-bulk="dry" data-field-ids="${U.attr(fieldIds)}">中干し</button>
-                  <button type="button" data-field-group-bulk="irrigation" data-field-ids="${U.attr(fieldIds)}">間断/湿潤</button>
+                <div class="field-group-field-panel">
+                  <b>グループ内の圃場</b>
+                  <div>
+                    ${group.fields.map((field) => `
+                      <button type="button" data-field-group-field="${U.attr(field.fieldId)}">
+                        <span>${U.escapeHTML(field.name)}</span>
+                        <small>${U.escapeHTML(state.variety(field.varietyId) && state.variety(field.varietyId).name || "品種未設定")} / ${U.escapeHTML(String(field.areaA || 0))}a</small>
+                      </button>
+                    `).join("")}
+                  </div>
                 </div>
               ` : ""}
             </article>
@@ -228,13 +233,41 @@
         ${renderMasterSummary()}
         ${renderMasterMenu()}
         ${renderGroupCards()}
-        <section class="field-master-section">
-          <div class="field-master-section-head">
-            <h3>圃場マスター</h3>
-            <span>履歴カルテの元データ</span>
-          </div>
-        </section>
+        ${renderFieldPicker()}
       </div>
+    `;
+  }
+
+  function selectedField() {
+    const fields = state.fields();
+    if (!fields.length) return null;
+    const selected = activeFieldId && state.field(activeFieldId);
+    return selected || fields.slice().sort((a, b) => U.number(a.sortOrder, 0) - U.number(b.sortOrder, 0))[0];
+  }
+
+  function renderFieldPicker() {
+    const selected = selectedField();
+    return `
+      <section class="field-master-section field-master-picker-section" data-field-master-picker>
+        <div class="field-master-section-head">
+          <h3>圃場マスター</h3>
+          <span>圃場を選んで編集</span>
+        </div>
+        <div class="field-master-picker">
+          ${state.fields().map((field) => {
+            const variety = state.variety(field.varietyId);
+            const isSelected = selected && selected.fieldId === field.fieldId;
+            const stage = riceStageNumberForField(field);
+            return `
+              <button type="button" class="${isSelected ? "active" : ""}" data-field-pick="${U.attr(field.fieldId)}">
+                <span class="field-master-picker-rice">${groupRiceImage(stage)}</span>
+                <b>${U.escapeHTML(field.name)}</b>
+                <small>${U.escapeHTML(variety && variety.name || "品種未設定")} / ${U.escapeHTML(String(field.areaA || 0))}a</small>
+              </button>
+            `;
+          }).join("")}
+        </div>
+      </section>
     `;
   }
 
@@ -353,7 +386,7 @@
     const variety = state.variety(field.varietyId);
     const plantingDate = state.plantingDateForField ? state.plantingDateForField(field.fieldId) : "";
     return `
-      <article class="record field-karte">
+      <article class="record field-karte" data-field-master-id="${U.attr(field.fieldId)}">
         <div class="record-head">
           <div>
             <div class="field-name">${U.escapeHTML(field.name)}</div>
@@ -425,12 +458,56 @@
       .filter(Boolean);
   }
 
+  function jumpToFieldMaster(fieldId) {
+    activeFieldId = fieldId;
+    render();
+    const el = document.querySelector(`[data-field-master-id="${U.attr(fieldId)}"]`);
+    if (!el) return;
+    el.scrollIntoView({ behavior: "smooth", block: "start" });
+    el.classList.add("field-karte-focus");
+    setTimeout(() => el.classList.remove("field-karte-focus"), 1600);
+  }
+
+  function addFieldToGroup(group) {
+    const groupNameValue = group === "未設定" ? "" : group;
+    const defaultName = groupNameValue ? `${groupNameValue} 新規` : "新しい圃場";
+    const name = prompt("追加する圃場名を入力してください", defaultName);
+    if (name === null) return;
+    const cleanName = name.trim() || defaultName;
+    const fieldId = state.addField(cleanName);
+    if (groupNameValue) state.updateField(fieldId, { fieldGroupId: groupNameValue });
+    activeBulkGroup = group;
+    activeFieldId = fieldId;
+    render();
+    setTimeout(() => jumpToFieldMaster(fieldId), 80);
+  }
+
+  function handleBack() {
+    if (activeFieldId) {
+      activeFieldId = "";
+      render();
+      const picker = document.querySelector("[data-field-master-picker]");
+      if (picker) picker.scrollIntoView({ behavior: "smooth", block: "start" });
+      return true;
+    }
+    if (activeBulkGroup) {
+      activeBulkGroup = "";
+      render();
+      return true;
+    }
+    if (window.scrollY > 80) {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return true;
+    }
+    return false;
+  }
+
   function render() {
     U.$("fieldList").innerHTML = `
       ${datalist("commonWeedsList", WEEDS)}
       ${datalist("fieldFeaturesList", FEATURES)}
       ${renderFieldMasterIntro()}
-      <div class="record-grid">${state.fields().map(renderField).join("")}</div>
+      <div class="record-grid">${selectedField() ? renderField(selectedField()) : ""}</div>
     `;
   }
 
@@ -456,8 +533,7 @@
       if (groupButton) {
         const group = groupButton.dataset.fieldGroup || "";
         if (groupButton.dataset.fieldGroupAction === "bulk") {
-          activeBulkGroup = activeBulkGroup === group ? "" : group;
-          render();
+          addFieldToGroup(group);
           return;
         }
         if (groupButton.dataset.fieldGroupAction === "edit") {
@@ -472,31 +548,26 @@
             });
           }, "圃場グループを更新しました");
           activeBulkGroup = cleanName;
+          render();
           return;
         }
         return;
       }
-      const bulkButton = event.target.closest("[data-field-group-bulk]");
-      if (bulkButton) {
-        const ids = String(bulkButton.dataset.fieldIds || "").split(",").filter(Boolean);
-        const kind = bulkButton.dataset.fieldGroupBulk;
-        const date = U.today();
-        if (kind === "work" && RiceOS.screens.fieldWork) {
-          RiceOS.app.show("field-work");
-          RiceOS.screens.fieldWork.prefillFields(date, ids);
-        }
-        if (kind === "growth" && RiceOS.screens.growth) {
-          RiceOS.app.show("growth");
-          RiceOS.screens.growth.prefillFields(date, ids);
-        }
-        if (kind === "dry" && RiceOS.screens.dryPeriod) {
-          RiceOS.app.show("dry-period");
-          RiceOS.screens.dryPeriod.prefillFields(date, ids);
-        }
-        if (kind === "irrigation" && RiceOS.screens.irrigation) {
-          RiceOS.app.show("irrigation");
-          RiceOS.screens.irrigation.prefillFields(date, ids);
-        }
+      const groupFieldButton = event.target.closest("[data-field-group-field]");
+      if (groupFieldButton) {
+        jumpToFieldMaster(groupFieldButton.dataset.fieldGroupField);
+        return;
+      }
+      const groupCard = event.target.closest("[data-field-group-card]");
+      if (groupCard) {
+        const group = groupCard.dataset.fieldGroupCard || "";
+        activeBulkGroup = activeBulkGroup === group ? "" : group;
+        render();
+        return;
+      }
+      const fieldPickButton = event.target.closest("[data-field-pick]");
+      if (fieldPickButton) {
+        jumpToFieldMaster(fieldPickButton.dataset.fieldPick);
         return;
       }
       const button = event.target.closest("[data-field-action]");
@@ -530,5 +601,5 @@
   }
 
   RiceOS.screens = RiceOS.screens || {};
-  RiceOS.screens.fields = { render, bind };
+  RiceOS.screens.fields = { render, bind, handleBack, preserveOnDataChange: true };
 })();

@@ -6,6 +6,7 @@
 
   let activeScreen = "home";
   let bound = false;
+  const screenHistory = [];
   const initialScreens = new Set([
     "home",
     "fields",
@@ -45,7 +46,19 @@
     });
   }
 
-  function show(screenId) {
+  function updateBackButton() {
+    const button = U.$("appBackButton");
+    if (!button) return;
+    button.classList.toggle("hidden", activeScreen === "home" && !screenHistory.length);
+  }
+
+  function show(screenId, options) {
+    const opts = options || {};
+    if (!initialScreens.has(screenId)) screenId = "home";
+    if (!opts.skipHistory && activeScreen && activeScreen !== screenId) {
+      screenHistory.push(activeScreen);
+      if (screenHistory.length > 20) screenHistory.shift();
+    }
     activeScreen = screenId;
     U.$$(".screen").forEach((section) => {
       section.classList.toggle("active", section.id === `screen-${screenId}`);
@@ -57,7 +70,18 @@
     if (section) document.title = `${section.dataset.title || "稲作カルテ"} - 稲作カルテ`;
     const mod = screenModule(screenId);
     if (mod && typeof mod.render === "function") mod.render();
+    updateBackButton();
     window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function back() {
+    const mod = screenModule(activeScreen);
+    if (mod && typeof mod.handleBack === "function" && mod.handleBack()) {
+      updateBackButton();
+      return;
+    }
+    const previous = screenHistory.pop();
+    show(previous || "home", { skipHistory: true });
   }
 
   function markSaved(message) {
@@ -83,6 +107,8 @@
     U.$$(".nav-item").forEach((button) => {
       button.addEventListener("click", () => show(button.dataset.screen));
     });
+    const backButton = U.$("appBackButton");
+    if (backButton) backButton.addEventListener("click", back);
   }
 
   function bindGlobalActions() {
@@ -164,12 +190,13 @@
     if (RiceOS.pwa) RiceOS.pwa.register();
     window.addEventListener("riceos:datachange", (event) => {
       markSaved(event.detail && event.detail.message);
-      renderAll();
+      const mod = screenModule(activeScreen);
+      if (!mod || !mod.preserveOnDataChange) renderAll();
       if (RiceOS.pwa && RiceOS.alerts) RiceOS.pwa.notifyDueAlerts(RiceOS.alerts.notificationAlerts());
       U.toast(event.detail && event.detail.message || "保存しました");
     });
     initializeFormDefaults();
-    show(activeScreen);
+    show(activeScreen, { skipHistory: true });
     if (RiceOS.pwa && RiceOS.alerts) RiceOS.pwa.notifyDueAlerts(RiceOS.alerts.notificationAlerts());
     markSaved("保存準備完了");
   }
@@ -177,6 +204,7 @@
   RiceOS.app = {
     init,
     show,
+    back,
     renderAll,
     markSaved
   };
