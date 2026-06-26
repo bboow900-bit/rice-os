@@ -4,6 +4,7 @@
   const RiceOS = window.RiceOS = window.RiceOS || {};
   const U = RiceOS.utils;
   const state = RiceOS.state;
+  let activeBulkGroup = "";
 
   const SOIL_TYPES = ["", "砂質", "粘土質", "中間", "その他"];
   const WATER_LEVELS = ["", "良い", "普通", "悪い"];
@@ -58,6 +59,181 @@
       <div class="field-karte-metric ${tone || ""}">
         <span>${U.escapeHTML(label)}</span>
         <b>${U.escapeHTML(value || "-")}</b>
+      </div>
+    `;
+  }
+
+  const MASTER_MENU = [
+    { key: "field-master", label: "圃場マスター", sub: "土質・面積", icon: "field-master.png", screen: "fields", tone: "green" },
+    { key: "recipe", label: "栽培レシピ", sub: "品種単位", icon: "recipe.png", screen: "recipes", tone: "green" },
+    { key: "transplanter", label: "田植え機", sub: "株間・箱数", icon: "transplanter.png", screen: "recipes", tone: "amber" },
+    { key: "dry", label: "中干し", sub: "目標・記録", icon: "dry-period.png", screen: "dry-period", tone: "amber" },
+    { key: "photos", label: "写真", sub: "比較素材", icon: "photos.png", screen: "photos", tone: "" },
+    { key: "irrigation", label: "間断/湿潤", sub: "水管理", icon: "irrigation.png", screen: "irrigation", tone: "water" },
+    { key: "materials", label: "資材管理", sub: "在庫・使用", icon: "materials.png", screen: "materials", tone: "amber" },
+    { key: "harvest", label: "収穫履歴", sub: "収量・販売", icon: "harvest.png", screen: "results", tone: "amber" }
+  ];
+
+  function menuIcon(name) {
+    return `assets/images/menu-icons/${name}`;
+  }
+
+  function groupName(field) {
+    const raw = String(field.fieldGroupId || field.district || "").trim();
+    if (raw) return raw;
+    const first = String(field.name || "").split(/[ 　]/)[0];
+    return first || "未設定";
+  }
+
+  function groupedFields() {
+    const map = new Map();
+    state.fields().forEach((field) => {
+      const name = groupName(field);
+      if (!map.has(name)) map.set(name, []);
+      map.get(name).push(field);
+    });
+    return Array.from(map.entries())
+      .map(([name, fields]) => ({ name, fields, area: fields.reduce((sum, field) => sum + U.number(field.areaA, 0), 0) }))
+      .sort((a, b) => b.fields.length - a.fields.length || a.name.localeCompare(b.name));
+  }
+
+  function fieldsForGroup(name) {
+    const group = groupedFields().find((item) => item.name === name);
+    return group ? group.fields : [];
+  }
+
+  function latestGrowthForField(fieldId) {
+    if (state.lastGrowthLog) return state.lastGrowthLog(fieldId);
+    return (state.growthLogsFor ? state.growthLogsFor(fieldId) : [])
+      .slice()
+      .sort((a, b) => String(b.date).localeCompare(String(a.date)))[0] || null;
+  }
+
+  function riceStageNumberForField(field) {
+    const latest = latestGrowthForField(field.fieldId);
+    const planting = state.plantingDateForField ? state.plantingDateForField(field.fieldId) : "";
+    const baseDate = latest && latest.date || U.today();
+    const dap = planting ? U.daysBetween(planting, baseDate) : "";
+    const tillers = latest ? U.number(latest.tillerCount, 0) : 0;
+    const height = latest ? U.number(latest.plantHeightCm, 0) : 0;
+    const leaf = latest ? U.number(latest.leafCount, 0) : 0;
+    if (!latest && !planting) return 1;
+    const signal = Math.max(
+      dap === "" ? 0 : U.number(dap, 0),
+      height >= 95 ? 115 : height >= 82 ? 96 : height >= 70 ? 80 : height >= 58 ? 66 : height >= 45 ? 52 : height >= 32 ? 38 : height >= 18 ? 22 : 0,
+      tillers >= 24 ? 64 : tillers >= 20 ? 54 : tillers >= 16 ? 44 : tillers >= 11 ? 32 : tillers >= 6 ? 20 : 0,
+      leaf >= 8 ? 68 : leaf >= 7 ? 54 : leaf >= 6 ? 42 : leaf >= 5 ? 31 : leaf >= 4 ? 20 : 0
+    );
+    if (signal < 14) return 1;
+    if (signal < 26) return 2;
+    if (signal < 40) return 3;
+    if (signal < 55) return 4;
+    if (signal < 70) return 5;
+    if (signal < 88) return 6;
+    if (signal < 108) return 7;
+    return 8;
+  }
+
+  function riceStageNumberForGroup(group) {
+    return Math.max(1, ...group.fields.map(riceStageNumberForField));
+  }
+
+  function groupRiceAsset(stageNumber) {
+    const num = Math.max(1, Math.min(8, Number(stageNumber) || 1));
+    return `assets/images/rice-stages/rice-card-clump-${String(num).padStart(2, "0")}.png`;
+  }
+
+  function groupRiceImage(stageNumber) {
+    const num = Math.max(1, Math.min(8, Number(stageNumber) || 1));
+    return `<img class="field-group-rice-img" src="${U.attr(groupRiceAsset(num))}" alt="" loading="lazy" data-rice-stage="${U.attr(String(num))}">`;
+  }
+
+  function renderMasterSummary() {
+    const fields = state.fields();
+    const area = fields.reduce((sum, field) => sum + U.number(field.areaA, 0), 0);
+    const groups = groupedFields().length;
+    return `
+      <section class="field-master-summary">
+        <div><small>管理面積</small><b>${U.escapeHTML(String(Math.round(area * 10) / 10))}a</b></div>
+        <div><small>圃場数</small><b>${U.escapeHTML(String(fields.length))}</b></div>
+        <div><small>グループ</small><b>${U.escapeHTML(String(groups))}</b></div>
+      </section>
+    `;
+  }
+
+  function renderMasterMenu() {
+    return `
+      <section class="field-master-section">
+        <div class="field-master-section-head">
+          <h3>管理メニュー</h3>
+          <span>項目の本籍地をここに集約</span>
+        </div>
+        <div class="field-master-menu-grid">
+          ${MASTER_MENU.map((item) => `
+            <button type="button" class="field-master-menu-button ${U.attr(item.tone || "")}" data-field-master-menu="${U.attr(item.key)}" data-jump-screen="${U.attr(item.screen)}">
+              <img src="${U.attr(menuIcon(item.icon))}" alt="">
+              <b>${U.escapeHTML(item.label)}</b>
+              <small>${U.escapeHTML(item.sub)}</small>
+            </button>
+          `).join("")}
+        </div>
+      </section>
+    `;
+  }
+
+  function renderGroupCards() {
+    const groups = groupedFields().slice(0, 4);
+    return `
+      <section class="field-master-section">
+        <div class="field-master-section-head">
+          <h3>圃場グループ</h3>
+          <span>一括登録の土台</span>
+        </div>
+        <div class="field-group-list">
+          ${groups.map((group) => {
+            const riceStage = riceStageNumberForGroup(group);
+            const isOpen = activeBulkGroup === group.name;
+            const fieldIds = group.fields.map((field) => field.fieldId).join(",");
+            return `
+            <article class="field-group-card ${isOpen ? "open" : ""}">
+              <span class="field-group-rice stage-${U.attr(String(riceStage).padStart(2, "0"))}" aria-hidden="true">${groupRiceImage(riceStage)}</span>
+              <div class="field-group-main">
+                <h4>${U.escapeHTML(group.name === "未設定" ? "未設定グループ" : `${group.name}グループ`)}</h4>
+                <p>${U.escapeHTML(String(group.fields.length))}圃場 / ${U.escapeHTML(String(Math.round(group.area * 10) / 10))}a</p>
+                <div>${group.fields.slice(0, 5).map((field) => `<span>${U.escapeHTML(field.name)}</span>`).join("")}</div>
+              </div>
+              <div class="field-group-card-actions">
+                <button type="button" data-field-group-action="bulk" data-field-group="${U.attr(group.name)}">一括登録</button>
+                <button type="button" data-field-group-action="edit" data-field-group="${U.attr(group.name)}">編集</button>
+              </div>
+              ${isOpen ? `
+                <div class="field-group-bulk-panel">
+                  <button type="button" data-field-group-bulk="work" data-field-ids="${U.attr(fieldIds)}">作業</button>
+                  <button type="button" data-field-group-bulk="growth" data-field-ids="${U.attr(fieldIds)}">生育</button>
+                  <button type="button" data-field-group-bulk="dry" data-field-ids="${U.attr(fieldIds)}">中干し</button>
+                  <button type="button" data-field-group-bulk="irrigation" data-field-ids="${U.attr(fieldIds)}">間断/湿潤</button>
+                </div>
+              ` : ""}
+            </article>
+          `;
+          }).join("")}
+        </div>
+      </section>
+    `;
+  }
+
+  function renderFieldMasterIntro() {
+    return `
+      <div class="field-master-home">
+        ${renderMasterSummary()}
+        ${renderMasterMenu()}
+        ${renderGroupCards()}
+        <section class="field-master-section">
+          <div class="field-master-section-head">
+            <h3>圃場マスター</h3>
+            <span>履歴カルテの元データ</span>
+          </div>
+        </section>
       </div>
     `;
   }
@@ -121,7 +297,6 @@
     const tags = [
       field.soilType,
       field.waterHolding ? `水持ち:${field.waterHolding}` : "",
-      field.drainage ? `水捌け:${field.drainage}` : "",
       ...(Array.isArray(field.fieldFeatures) ? field.fieldFeatures : []),
       ...(Array.isArray(field.commonWeeds) ? field.commonWeeds.map((weed) => `雑草:${weed}`) : [])
     ].filter(Boolean);
@@ -196,6 +371,7 @@
               ${input(field, "district", "地区")}
               <label>品種<select data-field-id="${U.attr(field.fieldId)}" data-field-field="varietyId">${varietyOptions(field.varietyId)}</select></label>
               ${input(field, "areaA", "面積(a)", "number")}
+              ${input(field, "fieldGroupId", "グループ")}
               <label>状態<select data-field-id="${U.attr(field.fieldId)}" data-field-field="status">${statusOptions(field.status)}</select></label>
               ${input(field, "sortOrder", "表示順", "number")}
             </div>
@@ -206,7 +382,6 @@
             <div class="form-grid dense inline-grid">
               <label>土質<select data-field-id="${U.attr(field.fieldId)}" data-field-field="soilType">${optionTags(SOIL_TYPES, field.soilType)}</select></label>
               <label>水持ち<select data-field-id="${U.attr(field.fieldId)}" data-field-field="waterHolding">${optionTags(WATER_LEVELS, field.waterHolding)}</select></label>
-              <label>水捌け<select data-field-id="${U.attr(field.fieldId)}" data-field-field="drainage">${optionTags(WATER_LEVELS, field.drainage)}</select></label>
               ${arrayInput(field, "commonWeeds", "生えやすい雑草", WEEDS)}
               ${arrayInput(field, "fieldFeatures", "圃場特徴", FEATURES)}
               ${input(field, "waterHabit", "水の癖")}
@@ -254,6 +429,7 @@
     U.$("fieldList").innerHTML = `
       ${datalist("commonWeedsList", WEEDS)}
       ${datalist("fieldFeaturesList", FEATURES)}
+      ${renderFieldMasterIntro()}
       <div class="record-grid">${state.fields().map(renderField).join("")}</div>
     `;
   }
@@ -270,6 +446,59 @@
     });
 
     U.$("fieldList").addEventListener("click", (event) => {
+      const menuButton = event.target.closest("[data-field-master-menu]");
+      if (menuButton) {
+        const target = menuButton.dataset.jumpScreen;
+        if (target && RiceOS.app) RiceOS.app.show(target);
+        return;
+      }
+      const groupButton = event.target.closest("[data-field-group-action]");
+      if (groupButton) {
+        const group = groupButton.dataset.fieldGroup || "";
+        if (groupButton.dataset.fieldGroupAction === "bulk") {
+          activeBulkGroup = activeBulkGroup === group ? "" : group;
+          render();
+          return;
+        }
+        if (groupButton.dataset.fieldGroupAction === "edit") {
+          const fields = fieldsForGroup(group);
+          const nextName = prompt("グループ名を入力してください", group === "未設定" ? "" : group);
+          if (nextName === null) return;
+          const cleanName = nextName.trim();
+          state.mutate((d) => {
+            const ids = new Set(fields.map((field) => field.fieldId));
+            d.fields.forEach((field) => {
+              if (ids.has(field.fieldId)) field.fieldGroupId = cleanName;
+            });
+          }, "圃場グループを更新しました");
+          activeBulkGroup = cleanName;
+          return;
+        }
+        return;
+      }
+      const bulkButton = event.target.closest("[data-field-group-bulk]");
+      if (bulkButton) {
+        const ids = String(bulkButton.dataset.fieldIds || "").split(",").filter(Boolean);
+        const kind = bulkButton.dataset.fieldGroupBulk;
+        const date = U.today();
+        if (kind === "work" && RiceOS.screens.fieldWork) {
+          RiceOS.app.show("field-work");
+          RiceOS.screens.fieldWork.prefillFields(date, ids);
+        }
+        if (kind === "growth" && RiceOS.screens.growth) {
+          RiceOS.app.show("growth");
+          RiceOS.screens.growth.prefillFields(date, ids);
+        }
+        if (kind === "dry" && RiceOS.screens.dryPeriod) {
+          RiceOS.app.show("dry-period");
+          RiceOS.screens.dryPeriod.prefillFields(date, ids);
+        }
+        if (kind === "irrigation" && RiceOS.screens.irrigation) {
+          RiceOS.app.show("irrigation");
+          RiceOS.screens.irrigation.prefillFields(date, ids);
+        }
+        return;
+      }
       const button = event.target.closest("[data-field-action]");
       if (!button) return;
       const field = state.field(button.dataset.fieldId);

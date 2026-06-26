@@ -20,6 +20,1156 @@
   --radius: 8px;
 }
 
+/* Final override: field management master top. */
+@media (max-width: 900px) {
+  #screen-fields {
+    width: min(100%, 360px) !important;
+    max-width: 360px !important;
+    margin-right: auto !important;
+    margin-left: auto !important;
+    padding-right: 0 !important;
+    padding-left: 0 !important;
+  }
+
+  #screen-fields .screen-head {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) auto !important;
+    align-items: center !important;
+    min-height: 48px !important;
+    margin: 0 0 8px !important;
+    padding: 4px 0 0 !important;
+    gap: 8px !important;
+    text-align: left !important;
+  }
+
+  #screen-fields .screen-head > div {
+    min-width: 0 !important;
+  }
+
+  #screen-fields .screen-head .eyebrow {
+    margin: 0 0 3px !important;
+    color: #516057 !important;
+    font-size: 11px !important;
+    font-weight: 760 !important;
+    line-height: 1.1 !important;
+  }
+
+  #screen-fields .screen-head h2 {
+    margin: 0 !important;
+    color: #101812 !important;
+    font-size: 24px !important;
+    font-weight: 850 !important;
+    line-height: 1.05 !important;
+    text-align: left !important;
+  }
+
+  #screen-fields .screen-head > button.primary {
+    width: auto !important;
+    min-width: 72px !important;
+    max-width: 92px !important;
+    min-height: 32px !important;
+    padding: 0 9px !important;
+    border-radius: 7px !important;
+    font-size: 10px !important;
+    font-weight: 850 !important;
+    line-height: 1.1 !important;
+    white-space: normal !important;
+  }
+
+  #screen-fields .field-group-card button {
+    min-width: 64px !important;
+    max-width: 70px !important;
+    padding: 0 6px !important;
+    line-height: 1.15 !important;
+  }
+}
+
+/* Field management master entry with playful PNG icons. */
+@media (max-width: 900px) {
+  body:has(#screen-fields.active),
+  .app-shell:has(#screen-fields.active),
+  .main-area:has(#screen-fields.active) {
+    background:
+      radial-gradient(circle at 82% 0%, rgba(238, 220, 162, 0.1), transparent 26%),
+      linear-gradient(180deg, #fbf8ef 0%, #faf6ec 58%, #f8f3e9 100%) !important;
+  }
+
+  #screen-fields {
+    width: min(100%, 360px) !important;
+    max-width: 360px !important;
+    margin-right: auto !important;
+    margin-left: auto !important;
+    padding-right: 0 !important;
+    padding-left: 0 !important;
+  }
+
+  #screen-fields .screen-head {
+    min-height: 46px !important;
+    margin: 0 0 8px !important;
+    padding: 4px 0 0 !important;
+    align-items: center !important;
+  }
+
+  #screen-fields .screen-head .eyebrow {
+    color: #516057 !important;
+    font-size: 11px !important;
+    font-weight: 760 !important;
+  }
+
+  #screen-fields .screen-head h2 {
+    color: #101812 !important;
+    font-size: 24px !important;
+    font-weight: 850 !important;
+    line-height: 1.05 !important;
+  }
+
+  #screen-fields .screen-head > button.primary {
+    min-height: 34px !important;
+    padding: 0 10px !important;
+    border-radius: 7px !important;
+    font-size: 11px !important;
+    font-weight: 850 !important;
+  }
+
+  .field-master-home {
+    display: grid !important;
+    gap: 9px !important;
+    margin-bottom: 8px !important;
+  }
+
+  .field-master-summary {
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 5px !important;
+    padding: 8px !important;
+    border-radius: 8px !important;
+    background: linear-gradient(135deg, #2faa43, #168b34) !important;
+    box-shadow: 0 8px 18px rgba(35, 119, 46, 0.17) !important;
+  }
+
+  .field-master-summary div {
+    min-height: 48px !important;
+    padding: 6px 3px !important;
+    border-radius: 5px !important;
+    background: #fbfcf3 !important;
+    box-shadow: inset 0 0 0 1px rgba(229, 228, 214, 0.78) !important;
+    text-align: center !important;
+  }
+
+  .field-master-summary small {
+    display: block !important;
+    color: #24402c !important;
+    font-size: 9px !important;
+    font-weight: 780 !important;
+  }
+
+  .field-master-summary b {
+    display: block !important;
+    color: #0d1710 !important;
+    font-size: 20px !important;
+    font-weight: 850 !important;
+    line-height: 1.05 !important;
+  }
+
+  .field-master-section {
+    display: grid !important;
+    gap: 7px !important;
+  }
+
+  .field-master-section-head {
+    display: flex !important;
+    align-items: end !important;
+    justify-content: space-between !important;
+    gap: 8px !important;
+    margin: 4px 1px 0 !important;
+  }
+
+  .field-master-section-head h3 {
+    margin: 0 !important;
+    color: #111914 !important;
+    font-size: 17px !important;
+    font-weight: 850 !important;
+    line-height: 1.1 !important;
+  }
+
+  .field-master-section-head span {
+    color: #69746b !important;
+    font-size: 10px !important;
+    font-weight: 720 !important;
+    white-space: nowrap !important;
+  }
+
+  .field-master-menu-grid {
+    display: grid !important;
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    gap: 7px !important;
+  }
+
+  .field-master-menu-button {
+    min-height: 78px !important;
+    padding: 6px 4px 5px !important;
+    border: 1px solid #d9dccf !important;
+    border-radius: 8px !important;
+    background: rgba(255, 255, 255, 0.94) !important;
+    color: #151f17 !important;
+    box-shadow: 0 4px 10px rgba(58, 47, 24, 0.06) !important;
+    text-align: center !important;
+  }
+
+  .field-master-menu-button.green {
+    border-color: #b8d9af !important;
+    background: linear-gradient(180deg, #ffffff, #f2ffef) !important;
+  }
+
+  .field-master-menu-button.amber {
+    border-color: #e9cb62 !important;
+    background: linear-gradient(180deg, #fffefa, #fff4cf) !important;
+  }
+
+  .field-master-menu-button.water {
+    border-color: #c4dfe9 !important;
+    background: linear-gradient(180deg, #fffefa, #ebf9ff) !important;
+  }
+
+  .field-master-menu-button img {
+    display: block !important;
+    width: 43px !important;
+    height: 43px !important;
+    margin: 0 auto 3px !important;
+    border-radius: 8px !important;
+    object-fit: cover !important;
+    filter: drop-shadow(0 1px 1px rgba(45, 58, 38, 0.16)) !important;
+  }
+
+  .field-master-menu-button b {
+    display: block !important;
+    color: #101812 !important;
+    font-size: 10px !important;
+    font-weight: 850 !important;
+    line-height: 1.12 !important;
+  }
+
+  .field-master-menu-button small {
+    display: block !important;
+    margin-top: 2px !important;
+    color: #626d64 !important;
+    font-size: 8px !important;
+    font-weight: 680 !important;
+    line-height: 1.1 !important;
+  }
+
+  .field-group-list {
+    display: grid !important;
+    gap: 7px !important;
+  }
+
+  .field-group-card {
+    display: grid !important;
+    grid-template-columns: 56px minmax(0, 1fr) 66px !important;
+    gap: 8px !important;
+    align-items: center !important;
+    padding: 9px 10px !important;
+    border: 1px solid #a8d5a1 !important;
+    border-radius: 8px !important;
+    background: linear-gradient(105deg, #ffffff 0%, #f4ffef 100%) !important;
+    box-shadow: 0 4px 10px rgba(45, 72, 39, 0.05) !important;
+  }
+
+  .field-group-rice {
+    width: 54px !important;
+    height: 43px !important;
+    border-radius: 8px !important;
+    background:
+      radial-gradient(ellipse at 50% 82%, #e9ddb3 0 32%, transparent 33%),
+      radial-gradient(ellipse at 50% 88%, rgba(74, 182, 210, 0.28) 0 47%, transparent 48%) !important;
+    position: relative !important;
+  }
+
+  .field-group-rice::before {
+    content: "" !important;
+    position: absolute !important;
+    left: 24px !important;
+    bottom: 11px !important;
+    width: 4px !important;
+    height: 27px !important;
+    border-radius: 999px !important;
+    background: #4d9a39 !important;
+    box-shadow: -7px 5px 0 -1px #66b347, 7px 3px 0 -1px #73bb4b, -12px 10px 0 -2px #76bd55, 12px 10px 0 -2px #5fa93d !important;
+  }
+
+  .field-group-card h4 {
+    margin: 0 0 3px !important;
+    color: #111914 !important;
+    font-size: 16px !important;
+    font-weight: 850 !important;
+    line-height: 1.1 !important;
+  }
+
+  .field-group-card p {
+    margin: 0 !important;
+    color: #354136 !important;
+    font-size: 10px !important;
+    font-weight: 720 !important;
+  }
+
+  .field-group-card div div {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 4px !important;
+    margin-top: 6px !important;
+  }
+
+  .field-group-card span {
+    padding: 2px 6px !important;
+    border: 1px solid #d6e5ce !important;
+    border-radius: 999px !important;
+    background: #f2f8ed !important;
+    color: #263426 !important;
+    font-size: 9px !important;
+    font-weight: 760 !important;
+  }
+
+  .field-group-card button {
+    min-height: 31px !important;
+    border: 0 !important;
+    border-radius: 6px !important;
+    background: #2fad46 !important;
+    color: #fff !important;
+    font-size: 10px !important;
+    font-weight: 850 !important;
+  }
+
+  #screen-fields .record-grid {
+    display: grid !important;
+    gap: 8px !important;
+  }
+
+  #screen-fields .record.field-karte {
+    border-radius: 8px !important;
+    box-shadow: 0 4px 12px rgba(58, 47, 24, 0.06) !important;
+  }
+}
+
+/* Ver2.0 detail pass: make the field karte tab match the reference card layout. */
+@media (max-width: 900px) {
+  #screen-annual.annual-detail-mode .annual-field-detail {
+    padding-bottom: 90px !important;
+  }
+
+  #screen-annual.annual-detail-mode .annual-field-tab-body {
+    margin-top: 4px !important;
+  }
+
+  #screen-annual.annual-detail-mode .annual-field-detail-grid {
+    display: grid !important;
+    gap: 7px !important;
+  }
+
+  #screen-annual.annual-detail-mode .annual-field-detail-card {
+    overflow: hidden !important;
+    border: 1px solid #d7decf !important;
+    border-radius: 8px !important;
+    background: rgba(255, 255, 255, 0.94) !important;
+    box-shadow: 0 4px 12px rgba(58, 47, 24, 0.06) !important;
+  }
+
+  #screen-annual.annual-detail-mode .annual-karte-card {
+    padding: 0 !important;
+  }
+
+  #screen-annual.annual-detail-mode .annual-card-title {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) 82px !important;
+    align-items: center !important;
+    justify-items: start !important;
+    min-height: 46px !important;
+    margin: 0 !important;
+    padding: 8px 13px 7px !important;
+    gap: 8px !important;
+    background: linear-gradient(100deg, #f2ffe6 0%, #fff3ba 100%) !important;
+    text-align: left !important;
+  }
+
+  #screen-annual.annual-detail-mode .annual-card-title h3 {
+    margin: 0 !important;
+    color: #132018 !important;
+    font-size: 17px !important;
+    font-weight: 850 !important;
+    line-height: 1.15 !important;
+  }
+
+  #screen-annual.annual-detail-mode .annual-card-rice {
+    display: grid !important;
+    place-items: end center !important;
+    justify-self: end !important;
+    width: 82px !important;
+    height: 42px !important;
+    margin: -4px -2px -6px 0 !important;
+    background: transparent !important;
+  }
+
+  #screen-annual.annual-detail-mode .annual-card-rice::before,
+  #screen-annual.annual-detail-mode .annual-card-rice::after {
+    display: none !important;
+  }
+
+  #screen-annual.annual-detail-mode .annual-card-rice .annual-picker-rice-img,
+  #screen-annual.annual-detail-mode .annual-card-rice .annual-rice-img {
+    display: block !important;
+    width: 90px !important;
+    height: 48px !important;
+    object-fit: contain !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    filter: drop-shadow(0 2px 2px rgba(52, 75, 37, 0.12)) !important;
+  }
+
+  #screen-annual.annual-detail-mode .annual-karte-card .annual-edit-grid,
+  #screen-annual.annual-detail-mode .annual-karte-card .annual-wide-label {
+    padding-right: 12px !important;
+    padding-left: 12px !important;
+  }
+
+  #screen-annual.annual-detail-mode .annual-karte-card .annual-edit-grid {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    gap: 0 !important;
+    padding-top: 1px !important;
+  }
+
+  #screen-annual.annual-detail-mode .annual-karte-card .annual-edit-grid label,
+  #screen-annual.annual-detail-mode .annual-karte-source-row {
+    display: grid !important;
+    grid-template-columns: 96px minmax(0, 1fr) !important;
+    align-items: center !important;
+    min-height: 34px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border-bottom: 1px solid #d9dfd1 !important;
+    color: #172018 !important;
+    font-size: 13px !important;
+    font-weight: 820 !important;
+    line-height: 1.15 !important;
+  }
+
+  #screen-annual.annual-detail-mode .annual-karte-source-row {
+    grid-template-columns: 96px minmax(0, 1fr) !important;
+    grid-template-rows: auto auto !important;
+    min-height: 39px !important;
+    padding: 3px 0 !important;
+  }
+
+  #screen-annual.annual-detail-mode .annual-karte-source-row span {
+    grid-row: 1 / span 2 !important;
+    color: #172018 !important;
+    font-size: 13px !important;
+    font-weight: 820 !important;
+  }
+
+  #screen-annual.annual-detail-mode .annual-karte-source-row b {
+    justify-self: end !important;
+    color: #111811 !important;
+    font-size: 14px !important;
+    font-weight: 820 !important;
+    line-height: 1.05 !important;
+  }
+
+  #screen-annual.annual-detail-mode .annual-karte-source-row small {
+    justify-self: end !important;
+    color: #39433b !important;
+    font-size: 9px !important;
+    font-weight: 650 !important;
+    line-height: 1.1 !important;
+  }
+
+  #screen-annual.annual-detail-mode .annual-karte-card .annual-edit-grid input,
+  #screen-annual.annual-detail-mode .annual-karte-card .annual-edit-grid select {
+    width: 100% !important;
+    min-height: 31px !important;
+    height: 31px !important;
+    margin: 0 !important;
+    padding: 0 0 0 6px !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    color: #111811 !important;
+    box-shadow: none !important;
+    font-size: 14px !important;
+    font-weight: 820 !important;
+    line-height: 31px !important;
+    text-align: right !important;
+  }
+
+  #screen-annual.annual-detail-mode .annual-karte-card .annual-edit-grid select {
+    direction: rtl !important;
+    appearance: none !important;
+    -webkit-appearance: none !important;
+  }
+
+  #screen-annual.annual-detail-mode .annual-karte-card .annual-edit-grid select option {
+    direction: ltr !important;
+  }
+
+  #screen-annual.annual-detail-mode .annual-karte-card .annual-wide-label {
+    display: grid !important;
+    grid-template-columns: 96px minmax(0, 1fr) !important;
+    align-items: center !important;
+    min-height: 38px !important;
+    margin: 0 !important;
+    padding-top: 0 !important;
+    padding-bottom: 8px !important;
+    color: #172018 !important;
+    font-size: 13px !important;
+    font-weight: 820 !important;
+  }
+
+  #screen-annual.annual-detail-mode .annual-karte-card .annual-wide-label textarea {
+    min-height: 30px !important;
+    height: 30px !important;
+    margin: 0 !important;
+    padding: 5px 0 3px 6px !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    color: #111811 !important;
+    box-shadow: none !important;
+    font-size: 13px !important;
+    font-weight: 760 !important;
+    line-height: 1.2 !important;
+    text-align: right !important;
+    resize: none !important;
+  }
+
+  #screen-annual.annual-detail-mode .annual-target-card {
+    border-color: #ecd58d !important;
+  }
+
+  #screen-annual.annual-detail-mode .annual-target-card .section-title {
+    min-height: 38px !important;
+    margin: 0 !important;
+    padding: 8px 12px !important;
+    border-bottom: 1px solid #eadca7 !important;
+    background: linear-gradient(90deg, #fff6d0 0%, #fff1bd 100%) !important;
+  }
+
+  #screen-annual.annual-detail-mode .annual-target-card .section-title h3 {
+    margin: 0 !important;
+    color: #172018 !important;
+    font-size: 15px !important;
+    font-weight: 850 !important;
+  }
+
+  #screen-annual.annual-detail-mode .annual-target-card .section-title .muted {
+    display: none !important;
+  }
+
+  #screen-annual.annual-detail-mode .annual-target-card .annual-kv-list {
+    padding: 0 12px 7px !important;
+  }
+
+  #screen-annual.annual-detail-mode .annual-kv-row {
+    min-height: 32px !important;
+    padding: 5px 0 !important;
+    border-bottom-color: #d9dfd1 !important;
+  }
+
+  #screen-annual.annual-detail-mode .annual-kv-row span {
+    color: #172018 !important;
+    font-size: 12.5px !important;
+    font-weight: 780 !important;
+  }
+
+  #screen-annual.annual-detail-mode .annual-kv-row b {
+    color: #111811 !important;
+    font-size: 13px !important;
+    font-weight: 820 !important;
+  }
+
+  #screen-annual.annual-detail-mode .annual-target-card > .annual-edit-grid {
+    display: none !important;
+  }
+}
+
+/* Final override: field management master top. */
+@media (max-width: 900px) {
+  #screen-fields {
+    width: min(100%, 360px) !important;
+    max-width: 360px !important;
+    margin-right: auto !important;
+    margin-left: auto !important;
+    padding-right: 0 !important;
+    padding-left: 0 !important;
+  }
+
+  #screen-fields .screen-head {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) auto !important;
+    align-items: center !important;
+    min-height: 48px !important;
+    margin: 0 0 8px !important;
+    padding: 4px 0 0 !important;
+    gap: 8px !important;
+    text-align: left !important;
+  }
+
+  #screen-fields .screen-head > div {
+    min-width: 0 !important;
+  }
+
+  #screen-fields .screen-head .eyebrow {
+    margin: 0 0 3px !important;
+    color: #516057 !important;
+    font-size: 11px !important;
+    font-weight: 760 !important;
+    line-height: 1.1 !important;
+  }
+
+  #screen-fields .screen-head h2 {
+    margin: 0 !important;
+    color: #101812 !important;
+    font-size: 24px !important;
+    font-weight: 850 !important;
+    line-height: 1.05 !important;
+    text-align: left !important;
+  }
+
+  #screen-fields .screen-head > button.primary {
+    width: auto !important;
+    min-width: 72px !important;
+    max-width: 92px !important;
+    min-height: 32px !important;
+    padding: 0 9px !important;
+    border-radius: 7px !important;
+    font-size: 10px !important;
+    font-weight: 850 !important;
+    line-height: 1.1 !important;
+    white-space: normal !important;
+  }
+
+  #screen-fields .field-group-card button {
+    min-width: 64px !important;
+    max-width: 70px !important;
+    padding: 0 6px !important;
+    line-height: 1.15 !important;
+  }
+}
+
+/* Ver2.0 Android visual pass: make the annual top visibly closer to the reference mock. */
+@media (max-width: 900px) {
+  body {
+    background:
+      linear-gradient(180deg, #fff9e9 0%, #f8f2e5 48%, #f4efe4 100%) !important;
+  }
+
+  .app-shell {
+    padding: 0 14px 96px !important;
+  }
+
+  #screen-annual .annual-phone-head {
+    grid-template-columns: minmax(0, 1fr) 118px 34px !important;
+    gap: 8px !important;
+    min-height: 54px !important;
+    margin: 0 0 10px !important;
+    padding: 8px 0 0 !important;
+  }
+
+  #screen-annual .annual-phone-head h2 {
+    font-size: 25px !important;
+    font-weight: 950 !important;
+    line-height: 1.05 !important;
+  }
+
+  .annual-year-button {
+    justify-content: center !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    min-height: 40px !important;
+    border-color: #e9c766 !important;
+    border-radius: 8px !important;
+    background: #fff7dc !important;
+    box-shadow: 0 2px 0 rgba(158, 115, 20, 0.08) !important;
+  }
+
+  .annual-year-button select {
+    font-size: 16px !important;
+    font-weight: 950 !important;
+  }
+
+  .annual-menu-button {
+    width: 34px !important;
+    min-width: 34px !important;
+    height: 40px !important;
+    min-height: 40px !important;
+    color: #1d281d !important;
+    font-size: 22px !important;
+  }
+
+  .annual-summary-board {
+    margin: 0 0 14px !important;
+    padding: 14px 12px 12px !important;
+    border: 0 !important;
+    border-radius: 8px !important;
+    background:
+      linear-gradient(165deg, rgba(255, 255, 255, 0.08) 0%, transparent 36%),
+      linear-gradient(135deg, #22a13a 0%, #168b2d 100%) !important;
+    box-shadow: 0 14px 28px rgba(32, 105, 39, 0.22) !important;
+  }
+
+  .annual-summary-board > div:first-child {
+    margin-bottom: 10px !important;
+  }
+
+  .annual-summary-board > div:first-child b {
+    color: #fff !important;
+    font-size: 21px !important;
+    font-weight: 950 !important;
+  }
+
+  .annual-summary-board > div:first-child span {
+    color: rgba(255, 255, 255, 0.88) !important;
+    font-size: 13px !important;
+    font-weight: 850 !important;
+  }
+
+  .annual-summary-board .annual-summary-grid {
+    gap: 6px !important;
+  }
+
+  .annual-summary-board .annual-summary-card {
+    min-height: 72px !important;
+    padding: 9px 3px 8px !important;
+    border: 0 !important;
+    border-radius: 6px !important;
+    background: rgba(247, 253, 245, 0.92) !important;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.64) !important;
+  }
+
+  .annual-summary-board .annual-summary-card span {
+    color: #1b3e25 !important;
+    font-size: 10.5px !important;
+    font-weight: 900 !important;
+  }
+
+  .annual-summary-board .annual-summary-card b {
+    margin-top: 5px !important;
+    color: #07150b !important;
+    font-size: 24px !important;
+    font-weight: 950 !important;
+    line-height: 1 !important;
+  }
+
+  .annual-field-picker {
+    gap: 9px !important;
+  }
+
+  .annual-field-picker .section-title {
+    display: grid !important;
+    justify-items: center !important;
+    gap: 3px !important;
+    margin: 4px 0 6px !important;
+    text-align: center !important;
+  }
+
+  .annual-field-picker .section-title h3 {
+    color: #162719 !important;
+    font-size: 19px !important;
+    font-weight: 950 !important;
+  }
+
+  .annual-field-picker .section-title .muted {
+    color: #7b8377 !important;
+    font-size: 12px !important;
+    font-weight: 700 !important;
+  }
+
+  #screen-annual .annual-filter-row {
+    grid-template-columns: minmax(0, 1fr) 82px !important;
+    gap: 8px !important;
+    margin: 0 0 3px !important;
+  }
+
+  #screen-annual .annual-filter-row .compact-label {
+    font-size: 0 !important;
+  }
+
+  #screen-annual .annual-filter-row input,
+  #screen-annual .annual-filter-row select {
+    min-height: 36px !important;
+    margin: 0 !important;
+    border: 1px solid #ded7c5 !important;
+    border-radius: 7px !important;
+    background: rgba(255, 255, 255, 0.96) !important;
+    color: #1e2b21 !important;
+    font-size: 13px !important;
+    font-weight: 850 !important;
+    box-shadow: 0 3px 10px rgba(43, 57, 36, 0.05) !important;
+  }
+
+  #screen-annual .annual-filter-row input {
+    padding: 8px 10px !important;
+  }
+
+  #screen-annual .annual-filter-row select {
+    padding: 7px 22px 7px 9px !important;
+  }
+
+  .annual-field-pick-grid {
+    gap: 9px !important;
+  }
+
+  .annual-field-pick-card {
+    grid-template-columns: 64px minmax(0, 1fr) 58px !important;
+    min-height: 106px !important;
+    padding: 10px !important;
+    border: 1px solid #cad9c6 !important;
+    border-radius: 8px !important;
+    background:
+      linear-gradient(90deg, rgba(226, 247, 213, 0.8), transparent 28%),
+      rgba(255, 255, 255, 0.96) !important;
+    box-shadow: 0 7px 14px rgba(44, 62, 40, 0.06) !important;
+  }
+
+  .annual-field-pick-card.status-warn {
+    border-color: #e7c864 !important;
+    background:
+      linear-gradient(90deg, rgba(255, 240, 174, 0.78), transparent 30%),
+      #fffdf4 !important;
+  }
+
+  .annual-field-pick-card.status-muted {
+    border-color: #cfd6d2 !important;
+    background:
+      linear-gradient(90deg, rgba(224, 235, 218, 0.75), transparent 30%),
+      #fffefa !important;
+  }
+
+  .annual-field-plant {
+    width: 58px !important;
+    height: 58px !important;
+    border-radius: 8px !important;
+    background-color: #eafaaf !important;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.55) !important;
+  }
+
+  .annual-field-plant .annual-rice-svg {
+    width: 50px !important;
+    height: 50px !important;
+  }
+
+  .annual-field-pick-head {
+    align-items: baseline !important;
+    gap: 5px !important;
+  }
+
+  .annual-field-pick-head b {
+    font-size: 18px !important;
+    line-height: 1.15 !important;
+  }
+
+  .annual-field-pick-head em {
+    margin-left: 5px !important;
+    color: #1f2f22 !important;
+    font-size: 11.5px !important;
+    font-style: normal !important;
+    font-weight: 850 !important;
+    white-space: nowrap !important;
+  }
+
+  .annual-field-pick-head strong {
+    font-size: 14px !important;
+    font-weight: 950 !important;
+  }
+
+  .annual-field-pick-main small {
+    color: #2f3e33 !important;
+    font-size: 11.5px !important;
+    font-weight: 850 !important;
+    line-height: 1.25 !important;
+  }
+
+  .annual-field-pick-metrics {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 4px 8px !important;
+    margin-top: 2px !important;
+  }
+
+  .annual-field-pick-metrics span {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 3px !important;
+    min-width: 0 !important;
+    color: #173c25 !important;
+    font-size: 11.5px !important;
+    font-weight: 900 !important;
+    white-space: nowrap !important;
+  }
+
+  .annual-status-badge {
+    align-self: center !important;
+    justify-self: end !important;
+    min-width: 52px !important;
+    padding: 8px 6px !important;
+    border-radius: 6px !important;
+    background: #dfe8d9 !important;
+    color: #243325 !important;
+    font-size: 11.5px !important;
+    font-weight: 900 !important;
+    line-height: 1.15 !important;
+  }
+
+  .annual-status-badge.ok {
+    background: linear-gradient(135deg, #3bb34c, #2b963b) !important;
+    color: #fff !important;
+  }
+
+  .annual-status-badge.warn {
+    background: #ffd85c !important;
+    color: #392d02 !important;
+  }
+
+  .annual-fab {
+    right: 14px !important;
+    bottom: calc(78px + env(safe-area-inset-bottom)) !important;
+    width: 62px !important;
+    height: 62px !important;
+    border: 0 !important;
+    border-radius: 50% !important;
+    background: linear-gradient(135deg, #3abd4f, #23952f) !important;
+    color: #fff !important;
+    font-size: 38px !important;
+    font-weight: 400 !important;
+    box-shadow: 0 12px 24px rgba(35, 125, 48, 0.28) !important;
+  }
+
+  .side-nav {
+    height: 66px !important;
+    padding: 7px 10px calc(6px + env(safe-area-inset-bottom)) !important;
+    border-top: 1px solid #dfdacd !important;
+    background: rgba(255, 255, 255, 0.98) !important;
+  }
+
+  .side-nav .nav-item[data-screen="home"],
+  .side-nav .nav-item[data-screen="fields"],
+  .side-nav .nav-item[data-screen="annual"],
+  .side-nav .nav-item[data-screen="notices"],
+  .side-nav .nav-item[data-screen="data"] {
+    min-height: 50px !important;
+    grid-template-rows: 28px 16px !important;
+    gap: 0 !important;
+  }
+
+  .side-nav .nav-icon svg {
+    width: 26px !important;
+    height: 26px !important;
+  }
+
+  .side-nav .nav-label {
+    color: #202820 !important;
+    font-size: 10px !important;
+    font-weight: 750 !important;
+    line-height: 15px !important;
+  }
+
+  .side-nav .nav-item.active .nav-icon,
+  .side-nav .nav-item.active .nav-label {
+    color: #228638 !important;
+  }
+}
+
+/* Ver2.0 Android bottom bar lock: equal columns, centered icons and labels. */
+@media (max-width: 900px) {
+  .side-nav {
+    box-sizing: border-box !important;
+    display: grid !important;
+    grid-template-columns: repeat(5, 1fr) !important;
+    align-items: stretch !important;
+    justify-items: stretch !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: auto !important;
+    height: calc(68px + env(safe-area-inset-bottom)) !important;
+    min-height: calc(68px + env(safe-area-inset-bottom)) !important;
+    padding: 7px 6px calc(7px + env(safe-area-inset-bottom)) !important;
+    gap: 0 !important;
+    border-radius: 0 !important;
+    overflow: hidden !important;
+  }
+
+  .side-nav .nav-item {
+    display: none !important;
+  }
+
+  .side-nav .nav-item[data-screen="home"],
+  .side-nav .nav-item[data-screen="fields"],
+  .side-nav .nav-item[data-screen="annual"],
+  .side-nav .nav-item[data-screen="notices"],
+  .side-nav .nav-item[data-screen="data"] {
+    box-sizing: border-box !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    height: 54px !important;
+    min-height: 54px !important;
+    margin: 0 !important;
+    padding: 2px 0 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    text-align: center !important;
+  }
+
+  .side-nav .nav-icon {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    flex: 0 0 30px !important;
+    width: 100% !important;
+    height: 30px !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    line-height: 1 !important;
+  }
+
+  .side-nav .nav-icon svg {
+    display: block !important;
+    width: 25px !important;
+    height: 25px !important;
+    margin: 0 auto !important;
+    overflow: visible !important;
+  }
+
+  .side-nav .nav-label {
+    display: block !important;
+    flex: 0 0 16px !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    height: 16px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    text-align: center !important;
+    white-space: nowrap !important;
+    color: #202820 !important;
+    font-size: 10px !important;
+    font-weight: 800 !important;
+    line-height: 16px !important;
+  }
+
+  .side-nav .nav-item.active .nav-icon,
+  .side-nav .nav-item.active .nav-label {
+    color: #23953a !important;
+  }
+
+  .side-nav .nav-item[data-screen="fields"] .nav-icon svg {
+    width: 24px !important;
+    height: 24px !important;
+  }
+
+  .annual-field-plant {
+    background:
+      radial-gradient(circle at 30% 28%, rgba(255, 255, 255, 0.62), transparent 34%),
+      linear-gradient(180deg, #ebfac9 0%, #fff2a7 100%) !important;
+  }
+
+  .annual-field-plant .annual-rice-svg {
+    width: 58px !important;
+    height: 58px !important;
+  }
+
+  .annual-field-plant.stage-seedling {
+    background:
+      radial-gradient(circle at 30% 28%, rgba(255, 255, 255, 0.64), transparent 34%),
+      linear-gradient(180deg, #effbd6 0%, #e7f6c4 100%) !important;
+  }
+
+  .annual-field-plant.stage-tillering {
+    background:
+      radial-gradient(circle at 30% 28%, rgba(255, 255, 255, 0.64), transparent 34%),
+      linear-gradient(180deg, #e5f8c5 0%, #dff2af 100%) !important;
+  }
+
+  .annual-field-plant.stage-panicle {
+    background:
+      radial-gradient(circle at 30% 28%, rgba(255, 255, 255, 0.62), transparent 34%),
+      linear-gradient(180deg, #ebfac9 0%, #fff2a7 100%) !important;
+  }
+
+  .annual-field-plant.stage-mature {
+    background:
+      radial-gradient(circle at 30% 28%, rgba(255, 255, 255, 0.58), transparent 34%),
+      linear-gradient(180deg, #f5eeb1 0%, #f4ca67 100%) !important;
+  }
+
+  .annual-card-rice .annual-rice-svg {
+    width: 62px !important;
+    height: 62px !important;
+  }
+}
+
+/* Ver2.0 rice bitmap stages: use generated image assets instead of SVG-like symbols. */
+@media (max-width: 900px) {
+  .annual-field-plant,
+  .annual-card-rice {
+    display: grid !important;
+    place-items: center !important;
+    overflow: hidden !important;
+  }
+
+  .annual-field-plant .annual-rice-img,
+  .annual-card-rice .annual-rice-img {
+    display: block !important;
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: contain !important;
+    filter: drop-shadow(0 2px 2px rgba(85, 70, 22, 0.18));
+  }
+
+  .annual-field-plant {
+    padding: 4px !important;
+  }
+
+  .annual-card-rice {
+    width: 68px !important;
+    height: 68px !important;
+    padding: 3px !important;
+    border-radius: 8px !important;
+    background:
+      radial-gradient(circle at 30% 25%, rgba(255, 255, 255, 0.68), transparent 38%),
+      linear-gradient(180deg, #f1f8d1, #fff2b3) !important;
+  }
+
+  .annual-field-plant.stage-01,
+  .annual-field-plant.stage-02 {
+    background: linear-gradient(180deg, #eefbd8 0%, #e8f5c6 100%) !important;
+  }
+
+  .annual-field-plant.stage-03,
+  .annual-field-plant.stage-04 {
+    background: linear-gradient(180deg, #e7f8c8 0%, #dff1b0 100%) !important;
+  }
+
+  .annual-field-plant.stage-05,
+  .annual-field-plant.stage-06 {
+    background: linear-gradient(180deg, #ebfac9 0%, #fff0a7 100%) !important;
+  }
+
+  .annual-field-plant.stage-07,
+  .annual-field-plant.stage-08 {
+    background: linear-gradient(180deg, #f7efae 0%, #efc867 100%) !important;
+  }
+}
+
 * {
   box-sizing: border-box;
 }
@@ -7000,5 +8150,1398 @@ label {
     font-size: 25px;
     line-height: 26px;
     text-align: center;
+  }
+}
+
+/* Ver2.0 icon correction: use real inline SVGs instead of generated glyphs. */
+.nav-icon svg,
+.annual-year-button svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.15;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.annual-year-button span::before {
+  display: none !important;
+}
+
+.annual-year-button span {
+  display: block;
+  width: 18px;
+  height: 18px;
+}
+
+.svg-icon {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.annual-field-plant {
+  display: grid;
+  place-items: center;
+  background: linear-gradient(180deg, #e9f8cf, #fff1ae) !important;
+}
+
+.annual-field-plant .annual-rice-svg {
+  width: 54px;
+  height: 54px;
+}
+
+.annual-card-rice {
+  display: grid;
+  place-items: center;
+  background: none !important;
+}
+
+.annual-card-rice .annual-rice-svg {
+  width: 54px;
+  height: 54px;
+}
+
+.annual-field-tabs button::before {
+  display: none !important;
+}
+
+.annual-tab-svg {
+  width: 18px;
+  height: 18px;
+}
+
+.annual-field-tabs button[data-annual-tab="work"] .annual-tab-svg {
+  color: #d94832;
+}
+
+.annual-kind-icon.annual-work-icon {
+  display: grid;
+  place-items: center;
+  overflow: visible;
+  font-size: 0 !important;
+}
+
+.annual-entry-svg {
+  width: 48px;
+  height: 48px;
+}
+
+@media (max-width: 900px) {
+  .side-nav .nav-icon::before,
+  .side-nav .nav-icon::after {
+    display: none !important;
+  }
+
+  .side-nav .nav-icon {
+    display: grid !important;
+    place-items: center !important;
+    width: 29px !important;
+    height: 28px !important;
+    font-size: 0 !important;
+  }
+
+  .side-nav .nav-icon svg {
+    width: 28px;
+    height: 28px;
+  }
+
+  .side-nav .nav-item[data-screen="annual"] .nav-icon svg,
+  .side-nav .nav-item.active .nav-icon svg {
+    stroke-width: 2.3;
+  }
+}
+
+/* Ver2.0 final rice tile assets: the paddy field background is baked into the PNG. */
+@media (max-width: 900px) {
+  .annual-field-plant,
+  .annual-card-rice {
+    display: grid !important;
+    place-items: center !important;
+    overflow: visible !important;
+    padding: 0 !important;
+    border: 0 !important;
+    border-radius: 8px !important;
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+
+  .annual-field-plant {
+    width: 64px !important;
+    height: 64px !important;
+  }
+
+  .annual-card-rice {
+    width: 72px !important;
+    height: 72px !important;
+  }
+
+  .annual-field-plant .annual-rice-img,
+  .annual-card-rice .annual-rice-img {
+    display: block !important;
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: contain !important;
+    border-radius: 8px !important;
+    transform: none !important;
+    filter: drop-shadow(0 3px 4px rgba(51, 67, 35, 0.18)) !important;
+  }
+}
+
+/* Ver2.0 correction: keep the reference-style mobile frame inside the viewport. */
+@media (max-width: 900px) {
+  html,
+  body {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
+  .app-shell,
+  .content,
+  .screen,
+  .timeline,
+  .annual-v2-top,
+  .annual-field-picker,
+  .annual-field-detail,
+  .mobile-screen-menu,
+  .data-actions {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .app-shell {
+    padding-right: 15px !important;
+    padding-left: 15px !important;
+  }
+
+  .side-nav {
+    display: grid !important;
+    grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: auto !important;
+    max-width: none !important;
+    gap: 0 !important;
+    padding: 7px 8px calc(7px + env(safe-area-inset-bottom)) !important;
+    border-radius: 0 !important;
+    overflow: hidden;
+  }
+
+  .side-nav .nav-item {
+    display: none !important;
+    width: auto !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+  }
+
+  .side-nav .nav-item[data-screen="home"],
+  .side-nav .nav-item[data-screen="fields"],
+  .side-nav .nav-item[data-screen="annual"],
+  .side-nav .nav-item[data-screen="notices"],
+  .side-nav .nav-item[data-screen="data"] {
+    display: grid !important;
+  }
+
+  .side-nav .nav-icon,
+  .side-nav .nav-label {
+    width: auto !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  .side-nav .nav-label {
+    overflow: visible !important;
+    text-align: center !important;
+  }
+
+  #screen-annual {
+    overflow-x: hidden;
+  }
+
+  #screen-annual .annual-phone-head {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    grid-template-columns: minmax(0, 1fr) auto 34px !important;
+  }
+
+  #screen-annual .annual-phone-head h2 {
+    min-width: 0;
+    overflow: hidden;
+    font-size: 22px;
+    white-space: nowrap;
+  }
+
+  .annual-year-button {
+    display: inline-flex;
+    align-items: center;
+    width: auto !important;
+    min-width: 106px;
+    max-width: 118px;
+    margin: 0;
+    overflow: hidden;
+  }
+
+  .annual-year-button select {
+    width: auto !important;
+    min-width: 70px;
+    min-height: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+  }
+
+  .annual-menu-button {
+    position: static !important;
+    width: 34px;
+    min-width: 34px;
+    padding: 0 !important;
+    transform: none !important;
+  }
+
+  .annual-summary-board {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    padding: 12px;
+    overflow: hidden;
+  }
+
+  .annual-summary-board .annual-summary-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 5px;
+  }
+
+  .annual-summary-board .annual-summary-card {
+    min-width: 0;
+    padding: 10px 4px;
+    overflow: hidden;
+  }
+
+  .annual-summary-board .annual-summary-card span {
+    display: block;
+    overflow: hidden;
+    font-size: 10.5px;
+    white-space: nowrap;
+    text-overflow: clip;
+  }
+
+  .annual-summary-board .annual-summary-card b {
+    font-size: 21px;
+    white-space: nowrap;
+  }
+
+  #screen-annual .annual-filter-row {
+    width: 100%;
+    max-width: 100%;
+    grid-template-columns: minmax(0, 1fr) 94px !important;
+  }
+
+  #screen-annual .annual-filter-row .compact-label,
+  #screen-annual .annual-filter-row input,
+  #screen-annual .annual-filter-row select {
+    min-width: 0 !important;
+    max-width: 100% !important;
+  }
+
+  .annual-field-pick-grid,
+  .annual-field-pick-card {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .annual-field-pick-card {
+    grid-template-columns: 62px minmax(0, 1fr) minmax(46px, auto) !important;
+    gap: 8px;
+    padding: 10px;
+  }
+
+  .annual-status-badge {
+    min-width: 46px;
+    padding-right: 7px;
+    padding-left: 7px;
+    text-align: center;
+  }
+
+  .settings-menu .menu-grid button {
+    position: relative;
+    font-size: 0;
+  }
+
+  .settings-menu .menu-grid button > span {
+    font-size: 13px;
+    line-height: 1.2;
+  }
+
+  .settings-menu .menu-grid button::before {
+    content: "";
+    display: block;
+    width: 26px;
+    height: 26px;
+    color: #0d4a32;
+  }
+
+  .settings-menu .menu-grid button[data-jump-screen="calendar"]::before {
+    border: 2px solid currentColor;
+    border-radius: 5px;
+    background:
+      linear-gradient(currentColor, currentColor) 0 7px / 100% 2px no-repeat,
+      linear-gradient(currentColor, currentColor) 8px 0 / 2px 100% no-repeat,
+      linear-gradient(currentColor, currentColor) 17px 0 / 2px 100% no-repeat;
+  }
+
+  .settings-menu .menu-grid button[data-jump-screen="field-work"]::before {
+    border: 2px solid currentColor;
+    border-radius: 50%;
+    background:
+      linear-gradient(currentColor, currentColor) 50% 50% / 14px 2px no-repeat,
+      linear-gradient(currentColor, currentColor) 50% 50% / 2px 14px no-repeat;
+  }
+
+  .settings-menu .menu-grid button[data-jump-screen="growth"]::before {
+    border-bottom: 3px solid currentColor;
+    background:
+      radial-gradient(ellipse at 35% 48%, #6fbf57 0 7px, transparent 7.5px),
+      radial-gradient(ellipse at 66% 42%, #7fca63 0 7px, transparent 7.5px),
+      linear-gradient(currentColor, currentColor) 50% 42% / 3px 17px no-repeat;
+    border-radius: 0 0 8px 8px;
+  }
+
+  .settings-menu .menu-grid button[data-jump-screen="dry-period"]::before {
+    border-bottom: 3px solid #9b7a2a;
+    background:
+      linear-gradient(135deg, transparent 43%, #9b7a2a 44% 56%, transparent 57%) 2px 9px / 10px 10px no-repeat,
+      linear-gradient(45deg, transparent 43%, #9b7a2a 44% 56%, transparent 57%) 13px 9px / 10px 10px no-repeat;
+  }
+
+  .settings-menu .menu-grid button[data-jump-screen="irrigation"]::before {
+    border-radius: 4px;
+    background:
+      radial-gradient(circle at 50% 7px, #3f8fc8 0 5px, transparent 5.5px),
+      linear-gradient(135deg, transparent 35%, #3f8fc8 36% 48%, transparent 49%) 0 15px / 13px 7px repeat-x;
+  }
+
+  .settings-menu .menu-grid button[data-jump-screen="materials"]::before {
+    border: 2px solid currentColor;
+    border-radius: 4px;
+    background:
+      linear-gradient(currentColor, currentColor) 50% 3px / 12px 2px no-repeat,
+      linear-gradient(currentColor, currentColor) 50% 11px / 14px 2px no-repeat,
+      linear-gradient(currentColor, currentColor) 50% 18px / 10px 2px no-repeat;
+  }
+
+  .settings-menu .menu-grid button[data-jump-screen="recipes"]::before {
+    border: 2px solid currentColor;
+    border-radius: 4px;
+    background:
+      linear-gradient(currentColor, currentColor) 7px 6px / 12px 2px no-repeat,
+      linear-gradient(currentColor, currentColor) 7px 12px / 12px 2px no-repeat,
+      linear-gradient(currentColor, currentColor) 7px 18px / 8px 2px no-repeat;
+  }
+
+  .settings-menu .menu-grid button[data-jump-screen="photos"]::before {
+    border: 2px solid currentColor;
+    border-radius: 5px;
+    background:
+      radial-gradient(circle at 19px 8px, currentColor 0 2.5px, transparent 3px),
+      linear-gradient(135deg, transparent 47%, currentColor 48% 56%, transparent 57%);
+  }
+
+  .settings-menu .menu-grid button[data-jump-screen="results"]::before {
+    content: "¥";
+    display: grid;
+    place-items: center;
+    border: 2px solid currentColor;
+    border-radius: 50%;
+    font-size: 17px;
+    font-weight: 1000;
+    line-height: 1;
+  }
+}
+/* Ver2.0 visual match pass: annual top typography, spacing, and color closer to the reference mock. */
+@media (max-width: 900px) {
+  body {
+    background: linear-gradient(180deg, #fffaf0 0%, #f8f2e5 50%, #f4efe3 100%) !important;
+    color: #172119 !important;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans JP", system-ui, sans-serif !important;
+  }
+
+  .app-shell {
+    padding: 0 15px 90px !important;
+  }
+
+  #screen-annual .annual-phone-head {
+    min-height: 47px !important;
+    margin: 0 0 10px !important;
+    padding-top: 6px !important;
+    grid-template-columns: minmax(0, 1fr) 100px 34px !important;
+    gap: 8px !important;
+  }
+
+  #screen-annual .annual-phone-head h2 {
+    color: #121812 !important;
+    font-size: 23px !important;
+    font-weight: 850 !important;
+    line-height: 1.1 !important;
+  }
+
+  .annual-year-button {
+    min-width: 100px !important;
+    max-width: 100px !important;
+    min-height: 34px !important;
+    padding: 0 8px !important;
+    border: 1px solid #e9cc73 !important;
+    border-radius: 8px !important;
+    background: #fff8de !important;
+    box-shadow: 0 2px 0 rgba(178, 133, 28, 0.08) !important;
+  }
+
+  .annual-year-button select {
+    color: #28301f !important;
+    font-size: 14px !important;
+    font-weight: 800 !important;
+  }
+
+  .annual-menu-button {
+    width: 34px !important;
+    min-width: 34px !important;
+    height: 34px !important;
+    min-height: 34px !important;
+    color: #141c15 !important;
+    font-size: 22px !important;
+    font-weight: 800 !important;
+  }
+
+  .annual-summary-board {
+    gap: 9px !important;
+    margin: 0 0 13px !important;
+    padding: 13px !important;
+    border-radius: 8px !important;
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.08), transparent 34%),
+      linear-gradient(135deg, #2fa33a 0%, #198333 100%) !important;
+    box-shadow: 0 8px 18px rgba(43, 104, 38, 0.18) !important;
+  }
+
+  .annual-summary-board > div:first-child {
+    gap: 2px !important;
+    margin-bottom: 7px !important;
+  }
+
+  .annual-summary-board > div:first-child b {
+    font-size: 20px !important;
+    font-weight: 850 !important;
+    line-height: 1.15 !important;
+  }
+
+  .annual-summary-board > div:first-child span {
+    font-size: 12px !important;
+    font-weight: 650 !important;
+  }
+
+  .annual-summary-board .annual-summary-grid {
+    gap: 5px !important;
+  }
+
+  .annual-summary-board .annual-summary-card {
+    min-height: 71px !important;
+    padding: 9px 4px 8px !important;
+    border-radius: 6px !important;
+    background: rgba(245, 253, 244, 0.92) !important;
+  }
+
+  .annual-summary-board .annual-summary-card span {
+    color: #26382b !important;
+    font-size: 10.5px !important;
+    font-weight: 750 !important;
+  }
+
+  .annual-summary-board .annual-summary-card b {
+    margin-top: 3px !important;
+    color: #101811 !important;
+    font-size: 24px !important;
+    font-weight: 850 !important;
+    line-height: 1.05 !important;
+  }
+
+  .annual-field-picker .section-title {
+    justify-items: start !important;
+    margin: 4px 0 7px !important;
+    padding: 0 !important;
+    text-align: left !important;
+  }
+
+  .annual-field-picker .section-title h3 {
+    color: #172119 !important;
+    font-size: 20px !important;
+    font-weight: 850 !important;
+  }
+
+  .annual-field-picker .section-title .muted {
+    color: #7a8276 !important;
+    font-size: 12px !important;
+    font-weight: 650 !important;
+  }
+
+  #screen-annual .annual-filter-row {
+    grid-template-columns: minmax(0, 1fr) 92px !important;
+    gap: 8px !important;
+    margin: 0 0 2px !important;
+  }
+
+  #screen-annual .annual-filter-row input,
+  #screen-annual .annual-filter-row select {
+    min-height: 36px !important;
+    border-color: #ddd7c8 !important;
+    border-radius: 7px !important;
+    background: #fffefa !important;
+    color: #313830 !important;
+    font-size: 12.5px !important;
+    font-weight: 700 !important;
+    box-shadow: 0 2px 8px rgba(47, 56, 43, 0.04) !important;
+  }
+
+  .annual-field-pick-grid {
+    gap: 8px !important;
+  }
+
+  .annual-field-pick-card {
+    grid-template-columns: 78px minmax(0, 1fr) 52px !important;
+    gap: 9px !important;
+    min-height: 108px !important;
+    padding: 9px 10px !important;
+    border-color: #b7daa9 !important;
+    border-radius: 8px !important;
+    background: linear-gradient(105deg, #ffffff 0%, #f7fff2 100%) !important;
+    box-shadow: 0 4px 10px rgba(45, 77, 35, 0.06) !important;
+  }
+
+  .annual-field-pick-card.status-warn {
+    border-color: #edcd65 !important;
+    background: linear-gradient(105deg, #fffefa 0%, #fff7d7 100%) !important;
+  }
+
+  .annual-field-pick-card.status-muted {
+    border-color: #cfd7d3 !important;
+    background: linear-gradient(105deg, #ffffff 0%, #f6f8f3 100%) !important;
+  }
+
+  .annual-field-plant {
+    width: 72px !important;
+    height: 72px !important;
+  }
+
+  .annual-field-plant .annual-rice-img,
+  .annual-card-rice .annual-rice-img {
+    filter: drop-shadow(0 2px 3px rgba(49, 65, 35, 0.16)) !important;
+  }
+
+  .annual-field-pick-head div {
+    gap: 7px !important;
+  }
+
+  .annual-field-pick-head b {
+    color: #141b15 !important;
+    font-size: 18px !important;
+    font-weight: 850 !important;
+    line-height: 1.15 !important;
+  }
+
+  .annual-field-pick-head em {
+    color: #293326 !important;
+    font-size: 11px !important;
+    font-weight: 700 !important;
+  }
+
+  .annual-field-pick-head strong {
+    color: #121812 !important;
+    font-size: 15px !important;
+    font-weight: 850 !important;
+  }
+
+  .annual-field-pick-main small {
+    color: #303a31 !important;
+    font-size: 11px !important;
+    font-weight: 700 !important;
+  }
+
+  .annual-field-pick-metrics {
+    gap: 3px 8px !important;
+    margin-top: 2px !important;
+  }
+
+  .annual-field-pick-metrics span {
+    color: #1d4a2b !important;
+    font-size: 11px !important;
+    font-weight: 750 !important;
+  }
+
+  .annual-status-badge {
+    min-width: 47px !important;
+    padding: 7px 6px !important;
+    border-radius: 6px !important;
+    background: linear-gradient(135deg, #48b247, #24933b) !important;
+    font-size: 11px !important;
+    font-weight: 850 !important;
+  }
+
+  .annual-fab {
+    right: 14px !important;
+    bottom: calc(74px + env(safe-area-inset-bottom)) !important;
+    width: 58px !important;
+    height: 58px !important;
+    background: linear-gradient(135deg, #3db948, #239537) !important;
+    box-shadow: 0 9px 18px rgba(35, 125, 48, 0.26) !important;
+  }
+
+  .side-nav {
+    height: calc(66px + env(safe-area-inset-bottom)) !important;
+    padding-top: 6px !important;
+    background: rgba(255, 255, 255, 0.98) !important;
+  }
+
+  .side-nav .nav-icon svg {
+    width: 24px !important;
+    height: 24px !important;
+    stroke-width: 2 !important;
+  }
+
+  .side-nav .nav-label {
+    font-size: 9.5px !important;
+    font-weight: 650 !important;
+  }
+}
+
+/* Ver2.0 target rebuild final override: annual history top only. */
+@media (max-width: 900px) {
+  #screen-annual {
+    box-sizing: border-box !important;
+    width: min(100%, 360px) !important;
+    max-width: 360px !important;
+    margin-right: auto !important;
+    margin-left: auto !important;
+    padding-right: 0 !important;
+    padding-left: 0 !important;
+    background:
+      radial-gradient(circle at 82% 0%, rgba(238, 220, 162, 0.12), transparent 26%),
+      linear-gradient(180deg, #fbf8ef 0%, #faf6ec 58%, #f8f3e9 100%) !important;
+  }
+
+  body:has(#screen-annual.active),
+  .app-shell:has(#screen-annual.active),
+  .main-area:has(#screen-annual.active) {
+    background:
+      radial-gradient(circle at 82% 0%, rgba(238, 220, 162, 0.1), transparent 26%),
+      linear-gradient(180deg, #fbf8ef 0%, #faf6ec 58%, #f8f3e9 100%) !important;
+  }
+
+  #screen-annual .annual-v2-top {
+    box-sizing: border-box !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin-right: 0 !important;
+    margin-left: 0 !important;
+    padding: 0 0 10px !important;
+  }
+
+  #screen-annual #annualTimeline {
+    box-sizing: border-box !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin-right: 0 !important;
+    margin-left: 0 !important;
+    padding-right: 0 !important;
+    padding-left: 0 !important;
+  }
+
+  #screen-annual .annual-phone-head {
+    box-sizing: border-box !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-height: 42px !important;
+    margin: 0 0 8px !important;
+    padding: 4px 0 0 !important;
+    grid-template-columns: minmax(0, 1fr) 84px 31px !important;
+    align-items: center !important;
+    gap: 8px !important;
+  }
+
+  #screen-annual .annual-phone-head h2 {
+    color: #111914 !important;
+    font-size: 21px !important;
+    font-weight: 850 !important;
+    letter-spacing: 0 !important;
+    line-height: 1.05 !important;
+  }
+
+  #screen-annual .annual-year-button {
+    min-width: 84px !important;
+    max-width: 84px !important;
+    min-height: 30px !important;
+    padding: 0 7px !important;
+    border: 1px solid #e8cc74 !important;
+    border-radius: 7px !important;
+    background: #fff8df !important;
+    box-shadow: 0 1px 0 rgba(170, 130, 38, 0.12) !important;
+  }
+
+  #screen-annual .annual-year-button select {
+    color: #1f271e !important;
+    font-size: 12.5px !important;
+    font-weight: 800 !important;
+    text-align: center !important;
+  }
+
+  #screen-annual .annual-menu-button {
+    width: 31px !important;
+    min-width: 31px !important;
+    height: 31px !important;
+    min-height: 31px !important;
+    color: #111914 !important;
+    font-size: 21px !important;
+    font-weight: 850 !important;
+    line-height: 1 !important;
+  }
+
+  #screen-annual .annual-summary-board {
+    gap: 6px !important;
+    margin: 0 0 5px !important;
+    padding: 9px 10px 9px !important;
+    border: 0 !important;
+    border-radius: 8px !important;
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.08), transparent 36%),
+      linear-gradient(135deg, #34a83f 0%, #168c35 100%) !important;
+    box-shadow: 0 7px 18px rgba(35, 119, 46, 0.17) !important;
+  }
+
+  #screen-annual .annual-summary-board > div:first-child {
+    display: grid !important;
+    gap: 1px !important;
+    margin: 0 0 4px !important;
+  }
+
+  #screen-annual .annual-summary-board > div:first-child b {
+    color: #ffffff !important;
+    font-size: 16.5px !important;
+    font-weight: 850 !important;
+    line-height: 1.15 !important;
+  }
+
+  #screen-annual .annual-summary-board > div:first-child span {
+    color: rgba(255, 255, 255, 0.92) !important;
+    font-size: 10px !important;
+    font-weight: 650 !important;
+  }
+
+  #screen-annual .annual-summary-board .annual-summary-grid {
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 3px !important;
+    padding: 3px !important;
+    border-radius: 6px !important;
+    background: #fbf8ea !important;
+    box-shadow:
+      inset 0 0 0 1px rgba(255, 255, 250, 0.52),
+      0 1px 0 rgba(20, 90, 35, 0.08) !important;
+  }
+
+  #screen-annual .annual-summary-board .annual-summary-card {
+    min-height: 47px !important;
+    padding: 4px 3px 3px !important;
+    border: 0 !important;
+    border-radius: 4px !important;
+    background: #fbfcf3 !important;
+    box-shadow: inset 0 0 0 1px rgba(229, 228, 214, 0.78) !important;
+  }
+
+  #screen-annual .annual-summary-board .annual-summary-card span {
+    color: #1d3325 !important;
+    font-size: 9px !important;
+    font-weight: 760 !important;
+    line-height: 1.15 !important;
+  }
+
+  #screen-annual .annual-summary-board .annual-summary-card b {
+    display: inline-flex !important;
+    align-items: baseline !important;
+    justify-content: center !important;
+    gap: 1px !important;
+    margin-top: 2px !important;
+    color: #0d1710 !important;
+    font-size: 0 !important;
+    font-weight: 850 !important;
+    line-height: 1 !important;
+  }
+
+  #screen-annual .annual-summary-board .annual-summary-card b strong {
+    color: #0d1710 !important;
+    font-size: 20px !important;
+    font-weight: 850 !important;
+    line-height: 1 !important;
+  }
+
+  #screen-annual .annual-summary-board .annual-summary-card b small {
+    color: #0d1710 !important;
+    font-size: 9.5px !important;
+    font-weight: 850 !important;
+    line-height: 1 !important;
+  }
+
+  #screen-annual .annual-field-picker {
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+  }
+
+  #screen-annual .annual-field-picker .section-title {
+    display: block !important;
+    margin: 0 0 4px !important;
+    padding: 0 1px !important;
+  }
+
+  #screen-annual .annual-field-picker .section-title h3 {
+    margin: 0 !important;
+    color: #172119 !important;
+    font-size: 17px !important;
+    font-weight: 850 !important;
+    line-height: 1.2 !important;
+  }
+
+  #screen-annual .annual-field-picker .section-title .muted {
+    display: none !important;
+  }
+
+  #screen-annual .annual-picker-controls {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) 22px 74px !important;
+    gap: 5px !important;
+    align-items: center !important;
+    margin: 0 0 7px !important;
+  }
+
+  #screen-annual .annual-search-label,
+  #screen-annual .annual-sort-button {
+    position: relative !important;
+    display: block !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+  }
+
+  #screen-annual .annual-search-label input,
+  #screen-annual .annual-sort-button select {
+    width: 100% !important;
+    height: 31px !important;
+    min-height: 31px !important;
+    margin: 0 !important;
+    padding: 0 8px !important;
+    border: 1px solid #ddd7c7 !important;
+    border-radius: 5px !important;
+    background: #fffefa !important;
+    color: #4a5048 !important;
+    font-size: 11.5px !important;
+    font-weight: 700 !important;
+    line-height: 31px !important;
+    box-shadow: 0 2px 8px rgba(43, 52, 37, 0.04) !important;
+  }
+
+  #screen-annual .annual-sort-button select {
+    position: absolute !important;
+    inset: 0 !important;
+    opacity: 0 !important;
+    z-index: 2 !important;
+    padding-right: 20px !important;
+    color: #172119 !important;
+    font-weight: 800 !important;
+  }
+
+  #screen-annual .annual-sort-button span {
+    display: grid !important;
+    place-items: center !important;
+    width: 100% !important;
+    height: 31px !important;
+    border: 1px solid #ddd7c7 !important;
+    border-radius: 5px !important;
+    background: #fffefa !important;
+    color: #172119 !important;
+    box-shadow: 0 2px 8px rgba(43, 52, 37, 0.04) !important;
+    font-size: 11.5px !important;
+    font-weight: 800 !important;
+    line-height: 1 !important;
+    white-space: nowrap !important;
+  }
+
+  #screen-annual .annual-filter-button {
+    display: grid !important;
+    place-items: center !important;
+    width: 22px !important;
+    height: 31px !important;
+    min-height: 31px !important;
+    padding: 0 !important;
+    border: 0 !important;
+    border-radius: 6px !important;
+    background: transparent !important;
+    color: #767030 !important;
+    box-shadow: none !important;
+  }
+
+  #screen-annual .annual-filter-button svg {
+    width: 14px !important;
+    height: 14px !important;
+    fill: currentColor !important;
+    stroke: none !important;
+  }
+
+  #screen-annual .annual-field-pick-grid {
+    display: grid !important;
+    gap: 6px !important;
+  }
+
+  #screen-annual .annual-field-pick-card {
+    position: relative !important;
+    display: grid !important;
+    grid-template-columns: 62px minmax(0, 1fr) 48px !important;
+    gap: 6px !important;
+    align-items: center !important;
+    min-height: 72px !important;
+    padding: 6px 7px 6px 7px !important;
+    overflow: hidden !important;
+    border: 1px solid #afd8a7 !important;
+    border-radius: 7px !important;
+    background:
+      radial-gradient(circle at 13% 55%, rgba(117, 187, 85, 0.16), transparent 30%),
+      linear-gradient(105deg, #ffffff 0%, #f5fff0 100%) !important;
+    box-shadow: 0 3px 8px rgba(47, 72, 38, 0.05) !important;
+    text-align: left !important;
+  }
+
+  #screen-annual .annual-field-pick-card.status-warn {
+    border-color: #ecc85c !important;
+    background:
+      radial-gradient(circle at 13% 55%, rgba(234, 190, 55, 0.17), transparent 30%),
+      linear-gradient(105deg, #fffefa 0%, #fff7d9 100%) !important;
+  }
+
+  #screen-annual .annual-field-pick-card.status-muted {
+    border-color: #cfd8d1 !important;
+    background:
+      radial-gradient(circle at 13% 55%, rgba(142, 154, 144, 0.13), transparent 30%),
+      linear-gradient(105deg, #ffffff 0%, #f5f7f3 100%) !important;
+  }
+
+  #screen-annual .annual-field-plant {
+    display: grid !important;
+    place-items: end center !important;
+    width: 58px !important;
+    height: 52px !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+
+  #screen-annual .annual-field-plant::before,
+  #screen-annual .annual-field-plant::after {
+    display: none !important;
+  }
+
+  #screen-annual .annual-field-plant .annual-picker-rice-img {
+    display: block !important;
+    width: 72px !important;
+    height: 53px !important;
+    object-fit: contain !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    mix-blend-mode: normal !important;
+    filter: drop-shadow(0 2px 2px rgba(52, 75, 37, 0.12)) !important;
+  }
+
+  #screen-annual .annual-field-pick-main {
+    min-width: 0 !important;
+    display: grid !important;
+    gap: 2px !important;
+    align-content: center !important;
+  }
+
+  #screen-annual .annual-field-pick-head {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) auto !important;
+    align-items: start !important;
+    gap: 3px !important;
+  }
+
+  #screen-annual .annual-field-pick-head div {
+    min-width: 0 !important;
+    display: flex !important;
+    align-items: baseline !important;
+    gap: 6px !important;
+  }
+
+  #screen-annual .annual-field-pick-head b {
+    color: #101813 !important;
+    font-size: 14.5px !important;
+    font-weight: 850 !important;
+    line-height: 1.12 !important;
+    white-space: nowrap !important;
+  }
+
+  #screen-annual .annual-field-pick-head em {
+    min-width: 0 !important;
+    color: #263427 !important;
+    font-size: 9.5px !important;
+    font-style: normal !important;
+    font-weight: 700 !important;
+    line-height: 1.1 !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+  }
+
+  #screen-annual .annual-field-pick-head strong {
+    color: #101813 !important;
+    font-size: 12px !important;
+    font-weight: 850 !important;
+    line-height: 1.15 !important;
+    padding-right: 0 !important;
+    white-space: nowrap !important;
+  }
+
+  #screen-annual .annual-field-pick-main small {
+    color: #27352c !important;
+    font-size: 9.6px !important;
+    font-weight: 720 !important;
+    line-height: 1.15 !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+  }
+
+  #screen-annual .annual-field-pick-metrics {
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    gap: 5px !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+    overflow: hidden !important;
+  }
+
+  #screen-annual .annual-field-pick-metrics span {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 3px !important;
+    min-width: 0 !important;
+    color: #164629 !important;
+    font-size: 9.6px !important;
+    font-weight: 800 !important;
+    line-height: 1.1 !important;
+    white-space: nowrap !important;
+  }
+
+  #screen-annual .annual-field-pick-metrics span::before,
+  #screen-annual .annual-field-pick-metrics span::after {
+    display: none !important;
+    content: none !important;
+  }
+
+  #screen-annual .annual-field-pick-metrics i {
+    display: inline-block !important;
+    width: 7px !important;
+    height: 7px !important;
+    border-radius: 2px !important;
+    border: 1.5px solid currentColor !important;
+    background: rgba(255, 255, 255, 0.45) !important;
+  }
+
+  #screen-annual .annual-field-pick-metrics .water {
+    color: #1b6f93 !important;
+  }
+
+  #screen-annual .annual-field-pick-metrics .water i {
+    width: 7px !important;
+    height: 10px !important;
+    border: 0 !important;
+    border-radius: 50% 50% 55% 55% !important;
+    background: linear-gradient(180deg, #75c9f2, #2c8dc6) !important;
+  }
+
+  #screen-annual .annual-field-pick-metrics .work {
+    color: #b86f10 !important;
+  }
+
+  #screen-annual .annual-field-pick-metrics .work i {
+    width: 6px !important;
+    height: 11px !important;
+    border-radius: 1px !important;
+    border-color: currentColor !important;
+    background: repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.55) 0 1px, transparent 1px 3px) !important;
+  }
+
+  #screen-annual .annual-status-badge {
+    display: grid !important;
+    place-items: center !important;
+    align-self: center !important;
+    justify-self: center !important;
+    min-width: 44px !important;
+    max-width: 46px !important;
+    min-height: 25px !important;
+    padding: 0 5px !important;
+    border: 0 !important;
+    border-radius: 5px !important;
+    background: #35ad4a !important;
+    color: #ffffff !important;
+    box-shadow: none !important;
+    font-size: 9.4px !important;
+    font-weight: 850 !important;
+    line-height: 1.05 !important;
+    text-align: center !important;
+    white-space: nowrap !important;
+  }
+
+  #screen-annual .annual-status-badge.warn {
+    background: #f3c844 !important;
+    color: #3a2f08 !important;
+  }
+
+  #screen-annual .annual-status-badge.muted {
+    background: #e5e8e2 !important;
+    color: #4b554d !important;
+  }
+
+  #screen-annual .annual-fab {
+    right: max(calc((100vw - 360px) / 2 + 8px), 13px) !important;
+    bottom: calc(74px + env(safe-area-inset-bottom)) !important;
+    width: 56px !important;
+    height: 56px !important;
+    border-radius: 999px !important;
+    background: #2fb246 !important;
+    color: #ffffff !important;
+    font-size: 34px !important;
+    font-weight: 300 !important;
+    box-shadow: 0 8px 18px rgba(35, 130, 49, 0.28) !important;
+  }
+}
+
+/* Ver2.0 final override: field karte tab only. */
+@media (max-width: 900px) {
+  #screen-annual.annual-detail-mode .annual-field-detail-grid {
+    display: grid !important;
+    gap: 7px !important;
+  }
+
+  #screen-annual.annual-detail-mode .annual-field-detail-card {
+    overflow: hidden !important;
+    border-radius: 8px !important;
+    box-shadow: 0 4px 12px rgba(58, 47, 24, 0.06) !important;
+  }
+
+  #screen-annual.annual-detail-mode .annual-card-title {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) 82px !important;
+    align-items: center !important;
+    justify-items: start !important;
+    min-height: 46px !important;
+    margin: 0 !important;
+    padding: 8px 13px 7px !important;
+    gap: 8px !important;
+    background: linear-gradient(100deg, #f2ffe6 0%, #fff3ba 100%) !important;
+    text-align: left !important;
+  }
+
+  #screen-annual.annual-detail-mode .annual-card-title h3 {
+    margin: 0 !important;
+    font-size: 17px !important;
+    font-weight: 850 !important;
+    line-height: 1.15 !important;
+  }
+
+  #screen-annual.annual-detail-mode .annual-card-rice {
+    display: grid !important;
+    place-items: end center !important;
+    justify-self: end !important;
+    width: 82px !important;
+    height: 42px !important;
+    margin: -4px -2px -6px 0 !important;
+    background: transparent !important;
+  }
+
+  #screen-annual.annual-detail-mode .annual-card-rice::before,
+  #screen-annual.annual-detail-mode .annual-card-rice::after {
+    display: none !important;
+  }
+
+  #screen-annual.annual-detail-mode .annual-card-rice .annual-picker-rice-img,
+  #screen-annual.annual-detail-mode .annual-card-rice .annual-rice-img {
+    display: block !important;
+    width: 90px !important;
+    height: 48px !important;
+    object-fit: contain !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    filter: drop-shadow(0 2px 2px rgba(52, 75, 37, 0.12)) !important;
+  }
+
+  #screen-annual.annual-detail-mode .annual-karte-card .annual-edit-grid,
+  #screen-annual.annual-detail-mode .annual-karte-card .annual-wide-label {
+    padding-right: 12px !important;
+    padding-left: 12px !important;
+  }
+
+  #screen-annual.annual-detail-mode .annual-karte-card .annual-edit-grid {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    gap: 0 !important;
+    padding-top: 1px !important;
+  }
+
+  #screen-annual.annual-detail-mode .annual-karte-card .annual-edit-grid label,
+  #screen-annual.annual-detail-mode .annual-karte-source-row {
+    display: grid !important;
+    grid-template-columns: 96px minmax(0, 1fr) !important;
+    align-items: center !important;
+    min-height: 34px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border-bottom: 1px solid #d9dfd1 !important;
+    color: #172018 !important;
+    font-size: 13px !important;
+    font-weight: 820 !important;
+    line-height: 1.15 !important;
+  }
+
+  #screen-annual.annual-detail-mode .annual-karte-source-row {
+    grid-template-rows: auto auto !important;
+    min-height: 39px !important;
+    padding: 3px 0 !important;
+  }
+
+  #screen-annual.annual-detail-mode .annual-karte-source-row span {
+    grid-row: 1 / span 2 !important;
+    font-size: 13px !important;
+    font-weight: 820 !important;
+  }
+
+  #screen-annual.annual-detail-mode .annual-karte-source-row b {
+    justify-self: end !important;
+    font-size: 14px !important;
+    font-weight: 820 !important;
+    line-height: 1.05 !important;
+  }
+
+  #screen-annual.annual-detail-mode .annual-karte-source-row small {
+    justify-self: end !important;
+    color: #39433b !important;
+    font-size: 9px !important;
+    font-weight: 650 !important;
+    line-height: 1.1 !important;
+  }
+
+  #screen-annual.annual-detail-mode .annual-karte-card .annual-edit-grid input,
+  #screen-annual.annual-detail-mode .annual-karte-card .annual-edit-grid select {
+    width: 100% !important;
+    min-height: 31px !important;
+    height: 31px !important;
+    margin: 0 !important;
+    padding: 0 0 0 6px !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    color: #111811 !important;
+    box-shadow: none !important;
+    font-size: 14px !important;
+    font-weight: 820 !important;
+    line-height: 31px !important;
+    text-align: right !important;
+  }
+
+  #screen-annual.annual-detail-mode .annual-karte-card .annual-edit-grid select {
+    direction: rtl !important;
+  }
+
+  #screen-annual.annual-detail-mode .annual-karte-card .annual-edit-grid select option {
+    direction: ltr !important;
+  }
+
+  #screen-annual.annual-detail-mode .annual-karte-card .annual-wide-label {
+    display: grid !important;
+    grid-template-columns: 96px minmax(0, 1fr) !important;
+    align-items: center !important;
+    min-height: 38px !important;
+    margin: 0 !important;
+    padding-top: 0 !important;
+    padding-bottom: 8px !important;
+    font-size: 13px !important;
+    font-weight: 820 !important;
+  }
+
+  #screen-annual.annual-detail-mode .annual-karte-card .annual-wide-label textarea {
+    min-height: 30px !important;
+    height: 30px !important;
+    margin: 0 !important;
+    padding: 5px 0 3px 6px !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    color: #111811 !important;
+    box-shadow: none !important;
+    font-size: 13px !important;
+    font-weight: 760 !important;
+    line-height: 1.2 !important;
+    text-align: right !important;
+    resize: none !important;
+  }
+
+  #screen-annual.annual-detail-mode .annual-target-card {
+    border-color: #ecd58d !important;
+  }
+
+  #screen-annual.annual-detail-mode .annual-target-card .section-title {
+    min-height: 38px !important;
+    margin: 0 !important;
+    padding: 8px 12px !important;
+    border-bottom: 1px solid #eadca7 !important;
+    background: linear-gradient(90deg, #fff6d0 0%, #fff1bd 100%) !important;
+  }
+
+  #screen-annual.annual-detail-mode .annual-target-card .section-title h3 {
+    margin: 0 !important;
+    font-size: 15px !important;
+    font-weight: 850 !important;
+  }
+
+  #screen-annual.annual-detail-mode .annual-target-card .section-title .muted {
+    display: none !important;
+  }
+
+  #screen-annual.annual-detail-mode .annual-target-card .annual-kv-list {
+    padding: 0 12px 7px !important;
+  }
+
+  #screen-annual.annual-detail-mode .annual-kv-row {
+    min-height: 32px !important;
+    padding: 5px 0 !important;
+    border-bottom-color: #d9dfd1 !important;
+  }
+
+  #screen-annual.annual-detail-mode .annual-kv-row span {
+    font-size: 12.5px !important;
+    font-weight: 780 !important;
+  }
+
+  #screen-annual.annual-detail-mode .annual-kv-row b {
+    font-size: 13px !important;
+    font-weight: 820 !important;
+  }
+
+  #screen-annual.annual-detail-mode .annual-target-card > .annual-edit-grid {
+    display: none !important;
   }
 }

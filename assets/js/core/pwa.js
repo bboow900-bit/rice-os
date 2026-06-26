@@ -1,4 +1,4 @@
-(function () {
+﻿(function () {
   "use strict";
 
   const RiceOS = window.RiceOS = window.RiceOS || {};
@@ -20,7 +20,7 @@
 
   function installHelpText() {
     if (!window.isSecureContext && !isLocalhost()) {
-      return "このURLはHTTP接続なので、Chromeでは完全なPWA/オフライン機能が制限されます。右上メニューから「ホーム画面に追加」はできる場合があります。完全対応にはHTTPS公開が必要です。";
+      return "このURLはHTTP接続のため、ChromeではPWAやオフライン機能が制限されます。メニューから「ホーム画面に追加」できる場合があります。安定運用にはHTTPS公開が必要です。";
     }
     return "Chromeのメニューから「ホーム画面に追加」を選んでください。インストール候補が出た場合は、このボタンからも追加できます。";
   }
@@ -34,7 +34,7 @@
 
     if (!canUseServiceWorker()) return;
 
-    navigator.serviceWorker.register("./service-worker.js?v=20260625_ver22")
+    navigator.serviceWorker.register("./service-worker.js?v=20260626_ver48")
       .then((registration) => {
         registration.update();
       })
@@ -55,7 +55,7 @@
 
   async function requestNotifications() {
     if (!canNotify()) {
-      alert("この環境では通知バーへの表示が使えません。HTTPSのChromeで開いてください。");
+      alert("この環境では通知を使えません。HTTPSのChromeで開いてください。");
       return false;
     }
     const permission = await Notification.requestPermission();
@@ -63,8 +63,8 @@
       alert("通知が許可されませんでした。Chromeのサイト設定から通知を許可できます。");
       return false;
     }
-    await showNotification("稲作カルテの通知を有効にしました", {
-      body: "中干し・間断灌水・湿潤灌漑の目安日が近いとき、アプリを開いたタイミングで通知します。",
+    await showNotification("稲作カルテ 通知を有効にしました", {
+      body: "中干し、間断灌水、湿潤灌漑などの目安日が近いときに通知します。",
       tag: "rice-os-notification-enabled"
     });
     return true;
@@ -108,7 +108,7 @@
     for (const alert of alerts) {
       const key = alert.key || `${alert.type}:${alert.fieldId || ""}:${alert.date || today}`;
       if (sent[today][key]) continue;
-      await showNotification(`稲作カルテ: ${alert.title || "確認"}`, {
+      await showNotification(`稲作カルテ ${alert.title || "確認"}`, {
         body: `${alert.fieldName ? `${alert.fieldName}: ` : ""}${alert.message || ""}`,
         tag: key,
         renotify: false
@@ -144,3 +144,16 @@
     installHelpText
   };
 })();
+
+
+
+
+
+
+
+
+
+
+
+
+

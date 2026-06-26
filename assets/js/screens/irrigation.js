@@ -5,6 +5,15 @@
   const U = RiceOS.utils;
   const S = RiceOS.schema;
   const state = RiceOS.state;
+  let bulkFieldIds = [];
+
+  function setBulkFields(ids) {
+    bulkFieldIds = (ids || []).filter(Boolean);
+  }
+
+  function clearBulkFields() {
+    bulkFieldIds = [];
+  }
 
   function firstFieldId() {
     const field = state.activeFields()[0] || state.fields()[0];
@@ -58,6 +67,7 @@
     U.$("irrigationPeriodStatus").value = "実施中";
     U.$("irrigationStatus").value = "入水中";
     U.$("irrigationMemo").value = "";
+    clearBulkFields();
   }
 
   function renderOptions() {
@@ -140,6 +150,20 @@
     }
   }
 
+  function prefillFields(date, fieldIds) {
+    resetForm();
+    U.$("irrigationDate").value = date || U.today();
+    setBulkFields(fieldIds || []);
+    if (bulkFieldIds[0]) U.$("irrigationField").value = bulkFieldIds[0];
+    const field = currentField();
+    if (field) {
+      U.$("irrigationStartDate").value = field.intermittentStartDate || U.$("irrigationStartDate").value;
+      U.$("irrigationTargetDays").value = field.intermittentIntervalDays || U.$("irrigationTargetDays").value;
+      setEndFromDays();
+    }
+    U.toast(`${bulkFieldIds.length}圃場へ同じ水管理記録を登録します`);
+  }
+
   function editIrrigation(irrigationId) {
     const item = (state.data().irrigations || []).find((row) => row.irrigationId === irrigationId);
     if (item) fillEdit(item);
@@ -148,10 +172,9 @@
   function bind() {
     U.$("irrigationForm").addEventListener("submit", (event) => {
       event.preventDefault();
-      state.saveIrrigation({
+      const common = {
         irrigationId: U.$("editIrrigationId").value,
         method: U.$("irrigationMethod").value,
-        fieldId: U.$("irrigationField").value,
         date: U.$("irrigationDate").value,
         startDate: U.$("irrigationStartDate").value,
         endDate: U.$("irrigationEndDate").value,
@@ -160,7 +183,13 @@
         periodStatus: U.$("irrigationPeriodStatus").value,
         status: U.$("irrigationStatus").value,
         memo: U.$("irrigationMemo").value
-      });
+      };
+      const targets = !common.irrigationId && bulkFieldIds.length > 1 ? bulkFieldIds : [U.$("irrigationField").value];
+      targets.forEach((fieldId) => state.saveIrrigation({
+        ...common,
+        irrigationId: targets.length > 1 ? "" : common.irrigationId,
+        fieldId
+      }));
       resetForm();
     });
 
@@ -194,5 +223,5 @@
   }
 
   RiceOS.screens = RiceOS.screens || {};
-  RiceOS.screens.irrigation = { render, bind, resetForm, prefillDate, editIrrigation };
+  RiceOS.screens.irrigation = { render, bind, resetForm, prefillDate, prefillFields, editIrrigation };
 })();

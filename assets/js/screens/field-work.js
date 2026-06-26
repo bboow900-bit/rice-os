@@ -146,6 +146,12 @@
     if (fieldId) setSelectedFieldIds([fieldId]);
   }
 
+  function prefillFields(date, fieldIds) {
+    resetForm();
+    U.$("fwDate").value = date || U.today();
+    setSelectedFieldIds(fieldIds || []);
+  }
+
   function editWork(workId) {
     const work = state.data().fieldWorks.find((item) => item.workId === workId);
     if (!work) return;
@@ -435,5 +441,5 @@
   }
 
   RiceOS.screens = RiceOS.screens || {};
-  RiceOS.screens.fieldWork = { render, bind, resetForm, prefillField, prefillDate, prefillWorkName, editWork, daysText };
+  RiceOS.screens.fieldWork = { render, bind, resetForm, prefillField, prefillDate, prefillFields, prefillWorkName, editWork, daysText };
 })();

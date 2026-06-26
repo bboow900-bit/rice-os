@@ -5,6 +5,15 @@
   const U = RiceOS.utils;
   const S = RiceOS.schema;
   const state = RiceOS.state;
+  let bulkFieldIds = [];
+
+  function setBulkFields(ids) {
+    bulkFieldIds = (ids || []).filter(Boolean);
+  }
+
+  function clearBulkFields() {
+    bulkFieldIds = [];
+  }
 
   function parseTargetRange(value) {
     const nums = String(value || "").match(/\d+(?:\.\d+)?/g);
@@ -82,6 +91,7 @@
     U.$("gPhotoPreview").src = "";
     U.$("gPhotoPreview").dataset.photoData = "";
     U.$("gPhotoPreview").classList.add("hidden");
+    clearBulkFields();
     renderChoiceControls();
     renderTargetPanel();
   }
@@ -95,6 +105,14 @@
     resetForm();
     U.$("gDate").value = date || U.today();
     if (fieldId) U.$("gField").value = fieldId;
+  }
+
+  function prefillFields(date, fieldIds) {
+    resetForm();
+    U.$("gDate").value = date || U.today();
+    setBulkFields(fieldIds || []);
+    if (bulkFieldIds[0]) U.$("gField").value = bulkFieldIds[0];
+    U.toast(`${bulkFieldIds.length}圃場へ同じ生育ログを登録します`);
   }
 
   function renderOptions() {
@@ -297,10 +315,9 @@
         alert("圃場を選んでください。");
         return;
       }
-      state.saveGrowthLog({
+      const common = {
         logId: U.$("editGrowthId").value,
         date: U.$("gDate").value,
-        fieldId: U.$("gField").value,
         leafCount: U.$("gLeafCount") ? U.$("gLeafCount").value : "",
         tillerCount: U.$("gTillerCount") ? U.$("gTillerCount").value : "",
         plantHeightCm: U.$("gPlantHeight") ? U.$("gPlantHeight").value : "",
@@ -312,7 +329,13 @@
         photo: U.$("gPhoto").value,
         photoData: U.$("gPhotoPreview").dataset.photoData || "",
         memo: U.$("gMemo").value
-      });
+      };
+      const targets = !common.logId && bulkFieldIds.length > 1 ? bulkFieldIds : [U.$("gField").value];
+      targets.forEach((fieldId) => state.saveGrowthLog({
+        ...common,
+        logId: targets.length > 1 ? "" : common.logId,
+        fieldId
+      }));
       resetForm();
     });
 
@@ -341,5 +364,5 @@
   }
 
   RiceOS.screens = RiceOS.screens || {};
-  RiceOS.screens.growth = { render, bind, resetForm, prefillField, prefillDate, editLog };
+  RiceOS.screens.growth = { render, bind, resetForm, prefillField, prefillDate, prefillFields, editLog };
 })();

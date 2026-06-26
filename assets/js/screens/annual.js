@@ -67,6 +67,186 @@
     return "other";
   }
 
+  function riceSvg(stage, cls) {
+    const normalized = ["seedling", "tillering", "panicle", "mature"].includes(stage) ? stage : "panicle";
+    const showPanicle = normalized === "panicle" || normalized === "mature";
+    const showTillers = normalized !== "seedling";
+    const mature = normalized === "mature";
+    const grain = mature ? "#e8b83c" : "#f6d05a";
+    const grainStroke = mature ? "#b98522" : "#d29a24";
+    const leafA = mature ? "#6ca553" : "#63a866";
+    const leafB = mature ? "#82b34f" : "#78ba61";
+    return `
+      <svg class="${cls} rice-stage-${normalized}" viewBox="0 0 96 96" aria-hidden="true">
+        <ellipse cx="47" cy="82" rx="27" ry="6" fill="#eadc9d" opacity=".55"/>
+        <path d="M47 82C47 65 49 48 51 28" fill="none" stroke="#4b8b55" stroke-width="5.2" stroke-linecap="round"/>
+        <path d="M48 78C40 62 29 53 15 50C23 65 34 75 48 78Z" fill="${leafA}"/>
+        <path d="M50 76C60 61 72 52 84 51C76 66 65 75 50 76Z" fill="${leafB}"/>
+        ${showTillers ? `
+          <path d="M46 70C42 55 35 45 24 39C28 55 36 66 46 70Z" fill="#5b9f61"/>
+          <path d="M52 67C62 53 71 44 83 39C80 55 69 65 52 67Z" fill="#70b65d"/>
+          <path d="M48 80C44 67 38 59 29 55C31 68 38 76 48 80Z" fill="#72b45e"/>
+        ` : `
+          <path d="M47 75C43 64 37 58 28 55C31 66 38 73 47 75Z" fill="#73b965"/>
+        `}
+        ${showPanicle ? `
+          <g fill="none" stroke="${grainStroke}" stroke-width="3.3" stroke-linecap="round">
+            <path d="M51 28C40 17 27 16 15 23"/>
+            <path d="M51 33C39 24 26 24 14 33"/>
+            <path d="M50 39C38 34 27 37 17 47"/>
+            <path d="M52 29C61 20 73 20 84 29"/>
+            <path d="M52 35C62 31 72 34 81 43"/>
+          </g>
+          <g fill="${grain}" stroke="${grainStroke}" stroke-width=".8">
+            <ellipse cx="17" cy="23" rx="4.1" ry="2.3" transform="rotate(-25 17 23)"/>
+            <ellipse cx="25" cy="20" rx="4.1" ry="2.3" transform="rotate(-12 25 20)"/>
+            <ellipse cx="34" cy="21" rx="4.1" ry="2.3" transform="rotate(4 34 21)"/>
+            <ellipse cx="43" cy="24" rx="4.1" ry="2.3" transform="rotate(18 43 24)"/>
+            <ellipse cx="15" cy="33" rx="4" ry="2.25" transform="rotate(-26 15 33)"/>
+            <ellipse cx="24" cy="29" rx="4" ry="2.25" transform="rotate(-12 24 29)"/>
+            <ellipse cx="34" cy="30" rx="4" ry="2.25" transform="rotate(5 34 30)"/>
+            <ellipse cx="43" cy="33" rx="4" ry="2.25" transform="rotate(18 43 33)"/>
+            <ellipse cx="18" cy="46" rx="3.8" ry="2.2" transform="rotate(-34 18 46)"/>
+            <ellipse cx="27" cy="40" rx="3.8" ry="2.2" transform="rotate(-20 27 40)"/>
+            <ellipse cx="37" cy="38" rx="3.8" ry="2.2" transform="rotate(-4 37 38)"/>
+            <ellipse cx="46" cy="39" rx="3.8" ry="2.2" transform="rotate(11 46 39)"/>
+            <ellipse cx="62" cy="27" rx="3.9" ry="2.25" transform="rotate(-17 62 27)"/>
+            <ellipse cx="71" cy="25" rx="3.9" ry="2.25" transform="rotate(2 71 25)"/>
+            <ellipse cx="80" cy="29" rx="3.9" ry="2.25" transform="rotate(20 80 29)"/>
+            <ellipse cx="63" cy="35" rx="3.7" ry="2.15" transform="rotate(1 63 35)"/>
+            <ellipse cx="72" cy="38" rx="3.7" ry="2.15" transform="rotate(18 72 38)"/>
+            <ellipse cx="80" cy="43" rx="3.7" ry="2.15" transform="rotate(31 80 43)"/>
+          </g>
+        ` : ""}
+      </svg>
+    `;
+  }
+
+  function iconSvg(name, className) {
+    const cls = `svg-icon ${className || ""}`.trim();
+    const iconName = String(name || "");
+    if (iconName === "rice" || iconName.startsWith("rice-")) {
+      return riceSvg(iconName === "rice" ? "panicle" : iconName.slice(5), cls);
+    }
+    const icons = {
+      rice: `
+        <svg class="${cls}" viewBox="0 0 96 96" aria-hidden="true">
+          <ellipse cx="47" cy="82" rx="27" ry="6" fill="#eadc9d" opacity=".55"/>
+          <path d="M47 82C47 65 49 48 51 28" fill="none" stroke="#4b8b55" stroke-width="5.2" stroke-linecap="round"/>
+          <path d="M48 78C40 62 29 53 15 50C23 65 34 75 48 78Z" fill="#63a866"/>
+          <path d="M50 76C60 61 72 52 84 51C76 66 65 75 50 76Z" fill="#78ba61"/>
+          <path d="M46 70C42 55 35 45 24 39C28 55 36 66 46 70Z" fill="#5b9f61"/>
+          <path d="M52 67C62 53 71 44 83 39C80 55 69 65 52 67Z" fill="#70b65d"/>
+
+          <g fill="none" stroke="#d6a229" stroke-width="3.3" stroke-linecap="round">
+            <path d="M51 28C40 17 27 16 15 23"/>
+            <path d="M51 33C39 24 26 24 14 33"/>
+            <path d="M50 39C38 34 27 37 17 47"/>
+            <path d="M52 29C61 20 73 20 84 29"/>
+            <path d="M52 35C62 31 72 34 81 43"/>
+          </g>
+
+          <g fill="#f6d05a" stroke="#d29a24" stroke-width=".8">
+            <ellipse cx="17" cy="23" rx="4.1" ry="2.3" transform="rotate(-25 17 23)"/>
+            <ellipse cx="25" cy="20" rx="4.1" ry="2.3" transform="rotate(-12 25 20)"/>
+            <ellipse cx="34" cy="21" rx="4.1" ry="2.3" transform="rotate(4 34 21)"/>
+            <ellipse cx="43" cy="24" rx="4.1" ry="2.3" transform="rotate(18 43 24)"/>
+            <ellipse cx="15" cy="33" rx="4" ry="2.25" transform="rotate(-26 15 33)"/>
+            <ellipse cx="24" cy="29" rx="4" ry="2.25" transform="rotate(-12 24 29)"/>
+            <ellipse cx="34" cy="30" rx="4" ry="2.25" transform="rotate(5 34 30)"/>
+            <ellipse cx="43" cy="33" rx="4" ry="2.25" transform="rotate(18 43 33)"/>
+            <ellipse cx="18" cy="46" rx="3.8" ry="2.2" transform="rotate(-34 18 46)"/>
+            <ellipse cx="27" cy="40" rx="3.8" ry="2.2" transform="rotate(-20 27 40)"/>
+            <ellipse cx="37" cy="38" rx="3.8" ry="2.2" transform="rotate(-4 37 38)"/>
+            <ellipse cx="46" cy="39" rx="3.8" ry="2.2" transform="rotate(11 46 39)"/>
+            <ellipse cx="62" cy="27" rx="3.9" ry="2.25" transform="rotate(-17 62 27)"/>
+            <ellipse cx="71" cy="25" rx="3.9" ry="2.25" transform="rotate(2 71 25)"/>
+            <ellipse cx="80" cy="29" rx="3.9" ry="2.25" transform="rotate(20 80 29)"/>
+            <ellipse cx="63" cy="35" rx="3.7" ry="2.15" transform="rotate(1 63 35)"/>
+            <ellipse cx="72" cy="38" rx="3.7" ry="2.15" transform="rotate(18 72 38)"/>
+            <ellipse cx="80" cy="43" rx="3.7" ry="2.15" transform="rotate(31 80 43)"/>
+          </g>
+        </svg>`,
+      karte: `
+        <svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true">
+          <rect x="4" y="4" width="16" height="16" rx="2.2" fill="none" stroke="currentColor" stroke-width="2"/>
+          <path d="M9 4v16M7 8h1M7 12h1M7 16h1" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+        </svg>`,
+      growthTab: `
+        <svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true">
+          <rect x="5" y="4" width="14" height="16" rx="2" fill="none" stroke="currentColor" stroke-width="2"/>
+          <path d="M8 9h8M8 13h8M8 17h5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          <path d="M9 2h6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>`,
+      workTab: `
+        <svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true">
+          <rect x="4" y="7" width="16" height="12" rx="2" fill="none" stroke="#d94832" stroke-width="2"/>
+          <path d="M9 7V5h6v2M4 12h16" fill="none" stroke="#d94832" stroke-width="2" stroke-linecap="round"/>
+        </svg>`,
+      photoTab: `
+        <svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true">
+          <rect x="4" y="5" width="16" height="14" rx="2" fill="none" stroke="currentColor" stroke-width="2"/>
+          <circle cx="16.5" cy="9" r="1.6" fill="currentColor"/>
+          <path d="M6.5 17l4.4-4.4 3.1 3.1 2.1-2.1 3.2 3.4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>`,
+      tractor: `
+        <svg class="${cls}" viewBox="0 0 64 64" aria-hidden="true">
+          <path d="M13 35h23l6 8h8v8H13Z" fill="#e85a2d" stroke="#7f261b" stroke-width="2" stroke-linejoin="round"/>
+          <path d="M21 24h15v11H18Z" fill="#f08a2e" stroke="#7f261b" stroke-width="2" stroke-linejoin="round"/>
+          <path d="M39 22h5v19" fill="none" stroke="#7f261b" stroke-width="3" stroke-linecap="round"/>
+          <circle cx="23" cy="51" r="9" fill="#28352b"/>
+          <circle cx="23" cy="51" r="4" fill="#f6d37b"/>
+          <circle cx="48" cy="51" r="6" fill="#28352b"/>
+          <circle cx="48" cy="51" r="2.5" fill="#f6d37b"/>
+        </svg>`,
+      planter: `
+        <svg class="${cls}" viewBox="0 0 64 64" aria-hidden="true">
+          <rect x="13" y="23" width="36" height="20" rx="3" fill="#eaf4e5" stroke="#3c8746" stroke-width="3"/>
+          <path d="M17 28h28M17 34h28M17 40h28" stroke="#3c8746" stroke-width="2.5" stroke-linecap="round"/>
+          <path d="M20 19h22l5 4H15Z" fill="#88c777" stroke="#3c8746" stroke-width="2"/>
+          <circle cx="18" cy="48" r="5" fill="#27352b"/>
+          <circle cx="46" cy="48" r="5" fill="#27352b"/>
+          <path d="M22 54c4-3 8-3 12 0M34 54c4-3 8-3 12 0" fill="none" stroke="#62a66d" stroke-width="2.5" stroke-linecap="round"/>
+        </svg>`,
+      sprayer: `
+        <svg class="${cls}" viewBox="0 0 64 64" aria-hidden="true">
+          <path d="M27 14h10v8H27Z" fill="#e9f4e6" stroke="#26332a" stroke-width="2.5"/>
+          <rect x="20" y="22" width="24" height="30" rx="8" fill="#6fcb56" stroke="#2d7b3b" stroke-width="3"/>
+          <path d="M25 29h14M24 44h16" stroke="#2d7b3b" stroke-width="2" stroke-linecap="round"/>
+          <circle cx="32" cy="37" r="4" fill="#f05a3a"/>
+          <path d="M44 28h10M54 28l4-4M54 28l4 4" fill="none" stroke="#26332a" stroke-width="2.5" stroke-linecap="round"/>
+        </svg>`,
+      water: `
+        <svg class="${cls}" viewBox="0 0 64 64" aria-hidden="true">
+          <path d="M11 42c10 8 32 8 42 0" fill="none" stroke="#55aee7" stroke-width="5" stroke-linecap="round"/>
+          <path d="M14 49c9 5 27 5 36 0" fill="none" stroke="#8cccf1" stroke-width="3" stroke-linecap="round"/>
+          <path d="M23 12c-4 7-8 11-8 16a8 8 0 0 0 16 0c0-5-4-9-8-16Z" fill="#5fb6ee"/>
+          <path d="M42 15c-3 5-6 9-6 13a6 6 0 0 0 12 0c0-4-3-8-6-13Z" fill="#7fc8f2"/>
+        </svg>`,
+      fertilizer: `
+        <svg class="${cls}" viewBox="0 0 64 64" aria-hidden="true">
+          <path d="M20 13h24l4 42H16Z" fill="#d99a32" stroke="#8b4d1f" stroke-width="2.5" stroke-linejoin="round"/>
+          <path d="M22 13h20v9H22Z" fill="#f3cf78"/>
+          <rect x="22" y="29" width="20" height="15" rx="2" fill="#fff0bd"/>
+          <text x="32" y="40" text-anchor="middle" font-size="10" font-weight="700" fill="#9b3328">肥料</text>
+        </svg>`,
+      harvest: `
+        <svg class="${cls}" viewBox="0 0 64 64" aria-hidden="true">
+          <path d="M14 34h31l7 10v8H14Z" fill="#e2b43d" stroke="#7c4a19" stroke-width="2.5" stroke-linejoin="round"/>
+          <path d="M22 22h18v12H19Z" fill="#efcf67" stroke="#7c4a19" stroke-width="2.5"/>
+          <circle cx="23" cy="52" r="7" fill="#28352b"/>
+          <circle cx="48" cy="52" r="5" fill="#28352b"/>
+          <path d="M46 20c4 2 8 6 10 12" fill="none" stroke="#e2b43d" stroke-width="4" stroke-linecap="round"/>
+        </svg>`,
+      other: `
+        <svg class="${cls}" viewBox="0 0 64 64" aria-hidden="true">
+          <rect x="17" y="16" width="30" height="34" rx="5" fill="#ecefe8" stroke="#6d786f" stroke-width="3"/>
+          <path d="M24 27h16M24 35h16M24 43h11" stroke="#6d786f" stroke-width="3" stroke-linecap="round"/>
+        </svg>`
+    };
+    return icons[name] || icons.other;
+  }
+
   function makeRow(kind, item, values) {
     const meta = KIND_META[kind] || KIND_META.other;
     return {
@@ -211,10 +391,14 @@
   }
 
   function summaryCard(label, value, tone) {
+    const text = String(value || "");
+    const match = text.match(/^(.*?)(件|時間|圃場)$/);
+    const main = match ? match[1] : text;
+    const unit = match ? match[2] : "";
     return `
       <div class="annual-summary-card ${tone || ""}">
         <span>${U.escapeHTML(label)}</span>
-        <b>${U.escapeHTML(value)}</b>
+        <b><strong>${U.escapeHTML(main)}</strong>${unit ? `<small>${U.escapeHTML(unit)}</small>` : ""}</b>
       </div>
     `;
   }
@@ -279,6 +463,57 @@
     };
   }
 
+  function latestGrowthForField(fieldId) {
+    return (state.growthLogsFor ? state.growthLogsFor(fieldId) : [])
+      .slice()
+      .sort((a, b) => String(b.date).localeCompare(String(a.date)))[0] || null;
+  }
+
+  function riceStageNumberForField(field) {
+    const latest = latestGrowthForField(field.fieldId);
+    const planting = state.plantingDateForField ? state.plantingDateForField(field.fieldId) : "";
+    const baseDate = latest && latest.date || U.today();
+    const dap = planting ? U.daysBetween(planting, baseDate) : "";
+    const tillers = latest ? U.number(latest.tillerCount, 0) : 0;
+    const height = latest ? U.number(latest.plantHeightCm, 0) : 0;
+    const leaf = latest ? U.number(latest.leafCount, 0) : 0;
+    if (!latest && !planting) return 1;
+    const signal = Math.max(
+      dap === "" ? 0 : U.number(dap, 0),
+      height >= 95 ? 115 : height >= 82 ? 96 : height >= 70 ? 80 : height >= 58 ? 66 : height >= 45 ? 52 : height >= 32 ? 38 : height >= 18 ? 22 : 0,
+      tillers >= 24 ? 64 : tillers >= 20 ? 54 : tillers >= 16 ? 44 : tillers >= 11 ? 32 : tillers >= 6 ? 20 : 0,
+      leaf >= 8 ? 68 : leaf >= 7 ? 54 : leaf >= 6 ? 42 : leaf >= 5 ? 31 : leaf >= 4 ? 20 : 0
+    );
+    if (signal < 14) return 1;
+    if (signal < 26) return 2;
+    if (signal < 40) return 3;
+    if (signal < 55) return 4;
+    if (signal < 70) return 5;
+    if (signal < 88) return 6;
+    if (signal < 108) return 7;
+    return 8;
+  }
+
+  function riceStageAsset(stageNumber) {
+    const num = Math.max(1, Math.min(8, Number(stageNumber) || 1));
+    return `assets/images/rice-stages/rice-paddy-tile-${String(num).padStart(2, "0")}.png`;
+  }
+
+  function riceStageImage(stageNumber, className) {
+    const num = Math.max(1, Math.min(8, Number(stageNumber) || 1));
+    return `<img class="${U.attr(className || "annual-rice-img")}" src="${U.attr(riceStageAsset(num))}" alt="" loading="lazy" data-rice-stage="${U.attr(String(num))}">`;
+  }
+
+  function annualPickerRiceAsset(stageNumber) {
+    const num = Math.max(1, Math.min(8, Number(stageNumber) || 1));
+    return `assets/images/rice-stages/rice-card-clump-${String(num).padStart(2, "0")}.png`;
+  }
+
+  function annualPickerRiceImage(stageNumber) {
+    const num = Math.max(1, Math.min(8, Number(stageNumber) || 1));
+    return `<img class="annual-rice-img annual-picker-rice-img" src="${U.attr(annualPickerRiceAsset(num))}" alt="" loading="lazy" data-rice-stage="${U.attr(String(num))}">`;
+  }
+
   function filteredFields() {
     const query = String(U.$("annualSearch") ? U.$("annualSearch").value : annualSearchValue).trim().toLowerCase();
     const sort = U.$("annualSort") ? U.$("annualSort").value : annualSortValue;
@@ -307,9 +542,11 @@
   function renderFieldPickerCard(item) {
     const { field, stats, status } = item;
     const last = stats.lastDate ? U.fd(stats.lastDate) : "記録なし";
+    const riceStage = riceStageNumberForField(field);
+    const district = field.district ? ` / ${U.escapeHTML(field.district)}` : "";
     return `
       <button type="button" class="annual-field-pick-card status-${U.attr(status.tone)}" data-annual-open-field="${U.attr(field.fieldId)}">
-        <div class="annual-field-plant" aria-hidden="true"><span></span></div>
+        <span class="annual-field-plant stage-${U.attr(String(riceStage).padStart(2, "0"))}" aria-hidden="true">${annualPickerRiceImage(riceStage)}</span>
         <div class="annual-field-pick-main">
           <div class="annual-field-pick-head">
             <div>
@@ -318,11 +555,11 @@
             </div>
             <strong>${U.escapeHTML(field.areaA ? `${field.areaA}a` : "面積未設定")}</strong>
           </div>
-          <small>最終更新：${U.escapeHTML(last)}${field.district ? ` / ${U.escapeHTML(field.district)}` : ""}</small>
+          <small>最終更新：${U.escapeHTML(last)}${district}</small>
           <div class="annual-field-pick-metrics">
-            <span class="growth">生育 ${U.escapeHTML(String(stats.growth))}件</span>
-            <span class="water">水管理 ${U.escapeHTML(String(stats.water))}件</span>
-            <span class="work">作業 ${U.escapeHTML(String(stats.work))}件</span>
+            <span class="growth"><i aria-hidden="true"></i>生育 ${U.escapeHTML(String(stats.growth))}件</span>
+            <span class="water"><i aria-hidden="true"></i>水管理 ${U.escapeHTML(String(stats.water))}件</span>
+            <span class="work"><i aria-hidden="true"></i>作業 ${U.escapeHTML(String(stats.work))}件</span>
           </div>
         </div>
         <span class="annual-status-badge ${U.attr(status.tone)}">${U.escapeHTML(status.label)}</span>
@@ -338,11 +575,18 @@
         <section class="annual-field-picker">
           <div class="section-title compact">
             <h3>圃場一覧</h3>
-            <span class="muted">圃場を選ぶと履歴へ移動</span>
           </div>
-          <div class="filter-row annual-filter-row annual-picker-controls">
-            <label class="compact-label annual-search-label">検索<input id="annualSearch" placeholder="圃場名・品種で検索" value="${U.attr(annualSearchValue)}"></label>
-            <label class="compact-label">並び替え<select id="annualSort"></select></label>
+          <div class="annual-filter-row annual-picker-controls">
+            <label class="annual-search-label" aria-label="圃場検索">
+              <input id="annualSearch" placeholder="圃場名・品種で検索" value="${U.attr(annualSearchValue)}">
+            </label>
+            <button type="button" class="annual-filter-button" aria-label="絞り込み" title="絞り込み">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16l-6.5 7.2v4.6l-3 1.6v-6.2L4 6z"></path></svg>
+            </button>
+            <label class="annual-sort-button" aria-label="並び替え">
+              <select id="annualSort"></select>
+              <span>並び替え ›</span>
+            </label>
           </div>
           <div class="annual-field-pick-grid">
             ${fields.length ? fields.map(renderFieldPickerCard).join("") : '<div class="empty">条件に合う圃場がありません。</div>'}
@@ -380,6 +624,24 @@
     `;
   }
 
+  function fieldSelect(field, key, label, values) {
+    return `
+      <label>${U.escapeHTML(label)}
+        <select data-annual-field-edit="${U.attr(key)}">${optionTags(values, field[key])}</select>
+      </label>
+    `;
+  }
+
+  function karteSourceRow(label, date, sourceText, emptyText) {
+    return `
+      <div class="annual-karte-source-row">
+        <span>${U.escapeHTML(label)}</span>
+        <b>${date ? U.escapeHTML(U.fd(date)) : U.escapeHTML(emptyText || "未登録")}</b>
+        <small>${date ? U.escapeHTML(sourceText || "作業記録から自動取得") : "田植え作業を登録してください"}</small>
+      </div>
+    `;
+  }
+
   function optionTags(values, selected) {
     return values.map((value) => `<option value="${U.attr(value)}" ${String(value) === String(selected || "") ? "selected" : ""}>${U.escapeHTML(value || "未設定")}</option>`).join("");
   }
@@ -391,22 +653,22 @@
     const dryEnd = state.workDateForField ? state.workDateForField(field.fieldId, "中干し終了") : "";
     const intermittentStart = state.workDateForField ? state.workDateForField(field.fieldId, "間断灌水開始") : "";
     const wetStart = state.workDateForField ? state.workDateForField(field.fieldId, "湿潤灌漑開始") : "";
+    const riceStage = riceStageNumberForField(field);
     return `
       <div class="annual-field-detail-grid">
         <section class="annual-field-detail-card annual-karte-card">
           <div class="section-title compact annual-card-title">
             <h3>圃場カルテ</h3>
-            <span class="annual-card-rice" aria-hidden="true"></span>
+            <span class="annual-card-rice stage-${U.attr(String(riceStage).padStart(2, "0"))}" aria-hidden="true">${annualPickerRiceImage(riceStage)}</span>
           </div>
           <div class="form-grid dense annual-edit-grid">
-            ${fieldInput(field, "name", "圃場名")}
-            ${fieldInput(field, "district", "地区")}
             <label>品種<select data-annual-field-edit="varietyId">${state.varieties().map((v) => `<option value="${U.attr(v.varietyId)}" ${v.varietyId === field.varietyId ? "selected" : ""}>${U.escapeHTML(v.name)}</option>`).join("")}</select></label>
             ${fieldInput(field, "areaA", "面積(a)", "number")}
-            <label>状態<select data-annual-field-edit="status">${optionTags(["使用中", "休耕", "終了"], field.status)}</select></label>
-            <label>土質<select data-annual-field-edit="soilType">${optionTags(["", "砂質", "粘土質", "中間", "その他"], field.soilType)}</select></label>
-            <label>水持ち<select data-annual-field-edit="waterHolding">${optionTags(["", "良い", "普通", "悪い"], field.waterHolding)}</select></label>
-            <label>排水性<select data-annual-field-edit="drainage">${optionTags(["", "良い", "普通", "悪い"], field.drainage)}</select></label>
+            ${fieldInput(field, "district", "地区")}
+            ${karteSourceRow("田植日", planting, "作業記録から自動取得")}
+            ${fieldSelect(field, "waterHolding", "水持ち", ["", "良い", "やや良い", "普通", "やや悪い", "悪い"])}
+            ${fieldSelect(field, "soilType", "土質", ["", "砂質", "壌土", "粘土質", "中間", "その他"])}
+            ${fieldSelect(field, "ditchRequired", "溝切り要否", ["", "必要", "不要", "圃場による"])}
           </div>
           <label class="annual-wide-label">固定メモ
             <textarea data-annual-field-edit="fixedMemo">${U.escapeHTML(field.fixedMemo || "")}</textarea>
@@ -414,26 +676,15 @@
         </section>
         <section class="annual-field-detail-card annual-target-card">
           <div class="section-title compact">
-            <h3>作業記録からの基準日</h3>
-            <span class="muted">日付はカルテで直接編集しません</span>
-          </div>
-          <div class="annual-kv-list">
-            ${sourceLine("田植日", planting, "作業記録: 田植え")}
-            ${sourceLine("中干し開始", dryStart, "作業記録: 中干し開始")}
-            ${sourceLine("中干し終了", dryEnd, "作業記録: 中干し終了")}
-            ${sourceLine("間断灌水開始", intermittentStart, "作業記録: 間断灌水開始")}
-            ${sourceLine("湿潤灌漑開始", wetStart, "作業記録: 湿潤灌漑開始")}
-          </div>
-        </section>
-        <section class="annual-field-detail-card annual-target-card">
-          <div class="section-title compact">
             <h3>中干し・水管理目標</h3>
-            <span class="muted">判断枠だけ用意</span>
           </div>
           <div class="annual-kv-list">
             ${targetLine("目標分げつ数", variety && variety.targetTillers)}
             ${targetLine("目標ひび割れ幅", field.targetCrackCm ? `${field.targetCrackCm}cm` : "")}
             ${targetLine("目標沈み込み", field.targetSinkCm ? `${field.targetSinkCm}cm` : "")}
+            ${targetLine("中干し目安日数", field.drainageTargetDays ? `${field.drainageTargetDays}日` : "")}
+            ${targetLine("間断灌水目安日数", field.intermittentIntervalDays ? `${field.intermittentIntervalDays}日` : "")}
+            ${targetLine("湿潤灌漑目安日数", field.wetIrrigationTargetDays ? `${field.wetIrrigationTargetDays}日` : "")}
           </div>
           <div class="form-grid dense annual-edit-grid">
             ${fieldInput(field, "targetCrackCm", "ひび割れ幅(cm)")}
@@ -514,7 +765,7 @@
     return `
       <article class="annual-entry annual-${U.attr(row.kindClass)} annual-work-card">
         <div class="annual-entry-main annual-work-main">
-          <span class="annual-kind-icon ${row.kind === "fieldWork" ? `annual-work-icon annual-work-icon-${U.attr(workIconClass(row.title))}` : ""}">${U.escapeHTML(row.kindIcon || row.kindLabel.slice(0, 1))}</span>
+          <span class="annual-kind-icon ${row.kind === "fieldWork" ? "annual-work-icon" : ""}">${row.kind === "fieldWork" ? iconSvg(workIconClass(row.title), "annual-entry-svg") : U.escapeHTML(row.kindIcon || row.kindLabel.slice(0, 1))}</span>
           <div class="annual-entry-title">
             <time>${showDate ? U.escapeHTML(U.fd(row.date)) : ""}</time>
             <b>${U.escapeHTML(row.title)}</b>
@@ -563,14 +814,14 @@
 
   function renderTabs(field) {
     const tabs = [
-      ["karte", "カルテ"],
-      ["growth", "生育記録"],
-      ["work", "作業記録"],
-      ["photos", "写真"]
+      ["karte", "karte", "カルテ"],
+      ["growth", "growthTab", "生育記録"],
+      ["work", "workTab", "作業記録"],
+      ["photos", "photoTab", "写真"]
     ];
     return `
       <div class="annual-field-tabs">
-        ${tabs.map(([id, label]) => `<button type="button" class="${selectedTab === id ? "active" : ""}" data-annual-tab="${U.attr(id)}">${U.escapeHTML(label)}</button>`).join("")}
+        ${tabs.map(([id, icon, label]) => `<button type="button" class="${selectedTab === id ? "active" : ""}" data-annual-tab="${U.attr(id)}">${iconSvg(icon, "annual-tab-svg")}<span>${U.escapeHTML(label)}</span></button>`).join("")}
       </div>
       <div class="annual-field-tab-body">
         ${selectedTab === "growth" ? renderGrowthTab(field) : ""}

@@ -6,6 +6,28 @@
 
   let activeScreen = "home";
   let bound = false;
+  const initialScreens = new Set([
+    "home",
+    "fields",
+    "annual",
+    "notices",
+    "data",
+    "calendar",
+    "field-work",
+    "materials",
+    "growth",
+    "dry-period",
+    "irrigation",
+    "recipes",
+    "photos",
+    "results"
+  ]);
+
+  function initialScreen() {
+    const params = new URLSearchParams(window.location.search);
+    const requested = params.get("screen");
+    return initialScreens.has(requested) ? requested : "home";
+  }
 
   function screenKey(screenId) {
     return String(screenId).replace(/-([a-z])/g, (_, ch) => ch.toUpperCase());
@@ -134,6 +156,7 @@
   }
 
   function init() {
+    activeScreen = initialScreen();
     U.$("todayLabel").textContent = U.fd(U.today());
     bindNav();
     bindScreens();

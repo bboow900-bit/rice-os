@@ -5,6 +5,15 @@
   const U = RiceOS.utils;
   const S = RiceOS.schema;
   const state = RiceOS.state;
+  let bulkFieldIds = [];
+
+  function setBulkFields(ids) {
+    bulkFieldIds = (ids || []).filter(Boolean);
+  }
+
+  function clearBulkFields() {
+    bulkFieldIds = [];
+  }
 
   function firstFieldId() {
     const field = state.activeFields()[0] || state.fields()[0];
@@ -88,6 +97,7 @@
     U.$("dryPhotoPreview").dataset.photoData = "";
     U.$("dryPhotoPreview").classList.add("hidden");
     U.$("dryMemo").value = "";
+    clearBulkFields();
     renderTargetCompare();
   }
 
@@ -180,6 +190,21 @@
     renderTargetCompare();
   }
 
+  function prefillFields(date, fieldIds) {
+    resetForm();
+    U.$("dryDate").value = date || U.today();
+    setBulkFields(fieldIds || []);
+    if (bulkFieldIds[0]) U.$("dryField").value = bulkFieldIds[0];
+    const field = currentField();
+    if (field) {
+      U.$("dryStartDate").value = field.drainageStartDate || U.$("dryStartDate").value;
+      U.$("dryTargetDays").value = field.drainageTargetDays || U.$("dryTargetDays").value;
+      setEndFromDays();
+    }
+    renderTargetCompare();
+    U.toast(`${bulkFieldIds.length}圃場へ同じ中干し記録を登録します`);
+  }
+
   function editDry(dryPeriodId) {
     const item = (state.data().dryPeriods || []).find((row) => row.dryPeriodId === dryPeriodId);
     if (item) fillEdit(item);
@@ -188,9 +213,8 @@
   function bind() {
     U.$("dryForm").addEventListener("submit", (event) => {
       event.preventDefault();
-      state.saveDryPeriod({
+      const common = {
         dryPeriodId: U.$("editDryId").value,
-        fieldId: U.$("dryField").value,
         date: U.$("dryDate").value,
         status: U.$("dryStatus").value,
         startDate: U.$("dryStartDate").value,
@@ -204,7 +228,13 @@
         photo: U.$("dryPhoto").value,
         photoData: U.$("dryPhotoPreview").dataset.photoData || "",
         memo: U.$("dryMemo").value
-      });
+      };
+      const targets = !common.dryPeriodId && bulkFieldIds.length > 1 ? bulkFieldIds : [U.$("dryField").value];
+      targets.forEach((fieldId) => state.saveDryPeriod({
+        ...common,
+        dryPeriodId: targets.length > 1 ? "" : common.dryPeriodId,
+        fieldId
+      }));
       resetForm();
     });
 
@@ -258,5 +288,5 @@
   }
 
   RiceOS.screens = RiceOS.screens || {};
-  RiceOS.screens.dryPeriod = { render, bind, resetForm, prefillDate, editDry };
+  RiceOS.screens.dryPeriod = { render, bind, resetForm, prefillDate, prefillFields, editDry };
 })();
