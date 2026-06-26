@@ -12,7 +12,6 @@
         ["rowSpacing", "条間"],
         ["plantSpacing", "株間"],
         ["plantsPerHill", "植付本数"],
-        ["seedlingBoxes", "箱数"],
         ["transplanterSetting", "田植機設定メモ"]
       ]
     },
@@ -21,7 +20,8 @@
       fields: [
         ["baseFertilizerName", "肥料名"],
         ["baseFertilizerNpk", "N-P-K"],
-        ["baseFertilizerAmount", "施肥量"]
+        ["baseFertilizerAmount", "施肥量"],
+        ["baseFertilizerBagKg", "1袋kg"]
       ]
     },
     {

@@ -28,6 +28,7 @@
     baseFertilizerName: "",
     baseFertilizerNpk: "",
     baseFertilizerAmount: "",
+    baseFertilizerBagKg: "20",
     boxTreatment: "",
     initialHerbicide: "",
     initialInsecticide: "",
@@ -48,6 +49,7 @@
     fieldGroupId: "",
     varietyId: "",
     areaA: 0,
+    seedlingBoxes: "",
     plantingDate: "",
     drainageStartDate: "",
     drainageTargetDays: "7",
@@ -242,6 +244,7 @@
     f.fieldGroupId = String(f.fieldGroupId || "");
     f.varietyId = String(f.varietyId || fallbackVarietyId || "");
     f.areaA = U.number(f.areaA, 0);
+    f.seedlingBoxes = String(f.seedlingBoxes || "");
     f.status = String(f.status || "使用中");
     f.drainageStartDate = String(f.drainageStartDate || "");
     f.drainageTargetDays = String(f.drainageTargetDays || "");

@@ -581,6 +581,52 @@
     animation: fieldKarteFocusPulse 1.4s ease;
   }
 
+  #screen-fields .field-master-derived {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 7px !important;
+    margin-top: 10px !important;
+  }
+
+  #screen-fields .field-master-derived > div {
+    min-width: 0 !important;
+    padding: 8px 9px !important;
+    border: 1px solid #e3eadc !important;
+    border-radius: 8px !important;
+    background: rgba(255, 254, 247, 0.94) !important;
+    box-shadow: 0 2px 8px rgba(43, 52, 37, 0.04) !important;
+  }
+
+  #screen-fields .field-master-derived span {
+    display: block !important;
+    color: #657063 !important;
+    font-size: 9px !important;
+    font-weight: 750 !important;
+    line-height: 1.2 !important;
+  }
+
+  #screen-fields .field-master-derived b {
+    display: block !important;
+    margin-top: 2px !important;
+    color: #101812 !important;
+    font-size: 11px !important;
+    font-weight: 900 !important;
+    line-height: 1.25 !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+  }
+
+  #screen-fields .field-history-link {
+    width: 100% !important;
+    min-height: 38px !important;
+    margin-top: 9px !important;
+    border-color: #cfe0c4 !important;
+    background: #fffefa !important;
+    color: #12662e !important;
+    font-weight: 850 !important;
+  }
+
   #screen-fields .record-actions.single-action {
     display: grid !important;
     grid-template-columns: 1fr 1fr !important;

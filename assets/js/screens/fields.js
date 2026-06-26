@@ -21,7 +21,7 @@
   }
 
   function statusOptions(selected) {
-    return ["使用中", "休耕", "終了"].map((value) => `<option ${value === selected ? "selected" : ""}>${value}</option>`).join("");
+    return ["使用中", "休止", "休耕", "終了"].map((value) => `<option ${value === selected ? "selected" : ""}>${value}</option>`).join("");
   }
 
   function input(field, key, label, type) {
@@ -64,10 +64,44 @@
     `;
   }
 
+  function formatNumber(value, digits) {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return "";
+    const fixed = n.toFixed(digits == null ? 1 : digits);
+    return fixed.replace(/\.0+$/, "").replace(/(\.\d*[1-9])0+$/, "$1");
+  }
+
+  function parseKgPer10a(value) {
+    const match = String(value || "").replace(/,/g, "").match(/(\d+(?:\.\d+)?)/);
+    return match ? Number(match[1]) : 0;
+  }
+
+  function per10a(value, areaA) {
+    const amount = U.number(value, 0);
+    const area = U.number(areaA, 0);
+    if (!amount || !area) return "";
+    return formatNumber(amount / area * 10, 1);
+  }
+
+  function fertilizerPlan(variety, field) {
+    const area = U.number(field.areaA, 0);
+    const kgPer10a = parseKgPer10a(variety && variety.baseFertilizerAmount);
+    const bagKg = U.number(variety && variety.baseFertilizerBagKg, 20) || 20;
+    const totalKg = area && kgPer10a ? area / 10 * kgPer10a : 0;
+    const bags = totalKg && bagKg ? totalKg / bagKg : 0;
+    return {
+      name: variety && variety.baseFertilizerName || "基肥未設定",
+      amount: variety && variety.baseFertilizerAmount || "",
+      bagKg,
+      totalKg,
+      bags
+    };
+  }
+
   const MASTER_MENU = [
     { key: "field-master", label: "圃場マスター", sub: "土質・面積", icon: "field-master.png", screen: "fields", tone: "green" },
     { key: "recipe", label: "栽培レシピ", sub: "品種単位", icon: "recipe.png", screen: "recipes", tone: "green" },
-    { key: "transplanter", label: "田植え機", sub: "株間・箱数", icon: "transplanter.png", screen: "recipes", tone: "amber" },
+    { key: "transplanter", label: "田植え機", sub: "株間・本数", icon: "transplanter.png", screen: "recipes", tone: "amber" },
     { key: "dry", label: "中干し", sub: "目標・記録", icon: "dry-period.png", screen: "dry-period", tone: "amber" },
     { key: "photos", label: "写真", sub: "比較素材", icon: "photos.png", screen: "photos", tone: "" },
     { key: "irrigation", label: "間断/湿潤", sub: "水管理", icon: "irrigation.png", screen: "irrigation", tone: "water" },
@@ -338,46 +372,33 @@
 
   function renderKarteDashboard(field) {
     const variety = state.variety(field.varietyId);
-    const latestWork = state.lastFieldWork(field.fieldId);
-    const latestGrowth = state.lastGrowthLog(field.fieldId);
-    const latestDry = latestByDate(state.dryPeriodsFor(field.fieldId));
-    const latestIrrigation = latestByDate(state.irrigationsFor(field.fieldId));
     const dap = U.daysAfterPlanting(field, U.today());
-    const dryStart = state.workDateForField ? state.workDateForField(field.fieldId, "中干し開始") : "";
-    const irrigationStart = state.workDateForField ? state.workDateForField(field.fieldId, "間断灌水開始") : "";
     const fixedMemo = String(field.fixedMemo || "").trim();
+    const fertilizer = fertilizerPlan(variety, field);
+    const boxPer10a = per10a(field.seedlingBoxes, field.areaA);
+    const fertilizerPer10a = fertilizer.totalKg && field.areaA ? formatNumber(fertilizer.totalKg / U.number(field.areaA, 0) * 10, 1) : "";
     return `
       <div class="field-karte-dashboard">
         <section class="field-karte-overview">
           <div class="field-karte-metrics">
             ${renderKarteMetric("品種", variety && variety.name || "未設定", "green")}
-            ${renderKarteMetric("田植後", dap !== "" ? `${dap}日` : "田植日未設定", "amber")}
             ${renderKarteMetric("面積", `${field.areaA || 0}a`, "blue")}
+            ${renderKarteMetric("箱数", field.seedlingBoxes ? `${field.seedlingBoxes}箱` : "未設定", "amber")}
+            ${renderKarteMetric("基肥合計", fertilizer.totalKg ? `${formatNumber(fertilizer.totalKg, 1)}kg` : "未設定", "purple")}
             ${renderKarteMetric("分げつ目標", variety && variety.targetTillers || "未設定", "purple")}
           </div>
           <div class="field-karte-tags">${renderFeatureTags(field)}</div>
           ${fixedMemo ? `<div class="field-fixed-note"><b>固定メモ</b><span>${U.escapeHTML(fixedMemo)}</span></div>` : ""}
         </section>
-        <section class="field-karte-activity">
-          ${renderLatestLog("最新作業", latestWork, [latestWork && latestWork.workName, latestWork && latestWork.hours ? `時間 ${latestWork.hours}` : "", latestWork && latestWork.material], "work")}
-          ${renderLatestLog("最新生育", latestGrowth, [latestGrowth && `分げつ ${latestGrowth.tillerCount || "-"}`, latestGrowth && `葉数 ${latestGrowth.leafCount || "-"}`, latestGrowth && `草丈 ${latestGrowth.plantHeightCm || "-"}cm`, latestGrowth && `葉色 ${latestGrowth.leafColor || "-"}`], "growth")}
-          ${renderLatestLog("中干し", latestDry || { date: dryStart }, [periodLine(null, dryStart, field.drainageTargetDays)], "water")}
-          ${renderLatestLog("間断/湿潤", latestIrrigation || { date: irrigationStart }, [periodLine(null, irrigationStart, field.intermittentIntervalDays)], "water")}
+        <section class="field-master-derived">
+          <div><span>基肥</span><b>${U.escapeHTML(fertilizer.name)}</b></div>
+          <div><span>レシピ施肥量</span><b>${U.escapeHTML(fertilizer.amount || "-")}</b></div>
+          <div><span>1袋</span><b>${U.escapeHTML(formatNumber(fertilizer.bagKg, 1))}kg</b></div>
+          <div><span>袋数</span><b>${fertilizer.bags ? `${U.escapeHTML(formatNumber(fertilizer.bags, 1))}袋` : "-"}</b></div>
+          <div><span>箱数/10a</span><b>${boxPer10a ? `${U.escapeHTML(boxPer10a)}箱` : "-"}</b></div>
+          <div><span>肥料kg/10a</span><b>${fertilizerPer10a ? `${U.escapeHTML(fertilizerPer10a)}kg` : "-"}</b></div>
         </section>
-        <section class="field-karte-photo-panel">
-          <div class="section-title compact">
-            <h3>写真</h3>
-            <span class="muted">${U.escapeHTML(compactArray(field.commonWeeds, "雑草未設定"))}</span>
-          </div>
-          ${renderPhotoStrip(field)}
-        </section>
-        <div class="field-karte-actions">
-          <button class="secondary" type="button" data-field-action="add-work" data-field-id="${U.attr(field.fieldId)}">作業</button>
-          <button class="secondary" type="button" data-field-action="add-growth" data-field-id="${U.attr(field.fieldId)}">生育</button>
-          <button class="secondary" type="button" data-field-action="add-dry" data-field-id="${U.attr(field.fieldId)}">中干し</button>
-          <button class="secondary" type="button" data-field-action="add-irrigation" data-field-id="${U.attr(field.fieldId)}">間断/湿潤</button>
-          <button class="secondary" type="button" data-field-action="photos" data-field-id="${U.attr(field.fieldId)}">写真一覧</button>
-        </div>
+        <button class="secondary field-history-link" type="button" data-field-action="history" data-field-id="${U.attr(field.fieldId)}">この圃場の年間履歴を見る</button>
       </div>
     `;
   }
@@ -404,7 +425,7 @@
               ${input(field, "district", "地区")}
               <label>品種<select data-field-id="${U.attr(field.fieldId)}" data-field-field="varietyId">${varietyOptions(field.varietyId)}</select></label>
               ${input(field, "areaA", "面積(a)", "number")}
-              ${input(field, "fieldGroupId", "グループ")}
+              ${input(field, "seedlingBoxes", "箱数", "number")}
               <label>状態<select data-field-id="${U.attr(field.fieldId)}" data-field-field="status">${statusOptions(field.status)}</select></label>
               ${input(field, "sortOrder", "表示順", "number")}
             </div>
@@ -417,8 +438,6 @@
               <label>水持ち<select data-field-id="${U.attr(field.fieldId)}" data-field-field="waterHolding">${optionTags(WATER_LEVELS, field.waterHolding)}</select></label>
               ${arrayInput(field, "commonWeeds", "生えやすい雑草", WEEDS)}
               ${arrayInput(field, "fieldFeatures", "圃場特徴", FEATURES)}
-              ${input(field, "waterHabit", "水の癖")}
-              ${input(field, "weedRisk", "雑草の癖")}
             </div>
           </details>
 
@@ -445,7 +464,7 @@
           </details>
         </div>
         <div class="record-actions single-action">
-          <button class="secondary" type="button" data-field-action="calendar" data-field-id="${U.attr(field.fieldId)}">予定出力</button>
+          <button class="secondary" type="button" data-field-action="history" data-field-id="${U.attr(field.fieldId)}">年間履歴</button>
           <button class="secondary danger" type="button" data-field-action="delete" data-field-id="${U.attr(field.fieldId)}">圃場を削除</button>
         </div>
       </article>
@@ -583,6 +602,11 @@
         activeFieldId = "";
         activeBulkGroup = "";
         render();
+        return;
+      }
+      if (action === "history") {
+        RiceOS.app.show("annual");
+        if (RiceOS.screens.annual && RiceOS.screens.annual.openField) RiceOS.screens.annual.openField(field.fieldId);
         return;
       }
       if (action === "calendar") RiceOS.alerts.downloadFieldCalendar(field);

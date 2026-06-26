@@ -939,6 +939,13 @@
     if (targetFieldId && RiceOS.screens.fieldWork) RiceOS.screens.fieldWork.prefillDate(U.today(), targetFieldId);
   }
 
+  function openField(fieldId) {
+    selectedFieldId = fieldId || "";
+    selectedTab = "karte";
+    render();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
   function bind() {
     const year = U.$("annualYear");
     if (year) year.addEventListener("change", render);
@@ -997,5 +1004,5 @@
   }
 
   RiceOS.screens = RiceOS.screens || {};
-  RiceOS.screens.annual = { render, bind };
+  RiceOS.screens.annual = { render, bind, openField };
 })();

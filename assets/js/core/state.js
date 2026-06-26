@@ -53,7 +53,7 @@
   }
 
   function activeFields() {
-    return fields().filter((f) => f.status !== "終了");
+    return fields().filter((f) => !["休止", "終了"].includes(f.status));
   }
 
   function variety(varietyId) {
