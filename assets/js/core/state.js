@@ -114,6 +114,25 @@
     }, "圃場マスターを保存しました");
   }
 
+  function deleteField(fieldId) {
+    mutate((d) => {
+      d.fields = (d.fields || []).filter((f) => f.fieldId !== fieldId);
+      d.fieldWorks = (d.fieldWorks || [])
+        .map((work) => ({ ...work, fieldIds: (work.fieldIds || []).filter((id) => id !== fieldId) }))
+        .filter((work) => (work.fieldIds || []).length);
+      d.otherWorks = (d.otherWorks || []).map((work) => ({
+        ...work,
+        relatedFieldIds: (work.relatedFieldIds || []).filter((id) => id !== fieldId)
+      }));
+      d.schedules = (d.schedules || [])
+        .map((schedule) => ({ ...schedule, fieldIds: (schedule.fieldIds || []).filter((id) => id !== fieldId) }))
+        .filter((schedule) => (schedule.fieldIds || []).length);
+      d.growthLogs = (d.growthLogs || []).filter((log) => log.fieldId !== fieldId);
+      d.dryPeriods = (d.dryPeriods || []).filter((row) => row.fieldId !== fieldId);
+      d.irrigations = (d.irrigations || []).filter((row) => row.fieldId !== fieldId);
+    }, "圃場を削除しました");
+  }
+
   function matchesWorkName(work, names) {
     const values = Array.isArray(names) ? names : [names];
     const workName = String(work && work.workName || "");
@@ -486,6 +505,7 @@
     updateVariety,
     addField,
     updateField,
+    deleteField,
     plantingDateForField,
     workDateForField,
     fieldWorksByNameFor,

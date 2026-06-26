@@ -211,7 +211,7 @@
                   <b>グループ内の圃場</b>
                   <div>
                     ${group.fields.map((field) => `
-                      <button type="button" data-field-group-field="${U.attr(field.fieldId)}">
+                      <button type="button" class="field-group-field-button" data-field-group-field="${U.attr(field.fieldId)}">
                         <span>${U.escapeHTML(field.name)}</span>
                         <small>${U.escapeHTML(state.variety(field.varietyId) && state.variety(field.varietyId).name || "品種未設定")} / ${U.escapeHTML(String(field.areaA || 0))}a</small>
                       </button>
@@ -445,7 +445,8 @@
           </details>
         </div>
         <div class="record-actions single-action">
-          <button class="secondary" type="button" data-field-action="calendar" data-field-id="${U.attr(field.fieldId)}">水管理予定をカレンダー出力</button>
+          <button class="secondary" type="button" data-field-action="calendar" data-field-id="${U.attr(field.fieldId)}">予定出力</button>
+          <button class="secondary danger" type="button" data-field-action="delete" data-field-id="${U.attr(field.fieldId)}">圃場を削除</button>
         </div>
       </article>
     `;
@@ -575,6 +576,15 @@
       const field = state.field(button.dataset.fieldId);
       if (!field) return;
       const action = button.dataset.fieldAction;
+      if (action === "delete") {
+        const ok = confirm(`${field.name} を削除しますか？\n\nこの圃場の生育・水管理記録は削除され、作業記録からはこの圃場だけ外れます。`);
+        if (!ok) return;
+        state.deleteField(field.fieldId);
+        activeFieldId = "";
+        activeBulkGroup = "";
+        render();
+        return;
+      }
       if (action === "calendar") RiceOS.alerts.downloadFieldCalendar(field);
       if (action === "add-work" && RiceOS.screens.fieldWork) {
         RiceOS.app.show("field-work");

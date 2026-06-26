@@ -33,11 +33,22 @@
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.76);
   color: #101812;
-  font-size: 34px;
+  font-size: 0;
   font-weight: 500;
   line-height: 1;
   box-shadow: 0 3px 10px rgba(37, 43, 31, 0.08);
   backdrop-filter: blur(8px);
+}
+
+.app-back-button::before {
+  content: "";
+  display: block;
+  width: 12px;
+  height: 12px;
+  border-bottom: 3px solid currentColor;
+  border-left: 3px solid currentColor;
+  border-radius: 1px;
+  transform: translateX(2px) rotate(45deg);
 }
 
 .app-back-button.hidden {

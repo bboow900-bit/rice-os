@@ -15,8 +15,10 @@
     display: block !important;
     width: 100% !important;
     max-width: 100vw !important;
+    box-sizing: border-box !important;
     margin: 0 !important;
-    padding: 0 15px calc(92px + env(safe-area-inset-bottom)) !important;
+    padding: 0 12px calc(92px + env(safe-area-inset-bottom)) !important;
+    overflow-x: hidden !important;
   }
 
   .content:has(#screen-fields.active),
@@ -30,7 +32,8 @@
 
   #screen-fields {
     width: 100% !important;
-    max-width: 430px !important;
+    max-width: 390px !important;
+    box-sizing: border-box !important;
     margin-right: auto !important;
     margin-left: auto !important;
     padding-right: 0 !important;
@@ -88,10 +91,13 @@
   }
 
   #screen-fields .screen-head > button.primary {
+    display: none !important;
+  }
+
+  #screen-fields .screen-head > button.primary {
     grid-column: 3 !important;
     grid-row: 1 !important;
     justify-self: end !important;
-    display: grid !important;
     place-items: center !important;
     width: 38px !important;
     min-width: 38px !important;
@@ -275,8 +281,8 @@
   }
 
   .field-master-menu-button {
-    min-height: 78px !important;
-    padding: 6px 4px 5px !important;
+    min-height: 82px !important;
+    padding: 7px 4px 6px !important;
     border: 1px solid #d9dccf !important;
     border-radius: 8px !important;
     background: rgba(255, 255, 255, 0.94) !important;
@@ -302,9 +308,9 @@
 
   .field-master-menu-button img {
     display: block !important;
-    width: 43px !important;
-    height: 43px !important;
-    margin: 0 auto 3px !important;
+    width: 41px !important;
+    height: 41px !important;
+    margin: 0 auto 4px !important;
     border-radius: 8px !important;
     object-fit: cover !important;
     filter: drop-shadow(0 1px 1px rgba(45, 58, 38, 0.16)) !important;
@@ -313,18 +319,20 @@
   .field-master-menu-button b {
     display: block !important;
     color: #101812 !important;
-    font-size: 10px !important;
+    font-size: 9.5px !important;
     font-weight: 850 !important;
-    line-height: 1.12 !important;
+    line-height: 1.22 !important;
+    overflow-wrap: anywhere !important;
   }
 
   .field-master-menu-button small {
     display: block !important;
-    margin-top: 2px !important;
+    margin-top: 1px !important;
     color: #626d64 !important;
-    font-size: 8px !important;
+    font-size: 7.5px !important;
     font-weight: 680 !important;
-    line-height: 1.1 !important;
+    line-height: 1.2 !important;
+    overflow-wrap: anywhere !important;
   }
 
   .field-group-list {
@@ -443,15 +451,20 @@
 
   .field-group-field-panel > div {
     display: grid !important;
-    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    grid-template-columns: 1fr !important;
     gap: 6px !important;
   }
 
-  .field-group-field-panel button {
-    display: grid !important;
-    gap: 2px !important;
-    min-height: 42px !important;
-    padding: 6px 7px !important;
+  #screen-fields .field-group-card .field-group-field-panel .field-group-field-button {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 8px !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    width: 100% !important;
+    min-height: 38px !important;
+    padding: 6px 9px !important;
     border: 1px solid #b9d8b4 !important;
     border-radius: 7px !important;
     background: #ffffff !important;
@@ -460,18 +473,29 @@
     text-align: left !important;
   }
 
-  .field-group-field-panel button span {
+  #screen-fields .field-group-card .field-group-field-panel .field-group-field-button span {
+    display: block !important;
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+    overflow: hidden !important;
     color: #101812 !important;
-    font-size: 12px !important;
+    font-size: 12.5px !important;
     font-weight: 900 !important;
     line-height: 1.15 !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
   }
 
-  .field-group-field-panel button small {
+  #screen-fields .field-group-card .field-group-field-panel .field-group-field-button small {
+    display: block !important;
+    flex: 0 0 auto !important;
+    min-width: 0 !important;
     color: #526253 !important;
     font-size: 9px !important;
     font-weight: 720 !important;
     line-height: 1.1 !important;
+    text-align: right !important;
+    white-space: nowrap !important;
   }
 
   .field-master-picker-section {
@@ -555,6 +579,18 @@
 
   #screen-fields .record.field-karte.field-karte-focus {
     animation: fieldKarteFocusPulse 1.4s ease;
+  }
+
+  #screen-fields .record-actions.single-action {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 8px !important;
+  }
+
+  #screen-fields .record-actions .danger {
+    border-color: #e5b8b4 !important;
+    background: #fff4f2 !important;
+    color: #9b302b !important;
   }
 }
 
