@@ -136,7 +136,28 @@
   function matchesWorkName(work, names) {
     const values = Array.isArray(names) ? names : [names];
     const workName = String(work && work.workName || "");
+    if (values.some((name) => workTextMatches(name, ["田植え", "田植", "逕ｰ讀阪∴"]))) return isPlantingWorkName(workName);
+    if (values.some((name) => workTextMatches(name, ["中干し開始", "荳ｭ蟷ｲ縺鈴幕蟋・"]))) return isDryStartWorkName(workName);
+    if (values.some((name) => workTextMatches(name, ["中干し終了", "荳ｭ蟷ｲ縺礼ｵゆｺ・"]))) return isDryEndWorkName(workName);
     return values.some((name) => workName === name || workName.includes(name));
+  }
+
+  function workTextMatches(workName, names) {
+    const values = Array.isArray(names) ? names : [names];
+    const text = String(workName || "");
+    return values.some((name) => text === name || text.includes(name));
+  }
+
+  function isPlantingWorkName(workName) {
+    return workTextMatches(workName, ["田植え", "田植", "逕ｰ讀阪∴"]);
+  }
+
+  function isDryStartWorkName(workName) {
+    return workTextMatches(workName, ["中干し開始", "荳ｭ蟷ｲ縺鈴幕蟋・"]);
+  }
+
+  function isDryEndWorkName(workName) {
+    return workTextMatches(workName, ["中干し終了", "荳ｭ蟷ｲ縺礼ｵゆｺ・"]);
   }
 
   function fieldWorksByNameFor(fieldId, names) {
@@ -190,6 +211,31 @@
       const index = d.fieldWorks.findIndex((w) => w.workId === normalized.workId);
       if (index >= 0) d.fieldWorks[index] = { ...d.fieldWorks[index], ...normalized };
       else d.fieldWorks.push(normalized);
+      if (isPlantingWorkName(normalized.workName)) {
+        normalized.fieldIds.forEach((fieldId) => {
+          const fieldIndex = d.fields.findIndex((f) => f.fieldId === fieldId);
+          if (fieldIndex >= 0) {
+            const dates = d.fieldWorks
+              .filter((work) => (work.fieldIds || []).includes(fieldId) && isPlantingWorkName(work.workName))
+              .map((work) => work.date)
+              .filter(Boolean)
+              .sort();
+            d.fields[fieldIndex].plantingDate = dates[0] || normalized.date;
+          }
+        });
+      }
+      if (isDryStartWorkName(normalized.workName)) {
+        normalized.fieldIds.forEach((fieldId) => {
+          const fieldIndex = d.fields.findIndex((f) => f.fieldId === fieldId);
+          if (fieldIndex >= 0 && !d.fields[fieldIndex].drainageStartDate) d.fields[fieldIndex].drainageStartDate = normalized.date;
+        });
+      }
+      if (isDryEndWorkName(normalized.workName)) {
+        normalized.fieldIds.forEach((fieldId) => {
+          const fieldIndex = d.fields.findIndex((f) => f.fieldId === fieldId);
+          if (fieldIndex >= 0 && !d.fields[fieldIndex].intermittentStartDate) d.fields[fieldIndex].intermittentStartDate = normalized.date;
+        });
+      }
       if (normalized.workName === "田植え") {
         normalized.fieldIds.forEach((fieldId) => {
           const fieldIndex = d.fields.findIndex((f) => f.fieldId === fieldId);

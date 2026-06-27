@@ -5,376 +5,637 @@
   const U = RiceOS.utils;
   const state = RiceOS.state;
 
-  let homeMonth = RiceOS.calendar.monthStart(U.today());
-  let homeDate = U.today();
-  let homeFieldId = "";
+  let viewMode = "week";
+  let anchorDate = U.today();
+  let filterFieldId = "all";
 
-  function fieldLabel(field) {
-    if (!field) return "圃場未設定";
-    const variety = state.variety(field.varietyId);
-    return `${field.name}${variety ? ` / ${variety.name}` : ""}`;
+  function toLocal(dateText) {
+    return U.localDate ? U.localDate(dateText) : new Date(`${dateText}T00:00:00`);
   }
 
-  function currentField() {
-    if (homeFieldId && state.field(homeFieldId)) return state.field(homeFieldId);
-    const field = state.activeFields()[0] || state.fields()[0] || null;
-    homeFieldId = field ? field.fieldId : "";
-    return field;
+  function dateKey(date) {
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
   }
 
-  function homeFieldOptions() {
-    const current = currentField();
-    return state.activeFields().map((field) => `
-      <option value="${U.attr(field.fieldId)}" ${current && current.fieldId === field.fieldId ? "selected" : ""}>${U.escapeHTML(field.name)}</option>
-    `).join("");
+  function addDays(dateText, diff) {
+    const d = toLocal(dateText);
+    d.setDate(d.getDate() + diff);
+    return dateKey(d);
   }
 
-  function areaText() {
-    const area = state.fields().reduce((sum, field) => sum + U.number(field.areaA), 0);
-    return `${Math.round(area * 10) / 10}a`;
+  function weekStart(dateText) {
+    const d = toLocal(dateText);
+    const day = d.getDay();
+    d.setDate(d.getDate() - (day === 0 ? 6 : day - 1));
+    return dateKey(d);
   }
 
-  function renderProgressCard() {
-    const field = currentField();
-    const progress = RiceOS.agro ? RiceOS.agro.progress(field, U.today()) : {};
-    const dap = progress.dap === "" ? "田植日未設定" : `田植後 ${progress.dap}日`;
-    return `
-      <div class="visual-heat-card">
-        <div>
-          <b>${U.escapeHTML(fieldLabel(field))}</b>
-          <span>生育進行の目安</span>
-        </div>
-        <div class="visual-heat-metrics">
-          <span><b>${U.escapeHTML(dap)}</b><small>日数</small></span>
-          <span><b>${U.escapeHTML(progress.tempText || "記録待ち")}</b><small>積算気温</small></span>
-          <span><b>${U.escapeHTML(progress.diffText || "前年比 --")}</b><small>前年比較</small></span>
-        </div>
-      </div>
-    `;
+  function weekDates() {
+    const start = weekStart(anchorDate);
+    return Array.from({ length: 7 }, (_, i) => addDays(start, i));
   }
 
-  function markerClass(entry) {
-    if (entry.kind === "schedule") return "mark-schedule";
-    if (entry.kind === "growth") return "mark-growth";
-    if (entry.kind === "work") return "mark-work";
-    return "mark-water";
+  function monthStart() {
+    return RiceOS.calendar.monthStart(anchorDate);
   }
 
-  function renderCalendarDay(date) {
-    const d = new Date(`${date}T00:00:00`);
-    const inMonth = date.slice(0, 7) === homeMonth.slice(0, 7);
-    const today = date === U.today();
-    const selected = date === homeDate;
-    const entries = RiceOS.calendar.entriesForDate(date);
-    const hasPhoto = entries.some((entry) => entry.hasPhoto);
-    return `
-      <button class="visual-cal-day ${inMonth ? "" : "outside"} ${today ? "today" : ""} ${selected ? "selected" : ""}" data-home-date="${U.attr(date)}">
-        <span>${d.getDate()}</span>
-        <i>
-          ${entries.slice(0, 3).map((entry) => `<b class="${markerClass(entry)}"></b>`).join("")}
-          ${hasPhoto ? '<em>写</em>' : ""}
-        </i>
-      </button>
-    `;
+  function monthLabel(dateText) {
+    const d = toLocal(RiceOS.calendar.monthStart(dateText));
+    return `${d.getFullYear()}年${d.getMonth() + 1}月`;
   }
 
-  function renderEntries(date) {
-    const entries = RiceOS.calendar.entriesForDate(date);
-    if (!entries.length) return '<div class="visual-empty">この日の記録はまだありません。</div>';
-    return entries.slice(0, 4).map((entry) => `
-      <div class="visual-record-line ${U.attr(entry.kind)}">
-        <b>${U.escapeHTML(entry.title)}</b>
-        <span>${U.escapeHTML(entry.subtitle || "")}</span>
-        ${entry.memo ? `<small>${U.escapeHTML(entry.memo)}</small>` : ""}
-      </div>
-    `).join("");
+  function shortDate(dateText) {
+    const d = toLocal(dateText);
+    return `${d.getMonth() + 1}/${d.getDate()}`;
   }
 
-  function renderActionButton(screen, label, icon, extra = "") {
-    return `<button class="visual-add-button ${extra}" data-home-add="${U.attr(screen)}"><span>${U.escapeHTML(icon)}</span>${U.escapeHTML(label)}</button>`;
+  function dayLabel(dateText) {
+    const d = toLocal(dateText);
+    return `${d.getDate()}<small>${["日", "月", "火", "水", "木", "金", "土"][d.getDay()]}</small>`;
   }
 
-  function renderCalendarPanel() {
-    return `
-      <section class="visual-phone visual-calendar-phone">
-        <div class="visual-phone-bar">
-          <div>
-            <b>稲作カルテ</b>
-            <span>田んぼの記録・比較・管理アプリ</span>
-          </div>
-          <button type="button" data-action="refresh-home">更新</button>
-        </div>
-        <div class="visual-month-head">
-          <button type="button" data-home-month="-1">‹</button>
-          <b>${U.escapeHTML(RiceOS.calendar.monthLabel(homeMonth))}</b>
-          <button type="button" data-home-month="1">›</button>
-        </div>
-        <div class="visual-calendar-grid">
-          ${["日", "月", "火", "水", "木", "金", "土"].map((day) => `<strong>${day}</strong>`).join("")}
-          ${RiceOS.calendar.daysForMonth(homeMonth).map(renderCalendarDay).join("")}
-        </div>
-        <div class="visual-day-card">
-          <div>
-            <b>${U.escapeHTML(U.fd(homeDate))} の記録</b>
-            <button type="button" data-home-open-date>日付を開く</button>
-          </div>
-          ${renderEntries(homeDate)}
-        </div>
-        <div class="visual-add-area">
-          <span>${U.escapeHTML(U.fd(homeDate))} に記録を追加</span>
-          <div>
-            ${renderActionButton("growth", "生育記録", "生", "green")}
-            ${renderActionButton("field-work", "作業記録", "作", "orange")}
-            ${renderActionButton("materials", "資材使用", "資", "blue")}
-            ${renderActionButton("calendar", "予定登録", "予", "green")}
-            ${renderActionButton("results", "収穫記録", "収", "brown")}
-            ${renderActionButton("photos", "写真", "写", "yellow")}
-          </div>
-        </div>
-      </section>
-    `;
-  }
-
-  function growthRows() {
-    const field = currentField();
-    return state.data().growthLogs
-      .filter((log) => !field || log.fieldId === field.fieldId)
-      .slice()
-      .sort((a, b) => String(b.date).localeCompare(String(a.date)))
-      .slice(0, 5);
-  }
-
-  function fallbackPhoto(field) {
-    return "";
-  }
-
-  function renderGrowthCard(log, index) {
-    const field = state.field(log.fieldId);
-    const dap = U.daysAfterPlanting(field, log.date);
-    const leafScore = RiceOS.alerts.leafScore(log);
-    const photo = log.photoData || fallbackPhoto(field);
-    return `
-      <article class="visual-growth-card ${index === 0 ? "current" : ""}">
-        <div class="visual-date-stamp">
-          <b>${U.escapeHTML(String(new Date(`${log.date}T00:00:00`).getMonth() + 1))}/${U.escapeHTML(String(new Date(`${log.date}T00:00:00`).getDate()))}</b>
-          <span>${U.escapeHTML(U.weekday(log.date))}</span>
-        </div>
-        <div class="visual-growth-body">
-          <div class="visual-growth-head">
-            <b>葉色：${U.escapeHTML(log.leafColor || "-")}</b>
-            <span>${U.escapeHTML(field && field.name || "圃場")}</span>
-          </div>
-          <div class="visual-leaves">${"●".repeat(Math.max(1, U.number(leafScore, 3)))}${"○".repeat(Math.max(0, 5 - U.number(leafScore, 3)))}</div>
-          <div class="visual-growth-metrics">
-            <span>葉数 ${U.escapeHTML(log.leafCount || "-")}</span>
-            <span>分げつ ${U.escapeHTML(log.tillerCount || "-")}</span>
-            <span>草丈 ${U.escapeHTML(log.plantHeightCm || "-")}cm</span>
-            ${dap !== "" ? `<span>田植後 ${U.escapeHTML(String(dap))}日</span>` : ""}
-          </div>
-          <small>雑草：${U.escapeHTML(log.weed || "-")}　ガス：${U.escapeHTML(log.gas || "-")}　水管理：${U.escapeHTML(log.water || "-")}</small>
-        </div>
-        <div class="visual-photo-tile ${photo ? "" : "empty"}">
-          ${photo ? `<img src="${U.attr(photo)}" alt="">` : "<span>写真</span>"}
-        </div>
-      </article>
-    `;
-  }
-
-  function renderLastYearMini(field) {
-    const result = RiceOS.calendar.lastYearSamePeriod(14);
-    const rows = result.rows.filter((row) => !field || !row.record || row.record.fieldId === field.fieldId).slice(0, 2);
-    return `
-      <div class="visual-compare">
-        <div class="section-title compact">
-          <h3>去年同時期との比較</h3>
-          <span class="muted">${U.escapeHTML(U.fd(result.range.start))} - ${U.escapeHTML(U.fd(result.range.end))}</span>
-        </div>
-        <div class="visual-compare-grid">
-          ${rows.length ? rows.map((row) => `
-            <div>
-              <b>${U.escapeHTML(U.fd(row.date))}</b>
-              <span>${U.escapeHTML(row.title)}</span>
-              <small>${U.escapeHTML(row.subtitle || "")}</small>
-            </div>
-          `).join("") : '<div><b>記録なし</b><span>今年の記録を増やすほど比較しやすくなります。</span></div>'}
-        </div>
-      </div>
-    `;
-  }
-
-  function renderTimelinePanel() {
-    const field = currentField();
+  function fieldVariety(field) {
     const variety = field ? state.variety(field.varietyId) : null;
-    const rows = growthRows();
+    return variety && variety.name || "";
+  }
+
+  function areaText(field) {
+    return field && field.areaA ? `${field.areaA}a` : "面積未設定";
+  }
+
+  function fields() {
+    const rows = state.activeFields().slice(0, 9);
+    return filterFieldId === "all" ? rows : rows.filter((field) => field.fieldId === filterFieldId);
+  }
+
+  function fieldOptions() {
+    return [
+      '<option value="all">すべての圃場</option>',
+      ...state.activeFields().map((field) => `<option value="${U.attr(field.fieldId)}" ${filterFieldId === field.fieldId ? "selected" : ""}>${U.escapeHTML(field.name)}</option>`)
+    ].join("");
+  }
+
+  function entryFieldIds(entry) {
+    const record = entry && entry.record || {};
+    if (record.fieldIds) return record.fieldIds;
+    if (record.fieldId) return [record.fieldId];
+    return [];
+  }
+
+  function eventTone(entry) {
+    if (entry.kind === "growth") return "growth";
+    if (entry.kind === "schedule") return "plan";
+    if (entry.kind === "dry" || entry.kind === "irrigation" || entry.kind === "water") return "water";
+    if (entry.kind === "photo") return "photo";
+    if (entry.kind === "candidate") return "candidate";
+    return "work";
+  }
+
+  function eventLabel(entry) {
+    const title = String(entry.title || "");
+    const record = entry.record || {};
+    if (entry.kind === "candidate") return entry.title;
+    if (entry.hasPhoto && entry.kind === "photo") return "写真追加";
+    if (entry.kind === "growth") {
+      return record.tillerCount ? `分げつ${record.tillerCount}本` : "生育記録";
+    }
+    if (entry.kind === "dry") return title.includes("終了") ? "中干し終了" : "中干し";
+    if (entry.kind === "irrigation") return title || "水管理";
+    if (title.includes("除草")) return "除草剤散布";
+    if (title.includes("草刈")) return "草刈り";
+    if (title.includes("代かき")) return "代かき";
+    if (title.includes("田植")) return "田植え";
+    if (title.includes("溝切")) return "溝切り";
+    if (title.includes("防除")) return "防除";
+    if (title.includes("追肥")) return "追肥";
+    if (title.includes("収穫")) return "収穫";
+    return title || "作業";
+  }
+
+  function shortEventLabel(entry) {
+    const label = eventLabel(entry);
+    const record = entry.record || {};
+    if (label.includes("中干し")) return "中干し";
+    if (label.includes("水深")) return "水深";
+    if (label.includes("葉色")) return "葉色";
+    if (label.includes("確認候補")) return "確認";
+    if (label.includes("分げつ")) return record.tillerCount ? `分げつ${record.tillerCount}` : "生育";
+    if (label.includes("除草")) return "除草";
+    if (label.includes("草刈")) return "草刈";
+    if (label.includes("代かき")) return "代かき";
+    if (label.includes("田植")) return "田植";
+    if (label.includes("写真")) return "写真";
+    return label.length > 4 ? label.slice(0, 4) : label;
+  }
+
+  function eventIcon(entry) {
+    const text = eventLabel(entry);
+    if (entry.kind === "candidate") return "⚠";
+    if (entry.kind === "growth") return "🌱";
+    if (entry.kind === "photo" || entry.hasPhoto && text === "写真追加") return "📷";
+    if (entry.kind === "dry" || entry.kind === "irrigation" || text.includes("水") || text.includes("溝切")) return "💧";
+    if (text.includes("除草") || text.includes("防除") || text.includes("追肥")) return "🧪";
+    if (text.includes("草刈")) return "🌿";
+    if (text.includes("田植")) return "🌾";
+    if (text.includes("収穫")) return "🚜";
+    return "🚜";
+  }
+
+  function latestGrowth(fieldId) {
+    return state.growthLogsFor(fieldId).slice().sort((a, b) => String(b.date).localeCompare(String(a.date)))[0] || null;
+  }
+
+  function latestWater(fieldId) {
+    const rows = [
+      ...(state.dryPeriodsFor ? state.dryPeriodsFor(fieldId) : []),
+      ...(state.irrigationsFor ? state.irrigationsFor(fieldId) : [])
+    ].filter((row) => row.date || row.startDate).sort((a, b) => String(b.date || b.startDate).localeCompare(String(a.date || a.startDate)));
+    return rows[0] || null;
+  }
+
+  function candidatesForDate(date) {
+    if (date !== U.today()) return [];
+    return state.activeFields().flatMap((field) => {
+      const rows = [];
+      const planting = state.plantingDateForField ? state.plantingDateForField(field.fieldId) : "";
+      const dap = planting ? U.daysBetween(planting, date) : "";
+      const dryStart = state.workDateForField ? state.workDateForField(field.fieldId, ["中干し開始"], "first") : "";
+      if (dap !== "" && dap >= 35 && dap <= 55 && !dryStart) {
+        rows.push({
+          kind: "candidate",
+          title: "中干し確認候補",
+          subtitle: `${field.name} / 田植後${dap}日`,
+          record: { fieldId: field.fieldId },
+          reason: "田植え後日数から現場確認の候補です"
+        });
+      }
+      const growth = latestGrowth(field.fieldId);
+      if (!growth || U.daysBetween(growth.date, date) >= 7) {
+        rows.push({
+          kind: "candidate",
+          title: "葉色確認候補",
+          subtitle: field.name,
+          record: { fieldId: field.fieldId },
+          reason: growth ? `前回 ${U.fd(growth.date)}` : "生育記録なし"
+        });
+      }
+      const water = latestWater(field.fieldId);
+      if (dap !== "" && dap >= 25 && (!water || U.daysBetween(water.date || water.startDate, date) >= 5)) {
+        rows.push({
+          kind: "candidate",
+          title: "水深確認候補",
+          subtitle: field.name,
+          record: { fieldId: field.fieldId },
+          reason: water ? `前回 ${U.fd(water.date || water.startDate)}` : "水管理記録なし"
+        });
+      }
+      return rows;
+    }).slice(0, 5);
+  }
+
+  function baseEntriesForDate(date) {
+    const entries = RiceOS.calendar.entriesForDate(date).slice();
+    return [...entries, ...candidatesForDate(date)];
+  }
+
+  function entriesForDate(date) {
+    return baseEntriesForDate(date).filter((entry) => {
+      if (filterFieldId === "all") return true;
+      return entryFieldIds(entry).includes(filterFieldId);
+    });
+  }
+
+  function entriesForCell(date, field) {
+    return entriesForDate(date).filter((entry) => entryFieldIds(entry).includes(field.fieldId));
+  }
+
+  function eventPill(entry, compact) {
+    const compactClass = compact === "month" ? "compact month-compact" : (compact ? "compact" : "");
+    const label = compact ? shortEventLabel(entry) : eventLabel(entry);
     return `
-      <section class="visual-phone visual-timeline-phone">
-        <div class="visual-panel-head">
-          <div>
-            <span>生育タイムライン：${U.escapeHTML(field ? field.name : "圃場")}</span>
-            <b>${U.escapeHTML(variety && variety.targetTillers ? `目標分げつ ${variety.targetTillers}` : "生育の流れ")}</b>
-          </div>
-          <button type="button" data-home-add="growth">追加</button>
-        </div>
-        <div class="visual-timeline-list">
-          ${rows.length ? rows.map(renderGrowthCard).join("") : '<div class="visual-empty tall">生育記録を入れると、ここに画像のようなタイムラインが並びます。</div>'}
-        </div>
-        ${renderLastYearMini(field)}
-      </section>
-    `;
-  }
-
-  function latestDry(field) {
-    return (state.data().dryPeriods || [])
-      .filter((item) => !field || item.fieldId === field.fieldId)
-      .sort((a, b) => String(b.date).localeCompare(String(a.date)))[0] || null;
-  }
-
-  function latestIrrigation(field) {
-    return (state.data().irrigations || [])
-      .filter((item) => !field || item.fieldId === field.fieldId)
-      .sort((a, b) => String(b.date).localeCompare(String(a.date)))[0] || null;
-  }
-
-  function renderChoiceRow(label, values, active) {
-    return `
-      <div class="visual-choice-row">
+      <span class="farm-event-pill ${eventTone(entry)} ${compactClass}">
+        <span>${eventIcon(entry)}</span>
         <b>${U.escapeHTML(label)}</b>
-        <div>${values.map((value) => `<span class="${String(value) === String(active) ? "active" : ""}">${U.escapeHTML(value)}</span>`).join("")}</div>
-      </div>
+      </span>
     `;
   }
 
-  function renderWaterProgress(field, dry, irrigation) {
-    const start = dry && dry.startDate || field && field.drainageStartDate || "";
-    const end = dry && dry.endDate || (start && field && field.drainageTargetDays ? U.dateAddDays(start, U.number(field.drainageTargetDays)) : "");
-    const elapsed = start ? U.daysBetween(start, U.today()) : "";
-    const remain = end ? U.daysBetween(U.today(), end) : "";
-    const pct = elapsed !== "" && remain !== "" ? Math.max(8, Math.min(100, (elapsed / Math.max(1, elapsed + remain)) * 100)) : 42;
+  function renderHeader() {
+    const year = toLocal(anchorDate).getFullYear();
     return `
-      <div class="visual-progress-card">
+      <header class="farm-calendar-header">
         <div>
-          <b>中干しの進捗</b>
-          <span>${elapsed !== "" ? `${elapsed}日目` : "開始日未設定"}${remain !== "" ? ` / 残り${remain}日` : ""}</span>
+          <h1>カレンダー</h1>
+          <p>圃場ごとの作業・生育・写真をまとめて確認</p>
         </div>
-        <i><span style="width:${U.attr(String(pct))}%"></span></i>
-        <dl>
-          <div><dt>開始日</dt><dd>${U.escapeHTML(U.fd(start) || "-")}</dd></div>
-          <div><dt>終了予定</dt><dd>${U.escapeHTML(U.fd(end) || "-")}</dd></div>
-          <div><dt>水管理</dt><dd>${U.escapeHTML(irrigation && irrigation.method || "間断灌水/湿潤灌漑")}</dd></div>
-        </dl>
+        <div class="farm-calendar-actions">
+          <button type="button" class="farm-year-button" data-home-today>📅 ${year}年</button>
+          <button type="button" class="farm-menu-button" data-home-filter>絞り込み</button>
+        </div>
+      </header>
+      <div class="farm-view-tabs" role="tablist">
+        ${["month:月表示", "week:週表示", "list:リスト", "progress:進捗"].map((item) => {
+          const [key, label] = item.split(":");
+          return `<button type="button" class="${viewMode === key ? "active" : ""}" data-home-view="${key}">${label}</button>`;
+        }).join("")}
+      </div>
+      <div class="farm-filter-row">
+        <select data-home-field-filter>${fieldOptions()}</select>
+        <button type="button" data-home-prev>‹</button>
+        <button type="button" data-home-next>›</button>
       </div>
     `;
   }
 
-  function renderInputPanel() {
-    const field = currentField();
-    const dry = latestDry(field);
-    const irrigation = latestIrrigation(field);
+  function renderWeekView() {
+    const dates = weekDates();
+    const start = dates[0];
+    const end = dates[dates.length - 1];
     return `
-      <section class="visual-phone visual-input-phone">
-        <div class="visual-form-head">
-          <div>
-            <span>中干し記録</span>
-            <b>${U.escapeHTML(fieldLabel(field))}</b>
+      <section class="farm-calendar-panel">
+        <div class="farm-panel-title">
+          <button type="button" data-home-prev>‹</button>
+          <h2>${U.escapeHTML(U.fd(start))} 〜 ${U.escapeHTML(U.fd(end))}</h2>
+          <button type="button" data-home-this-week>今週</button>
+        </div>
+        <div class="farm-week-scroll">
+          <div class="farm-week-grid" style="--day-count:${dates.length}">
+            <div class="farm-week-corner">圃場</div>
+            ${dates.map((date) => `<div class="farm-week-day ${date === U.today() ? "today" : ""}">${dayLabel(date)}</div>`).join("")}
+            ${fields().map((field) => `
+              <button type="button" class="farm-week-field" data-home-open-field="${U.attr(field.fieldId)}">
+                <img src="assets/images/light-icons/rice-clump.png" alt="">
+                <b>${U.escapeHTML(field.name)}</b>
+                <small>${U.escapeHTML(fieldVariety(field))} / ${U.escapeHTML(areaText(field))}</small>
+              </button>
+              ${dates.map((date) => {
+                const entries = entriesForCell(date, field).slice(0, 2);
+                return `
+                  <button type="button" class="farm-week-cell ${entries.length ? "has-event" : ""} ${entries.length > 1 ? "multi-event" : ""} ${date === U.today() ? "today-col" : ""}" data-home-date="${U.attr(date)}" data-home-field="${U.attr(field.fieldId)}">
+                    ${entries.length ? entries.map((entry) => eventPill(entry, true)).join("") : "<span></span>"}
+                  </button>
+                `;
+              }).join("")}
+            `).join("")}
           </div>
-          <button type="button" data-home-add="dry-period">追加</button>
         </div>
-        <div class="visual-tabs">
-          <span>基本情報</span>
-          <span class="active">中干し観察</span>
-          <span>写真・メモ</span>
+        <div class="farm-legend">
+          <span><i class="work"></i>作業</span>
+          <span><i class="growth"></i>生育</span>
+          <span><i class="photo"></i>写真</span>
+          <span><i class="candidate"></i>確認候補</span>
+          <span><i class="water"></i>水管理</span>
         </div>
-        <div class="visual-form-body">
-          <label>観察日 <b>${U.escapeHTML(U.fd(dry && dry.date || U.today()))}</b></label>
-          <label>中干し日数 <b>${U.escapeHTML(dry && dry.targetDays || field && field.drainageTargetDays || "7")}日目安</b></label>
-          ${renderChoiceRow("ひび割れ幅", ["0", "1cm", "2cm", "3cm", "5cm以上"], dry && dry.crackCm ? `${dry.crackCm}cm` : "2cm")}
-          ${renderChoiceRow("足の沈み込み", ["0", "2cm", "3cm", "5cm", "10cm以上"], dry && dry.sinkCm ? `${dry.sinkCm}cm` : "3cm")}
-          ${renderChoiceRow("田面の状態", ["湿っている", "やや乾いている", "乾いている"], dry && dry.surface || "乾いている")}
-          ${renderChoiceRow("ガスの状態", ["多い", "少しあり", "ほとんど無し", "無し"], dry && dry.gas || "ほとんど無し")}
-          <label>メモ <small>${U.escapeHTML(dry && dry.memo || "午前中観察。田面はよく乾いてきている。")}</small></label>
-          <button class="visual-save-button" type="button" data-home-add="dry-period">中干しを記録する</button>
-        </div>
-        ${renderWaterProgress(field, dry, irrigation)}
+        ${renderTodaySchedule(dates[3] || U.today())}
       </section>
     `;
   }
 
-  function renderTopSummary() {
+  function renderMonthView() {
+    const month = monthStart();
+    const days = RiceOS.calendar.daysForMonth(month);
     return `
-      <section class="visual-home-top">
-        <div class="visual-home-title">
-          <span>田んぼの記録・比較・管理アプリ</span>
-          <b>稲作カルテ</b>
-          <label class="visual-home-field">表示圃場<select data-home-field>${homeFieldOptions()}</select></label>
+      <section class="farm-calendar-panel">
+        <div class="farm-panel-title">
+          <button type="button" data-home-prev>‹</button>
+          <h2>${monthLabel(month)}</h2>
+          <button type="button" data-home-today>今日</button>
         </div>
-        <div class="visual-home-hero" role="img" aria-label="田んぼの写真">
-          <span>今日の田んぼを、来年の判断材料へ</span>
+        <div class="farm-month-grid">
+          ${["日", "月", "火", "水", "木", "金", "土"].map((day) => `<strong>${day}</strong>`).join("")}
+          ${days.map((date) => {
+            const inMonth = date.slice(0, 7) === month.slice(0, 7);
+            const entries = entriesForDate(date);
+            return `
+              <button type="button" class="farm-month-day ${inMonth ? "" : "muted"} ${entries.length ? "has-event" : ""} ${entries.length > 1 ? "multi-event" : ""} ${date === U.today() ? "today" : ""}" data-home-date="${U.attr(date)}">
+                <b>${toLocal(date).getDate()}</b>
+                ${entries.slice(0, 2).map((entry) => eventPill(entry, "month")).join("")}
+                ${entries.length > 2 ? `<em>+${entries.length - 2}件</em>` : ""}
+              </button>
+            `;
+          }).join("")}
         </div>
-        <div class="visual-kpi-row">
-          <span><b>${U.escapeHTML(areaText())}</b><small>管理面積</small></span>
-          <span><b>${U.escapeHTML(String(state.fields().length))}枚</b><small>圃場</small></span>
-          <span><b>${U.escapeHTML(String(state.varieties().length))}</b><small>品種</small></span>
+        ${renderCandidateCard()}
+      </section>
+    `;
+  }
+
+  function listEntries() {
+    const start = addDays(anchorDate, -20);
+    const end = addDays(anchorDate, 30);
+    const rows = [];
+    for (let date = start; date <= end; date = addDays(date, 1)) {
+      entriesForDate(date).forEach((entry) => rows.push({ date, entry }));
+    }
+    const grouped = [];
+    const candidateMap = new Map();
+    rows.forEach((row) => {
+      if (row.entry.kind !== "candidate") {
+        grouped.push(row);
+        return;
+      }
+      const fieldId = entryFieldIds(row.entry)[0] || "";
+      const key = `${row.date}:${fieldId}`;
+      if (!candidateMap.has(key)) {
+        const field = state.field(fieldId);
+        const item = {
+          date: row.date,
+          entry: {
+            kind: "candidate",
+            title: row.entry.title,
+            subtitle: field ? field.name : row.entry.subtitle,
+            record: { fieldId },
+            candidateTitles: [row.entry.title]
+          }
+        };
+        candidateMap.set(key, item);
+        grouped.push(item);
+        return;
+      }
+      const item = candidateMap.get(key);
+      if (!item.entry.candidateTitles.includes(row.entry.title)) item.entry.candidateTitles.push(row.entry.title);
+      item.entry.title = `${item.entry.candidateTitles.slice(0, 2).map((title) => title.replace("確認候補", "")).join("・")}確認候補`;
+      if (item.entry.candidateTitles.length > 2) item.entry.title = `確認候補 ${item.entry.candidateTitles.length}件`;
+    });
+    return grouped.sort((a, b) => String(a.date).localeCompare(String(b.date))).slice(0, 36);
+  }
+
+  function renderListView() {
+    const rows = listEntries();
+    return `
+      <section class="farm-calendar-panel farm-list-panel">
+        <div class="farm-panel-title">
+          <h2>${monthLabel(anchorDate)}</h2>
+          <select data-home-field-filter>${fieldOptions()}</select>
         </div>
-        ${renderProgressCard()}
+        <div class="farm-list">
+          ${rows.length ? rows.map(({ date, entry }) => {
+            const field = state.field(entryFieldIds(entry)[0]);
+            return `
+              <button type="button" class="farm-list-row ${eventTone(entry)}" data-home-date="${U.attr(date)}" data-home-field="${U.attr(field && field.fieldId || "")}">
+                <time>${U.escapeHTML(shortDate(date))}<small>${U.escapeHTML(U.weekday(date))}</small></time>
+                <span>${eventIcon(entry)}</span>
+                <b>${U.escapeHTML(eventLabel(entry))}</b>
+                <em>${U.escapeHTML(field ? `${field.name} / ${areaText(field)}` : entry.subtitle || "")}</em>
+                <i>›</i>
+              </button>
+            `;
+          }).join("") : '<div class="farm-empty">この期間の記録はまだありません</div>'}
+        </div>
+      </section>
+    `;
+  }
+
+  function progressPercent(current, target) {
+    const c = U.number(current, 0);
+    const t = U.number(target, 0);
+    if (!t) return 0;
+    return Math.max(0, Math.min(100, Math.round((c / t) * 100)));
+  }
+
+  function fieldWorksMatching(fieldId, names) {
+    return state.fieldWorksFor(fieldId)
+      .filter((work) => names.some((name) => String(work.workName || "").includes(name)))
+      .sort((a, b) => String(b.date).localeCompare(String(a.date)));
+  }
+
+  function latestProgressGrowth(fieldId) {
+    return state.growthLogsFor(fieldId)
+      .slice()
+      .sort((a, b) => String(b.date).localeCompare(String(a.date)))[0] || null;
+  }
+
+  function varietyDayTarget(variety, key, fallback) {
+    return U.number(variety && variety[key], fallback) || fallback;
+  }
+
+  function progressRowsForField(field) {
+    const planting = state.plantingDateForField ? state.plantingDateForField(field.fieldId) : "";
+    const dap = planting ? U.daysBetween(planting, U.today()) : "";
+    const dryStart = field.drainageStartDate || (state.workDateForField ? state.workDateForField(field.fieldId, ["中干し開始"], "first") : "");
+    const dryDays = U.number(field.drainageTargetDays, 7) || 7;
+    const dryElapsed = dryStart ? U.daysBetween(dryStart, U.today()) : "";
+    const irrigationStart = field.intermittentStartDate || (state.workDateForField ? state.workDateForField(field.fieldId, ["間断灌水開始", "湿潤灌漑開始"], "first") : "");
+    const irrigationDays = U.number(field.intermittentIntervalDays, 3) || 3;
+    const irrigationElapsed = irrigationStart ? U.daysBetween(irrigationStart, U.today()) : "";
+    const herbicide = fieldWorksMatching(field.fieldId, ["除草", "除草剤"])[0];
+    const growth = latestProgressGrowth(field.fieldId);
+    const variety = state.variety(field.varietyId);
+    const targetTillers = variety && variety.targetTillers || "";
+    const herbicideDays = varietyDayTarget(variety, "herbicideDaysAfterPlanting", 7);
+    const panicleDays = varietyDayTarget(variety, "panicleInitiationDaysAfterPlanting", 60);
+    const headingDays = varietyDayTarget(variety, "headingDaysAfterPlanting", 85);
+    const panicleTemp = variety && variety.panicleAccumulatedTempTarget || "";
+    const headingTemp = variety && variety.headingAccumulatedTempTarget || "";
+    return [
+      {
+        tone: "green",
+        icon: "🌾",
+        title: "田植え後",
+        value: dap === "" ? "未登録" : `${dap}日`,
+        note: planting ? `田植日 ${U.fd(planting)}` : "田植え作業を登録してください",
+        percent: dap === "" ? 0 : progressPercent(dap, 120)
+      },
+      {
+        tone: dryStart ? "water" : "amber",
+        icon: "💧",
+        title: dryStart ? "中干し進捗" : "中干し目安",
+        value: dryStart ? `${dryElapsed} / ${dryDays}日` : (dap === "" ? "未判定" : `${dap}日経過`),
+        note: dryStart ? `開始 ${U.fd(dryStart)}` : "田植え後42日前後を目安に現場確認",
+        percent: dryStart ? progressPercent(dryElapsed, dryDays) : (dap === "" ? 0 : progressPercent(dap, 42))
+      },
+      {
+        tone: herbicide ? "green" : "orange",
+        icon: "🧪",
+        title: herbicide ? "除草剤散布" : "除草剤目安",
+        value: herbicide ? "記録済み" : (dap === "" ? "未判定" : `${dap}日経過`),
+        note: herbicide ? `${U.fd(herbicide.date)} ${herbicide.workName}` : `初期剤は田植え後${herbicideDays}日前後を目安に確認`,
+        percent: herbicide ? 100 : (dap === "" ? 0 : progressPercent(dap, herbicideDays))
+      },
+      {
+        tone: "amber",
+        icon: "🌿",
+        title: "幼穂形成期",
+        value: dap === "" ? "未判定" : (dap >= panicleDays ? `${dap}日経過` : `あと${panicleDays - dap}日`),
+        note: panicleTemp ? `日数目安 ${panicleDays}日 / 積算気温目標 ${panicleTemp}` : `田植え後${panicleDays}日前後を目安に確認`,
+        percent: dap === "" ? 0 : progressPercent(dap, panicleDays)
+      },
+      {
+        tone: "green",
+        icon: "🌾",
+        title: "出穂目安",
+        value: dap === "" ? "未判定" : (dap >= headingDays ? `${dap}日経過` : `あと${headingDays - dap}日`),
+        note: headingTemp ? `日数目安 ${headingDays}日 / 積算気温目標 ${headingTemp}` : `田植え後${headingDays}日前後を目安に確認`,
+        percent: dap === "" ? 0 : progressPercent(dap, headingDays)
+      },
+      {
+        tone: "blue",
+        icon: "🌱",
+        title: "生育確認",
+        value: growth ? `分げつ${growth.tillerCount || "-"}本` : "未入力",
+        note: targetTillers ? `目標 ${targetTillers}` : "栽培レシピで目標設定",
+        percent: growth && growth.tillerCount ? progressPercent(U.number(growth.tillerCount, 0), U.number(String(targetTillers).match(/\\d+/)?.[0], 22)) : 0
+      },
+      {
+        tone: "water",
+        icon: "〰",
+        title: "間断/湿潤",
+        value: irrigationStart ? `${irrigationElapsed} / ${irrigationDays}日` : "開始未登録",
+        note: irrigationStart ? `開始 ${U.fd(irrigationStart)}` : "中干し後に開始日を登録",
+        percent: irrigationStart ? progressPercent(irrigationElapsed % irrigationDays || irrigationDays, irrigationDays) : 0
+      }
+    ];
+  }
+
+  function renderProgressRow(row) {
+    return `
+      <div class="farm-progress-row ${U.attr(row.tone)}">
+        <span class="farm-progress-icon">${U.escapeHTML(row.icon)}</span>
+        <div>
+          <b>${U.escapeHTML(row.title)}</b>
+          <small>${U.escapeHTML(row.note)}</small>
+          <i><em style="width:${U.attr(String(row.percent))}%"></em></i>
+        </div>
+        <strong>${U.escapeHTML(row.value)}</strong>
+      </div>
+    `;
+  }
+
+  function renderProgressView() {
+    const rows = fields().slice(0, 8);
+    return `
+      <section class="farm-calendar-panel farm-progress-panel">
+        <div class="farm-panel-title farm-progress-title">
+          <h2>田植えからの進捗</h2>
+          <button type="button" data-home-today>今日</button>
+        </div>
+        <div class="farm-progress-list">
+          ${rows.map((field) => `
+            <article class="farm-progress-card">
+              <header>
+                <img src="assets/images/light-icons/rice-panicle.png" alt="">
+                <div>
+                  <b>${U.escapeHTML(field.name)}</b>
+                  <small>${U.escapeHTML(fieldVariety(field))} / ${U.escapeHTML(areaText(field))}</small>
+                </div>
+              </header>
+              ${progressRowsForField(field).map(renderProgressRow).join("")}
+            </article>
+          `).join("")}
+        </div>
+      </section>
+    `;
+  }
+
+  function renderCandidateCard() {
+    const rows = candidatesForDate(U.today()).slice(0, 2);
+    return `
+      <section class="farm-candidate-card">
+        <div>
+          <h3>今日の確認候補</h3>
+          <button type="button" data-home-view="list">すべて見る ›</button>
+        </div>
+        ${rows.length ? rows.map((entry) => {
+          const field = state.field(entryFieldIds(entry)[0]);
+          const planting = field && state.plantingDateForField ? state.plantingDateForField(field.fieldId) : "";
+          const dap = planting ? U.daysBetween(planting, U.today()) : "";
+          return `
+            <button type="button" class="farm-candidate-row" data-home-date="${U.attr(U.today())}" data-home-field="${U.attr(field && field.fieldId || "")}">
+              <img src="assets/images/light-icons/rice-panicle.png" alt="">
+              <span>
+                <b>${U.escapeHTML(field && field.name || entry.subtitle || "圃場")}</b>
+                <em>${U.escapeHTML(entry.title)}</em>
+                <small>${dap !== "" ? `田植え後${dap}日` : "田植日未登録"}・現場を見て判断</small>
+              </span>
+              <i>›</i>
+            </button>
+          `;
+        }).join("") : '<div class="farm-empty">今日の確認候補はありません</div>'}
+      </section>
+    `;
+  }
+
+  function renderTodaySchedule(date) {
+    const rows = fields().map((field) => ({ field, entries: entriesForCell(date, field) })).filter((row) => row.entries.length).slice(0, 2);
+    return `
+      <section class="farm-today-card">
+        <h3>${U.escapeHTML(shortDate(date))}（${U.escapeHTML(U.weekday(date))}）の予定</h3>
+        <div class="farm-today-grid">
+          ${rows.length ? rows.map((row) => `
+            <div class="farm-today-field">
+              <b>${U.escapeHTML(row.field.name)} <small>(${U.escapeHTML(fieldVariety(row.field))} / ${U.escapeHTML(areaText(row.field))})</small></b>
+              ${row.entries.slice(0, 3).map((entry) => eventPill(entry, false)).join("")}
+            </div>
+          `).join("") : '<div class="farm-empty">この日の予定はまだありません</div>'}
+        </div>
       </section>
     `;
   }
 
   function render() {
-    U.$("homeVisualDashboard").innerHTML = `
-      <div class="visual-app-board">
-        ${renderTopSummary()}
-        <div class="visual-three-panel">
-          ${renderCalendarPanel()}
-          ${renderTimelinePanel()}
-          ${renderInputPanel()}
-        </div>
+    const root = U.$("homeVisualDashboard");
+    if (!root) return;
+    root.innerHTML = `
+      <div class="farm-calendar-home">
+        ${renderHeader()}
+        ${viewMode === "week" ? renderWeekView() : ""}
+        ${viewMode === "month" ? renderMonthView() : ""}
+        ${viewMode === "list" ? renderListView() : ""}
+        ${viewMode === "progress" ? renderProgressView() : ""}
+        <button type="button" class="farm-calendar-fab" data-home-date="${U.attr(U.today())}" aria-label="記録を追加">＋</button>
       </div>
     `;
   }
 
-  function openAddTarget(target) {
-    if (!target) return;
-    const field = currentField();
-    if (target === "calendar") {
-      RiceOS.app.show("calendar");
-      if (RiceOS.bottomSheet) RiceOS.bottomSheet.open(homeDate, field && field.fieldId);
-      return;
-    }
-    RiceOS.app.show(target);
-    if (target === "growth" && RiceOS.screens.growth) RiceOS.screens.growth.prefillDate(homeDate, field && field.fieldId);
-    if (target === "field-work" && RiceOS.screens.fieldWork) RiceOS.screens.fieldWork.prefillDate(homeDate, field && field.fieldId);
-    if (target === "dry-period" && RiceOS.screens.dryPeriod) RiceOS.screens.dryPeriod.prefillDate(homeDate, field && field.fieldId);
+  function openDate(date, fieldId) {
+    if (RiceOS.bottomSheet) RiceOS.bottomSheet.open(date || U.today(), fieldId || "");
   }
 
   function bind() {
-    U.$("homeVisualDashboard").addEventListener("click", (event) => {
-      const monthButton = event.target.closest("[data-home-month]");
-      if (monthButton) {
-        homeMonth = RiceOS.calendar.addMonths(homeMonth, Number(monthButton.dataset.homeMonth));
+    const root = U.$("homeVisualDashboard");
+    if (!root || root.dataset.boundHomeCalendar === "1") return;
+    root.dataset.boundHomeCalendar = "1";
+    root.addEventListener("click", (event) => {
+      const view = event.target.closest("[data-home-view]");
+      if (view) {
+        viewMode = view.dataset.homeView;
         render();
+        return;
+      }
+      if (event.target.closest("[data-home-today]")) {
+        anchorDate = U.today();
+        render();
+        return;
+      }
+      if (event.target.closest("[data-home-this-week]")) {
+        anchorDate = U.today();
+        render();
+        return;
+      }
+      if (event.target.closest("[data-home-prev]")) {
+        anchorDate = viewMode === "month" ? RiceOS.calendar.addMonths(RiceOS.calendar.monthStart(anchorDate), -1) : addDays(anchorDate, viewMode === "week" ? -7 : -30);
+        render();
+        return;
+      }
+      if (event.target.closest("[data-home-next]")) {
+        anchorDate = viewMode === "month" ? RiceOS.calendar.addMonths(RiceOS.calendar.monthStart(anchorDate), 1) : addDays(anchorDate, viewMode === "week" ? 7 : 30);
+        render();
+        return;
+      }
+      const fieldButton = event.target.closest("[data-home-open-field]");
+      if (fieldButton && RiceOS.app) {
+        RiceOS.app.show("fields");
         return;
       }
       const dateButton = event.target.closest("[data-home-date]");
       if (dateButton) {
-        homeDate = dateButton.dataset.homeDate;
-        render();
-        if (RiceOS.bottomSheet) RiceOS.bottomSheet.open(homeDate, currentField() && currentField().fieldId);
-        return;
+        openDate(dateButton.dataset.homeDate || U.today(), dateButton.dataset.homeField || "");
       }
-      if (event.target.closest("[data-home-open-date]")) {
-        if (RiceOS.bottomSheet) RiceOS.bottomSheet.open(homeDate, currentField() && currentField().fieldId);
-        return;
-      }
-      const fieldSelect = event.target.closest("[data-home-field]");
-      if (fieldSelect) return;
-      const addButton = event.target.closest("[data-home-add]");
-      if (addButton) openAddTarget(addButton.dataset.homeAdd);
     });
-    U.$("homeVisualDashboard").addEventListener("change", (event) => {
-      const select = event.target.closest("[data-home-field]");
+    root.addEventListener("change", (event) => {
+      const select = event.target.closest("[data-home-field-filter]");
       if (!select) return;
-      homeFieldId = select.value;
+      filterFieldId = select.value || "all";
       render();
     });
   }

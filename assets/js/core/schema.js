@@ -42,6 +42,11 @@
     topDressingTiming: "",
     pestControlPlan: "",
     targetTillers: "18〜22本",
+    herbicideDaysAfterPlanting: "7",
+    panicleInitiationDaysAfterPlanting: "60",
+    headingDaysAfterPlanting: "85",
+    headingAccumulatedTempTarget: "",
+    panicleAccumulatedTempTarget: "",
     memo: ""
   };
 
