@@ -2781,6 +2781,69 @@ h3 {
   margin-top: 6px;
 }
 
+.field-bulk-tools {
+  display: grid;
+  gap: 8px;
+  margin: 4px 0 10px;
+  padding: 10px;
+  border: 1px solid #d9e8d2;
+  border-radius: 10px;
+  background: linear-gradient(180deg, #f8fff4, #fffdf5);
+}
+
+.field-bulk-tools > div:first-child {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.field-bulk-tools b {
+  color: #162219;
+  font-size: 14px;
+  font-weight: 850;
+}
+
+.field-bulk-tools small {
+  color: #267737;
+  font-size: 12px;
+  font-weight: 850;
+  text-align: right;
+}
+
+.field-bulk-actions,
+.field-group-picks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.field-bulk-actions button {
+  min-height: 34px;
+  padding: 0 13px;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.field-group-pick {
+  min-height: 34px;
+  padding: 0 10px;
+  border: 1px solid #cfe4c6;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #193521;
+  box-shadow: 0 2px 7px rgba(33, 90, 42, 0.08);
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.field-group-pick span {
+  margin-left: 4px;
+  color: #69806d;
+  font-size: 10px;
+  font-weight: 800;
+}
+
 .select-card {
   min-height: 48px;
   padding: 9px;

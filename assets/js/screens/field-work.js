@@ -23,9 +23,39 @@
     return U.$$("#fwFields .select-card.selected").map((el) => el.dataset.id);
   }
 
+  function fieldGroupName(field) {
+    const raw = String(field && (field.fieldGroupId || field.district) || "").trim();
+    if (!raw) return "未設定";
+    return raw.replace(/グループ$/, "");
+  }
+
+  function fieldGroups() {
+    const map = new Map();
+    state.activeFields().forEach((field) => {
+      const name = fieldGroupName(field);
+      if (!map.has(name)) map.set(name, []);
+      map.get(name).push(field);
+    });
+    return Array.from(map.entries()).map(([name, fields]) => ({ name, fields }));
+  }
+
+  function updateFieldSelectionSummary() {
+    const summary = U.$("fwFieldSelectionSummary");
+    if (!summary) return;
+    const ids = selectedFieldIds();
+    const totalArea = ids.reduce((sum, id) => {
+      const field = state.field(id);
+      return sum + U.number(field && field.areaA, 0);
+    }, 0);
+    summary.textContent = ids.length
+      ? `${ids.length}圃場 / ${Math.round(totalArea * 10) / 10}a を選択中`
+      : "未選択";
+  }
+
   function setSelectedFieldIds(ids) {
     const selected = new Set(ids || []);
     U.$$("#fwFields .select-card").forEach((el) => el.classList.toggle("selected", selected.has(el.dataset.id)));
+    updateFieldSelectionSummary();
   }
 
   function selectedVarietyForWork() {
@@ -88,6 +118,15 @@
   }
 
   function renderFieldCards() {
+    const selected = selectedFieldIds();
+    if (U.$("fwGroupPicks")) {
+      U.$("fwGroupPicks").innerHTML = fieldGroups().map((group) => `
+        <button class="field-group-pick" type="button" data-fw-group="${U.attr(group.name)}">
+          ${U.escapeHTML(group.name === "未設定" ? "未設定" : `${group.name}グループ`)}
+          <span>${U.escapeHTML(String(group.fields.length))}圃場</span>
+        </button>
+      `).join("");
+    }
     U.$("fwFields").innerHTML = state.activeFields().map((field) => {
       const variety = state.variety(field.varietyId);
       return `
@@ -97,6 +136,7 @@
         </div>
       `;
     }).join("");
+    setSelectedFieldIds(selected);
   }
 
   function syncWorkerPreset() {
@@ -302,6 +342,28 @@
       const card = event.target.closest(".select-card");
       if (card) {
         card.classList.toggle("selected");
+        updateFieldSelectionSummary();
+        applyWorkPreset(U.$("fwName").value);
+      }
+    });
+
+    const bulkTools = U.$("fieldWorkForm");
+    bulkTools.addEventListener("click", (event) => {
+      const actionButton = event.target.closest("[data-fw-select]");
+      if (actionButton) {
+        const action = actionButton.dataset.fwSelect;
+        if (action === "all") setSelectedFieldIds(state.activeFields().map((field) => field.fieldId));
+        if (action === "clear") setSelectedFieldIds([]);
+        applyWorkPreset(U.$("fwName").value);
+        return;
+      }
+      const groupButton = event.target.closest("[data-fw-group]");
+      if (groupButton) {
+        const group = groupButton.dataset.fwGroup || "";
+        const ids = state.activeFields()
+          .filter((field) => fieldGroupName(field) === group)
+          .map((field) => field.fieldId);
+        setSelectedFieldIds(ids);
         applyWorkPreset(U.$("fwName").value);
       }
     });
