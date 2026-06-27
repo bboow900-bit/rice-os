@@ -64,6 +64,23 @@
     `;
   }
 
+  function renderMasterTile(label, value, tone) {
+    return `
+      <div class="${tone || ""}">
+        <span>${U.escapeHTML(label)}</span>
+        <b>${U.escapeHTML(value || "-")}</b>
+      </div>
+    `;
+  }
+
+  function renderMiniTiles(items, tone) {
+    return `
+      <div class="field-master-mini-grid">
+        ${items.map((item) => renderMasterTile(item[0], item[1], tone)).join("")}
+      </div>
+    `;
+  }
+
   function formatNumber(value, digits) {
     const n = Number(value);
     if (!Number.isFinite(n)) return "";
@@ -95,6 +112,24 @@
       bagKg,
       totalKg,
       bags
+    };
+  }
+
+  function seedlingPlan(variety, field) {
+    const area = U.number(field.areaA, 0);
+    const boxesPer10a = U.number(variety && variety.seedlingBoxesPer10a, 0);
+    const required = area && boxesPer10a ? area / 10 * boxesPer10a : 0;
+    const actual = U.number(field.seedlingBoxes, 0);
+    const diff = actual && required ? actual - required : 0;
+    return {
+      rowSpacing: variety && variety.rowSpacing || "",
+      plantSpacing: variety && variety.plantSpacing || "",
+      plantsPerTsubo: variety && variety.plantsPerTsubo || "",
+      scrapeAmount: variety && variety.seedlingScrapeAmount || "",
+      boxesPer10a,
+      required,
+      actual,
+      diff
     };
   }
 
@@ -360,13 +395,17 @@
     `;
   }
 
-  function renderFeatureTags(field) {
-    const tags = [
+  function featureItems(field) {
+    return [
       field.soilType,
       field.waterHolding ? `水持ち:${field.waterHolding}` : "",
       ...(Array.isArray(field.fieldFeatures) ? field.fieldFeatures : []),
       ...(Array.isArray(field.commonWeeds) ? field.commonWeeds.map((weed) => `雑草:${weed}`) : [])
     ].filter(Boolean);
+  }
+
+  function renderFeatureTags(field) {
+    const tags = featureItems(field);
     return tags.length ? tags.slice(0, 8).map((tag) => `<span>${U.escapeHTML(tag)}</span>`).join("") : '<span>特徴未設定</span>';
   }
 
@@ -375,29 +414,88 @@
     const dap = U.daysAfterPlanting(field, U.today());
     const fixedMemo = String(field.fixedMemo || "").trim();
     const fertilizer = fertilizerPlan(variety, field);
+    const seedling = seedlingPlan(variety, field);
     const boxPer10a = per10a(field.seedlingBoxes, field.areaA);
     const fertilizerPer10a = fertilizer.totalKg && field.areaA ? formatNumber(fertilizer.totalKg / U.number(field.areaA, 0) * 10, 1) : "";
+    const seedlingDiffText = seedling.actual && seedling.required
+      ? `${seedling.diff >= 0 ? "+" : ""}${formatNumber(seedling.diff, 1)}箱`
+      : "-";
+    const features = featureItems(field);
+    const featureText = features.length ? features.slice(0, 3).join("・") + (features.length > 3 ? ` ほか${features.length - 3}` : "") : "未設定";
     return `
       <div class="field-karte-dashboard">
-        <section class="field-karte-overview">
-          <div class="field-karte-metrics">
-            ${renderKarteMetric("品種", variety && variety.name || "未設定", "green")}
-            ${renderKarteMetric("面積", `${field.areaA || 0}a`, "blue")}
-            ${renderKarteMetric("箱数", field.seedlingBoxes ? `${field.seedlingBoxes}箱` : "未設定", "amber")}
-            ${renderKarteMetric("基肥合計", fertilizer.totalKg ? `${formatNumber(fertilizer.totalKg, 1)}kg` : "未設定", "purple")}
-            ${renderKarteMetric("分げつ目標", variety && variety.targetTillers || "未設定", "purple")}
-          </div>
-          <div class="field-karte-tags">${renderFeatureTags(field)}</div>
-          ${fixedMemo ? `<div class="field-fixed-note"><b>固定メモ</b><span>${U.escapeHTML(fixedMemo)}</span></div>` : ""}
-        </section>
-        <section class="field-master-derived">
-          <div><span>基肥</span><b>${U.escapeHTML(fertilizer.name)}</b></div>
-          <div><span>レシピ施肥量</span><b>${U.escapeHTML(fertilizer.amount || "-")}</b></div>
-          <div><span>1袋</span><b>${U.escapeHTML(formatNumber(fertilizer.bagKg, 1))}kg</b></div>
-          <div><span>袋数</span><b>${fertilizer.bags ? `${U.escapeHTML(formatNumber(fertilizer.bags, 1))}袋` : "-"}</b></div>
-          <div><span>箱数/10a</span><b>${boxPer10a ? `${U.escapeHTML(boxPer10a)}箱` : "-"}</b></div>
-          <div><span>肥料kg/10a</span><b>${fertilizerPer10a ? `${U.escapeHTML(fertilizerPer10a)}kg` : "-"}</b></div>
-        </section>
+        <div class="field-master-panels">
+          <section class="field-master-panel basic">
+            <div class="field-master-panel-head">
+              <span class="field-master-panel-icon rice"><img src="assets/images/light-icons/paddy-field.png" alt=""></span>
+              <div><h4>圃場基本</h4><p>この田んぼの固定情報</p></div>
+            </div>
+            <div class="field-master-hero-row">
+              <div class="field-master-hero-main">
+                <span>品種</span>
+                <b>${U.escapeHTML(variety && variety.name || "未設定")}</b>
+              </div>
+              <div class="field-master-hero-sub">
+                <span>面積</span>
+                <b>${U.escapeHTML(String(field.areaA || 0))}a</b>
+              </div>
+            </div>
+            ${renderMiniTiles([
+              ["分げつ目標", variety && variety.targetTillers || "未設定"],
+              ["特徴", featureText]
+            ], "green")}
+            ${fixedMemo ? `<div class="field-fixed-note compact"><b>固定メモ</b><span>${U.escapeHTML(fixedMemo)}</span></div>` : ""}
+          </section>
+          <section class="field-master-panel seedling">
+            <div class="field-master-panel-head">
+              <span class="field-master-panel-icon tray"><img src="assets/images/light-icons/seedling-tray.png" alt=""></span>
+              <div><h4>苗箱計算</h4><p>田植機設定から目安箱数を計算</p></div>
+            </div>
+            <div class="field-master-hero-row">
+              <div class="field-master-hero-main">
+                <span>必要箱数</span>
+                <b>${seedling.required ? `${U.escapeHTML(formatNumber(seedling.required, 1))}箱` : "未設定"}</b>
+              </div>
+              <div class="field-master-hero-sub">
+                <span>実使用</span>
+                <b>${field.seedlingBoxes ? `${U.escapeHTML(String(field.seedlingBoxes))}箱` : "未入力"}</b>
+              </div>
+              <div class="field-master-hero-sub">
+                <span>差分</span>
+                <b>${U.escapeHTML(seedlingDiffText)}</b>
+              </div>
+            </div>
+            ${renderMiniTiles([
+              ["株間", seedling.plantSpacing || "-"],
+              ["坪あたり株数", seedling.plantsPerTsubo ? `${seedling.plantsPerTsubo}株` : "-"],
+              ["10a箱数目安", seedling.boxesPer10a ? `${formatNumber(seedling.boxesPer10a, 1)}箱` : "-"],
+              ["かき取り量", seedling.scrapeAmount || "未設定"],
+              ["実績/10a", boxPer10a ? `${boxPer10a}箱` : "-"]
+            ], "amber")}
+          </section>
+          <section class="field-master-panel fertilizer">
+            <div class="field-master-panel-head">
+              <span class="field-master-panel-icon bag"><img src="assets/images/light-icons/fertilizer-bag.png" alt=""></span>
+              <div><h4>基肥計算</h4><p>レシピから袋数まで自動計算</p></div>
+            </div>
+            <div class="field-master-hero-row">
+              <div class="field-master-hero-main">
+                <span>合計</span>
+                <b>${fertilizer.totalKg ? `${U.escapeHTML(formatNumber(fertilizer.totalKg, 1))}kg` : "未設定"}</b>
+              </div>
+              <div class="field-master-hero-sub">
+                <span>袋数</span>
+                <b>${fertilizer.bags ? `${U.escapeHTML(formatNumber(fertilizer.bags, 1))}袋` : "-"}</b>
+              </div>
+            </div>
+            ${renderMiniTiles([
+              ["基肥", fertilizer.name],
+              ["施肥量", fertilizer.amount || "-"],
+              ["1袋", `${formatNumber(fertilizer.bagKg, 1)}kg`],
+              ["肥料kg/10a", fertilizerPer10a ? `${fertilizerPer10a}kg` : "-"]
+            ], "purple")}
+          </section>
+        </div>
         <button class="secondary field-history-link" type="button" data-field-action="history" data-field-id="${U.attr(field.fieldId)}">この圃場の年間履歴を見る</button>
       </div>
     `;
@@ -425,7 +523,7 @@
               ${input(field, "district", "地区")}
               <label>品種<select data-field-id="${U.attr(field.fieldId)}" data-field-field="varietyId">${varietyOptions(field.varietyId)}</select></label>
               ${input(field, "areaA", "面積(a)", "number")}
-              ${input(field, "seedlingBoxes", "箱数", "number")}
+              ${input(field, "seedlingBoxes", "実使用箱数", "number")}
               <label>状態<select data-field-id="${U.attr(field.fieldId)}" data-field-field="status">${statusOptions(field.status)}</select></label>
               ${input(field, "sortOrder", "表示順", "number")}
             </div>

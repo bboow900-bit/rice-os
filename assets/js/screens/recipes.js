@@ -12,6 +12,9 @@
         ["rowSpacing", "条間"],
         ["plantSpacing", "株間"],
         ["plantsPerHill", "植付本数"],
+        ["plantsPerTsubo", "坪あたり株数"],
+        ["seedlingBoxesPer10a", "10a箱数目安"],
+        ["seedlingScrapeAmount", "かき取り量"],
         ["transplanterSetting", "田植機設定メモ"]
       ]
     },

@@ -1,5 +1,5 @@
-﻿const CACHE_NAME = "rice-karte-20260626-61";
-const APP_VERSION = "20260626_ver61";
+﻿const CACHE_NAME = "rice-karte-20260627-67";
+const APP_VERSION = "20260627_ver67";
 
 const APP_SHELL = [
   "./",
@@ -41,6 +41,18 @@ const APP_SHELL = [
   "./assets/images/rice-stages/rice-paddy-tile-06.png",
   "./assets/images/rice-stages/rice-paddy-tile-07.png",
   "./assets/images/rice-stages/rice-paddy-tile-08.png",
+  "./assets/images/light-icons/paddy-field.png",
+  "./assets/images/light-icons/rice-clump.png",
+  "./assets/images/light-icons/rice-panicle.png",
+  "./assets/images/light-icons/seedling-tray.png",
+  "./assets/images/light-icons/transplanter-light.png",
+  "./assets/images/light-icons/fertilizer-bag.png",
+  "./assets/images/light-icons/water-gate.png",
+  "./assets/images/light-icons/water-channel.png",
+  "./assets/images/light-icons/muddy-footprint.png",
+  "./assets/images/light-icons/dry-cracks.png",
+  "./assets/images/light-icons/karte-notebook.png",
+  "./assets/images/light-icons/rice-sack.png",
   `./assets/js/core/utils.js?v=${APP_VERSION}`,
   `./assets/js/core/schema.js?v=${APP_VERSION}`,
   `./assets/js/core/storage.js?v=${APP_VERSION}`,

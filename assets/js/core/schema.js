@@ -24,6 +24,9 @@
     plantSpacing: "18cm",
     plantsPerHill: "4本",
     seedlingBoxes: "",
+    plantsPerTsubo: "60",
+    seedlingBoxesPer10a: "",
+    seedlingScrapeAmount: "",
     transplanterSetting: "",
     baseFertilizerName: "",
     baseFertilizerNpk: "",
@@ -78,6 +81,8 @@
       rowSpacing: "30cm",
       plantSpacing: "18cm",
       plantsPerHill: "4本",
+      plantsPerTsubo: "60",
+      seedlingBoxesPer10a: "18",
       baseFertilizerName: "多収稲専用",
       baseFertilizerNpk: "25-8-8",
       baseFertilizerAmount: "45kg/10a",
@@ -87,8 +92,10 @@
       varietyId: "variety_koshihikari",
       name: "コシヒカリ",
       rowSpacing: "30cm",
-      plantSpacing: "18cm",
+      plantSpacing: "24cm",
       plantsPerHill: "4本",
+      plantsPerTsubo: "60",
+      seedlingBoxesPer10a: "15",
       memo: "倒伏と追肥量に注意。"
     }
   ].map((v) => ({ ...DEFAULT_VARIETY_FIELDS, ...v }));
