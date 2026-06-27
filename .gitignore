@@ -1,3 +1,6 @@
 __pycache__/
 *.pyc
 稲作OS_Ver*.html
+.codex-remote-attachments/
+.tmp-chrome*/
+artifacts-icons-check/

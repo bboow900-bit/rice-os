@@ -1,0 +1,20 @@
+{
+  "name": "Rice Karte",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:1-22-bookworm",
+  "forwardPorts": [8001],
+  "portsAttributes": {
+    "8001": {
+      "label": "Rice Karte preview",
+      "onAutoForward": "openPreview"
+    }
+  },
+  "postCreateCommand": "node --version",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "GitHub.copilot",
+        "GitHub.copilot-chat"
+      ]
+    }
+  }
+}
