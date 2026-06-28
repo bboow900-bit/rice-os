@@ -9,6 +9,7 @@
   let anchorDate = U.today();
   let filterFieldId = "all";
   const heatCache = new Map();
+  const heatProjectionCache = new Map();
 
   function toLocal(dateText) {
     return U.localDate ? U.localDate(dateText) : new Date(`${dateText}T00:00:00`);
@@ -21,6 +22,12 @@
   function addDays(dateText, diff) {
     const d = toLocal(dateText);
     d.setDate(d.getDate() + diff);
+    return dateKey(d);
+  }
+
+  function addYears(dateText, diff) {
+    const d = toLocal(dateText);
+    d.setFullYear(d.getFullYear() + diff);
     return dateKey(d);
   }
 
@@ -411,6 +418,53 @@
     return [field && field.fieldId, planting, date, location.latitude, location.longitude, location.updatedAt].join(":");
   }
 
+  function heatPace(cached) {
+    const rows = cached && Array.isArray(cached.rows) ? cached.rows : [];
+    const valid = rows.filter((row) => row.tempMean !== "" && Number.isFinite(Number(row.tempMean)));
+    const recent = valid.slice(-10);
+    const source = recent.length ? recent : valid;
+    if (!source.length) return 0;
+    const total = source.reduce((sum, row) => sum + Number(row.tempMean), 0);
+    return Math.round((total / source.length) * 10) / 10;
+  }
+
+  function heatEtaLabel(total, target, pace, reachedLabel, pendingLabel) {
+    if (total === "" || !pace) return `${pendingLabel}: 計算中`;
+    if (Number(total) >= Number(target)) return `${reachedLabel}: 到達`;
+    const days = Math.max(1, Math.ceil((Number(target) - Number(total)) / pace));
+    return `${pendingLabel}: あと${days}日ごろ (${U.fd(addDays(U.today(), days))})`;
+  }
+
+  function heatEtaFromProjection(total, target, rows, reachedLabel, pendingLabel) {
+    if (total === "") return `${pendingLabel}: 計算中`;
+    if (Number(total) >= Number(target)) return `${reachedLabel}: 到達`;
+    let sum = Number(total);
+    const validRows = (rows || []).filter((row) => row.tempMean !== "" && Number.isFinite(Number(row.tempMean)));
+    for (const row of validRows) {
+      sum += Number(row.tempMean);
+      if (sum >= Number(target)) {
+        const days = Math.max(1, U.daysBetween(U.today(), row.date));
+        return `${pendingLabel}: あと${days}日ごろ (${U.fd(row.date)})`;
+      }
+    }
+    const pace = heatPace({ rows: validRows });
+    return heatEtaLabel(total, target, pace, reachedLabel, pendingLabel);
+  }
+
+  function renderHeatForecast(cached, total, panicleTarget, target) {
+    const pace = heatPace(cached);
+    if (!cached || cached.error) return "";
+    const projectionRows = cached.projectionRows || [];
+    const basis = projectionRows.length ? "今年実測 + 7日予報 + 昨年同時期" : (pace ? `直近ペース ${pace}℃/日` : "気温データ確認中");
+    return `
+      <div class="farm-heat-forecast">
+        <span>${U.escapeHTML(`予測: ${basis}`)}</span>
+        <b>${U.escapeHTML(projectionRows.length ? heatEtaFromProjection(total, panicleTarget, projectionRows, "幼穂形成", "幼穂形成まで") : heatEtaLabel(total, panicleTarget, pace, "幼穂形成", "幼穂形成まで"))}</b>
+        <b>${U.escapeHTML(projectionRows.length ? heatEtaFromProjection(total, target, projectionRows, "出穂目安", "出穂目安まで") : heatEtaLabel(total, target, pace, "出穂目安", "出穂目安まで"))}</b>
+      </div>
+    `;
+  }
+
   function renderHeatMeter(field) {
     const planting = state.plantingDateForField ? state.plantingDateForField(field.fieldId) : "";
     const target = accumulatedTempTarget(field);
@@ -443,6 +497,7 @@
           <i style="left:${U.attr(String(paniclePercent))}%"></i>
           <em style="width:${U.attr(String(percent))}%"></em>
         </div>
+        ${renderHeatForecast(cached, total, panicleTarget, target)}
         <div class="farm-heat-scale">
           <span>田植え</span>
           <span>幼穂 ${U.escapeHTML(String(panicleTarget))}℃</span>
@@ -648,20 +703,70 @@
     if (viewMode === "progress") setTimeout(hydrateHeatMeters, 50);
   }
 
+  function heatProjectionKey(location) {
+    return [U.today(), location && location.latitude, location && location.longitude].join(":");
+  }
+
+  async function fetchHeatProjection(location) {
+    const key = heatProjectionKey(location);
+    if (heatProjectionCache.has(key)) return heatProjectionCache.get(key);
+    const promise = (async () => {
+      const today = U.today();
+      const rows = [];
+      try {
+        const forecast = await RiceOS.weather.fetchDailyRange(addDays(today, 1), addDays(today, 7), location);
+        rows.push(...(forecast.rows || []).map((row) => ({ ...row, basis: "forecast" })));
+      } catch (error) {
+        // Forecast horizons can vary. Last year's archive still gives a seasonal estimate.
+      }
+      try {
+        const lastYear = await RiceOS.weather.fetchDailyRange(addYears(addDays(today, 8), -1), addYears(addDays(today, 120), -1), location);
+        rows.push(...(lastYear.rows || []).map((row) => ({
+          ...row,
+          date: addYears(row.date, 1),
+          basedOnDate: row.date,
+          basis: "lastYear"
+        })));
+      } catch (error) {
+        // If archive data is unavailable, the UI falls back to the recent actual pace.
+      }
+      return rows
+        .filter((row) => row.date > today)
+        .sort((a, b) => String(a.date).localeCompare(String(b.date)));
+    })();
+    heatProjectionCache.set(key, promise);
+    return promise;
+  }
+
   async function hydrateHeatMeters() {
     if (viewMode !== "progress" || !RiceOS.weather || !RiceOS.weather.fetchDailyRange) return;
     const visibleFields = fields().slice(0, 8);
+    let location = null;
+    let projectionRows = [];
     for (const field of visibleFields) {
       const planting = state.plantingDateForField ? state.plantingDateForField(field.fieldId) : "";
       if (!planting) continue;
       const key = heatCacheKey(field, planting, U.today());
       if (!heatCache.has(key)) {
         try {
-          const location = await RiceOS.weather.ensureLocation();
+          location = location || await RiceOS.weather.ensureLocation();
           const result = await RiceOS.weather.fetchDailyRange(planting, U.today(), location);
+          projectionRows = projectionRows.length ? projectionRows : await fetchHeatProjection(location);
+          result.projectionRows = projectionRows;
           heatCache.set(key, result);
         } catch (error) {
           heatCache.set(key, { error: error.message || "積算気温を取得できませんでした" });
+        }
+      } else {
+        const cached = heatCache.get(key);
+        if (cached && !cached.error && !cached.projectionRows) {
+          try {
+            location = location || await RiceOS.weather.ensureLocation();
+            projectionRows = projectionRows.length ? projectionRows : await fetchHeatProjection(location);
+            cached.projectionRows = projectionRows;
+          } catch (error) {
+            // Keep the accumulated value visible even if prediction loading fails.
+          }
         }
       }
       const target = document.querySelector(`[data-heat-field="${CSS.escape(field.fieldId)}"]`);

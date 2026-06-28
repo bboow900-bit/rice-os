@@ -825,6 +825,31 @@
   box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.74);
 }
 
+.farm-heat-forecast {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 3px;
+  padding: 7px 8px;
+  border: 1px solid rgba(199, 171, 89, 0.38);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.58);
+}
+
+.farm-heat-forecast span {
+  color: #75663a;
+  font-size: 9.5px;
+  font-weight: 850;
+  line-height: 1.15;
+}
+
+.farm-heat-forecast b {
+  display: block;
+  color: #24301f;
+  font-size: 10.5px;
+  font-weight: 920;
+  line-height: 1.2;
+}
+
 .farm-heat-scale {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
