@@ -8,6 +8,7 @@
   let viewMode = "week";
   let anchorDate = U.today();
   let filterFieldId = "all";
+  const heatCache = new Map();
 
   function toLocal(dateText) {
     return U.localDate ? U.localDate(dateText) : new Date(`${dateText}T00:00:00`);
@@ -309,8 +310,10 @@
             return `
               <button type="button" class="farm-month-day ${inMonth ? "" : "muted"} ${entries.length ? "has-event" : ""} ${entries.length > 1 ? "multi-event" : ""} ${date === U.today() ? "today" : ""}" data-home-date="${U.attr(date)}">
                 <b>${toLocal(date).getDate()}</b>
-                ${entries.slice(0, 2).map((entry) => eventPill(entry, "month")).join("")}
-                ${entries.length > 2 ? `<em>+${entries.length - 2}件</em>` : ""}
+                <span class="farm-month-events" style="--event-count:${entries.length ? 1 : 0}">
+                  ${entries.slice(0, 1).map((entry) => eventPill(entry, "month")).join("")}
+                </span>
+                ${entries.length > 1 ? `<em class="farm-month-more">+${entries.length - 1}件</em>` : ""}
               </button>
             `;
           }).join("")}
@@ -391,6 +394,62 @@
     const t = U.number(target, 0);
     if (!t) return 0;
     return Math.max(0, Math.min(100, Math.round((c / t) * 100)));
+  }
+
+  function accumulatedTempTarget(field) {
+    const variety = field ? state.variety(field.varietyId) : null;
+    return U.number(variety && variety.headingAccumulatedTempTarget, 1600) || 1600;
+  }
+
+  function panicleTempTarget(field) {
+    const variety = field ? state.variety(field.varietyId) : null;
+    return U.number(variety && variety.panicleAccumulatedTempTarget, 1000) || 1000;
+  }
+
+  function heatCacheKey(field, planting, date) {
+    const location = state.data().meta && state.data().meta.weatherLocation || {};
+    return [field && field.fieldId, planting, date, location.latitude, location.longitude, location.updatedAt].join(":");
+  }
+
+  function renderHeatMeter(field) {
+    const planting = state.plantingDateForField ? state.plantingDateForField(field.fieldId) : "";
+    const target = accumulatedTempTarget(field);
+    const panicleTarget = panicleTempTarget(field);
+    const key = heatCacheKey(field, planting, U.today());
+    const cached = heatCache.get(key);
+    const total = cached && cached.total !== undefined ? cached.total : "";
+    const count = cached && cached.count || 0;
+    const percent = total === "" ? 0 : progressPercent(total, target);
+    const paniclePercent = progressPercent(panicleTarget, target);
+    const title = total === "" ? "積算気温を取得中" : `${Math.round(total)}℃`;
+    const note = !planting
+      ? "田植え作業を登録すると計算します"
+      : cached && cached.error
+        ? cached.error
+        : count
+          ? `${U.fd(planting)}から${count}日分 / 出穂目安 ${target}℃`
+          : "圃場付近の天気データを確認中";
+    return `
+      <section class="farm-heat-meter" data-heat-field="${U.attr(field.fieldId)}">
+        <div class="farm-heat-meter-head">
+          <span>🔥</span>
+          <div>
+            <b>積算気温</b>
+            <small>${U.escapeHTML(note)}</small>
+          </div>
+          <strong>${U.escapeHTML(title)}</strong>
+        </div>
+        <div class="farm-heat-bar">
+          <i style="left:${U.attr(String(paniclePercent))}%"></i>
+          <em style="width:${U.attr(String(percent))}%"></em>
+        </div>
+        <div class="farm-heat-scale">
+          <span>田植え</span>
+          <span>幼穂 ${U.escapeHTML(String(panicleTarget))}℃</span>
+          <span>出穂 ${U.escapeHTML(String(target))}℃</span>
+        </div>
+      </section>
+    `;
   }
 
   function fieldWorksMatching(fieldId, names) {
@@ -519,6 +578,7 @@
                   <small>${U.escapeHTML(fieldVariety(field))} / ${U.escapeHTML(areaText(field))}</small>
                 </div>
               </header>
+              ${renderHeatMeter(field)}
               ${progressRowsForField(field).map(renderProgressRow).join("")}
             </article>
           `).join("")}
@@ -585,6 +645,28 @@
         <button type="button" class="farm-calendar-fab" data-home-date="${U.attr(U.today())}" aria-label="記録を追加">＋</button>
       </div>
     `;
+    if (viewMode === "progress") setTimeout(hydrateHeatMeters, 50);
+  }
+
+  async function hydrateHeatMeters() {
+    if (viewMode !== "progress" || !RiceOS.weather || !RiceOS.weather.fetchDailyRange) return;
+    const visibleFields = fields().slice(0, 8);
+    for (const field of visibleFields) {
+      const planting = state.plantingDateForField ? state.plantingDateForField(field.fieldId) : "";
+      if (!planting) continue;
+      const key = heatCacheKey(field, planting, U.today());
+      if (!heatCache.has(key)) {
+        try {
+          const location = await RiceOS.weather.ensureLocation();
+          const result = await RiceOS.weather.fetchDailyRange(planting, U.today(), location);
+          heatCache.set(key, result);
+        } catch (error) {
+          heatCache.set(key, { error: error.message || "積算気温を取得できませんでした" });
+        }
+      }
+      const target = document.querySelector(`[data-heat-field="${CSS.escape(field.fieldId)}"]`);
+      if (target) target.outerHTML = renderHeatMeter(field);
+    }
   }
 
   function openDate(date, fieldId) {

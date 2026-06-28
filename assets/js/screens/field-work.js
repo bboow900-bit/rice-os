@@ -25,8 +25,9 @@
 
   function fieldGroupName(field) {
     const raw = String(field && (field.fieldGroupId || field.district) || "").trim();
-    if (!raw) return "未設定";
-    return raw.replace(/グループ$/, "");
+    if (raw) return raw.replace(/グループ$/, "");
+    const first = String(field && field.name || "").split(/[ 　]/)[0];
+    return first || "未設定";
   }
 
   function fieldGroups() {
@@ -265,12 +266,18 @@
     U.$("fwWeatherStatus").textContent = message;
   }
 
+  function weatherLocationText(location) {
+    return RiceOS.weather && RiceOS.weather.locationText
+      ? RiceOS.weather.locationText(location)
+      : [location && location.label, location && location.latitude, location && location.longitude].filter(Boolean).join(" / ");
+  }
+
   async function useCurrentLocation() {
     try {
       setWeatherStatus("現在地を取得中です。");
       const location = await RiceOS.weather.currentPosition();
       state.updateWeatherLocation(location);
-      setWeatherStatus(`位置を保存しました: ${location.latitude}, ${location.longitude}`);
+      setWeatherStatus(`位置を保存しました: ${weatherLocationText(location)}`);
       await fetchWorkWeather(false);
     } catch (error) {
       setWeatherStatus(error.message);
@@ -290,9 +297,9 @@
       alert("緯度・経度は数字で入力してください。");
       return;
     }
-    const location = { latitude, longitude, label: "手入力位置", updatedAt: U.now() };
+    const location = { latitude, longitude, label: "手入力位置", source: "manual", updatedAt: U.now() };
     state.updateWeatherLocation(location);
-    setWeatherStatus(`位置を保存しました: ${latitude}, ${longitude}`);
+    setWeatherStatus(`位置を保存しました: ${weatherLocationText(location)}`);
     await fetchWorkWeather(false);
   }
 
@@ -302,7 +309,7 @@
       setWeatherStatus("地名から位置を検索中です。");
       const location = await RiceOS.weather.searchPlace(place);
       state.updateWeatherLocation(location);
-      setWeatherStatus(`位置を保存しました: ${location.label}`);
+      setWeatherStatus(`位置を保存しました: ${weatherLocationText(location)}`);
       await fetchWorkWeather(false);
     } catch (error) {
       setWeatherStatus(error.message);
@@ -319,7 +326,7 @@
       U.$("fwWeather").value = weather.summary;
       U.$("fwWeather").dataset.autoFilled = "1";
       U.$("fwWeatherAutoJson").value = JSON.stringify(weather);
-      setWeatherStatus(`${weather.source}: ${weather.summary}`);
+      setWeatherStatus(`${weather.source}: ${weather.summary} / 位置: ${weatherLocationText(location)}`);
       if (showAlert) U.toast("天気を取得しました");
       return weather;
     } catch (error) {

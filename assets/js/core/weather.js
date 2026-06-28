@@ -43,6 +43,9 @@
     99: "強いひょうを伴う雷雨"
   };
 
+  const GEO_MAXIMUM_AGE_MS = 5 * 60 * 1000;
+  const GEO_STALE_MS = 12 * 60 * 60 * 1000;
+
   function weatherLabel(code) {
     return WEATHER_LABELS[Number(code)] || `天気コード${code}`;
   }
@@ -50,6 +53,30 @@
   function round(value) {
     const n = Number(value);
     return Number.isFinite(n) ? Math.round(n * 10) / 10 : "";
+  }
+
+  function updatedAtMs(location) {
+    const t = location && location.updatedAt ? Date.parse(location.updatedAt) : NaN;
+    return Number.isFinite(t) ? t : 0;
+  }
+
+  function isGeolocation(location) {
+    return String(location && location.source || "") === "geolocation" || String(location && location.label || "") === "現在地";
+  }
+
+  function isStaleCurrentLocation(location) {
+    if (!location || !isGeolocation(location)) return false;
+    const updated = updatedAtMs(location);
+    return !updated || Date.now() - updated > GEO_STALE_MS;
+  }
+
+  function locationText(location) {
+    if (!location) return "位置未設定";
+    const lat = Number(location.latitude);
+    const lon = Number(location.longitude);
+    const coords = Number.isFinite(lat) && Number.isFinite(lon) ? `${lat.toFixed(5)}, ${lon.toFixed(5)}` : "";
+    const accuracy = location.accuracy ? `精度約${Math.round(location.accuracy)}m` : "";
+    return [location.label || "取得位置", coords, accuracy].filter(Boolean).join(" / ");
   }
 
   function isPastDate(dateText) {
@@ -70,6 +97,17 @@
     url.searchParams.set("timezone", "Asia/Tokyo");
     url.searchParams.set("start_date", dateText);
     url.searchParams.set("end_date", dateText);
+    return url.toString();
+  }
+
+  function buildRangeUrl(startDate, endDate, location, endpoint) {
+    const url = new URL(endpoint);
+    url.searchParams.set("latitude", String(location.latitude));
+    url.searchParams.set("longitude", String(location.longitude));
+    url.searchParams.set("daily", DAILY_PARAMS);
+    url.searchParams.set("timezone", "Asia/Tokyo");
+    url.searchParams.set("start_date", startDate);
+    url.searchParams.set("end_date", endDate);
     return url.toString();
   }
 
@@ -108,6 +146,70 @@
     return result;
   }
 
+  async function fetchDailyRange(startDate, endDate, location) {
+    if (!startDate || !endDate) throw new Error("開始日と終了日を指定してください。");
+    if (!location || location.latitude === undefined || location.longitude === undefined) {
+      throw new Error("天気取得位置が未設定です。");
+    }
+    const today = U.today();
+    const ranges = [];
+    if (startDate < today) {
+      const archiveEnd = endDate < today ? endDate : addDays(today, -1);
+      if (startDate <= archiveEnd) {
+        ranges.push({
+          source: "Open-Meteo Archive",
+          url: buildRangeUrl(startDate, archiveEnd, location, "https://archive-api.open-meteo.com/v1/archive")
+        });
+      }
+    }
+    if (endDate >= today) {
+      const forecastStart = startDate > today ? startDate : today;
+      ranges.push({
+        source: "Open-Meteo Forecast",
+        url: buildRangeUrl(forecastStart, endDate, location, "https://api.open-meteo.com/v1/forecast")
+      });
+    }
+
+    const rows = [];
+    for (const range of ranges) {
+      const response = await fetch(range.url);
+      if (!response.ok) throw new Error(`天気APIエラー: ${response.status}`);
+      const json = await response.json();
+      if (json.error) throw new Error(json.reason || "天気を取得できませんでした。");
+      const daily = json.daily || {};
+      const dates = daily.time || [];
+      dates.forEach((date, index) => {
+        rows.push({
+          date,
+          source: range.source,
+          weatherCode: Array.isArray(daily.weather_code) ? daily.weather_code[index] : "",
+          tempMax: round(Array.isArray(daily.temperature_2m_max) ? daily.temperature_2m_max[index] : ""),
+          tempMin: round(Array.isArray(daily.temperature_2m_min) ? daily.temperature_2m_min[index] : ""),
+          tempMean: round(Array.isArray(daily.temperature_2m_mean) ? daily.temperature_2m_mean[index] : ""),
+          precipitation: round(Array.isArray(daily.precipitation_sum) ? daily.precipitation_sum[index] : "")
+        });
+      });
+    }
+    rows.sort((a, b) => String(a.date).localeCompare(String(b.date)));
+    const valid = rows.filter((row) => row.tempMean !== "");
+    const total = valid.reduce((sum, row) => sum + Number(row.tempMean), 0);
+    return {
+      startDate,
+      endDate,
+      rows,
+      count: valid.length,
+      total: Math.round(total * 10) / 10,
+      location,
+      fetchedAt: U.now()
+    };
+  }
+
+  function addDays(dateText, diff) {
+    const d = U.localDate ? U.localDate(dateText) : new Date(`${dateText}T00:00:00`);
+    d.setDate(d.getDate() + diff);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  }
+
   function formatSummary(weather) {
     if (!weather) return "";
     const temp = weather.tempMean !== ""
@@ -135,11 +237,12 @@
             longitude: Math.round(pos.coords.longitude * 100000) / 100000,
             accuracy: Math.round(pos.coords.accuracy || 0),
             label: "現在地",
+            source: "geolocation",
             updatedAt: U.now()
           });
         },
         () => reject(new Error("現在地を取得できませんでした。ブラウザの位置情報許可を確認してください。")),
-        { enableHighAccuracy: true, timeout: 12000, maximumAge: 86400000 }
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: GEO_MAXIMUM_AGE_MS }
       );
     });
   }
@@ -161,13 +264,15 @@
       latitude: Math.round(Number(item.latitude) * 100000) / 100000,
       longitude: Math.round(Number(item.longitude) * 100000) / 100000,
       label: [item.name, item.admin1, item.country].filter(Boolean).join(" / "),
+      source: "geocoding",
       updatedAt: U.now()
     };
   }
 
-  async function ensureLocation() {
+  async function ensureLocation(options) {
+    const opts = options || {};
     const current = RiceOS.state.data().meta && RiceOS.state.data().meta.weatherLocation;
-    if (current && current.latitude !== undefined && current.longitude !== undefined) return current;
+    if (!opts.refresh && current && current.latitude !== undefined && current.longitude !== undefined && !isStaleCurrentLocation(current)) return current;
     const location = await currentPosition();
     RiceOS.state.updateWeatherLocation(location);
     return location;
@@ -179,6 +284,8 @@
     weatherLabel,
     currentPosition,
     searchPlace,
-    ensureLocation
+    ensureLocation,
+    locationText,
+    fetchDailyRange
   };
 })();
