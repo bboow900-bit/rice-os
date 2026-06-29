@@ -414,6 +414,9 @@
       scheduleType: String(s.scheduleType || s.kind || "作業予定"),
       title: String(s.title || s.workName || s.scheduleType || "予定"),
       status: String(s.status || "予定"),
+      completedAt: String(s.completedAt || ""),
+      completedByWorkId: String(s.completedByWorkId || ""),
+      completedManuallyAt: String(s.completedManuallyAt || ""),
       memo: String(s.memo || ""),
       createdAt: String(s.createdAt || U.now()),
       updatedAt: String(s.updatedAt || U.now())

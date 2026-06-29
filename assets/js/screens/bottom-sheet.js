@@ -9,16 +9,36 @@
   let selectedFieldId = "";
   let editingScheduleId = "";
 
+  function scheduleDone(record) {
+    return Boolean(record && (record.completedAt || record.completedByWorkId || record.status === "実施済み" || record.status === "手動完了"));
+  }
+
+  function entryStatusLabel(entry) {
+    if (entry.kind === "schedule") {
+      if (entry.tone === "schedule-overdue") return "超過";
+      if (entry.tone === "schedule-done") return "済";
+      return "予定";
+    }
+    if (entry.kind === "work") return "実績";
+    if (entry.kind === "growth") return "生育";
+    if (entry.kind === "dry" || entry.kind === "irrigation") return "水管理";
+    return "";
+  }
+
   function entryHtml(entry) {
     const id = RiceOS.recordActions ? RiceOS.recordActions.idFor(entry.kind, entry.record) : "";
+    const toneClass = entry.tone || "";
+    const canCompleteSchedule = entry.kind === "schedule" && id && !scheduleDone(entry.record);
     return `
-      <div class="mini-card ${U.attr(entry.kind)}">
+      <div class="mini-card ${U.attr(entry.kind)} ${U.attr(toneClass)}">
         <b>${U.escapeHTML(entry.title)}</b>
+        ${entryStatusLabel(entry) ? `<em class="mini-status ${U.attr(entry.tone || entry.kind)}">${U.escapeHTML(entryStatusLabel(entry))}</em>` : ""}
         <span>${U.escapeHTML(entry.subtitle || "")}</span>
         ${entry.memo ? `<small>${U.escapeHTML(entry.memo)}</small>` : ""}
         ${entry.hasPhoto ? '<span class="pill info">写真あり</span>' : ""}
         ${id ? `
           <div class="record-actions mini-actions">
+            ${canCompleteSchedule ? `<button class="primary" type="button" data-sheet-action="complete" data-kind="${U.attr(entry.kind)}" data-id="${U.attr(id)}">実施済み</button>` : ""}
             <button class="secondary" type="button" data-sheet-action="edit" data-kind="${U.attr(entry.kind)}" data-id="${U.attr(id)}">編集</button>
             <button class="danger" type="button" data-sheet-action="delete" data-kind="${U.attr(entry.kind)}" data-id="${U.attr(id)}">削除</button>
           </div>
@@ -134,6 +154,11 @@
       if (actionButton && RiceOS.recordActions) {
         const entry = findEntry(actionButton.dataset.kind, actionButton.dataset.id);
         if (!entry) return;
+        if (actionButton.dataset.sheetAction === "complete" && entry.kind === "schedule") {
+          state.completeSchedule(entry.record.scheduleId);
+          render();
+          return;
+        }
         if (actionButton.dataset.sheetAction === "edit") {
           if (entry.kind === "schedule") {
             showScheduleForm(entry.record);

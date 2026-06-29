@@ -49,16 +49,27 @@
     return state().field(id) && state().field(id).name || "";
   }
 
+  function isScheduleDone(schedule) {
+    return Boolean(schedule && (schedule.completedAt || schedule.completedByWorkId || schedule.status === "実施済み" || schedule.status === "手動完了"));
+  }
+
+  function scheduleDisplayStatus(schedule) {
+    if (isScheduleDone(schedule)) return schedule.status || "実施済み";
+    if (schedule && schedule.date < U.today()) return "期限超過";
+    return schedule && schedule.status || "予定";
+  }
+
   function entriesForDate(date) {
     const d = state().data();
     const entries = [];
     (d.schedules || []).filter((x) => x.date === date).forEach((x) => {
+      const displayStatus = scheduleDisplayStatus(x);
       entries.push({
         kind: "schedule",
-        tone: "schedule",
+        tone: displayStatus === "期限超過" ? "schedule-overdue" : (isScheduleDone(x) ? "schedule-done" : "schedule"),
         title: x.title || x.scheduleType || "予定",
         subtitle: fieldNames(x.fieldIds),
-        memo: x.memo || "",
+        memo: [displayStatus, x.memo || ""].filter(Boolean).join(" / "),
         record: x
       });
     });
@@ -121,7 +132,7 @@
   function upcomingSchedules(limit) {
     const today = U.today();
     return (state().data().schedules || [])
-      .filter((x) => x.date >= today)
+      .filter((x) => x.date >= today && !isScheduleDone(x))
       .sort((a, b) => String(a.date).localeCompare(String(b.date)))
       .slice(0, limit || 6);
   }

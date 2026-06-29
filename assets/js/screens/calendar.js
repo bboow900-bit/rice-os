@@ -7,8 +7,28 @@
   let currentMonth = RiceOS.calendar.monthStart(U.today());
   let selectedDate = U.today();
 
+  function scheduleDone(record) {
+    return Boolean(record && (record.completedAt || record.completedByWorkId || record.status === "実施済み" || record.status === "手動完了"));
+  }
+
+  function entryStatusLabel(entry) {
+    if (entry.kind === "schedule") {
+      if (entry.tone === "schedule-overdue") return "超過";
+      if (entry.tone === "schedule-done") return "済";
+      return "予定";
+    }
+    if (entry.kind === "work") return "実績";
+    if (entry.kind === "growth") return "生育";
+    if (entry.kind === "dry" || entry.kind === "irrigation") return "水管理";
+    return "";
+  }
+
   function markerClass(entry) {
-    if (entry.kind === "schedule") return "mark-schedule";
+    if (entry.kind === "schedule") {
+      if (entry.tone === "schedule-overdue") return "mark-schedule-overdue";
+      if (entry.tone === "schedule-done") return "mark-schedule-done";
+      return "mark-schedule";
+    }
     if (entry.kind === "growth") return "mark-growth";
     if (entry.kind === "work") return "mark-work";
     return "mark-water";
@@ -34,14 +54,18 @@
 
   function entryHtml(entry) {
     const id = RiceOS.recordActions ? RiceOS.recordActions.idFor(entry.kind, entry.record) : "";
+    const toneClass = entry.tone || "";
+    const canCompleteSchedule = entry.kind === "schedule" && id && !scheduleDone(entry.record);
     return `
-      <div class="mini-card ${U.attr(entry.kind)}">
+      <div class="mini-card ${U.attr(entry.kind)} ${U.attr(toneClass)}">
         <b>${U.escapeHTML(entry.title)}</b>
+        ${entryStatusLabel(entry) ? `<em class="mini-status ${U.attr(entry.tone || entry.kind)}">${U.escapeHTML(entryStatusLabel(entry))}</em>` : ""}
         <span>${U.escapeHTML(entry.subtitle || "")}</span>
         ${entry.memo ? `<small>${U.escapeHTML(entry.memo)}</small>` : ""}
         ${entry.hasPhoto ? '<span class="pill info">写真あり</span>' : ""}
         ${id ? `
           <div class="record-actions mini-actions">
+            ${canCompleteSchedule ? `<button class="primary" type="button" data-calendar-action="complete" data-kind="${U.attr(entry.kind)}" data-id="${U.attr(id)}">実施済み</button>` : ""}
             <button class="secondary" type="button" data-calendar-action="edit" data-kind="${U.attr(entry.kind)}" data-id="${U.attr(id)}">編集</button>
             <button class="danger" type="button" data-calendar-action="delete" data-kind="${U.attr(entry.kind)}" data-id="${U.attr(id)}">削除</button>
           </div>
@@ -93,6 +117,11 @@
       if (!button || !RiceOS.recordActions) return;
       const entry = findEntry(button.dataset.kind, button.dataset.id);
       if (!entry) return;
+      if (button.dataset.calendarAction === "complete" && entry.kind === "schedule") {
+        RiceOS.state.completeSchedule(entry.record.scheduleId);
+        render();
+        return;
+      }
       if (button.dataset.calendarAction === "edit") {
         RiceOS.recordActions.edit(entry.kind, entry.record);
         render();

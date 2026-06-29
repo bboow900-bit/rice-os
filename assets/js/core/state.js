@@ -185,6 +185,43 @@
     return mode === "last" ? lastFieldWorkDate(fieldId, names) : firstFieldWorkDate(fieldId, names);
   }
 
+  function scheduleText(value) {
+    return String(value || "")
+      .replace(/予定|確認|作業|実施|散布|開始|終了|する|します|\s/g, "")
+      .toLowerCase();
+  }
+
+  function scheduleKeyword(value) {
+    const text = String(value || "");
+    const keys = ["田植", "除草", "中干", "溝切", "草刈", "追肥", "防除", "収穫", "代かき", "播種", "水深", "葉色", "間断", "湿潤"];
+    return keys.find((key) => text.includes(key)) || "";
+  }
+
+  function scheduleMatchesWork(schedule, work) {
+    if (!schedule || !work || schedule.status === "実施済み" || schedule.status === "手動完了") return false;
+    const scheduleFields = schedule.fieldIds || [];
+    const workFields = work.fieldIds || [];
+    if (scheduleFields.length && !scheduleFields.some((id) => workFields.includes(id))) return false;
+    const diff = Math.abs(U.daysBetween(schedule.date, work.date));
+    if (diff > 2) return false;
+    const scheduleKey = scheduleKeyword(`${schedule.title || ""} ${schedule.scheduleType || ""}`);
+    const workKey = scheduleKeyword(work.workName || "");
+    if (scheduleKey && workKey) return scheduleKey === workKey;
+    const a = scheduleText(`${schedule.title || ""}${schedule.scheduleType || ""}`);
+    const b = scheduleText(work.workName || "");
+    return Boolean(a && b && (a.includes(b) || b.includes(a)));
+  }
+
+  function completeMatchingSchedules(d, work) {
+    (d.schedules || []).forEach((schedule) => {
+      if (!scheduleMatchesWork(schedule, work)) return;
+      schedule.status = "実施済み";
+      schedule.completedAt = U.now();
+      schedule.completedByWorkId = work.workId;
+      schedule.updatedAt = U.now();
+    });
+  }
+
   function saveFieldWork(record) {
     mutate((d) => {
       const date = record.date || U.today();
@@ -211,6 +248,7 @@
       const index = d.fieldWorks.findIndex((w) => w.workId === normalized.workId);
       if (index >= 0) d.fieldWorks[index] = { ...d.fieldWorks[index], ...normalized };
       else d.fieldWorks.push(normalized);
+      completeMatchingSchedules(d, normalized);
       if (isPlantingWorkName(normalized.workName)) {
         normalized.fieldIds.forEach((fieldId) => {
           const fieldIndex = d.fields.findIndex((f) => f.fieldId === fieldId);
@@ -267,6 +305,13 @@
   function deleteFieldWork(workId) {
     mutate((d) => {
       d.fieldWorks = d.fieldWorks.filter((w) => w.workId !== workId);
+      (d.schedules || []).forEach((schedule) => {
+        if (schedule.completedByWorkId !== workId) return;
+        schedule.status = "予定";
+        schedule.completedAt = "";
+        schedule.completedByWorkId = "";
+        schedule.updatedAt = U.now();
+      });
     }, "圃場作業を削除しました");
   }
 
@@ -397,6 +442,9 @@
         scheduleType: record.scheduleType || "作業予定",
         title: record.title || record.scheduleType || "予定",
         status: record.status || "予定",
+        completedAt: record.completedAt || "",
+        completedByWorkId: record.completedByWorkId || "",
+        completedManuallyAt: record.completedManuallyAt || "",
         memo: record.memo || "",
         createdAt: record.createdAt || U.now(),
         updatedAt: U.now()
@@ -405,6 +453,20 @@
       if (index >= 0) d.schedules[index] = { ...d.schedules[index], ...normalized };
       else d.schedules.push(normalized);
     }, "予定を保存しました");
+  }
+
+  function completeSchedule(scheduleId) {
+    mutate((d) => {
+      const index = (d.schedules || []).findIndex((s) => s.scheduleId === scheduleId);
+      if (index < 0) return;
+      d.schedules[index] = {
+        ...d.schedules[index],
+        status: "手動完了",
+        completedAt: U.now(),
+        completedManuallyAt: U.now(),
+        updatedAt: U.now()
+      };
+    }, "予定を完了にしました");
   }
 
   function deleteSchedule(scheduleId) {
@@ -564,6 +626,7 @@
     saveMaterial,
     saveResult,
     saveSchedule,
+    completeSchedule,
     deleteSchedule,
     saveDryPeriod,
     deleteDryPeriod,

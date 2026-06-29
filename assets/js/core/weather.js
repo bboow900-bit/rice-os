@@ -46,8 +46,45 @@
   const GEO_MAXIMUM_AGE_MS = 5 * 60 * 1000;
   const GEO_STALE_MS = 12 * 60 * 60 * 1000;
 
-  function weatherLabel(code) {
-    return WEATHER_LABELS[Number(code)] || `天気コード${code}`;
+  function isDrizzleCode(code) {
+    return [51, 53, 55, 56, 57].includes(Number(code));
+  }
+
+  function isRainCode(code) {
+    return [61, 63, 65, 66, 67, 80, 81, 82].includes(Number(code));
+  }
+
+  function weatherLabel(code, precipitation) {
+    const weatherCode = Number(code);
+    const rain = Number(precipitation);
+    const hasRainAmount = Number.isFinite(rain);
+    if ((isDrizzleCode(weatherCode) || isRainCode(weatherCode)) && hasRainAmount && rain <= 0.2) return "くもり";
+    if (isDrizzleCode(weatherCode)) {
+      if (hasRainAmount && rain <= 1) return "くもり時々小雨";
+      return "小雨";
+    }
+    return WEATHER_LABELS[weatherCode] || `天気コード${code}`;
+  }
+
+  function normalizedWeatherAuto(record) {
+    if (!record || record.weatherCode === undefined || record.weatherCode === "") return null;
+    const precipitation = round(record.precipitation);
+    const weather = weatherLabel(record.weatherCode, precipitation);
+    const normalized = {
+      ...record,
+      weather,
+      precipitation
+    };
+    normalized.summary = formatSummary(normalized);
+    return normalized;
+  }
+
+  function shouldRewriteWorkWeather(work, before, after) {
+    if (!after || !after.weather) return false;
+    if (!work.weather) return true;
+    if (before && work.weather === before.weather) return true;
+    if (before && isDrizzleCode(before.weatherCode) && String(work.weather).includes("霧雨")) return true;
+    return false;
   }
 
   function round(value) {
@@ -128,6 +165,7 @@
     if (json.error) throw new Error(json.reason || "天気を取得できませんでした。");
     const daily = json.daily || {};
     const code = dailyValue(daily, "weather_code");
+    const precipitation = round(dailyValue(daily, "precipitation_sum"));
     const result = {
       date: dateText,
       source: isPastDate(dateText) ? "Open-Meteo Archive" : "Open-Meteo Forecast",
@@ -135,11 +173,11 @@
       longitude: Number(location.longitude),
       label: location.label || "取得位置",
       weatherCode: code,
-      weather: weatherLabel(code),
+      weather: weatherLabel(code, precipitation),
       tempMax: round(dailyValue(daily, "temperature_2m_max")),
       tempMin: round(dailyValue(daily, "temperature_2m_min")),
       tempMean: round(dailyValue(daily, "temperature_2m_mean")),
-      precipitation: round(dailyValue(daily, "precipitation_sum")),
+      precipitation,
       fetchedAt: U.now()
     };
     result.summary = formatSummary(result);
@@ -220,6 +258,27 @@
     return [weather.weather, temp, range, rain].filter(Boolean).join(" / ");
   }
 
+  function repairStoredWeatherLabels() {
+    if (!RiceOS.state || !RiceOS.state.data || !RiceOS.state.mutate) return 0;
+    let fixed = 0;
+    RiceOS.state.mutate((d) => {
+      (d.fieldWorks || []).forEach((work) => {
+        if (!work.weatherAuto) return;
+        const before = work.weatherAuto;
+        const after = normalizedWeatherAuto(before);
+        if (!after || after.weather === before.weather && after.summary === before.summary) return;
+        work.weatherAuto = after;
+        if (shouldRewriteWorkWeather(work, before, after)) work.weather = after.weather;
+        work.updatedAt = U.now();
+        fixed += 1;
+      });
+      d.meta = d.meta || {};
+      d.meta.weatherLabelRepairVersion = "20260629_ver80";
+      d.meta.weatherLabelRepairedAt = fixed ? U.now() : d.meta.weatherLabelRepairedAt || "";
+    }, fixed ? `過去の天気表示を${fixed}件補正しました` : "過去の天気表示を確認しました");
+    return fixed;
+  }
+
   function currentPosition() {
     return new Promise((resolve, reject) => {
       if (!navigator.geolocation) {
@@ -286,6 +345,7 @@
     searchPlace,
     ensureLocation,
     locationText,
-    fetchDailyRange
+    fetchDailyRange,
+    repairStoredWeatherLabels
   };
 })();

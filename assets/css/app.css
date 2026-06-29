@@ -22,13 +22,16 @@
 
 /* Home calendar hub */
 #screen-home {
+  overflow-x: hidden;
   background:
     radial-gradient(circle at 20% 0%, rgba(255, 244, 197, 0.7), transparent 34%),
     linear-gradient(180deg, #fffaf0 0%, #f8f7ef 48%, #f2fbf1 100%);
 }
 
 .farm-calendar-home {
-  max-width: 760px;
+  width: 100%;
+  max-width: min(760px, 100%);
+  box-sizing: border-box;
   margin: 0 auto;
   padding: 8px 0 calc(92px + env(safe-area-inset-bottom));
   color: #111b13;
@@ -63,8 +66,9 @@
 .farm-calendar-actions {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   flex: 0 0 auto;
+  min-width: 0;
 }
 
 .farm-year-button,
@@ -84,13 +88,104 @@
 }
 
 .farm-year-button {
-  padding: 0 12px;
+  padding: 0 10px;
+  white-space: nowrap;
 }
 
 .farm-menu-button {
-  padding: 0 12px;
+  padding: 0 10px;
   border-color: #dde2d6;
   background: #ffffff;
+  white-space: nowrap;
+}
+
+.farm-today-overview {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 8px 0 10px;
+}
+
+.farm-overview-card {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  grid-template-rows: auto auto auto;
+  align-items: center;
+  gap: 2px 6px;
+  min-height: 74px;
+  padding: 8px;
+  border: 1px solid rgba(205, 220, 194, 0.95);
+  border-radius: 10px;
+  background: linear-gradient(135deg, #ffffff 0%, #f5fbef 100%);
+  box-shadow: 0 7px 16px rgba(45, 68, 35, 0.07);
+  color: #172018;
+  text-align: left;
+}
+
+.farm-overview-card span {
+  grid-row: 1 / span 2;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  background: #e8f7de;
+  color: #229239;
+  font-size: 11px;
+  font-weight: 950;
+}
+
+.farm-overview-card b,
+.farm-overview-card strong,
+.farm-overview-card small {
+  overflow: hidden;
+  min-width: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.farm-overview-card b {
+  color: #556150;
+  font-size: 9.5px;
+  font-weight: 850;
+  line-height: 1.1;
+}
+
+.farm-overview-card strong {
+  color: #101811;
+  font-size: 16px;
+  font-weight: 950;
+  line-height: 1.05;
+}
+
+.farm-overview-card small {
+  grid-column: 1 / -1;
+  color: #62705f;
+  font-size: 9px;
+  font-weight: 760;
+  line-height: 1.15;
+}
+
+.farm-overview-card.overdue {
+  border-color: #f0c38c;
+  background: linear-gradient(135deg, #fffaf0 0%, #fff3dd 100%);
+}
+
+.farm-overview-card.overdue span {
+  background: #fff0d7;
+  color: #d65f13;
+}
+
+.farm-overview-card.candidate {
+  border-color: #e8d99d;
+  background: linear-gradient(135deg, #fffdf0 0%, #f8ffe8 100%);
+}
+
+.farm-overview-card.progress {
+  border-color: #bddfac;
+  background:
+    radial-gradient(circle at 12% 10%, rgba(255, 231, 121, 0.38), transparent 35%),
+    linear-gradient(135deg, #f7fff3 0%, #eef9ff 100%);
 }
 
 .farm-view-tabs {
@@ -104,12 +199,12 @@
 }
 
 .farm-view-tabs button {
-  min-height: 35px;
+  min-height: 34px;
   border: 0;
   border-right: 1px solid #d8ddd1;
   background: transparent;
   color: #151c16;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 850;
 }
 
@@ -124,7 +219,7 @@
 
 .farm-filter-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 38px 38px;
+  grid-template-columns: minmax(0, 1fr) 54px 36px 36px;
   gap: 8px;
   margin-bottom: 12px;
 }
@@ -140,6 +235,12 @@
 .farm-panel-title button {
   padding: 0;
   font-size: 18px;
+}
+
+.farm-filter-row .farm-menu-button {
+  border-color: #dde2d6;
+  background: #ffffff;
+  font-size: 11px;
 }
 
 .farm-calendar-panel,
@@ -313,7 +414,7 @@
 
 .farm-event-pill {
   display: grid;
-  grid-template-columns: 18px minmax(0, 1fr);
+  grid-template-columns: 18px minmax(0, 1fr) auto;
   align-items: center;
   gap: 3px;
   width: 100%;
@@ -340,10 +441,28 @@
   white-space: normal;
 }
 
+.farm-event-pill em {
+  align-self: center;
+  padding: 2px 4px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.64);
+  color: currentColor;
+  font-size: 8px;
+  font-style: normal;
+  font-weight: 900;
+  line-height: 1;
+  white-space: nowrap;
+}
+
 .farm-event-pill.compact {
   min-height: 31px;
   padding: 4px;
   grid-template-columns: 16px minmax(0, 1fr);
+}
+
+.farm-event-pill.compact em,
+.farm-event-pill.month-compact em {
+  display: none;
 }
 
 .farm-event-pill.work { background: #eef7eb; color: #157225; }
@@ -352,6 +471,7 @@
 .farm-event-pill.photo { background: #f8f1ff; color: #6e3aa2; }
 .farm-event-pill.candidate { background: #fff0db; color: #e65312; }
 .farm-event-pill.plan { background: #fff7d7; color: #856006; }
+.farm-event-pill.plan-done { background: #edf1ea; color: #687367; }
 
 .farm-legend {
   display: flex;
@@ -618,7 +738,7 @@
 
 .farm-list-row {
   display: grid;
-  grid-template-columns: 52px 26px minmax(0, 1fr) 90px 12px;
+  grid-template-columns: 48px 24px minmax(0, 1fr) 42px 72px 12px;
   align-items: center;
   gap: 7px;
   width: 100%;
@@ -673,6 +793,18 @@
   font-weight: 750;
   text-align: right;
   text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.farm-list-row mark {
+  justify-self: center;
+  padding: 3px 6px;
+  border-radius: 999px;
+  background: #eef4e8;
+  color: #4e634e;
+  font-size: 9px;
+  font-weight: 900;
+  line-height: 1;
   white-space: nowrap;
 }
 
@@ -1000,6 +1132,31 @@
     font-size: 11px;
   }
 
+  .farm-today-overview {
+    gap: 6px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .farm-overview-card {
+    min-height: 66px;
+    padding: 8px;
+    gap: 2px 6px;
+  }
+
+  .farm-overview-card span {
+    width: 21px;
+    height: 21px;
+    font-size: 10px;
+  }
+
+  .farm-overview-card strong {
+    font-size: 14px;
+  }
+
+  .farm-overview-card small {
+    font-size: 9px;
+  }
+
   .farm-week-grid {
     grid-template-columns: 70px repeat(var(--day-count), 41px);
     min-width: 357px;
@@ -1109,6 +1266,41 @@
   .farm-month-more {
     bottom: 2px;
     font-size: 8px;
+  }
+}
+
+@media (max-width: 900px) {
+  #screen-home.active {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    overflow-x: hidden !important;
+  }
+
+  #screen-home.active .farm-calendar-home,
+  #screen-home.active .farm-calendar-header,
+  #screen-home.active .farm-view-tabs,
+  #screen-home.active .farm-filter-row,
+  #screen-home.active .farm-today-overview,
+  #screen-home.active .farm-calendar-panel {
+    box-sizing: border-box !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  #screen-home.active .farm-calendar-header {
+    align-items: flex-start !important;
+  }
+
+  #screen-home.active .farm-calendar-actions {
+    flex-shrink: 0 !important;
+  }
+
+  #screen-home.active .farm-week-scroll {
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow-x: auto !important;
   }
 }
 
@@ -1723,6 +1915,85 @@
 
   #screen-annual.annual-detail-mode .annual-target-card > .annual-edit-grid {
     display: none !important;
+  }
+}
+
+/* Home calendar final mobile lock: keep the farm calendar controls inside Android width. */
+@media (max-width: 900px) {
+  body:has(#screen-home.active) .app-shell,
+  body:has(#screen-home.active) .content {
+    box-sizing: border-box !important;
+    width: auto !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    overflow-x: hidden !important;
+  }
+
+  #screen-home.active .farm-calendar-home {
+    box-sizing: border-box !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    overflow-x: hidden !important;
+  }
+
+  #screen-home.active .farm-calendar-header,
+  #screen-home.active .farm-view-tabs,
+  #screen-home.active .farm-filter-row,
+  #screen-home.active .farm-today-overview,
+  #screen-home.active .farm-calendar-panel {
+    box-sizing: border-box !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  #screen-home.active .farm-view-tabs {
+    display: grid !important;
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    overflow: hidden !important;
+  }
+
+  #screen-home.active .farm-view-tabs button {
+    box-sizing: border-box !important;
+    min-width: 0 !important;
+    min-height: 34px !important;
+    padding: 0 2px !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    font-size: 11.5px !important;
+    line-height: 1 !important;
+    white-space: nowrap !important;
+  }
+
+  #screen-home.active .farm-filter-row {
+    grid-template-columns: minmax(0, 1fr) 50px 34px 34px !important;
+    gap: 6px !important;
+  }
+
+  #screen-home.active .farm-filter-row select,
+  #screen-home.active .farm-filter-row button,
+  #screen-home.active .farm-year-button {
+    box-sizing: border-box !important;
+    min-width: 0 !important;
+    min-height: 34px !important;
+    padding: 0 7px !important;
+    border-radius: 8px !important;
+    box-shadow: 0 2px 8px rgba(74, 55, 20, 0.06) !important;
+    font-size: 11px !important;
+    line-height: 1 !important;
+    white-space: nowrap !important;
+  }
+
+  #screen-home.active .farm-filter-row .farm-menu-button {
+    padding: 0 4px !important;
+    font-size: 10.5px !important;
+  }
+
+  #screen-home.active .farm-week-scroll {
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow-x: auto !important;
   }
 }
 
@@ -3253,8 +3524,48 @@ h3 {
   background: linear-gradient(135deg, #ffffff, #f8fbf5);
 }
 
+.mini-status {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  padding: 4px 7px;
+  border-radius: 999px;
+  background: #eef4e8;
+  color: #4e634e;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.mini-status.schedule-overdue {
+  background: #fff0d8;
+  color: #d65f13;
+}
+
+.mini-status.schedule-done {
+  background: #e9eee5;
+  color: #667265;
+}
+
+.mini-status.work {
+  background: #f8eadb;
+  color: #b85a13;
+}
+
 .mini-card.schedule {
   border-left-color: var(--blue);
+}
+
+.mini-card.schedule.schedule-overdue {
+  border-left-color: #f08a24;
+  background: #fff8ea;
+}
+
+.mini-card.schedule.schedule-done {
+  border-left-color: #9daf98;
+  background: #f4f7f1;
+  opacity: 0.82;
 }
 
 .mini-card.work {
@@ -6377,6 +6688,14 @@ label {
   background: var(--blue);
 }
 
+.day-markers .mark-schedule-overdue {
+  background: #f08a24;
+}
+
+.day-markers .mark-schedule-done {
+  background: #9daf98;
+}
+
 .day-markers .mark-growth {
   background: var(--primary);
 }
@@ -6607,6 +6926,19 @@ label {
 #sheetEntries .mini-card.schedule {
   border-left-color: #2879c9;
   background: linear-gradient(90deg, rgba(234, 245, 255, 0.95), #fff);
+}
+
+#selectedDateEntries .mini-card.schedule.schedule-overdue,
+#sheetEntries .mini-card.schedule.schedule-overdue {
+  border-left-color: #f08a24;
+  background: linear-gradient(90deg, rgba(255, 245, 225, 0.98), #fff);
+}
+
+#selectedDateEntries .mini-card.schedule.schedule-done,
+#sheetEntries .mini-card.schedule.schedule-done {
+  border-left-color: #9daf98;
+  background: linear-gradient(90deg, rgba(240, 246, 237, 0.96), #fff);
+  opacity: 0.84;
 }
 
 #selectedDateEntries .mini-card.dry,
@@ -9553,6 +9885,7 @@ label {
     width: 100%;
     max-width: 100%;
     min-width: 0;
+    box-sizing: border-box;
   }
 
   .app-shell {

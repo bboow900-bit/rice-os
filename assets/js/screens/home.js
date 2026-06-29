@@ -92,11 +92,29 @@
 
   function eventTone(entry) {
     if (entry.kind === "growth") return "growth";
-    if (entry.kind === "schedule") return "plan";
+    if (entry.kind === "schedule") {
+      if (entry.tone === "schedule-overdue") return "candidate";
+      if (entry.tone === "schedule-done") return "plan-done";
+      return "plan";
+    }
     if (entry.kind === "dry" || entry.kind === "irrigation" || entry.kind === "water") return "water";
     if (entry.kind === "photo") return "photo";
     if (entry.kind === "candidate") return "candidate";
     return "work";
+  }
+
+  function entryStatusLabel(entry) {
+    if (!entry) return "";
+    if (entry.kind === "schedule") {
+      if (entry.tone === "schedule-overdue") return "超過";
+      if (entry.tone === "schedule-done") return "済";
+      return "予定";
+    }
+    if (entry.kind === "work") return "実績";
+    if (entry.kind === "growth") return "生育";
+    if (entry.kind === "candidate") return "確認";
+    if (entry.kind === "dry" || entry.kind === "irrigation" || entry.kind === "water") return "水";
+    return "";
   }
 
   function eventLabel(entry) {
@@ -220,11 +238,52 @@
   function eventPill(entry, compact) {
     const compactClass = compact === "month" ? "compact month-compact" : (compact ? "compact" : "");
     const label = compact ? shortEventLabel(entry) : eventLabel(entry);
+    const status = compact === "month" ? "" : entryStatusLabel(entry);
     return `
       <span class="farm-event-pill ${eventTone(entry)} ${compactClass}">
         <span>${eventIcon(entry)}</span>
         <b>${U.escapeHTML(label)}</b>
+        ${status ? `<em>${U.escapeHTML(status)}</em>` : ""}
       </span>
+    `;
+  }
+
+  function scheduleDone(record) {
+    return Boolean(record && (record.completedAt || record.completedByWorkId || record.status === "実施済み" || record.status === "手動完了"));
+  }
+
+  function overdueSchedules() {
+    return (state.data().schedules || [])
+      .filter((schedule) => schedule.date < U.today() && !scheduleDone(schedule))
+      .sort((a, b) => String(a.date).localeCompare(String(b.date)));
+  }
+
+  function renderOverviewCard(kind, icon, title, value, note) {
+    return `
+      <button type="button" class="farm-overview-card ${U.attr(kind)}" data-home-overview="${U.attr(kind)}">
+        <span>${U.escapeHTML(icon)}</span>
+        <b>${U.escapeHTML(title)}</b>
+        <strong>${U.escapeHTML(value)}</strong>
+        <small>${U.escapeHTML(note)}</small>
+      </button>
+    `;
+  }
+
+  function renderTodayOverview() {
+    const todayEntries = entriesForDate(U.today()).filter((entry) => entry.kind !== "candidate");
+    const overdue = overdueSchedules();
+    const candidates = candidatesForDate(U.today());
+    const planted = state.activeFields().filter((field) => state.plantingDateForField && state.plantingDateForField(field.fieldId));
+    const todayMain = todayEntries[0] ? eventLabel(todayEntries[0]) : "予定なし";
+    const overdueNote = overdue[0] ? `${U.fd(overdue[0].date)} ${overdue[0].title || overdue[0].scheduleType || "予定"}` : "遅れなし";
+    const candidateNote = candidates[0] ? candidates[0].title : "大きな確認なし";
+    return `
+      <section class="farm-today-overview" aria-label="今日の確認">
+        ${renderOverviewCard("today", "日", "今日", `${todayEntries.length}件`, todayMain)}
+        ${renderOverviewCard("overdue", "!", "期限超過", `${overdue.length}件`, overdueNote)}
+        ${renderOverviewCard("candidate", "?", "確認候補", `${candidates.length}件`, candidateNote)}
+        ${renderOverviewCard("progress", "℃", "進捗", `${planted.length}圃場`, "積算気温を見る")}
+      </section>
     `;
   }
 
@@ -238,7 +297,6 @@
         </div>
         <div class="farm-calendar-actions">
           <button type="button" class="farm-year-button" data-home-today>📅 ${year}年</button>
-          <button type="button" class="farm-menu-button" data-home-filter>絞り込み</button>
         </div>
       </header>
       <div class="farm-view-tabs" role="tablist">
@@ -249,9 +307,11 @@
       </div>
       <div class="farm-filter-row">
         <select data-home-field-filter>${fieldOptions()}</select>
+        <button type="button" class="farm-menu-button" data-home-filter>絞込</button>
         <button type="button" data-home-prev>‹</button>
         <button type="button" data-home-next>›</button>
       </div>
+      ${renderTodayOverview()}
     `;
   }
 
@@ -387,6 +447,7 @@
                 <span>${eventIcon(entry)}</span>
                 <b>${U.escapeHTML(eventLabel(entry))}</b>
                 <em>${U.escapeHTML(field ? `${field.name} / ${areaText(field)}` : entry.subtitle || "")}</em>
+                <mark>${U.escapeHTML(entryStatusLabel(entry))}</mark>
                 <i>›</i>
               </button>
             `;
@@ -783,6 +844,23 @@
     if (!root || root.dataset.boundHomeCalendar === "1") return;
     root.dataset.boundHomeCalendar = "1";
     root.addEventListener("click", (event) => {
+      const overview = event.target.closest("[data-home-overview]");
+      if (overview) {
+        const kind = overview.dataset.homeOverview;
+        if (kind === "today") {
+          openDate(U.today(), filterFieldId === "all" ? "" : filterFieldId);
+          return;
+        }
+        if (kind === "progress") {
+          viewMode = "progress";
+          render();
+          return;
+        }
+        viewMode = "list";
+        anchorDate = U.today();
+        render();
+        return;
+      }
       const view = event.target.closest("[data-home-view]");
       if (view) {
         viewMode = view.dataset.homeView;

@@ -188,6 +188,10 @@
     bindScreens();
     bindGlobalActions();
     if (RiceOS.pwa) RiceOS.pwa.register();
+    if (RiceOS.weather && RiceOS.weather.repairStoredWeatherLabels) {
+      const meta = RiceOS.state.data().meta || {};
+      if (meta.weatherLabelRepairVersion !== "20260629_ver80") RiceOS.weather.repairStoredWeatherLabels();
+    }
     window.addEventListener("riceos:datachange", (event) => {
       markSaved(event.detail && event.detail.message);
       const mod = screenModule(activeScreen);
