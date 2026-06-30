@@ -59,6 +59,17 @@
     return schedule && schedule.status || "予定";
   }
 
+  function scheduleCompletionMemo(schedule) {
+    if (!schedule || !isScheduleDone(schedule)) return "";
+    if (schedule.completionReason) return schedule.completionReason;
+    if (schedule.completedByWorkId) {
+      const work = (state().data().fieldWorks || []).find((item) => item.workId === schedule.completedByWorkId);
+      if (work) return `${work.workName || "作業"} ${U.fd(work.date)} の記録により完了`;
+    }
+    if (schedule.completedManuallyAt) return "手動で実施済みにしました";
+    return "実施済み";
+  }
+
   function entriesForDate(date) {
     const d = state().data();
     const entries = [];
@@ -69,7 +80,7 @@
         tone: displayStatus === "期限超過" ? "schedule-overdue" : (isScheduleDone(x) ? "schedule-done" : "schedule"),
         title: x.title || x.scheduleType || "予定",
         subtitle: fieldNames(x.fieldIds),
-        memo: [displayStatus, x.memo || ""].filter(Boolean).join(" / "),
+        memo: [displayStatus, scheduleCompletionMemo(x), x.memo || ""].filter(Boolean).join(" / "),
         record: x
       });
     });

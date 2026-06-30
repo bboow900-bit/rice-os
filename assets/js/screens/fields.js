@@ -134,14 +134,14 @@
   }
 
   const MASTER_MENU = [
-    { key: "field-master", label: "圃場マスター", sub: "土質・面積", icon: "field-master.png", screen: "fields", tone: "green" },
-    { key: "recipe", label: "栽培レシピ", sub: "品種単位", icon: "recipe.png", screen: "recipes", tone: "green" },
-    { key: "transplanter", label: "田植え機", sub: "株間・本数", icon: "transplanter.png", screen: "recipes", tone: "amber" },
-    { key: "dry", label: "中干し", sub: "目標・記録", icon: "dry-period.png", screen: "dry-period", tone: "amber" },
-    { key: "photos", label: "写真", sub: "比較素材", icon: "photos.png", screen: "photos", tone: "" },
-    { key: "irrigation", label: "間断/湿潤", sub: "水管理", icon: "irrigation.png", screen: "irrigation", tone: "water" },
-    { key: "materials", label: "資材管理", sub: "在庫・使用", icon: "materials.png", screen: "materials", tone: "amber" },
-    { key: "harvest", label: "収穫履歴", sub: "収量・販売", icon: "harvest.png", screen: "results", tone: "amber" }
+    { key: "field-master", group: "マスター", label: "圃場マスター", sub: "土質・面積", icon: "field-master.png", screen: "fields", tone: "green" },
+    { key: "recipe", group: "マスター", label: "栽培レシピ", sub: "品種単位", icon: "recipe.png", screen: "recipes", tone: "green" },
+    { key: "transplanter", group: "マスター", label: "田植え機", sub: "株間・本数", icon: "transplanter.png", screen: "recipes", tone: "amber" },
+    { key: "materials", group: "マスター", label: "資材管理", sub: "在庫・使用", icon: "materials.png", screen: "materials", tone: "amber" },
+    { key: "dry", group: "記録・確認", label: "中干し", sub: "目標・記録", icon: "dry-period.png", screen: "dry-period", tone: "amber" },
+    { key: "irrigation", group: "記録・確認", label: "間断/湿潤", sub: "水管理", icon: "irrigation.png", screen: "irrigation", tone: "water" },
+    { key: "photos", group: "記録・確認", label: "写真", sub: "比較素材", icon: "photos.png", screen: "photos", tone: "" },
+    { key: "harvest", group: "記録・確認", label: "収穫履歴", sub: "収量・販売", icon: "harvest.png", screen: "results", tone: "amber" }
   ];
 
   function menuIcon(name) {
@@ -232,19 +232,27 @@
   }
 
   function renderMasterMenu() {
+    const groups = ["マスター", "記録・確認"];
     return `
       <section class="field-master-section">
         <div class="field-master-section-head">
           <h3>管理メニュー</h3>
           <span>項目の本籍地をここに集約</span>
         </div>
-        <div class="field-master-menu-grid">
-          ${MASTER_MENU.map((item) => `
-            <button type="button" class="field-master-menu-button ${U.attr(item.tone || "")}" data-field-master-menu="${U.attr(item.key)}" data-jump-screen="${U.attr(item.screen)}">
-              <img src="${U.attr(menuIcon(item.icon))}" alt="">
-              <b>${U.escapeHTML(item.label)}</b>
-              <small>${U.escapeHTML(item.sub)}</small>
-            </button>
+        <div class="field-master-menu-stack">
+          ${groups.map((group) => `
+            <div class="field-master-menu-block">
+              <b>${U.escapeHTML(group)}</b>
+              <div class="field-master-menu-grid">
+                ${MASTER_MENU.filter((item) => item.group === group).map((item) => `
+                  <button type="button" class="field-master-menu-button ${U.attr(item.tone || "")}" data-field-master-menu="${U.attr(item.key)}" data-jump-screen="${U.attr(item.screen)}">
+                    <img src="${U.attr(menuIcon(item.icon))}" alt="">
+                    <b>${U.escapeHTML(item.label)}</b>
+                    <small>${U.escapeHTML(item.sub)}</small>
+                  </button>
+                `).join("")}
+              </div>
+            </div>
           `).join("")}
         </div>
       </section>

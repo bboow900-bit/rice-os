@@ -417,6 +417,7 @@
       completedAt: String(s.completedAt || ""),
       completedByWorkId: String(s.completedByWorkId || ""),
       completedManuallyAt: String(s.completedManuallyAt || ""),
+      completionReason: String(s.completionReason || ""),
       memo: String(s.memo || ""),
       createdAt: String(s.createdAt || U.now()),
       updatedAt: String(s.updatedAt || U.now())

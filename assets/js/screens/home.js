@@ -216,7 +216,20 @@
         });
       }
       return rows;
-    }).slice(0, 5);
+    });
+  }
+
+  function candidateGroupsForDate(date) {
+    const map = new Map();
+    candidatesForDate(date).forEach((entry) => {
+      const fieldId = entryFieldIds(entry)[0] || "";
+      if (!map.has(fieldId)) {
+        const field = state.field(fieldId);
+        map.set(fieldId, { field, entries: [] });
+      }
+      map.get(fieldId).entries.push(entry);
+    });
+    return Array.from(map.values());
   }
 
   function baseEntriesForDate(date) {
@@ -694,6 +707,7 @@
                   <small>${U.escapeHTML(fieldVariety(field))} / ${U.escapeHTML(areaText(field))}</small>
                 </div>
               </header>
+              ${renderFieldProgressSummary(field)}
               ${renderHeatMeter(field)}
               ${progressRowsForField(field).map(renderProgressRow).join("")}
             </article>
@@ -703,25 +717,39 @@
     `;
   }
 
+  function renderFieldProgressSummary(field) {
+    const planting = state.plantingDateForField ? state.plantingDateForField(field.fieldId) : "";
+    const dap = planting ? U.daysBetween(planting, U.today()) : "";
+    const candidates = candidatesForDate(U.today()).filter((entry) => entryFieldIds(entry).includes(field.fieldId));
+    const next = progressRowsForField(field).find((row) => row.value && String(row.value).includes("あと"));
+    return `
+      <div class="farm-progress-summary">
+        <span><b>${U.escapeHTML(dap === "" ? "-" : `${dap}日`)}</b><small>田植後</small></span>
+        <span class="${candidates.length ? "warn" : "ok"}"><b>${U.escapeHTML(String(candidates.length))}</b><small>確認候補</small></span>
+        <span><b>${U.escapeHTML(next ? next.title : "通常")}</b><small>${U.escapeHTML(next ? next.value : "大きな候補なし")}</small></span>
+      </div>
+    `;
+  }
+
   function renderCandidateCard() {
-    const rows = candidatesForDate(U.today()).slice(0, 2);
+    const rows = candidateGroupsForDate(U.today()).slice(0, 3);
     return `
       <section class="farm-candidate-card">
         <div>
           <h3>今日の確認候補</h3>
           <button type="button" data-home-view="list">すべて見る ›</button>
         </div>
-        ${rows.length ? rows.map((entry) => {
-          const field = state.field(entryFieldIds(entry)[0]);
+        ${rows.length ? rows.map((group) => {
+          const field = group.field;
           const planting = field && state.plantingDateForField ? state.plantingDateForField(field.fieldId) : "";
           const dap = planting ? U.daysBetween(planting, U.today()) : "";
           return `
             <button type="button" class="farm-candidate-row" data-home-date="${U.attr(U.today())}" data-home-field="${U.attr(field && field.fieldId || "")}">
               <img src="assets/images/light-icons/rice-panicle.png" alt="">
               <span>
-                <b>${U.escapeHTML(field && field.name || entry.subtitle || "圃場")}</b>
-                <em>${U.escapeHTML(entry.title)}</em>
-                <small>${dap !== "" ? `田植え後${dap}日` : "田植日未登録"}・現場を見て判断</small>
+                <b>${U.escapeHTML(field && field.name || "圃場")}</b>
+                <em>${U.escapeHTML(group.entries.map((entry) => entry.title.replace("確認候補", "")).join("・"))}確認候補</em>
+                <small>${dap !== "" ? `田植え後${dap}日` : "田植日未登録"}・${U.escapeHTML(String(group.entries.length))}件を現場確認</small>
               </span>
               <i>›</i>
             </button>

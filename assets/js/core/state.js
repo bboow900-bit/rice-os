@@ -8,8 +8,8 @@
 
   let cache = storage.loadData();
 
-  function emit(message) {
-    window.dispatchEvent(new CustomEvent("riceos:datachange", { detail: { message: message || "保存しました" } }));
+  function emit(message, status) {
+    window.dispatchEvent(new CustomEvent("riceos:datachange", { detail: { message: message || "保存しました", status: status || "saved" } }));
   }
 
   function data() {
@@ -18,22 +18,24 @@
 
   function save(next, message) {
     try {
+      emit("自動保存中", "saving");
       cache = storage.saveData(next);
-      emit(message);
+      emit(message, "saved");
     } catch (error) {
       alert(error.message);
-      emit("保存に失敗しました");
+      emit("保存に失敗しました", "error");
     }
     return cache;
   }
 
   function replace(next, message) {
     try {
+      emit("復元中", "saving");
       cache = storage.replaceData(next);
-      emit(message || "復元しました");
+      emit(message || "復元しました", "saved");
     } catch (error) {
       alert(error.message);
-      emit("復元に失敗しました");
+      emit("復元に失敗しました", "error");
     }
     return cache;
   }
@@ -218,6 +220,7 @@
       schedule.status = "実施済み";
       schedule.completedAt = U.now();
       schedule.completedByWorkId = work.workId;
+      schedule.completionReason = `${work.workName || "作業"}の作業記録により完了`;
       schedule.updatedAt = U.now();
     });
   }
@@ -310,6 +313,7 @@
         schedule.status = "予定";
         schedule.completedAt = "";
         schedule.completedByWorkId = "";
+        schedule.completionReason = "";
         schedule.updatedAt = U.now();
       });
     }, "圃場作業を削除しました");
@@ -445,6 +449,7 @@
         completedAt: record.completedAt || "",
         completedByWorkId: record.completedByWorkId || "",
         completedManuallyAt: record.completedManuallyAt || "",
+        completionReason: record.completionReason || "",
         memo: record.memo || "",
         createdAt: record.createdAt || U.now(),
         updatedAt: U.now()
@@ -464,6 +469,7 @@
         status: "手動完了",
         completedAt: U.now(),
         completedManuallyAt: U.now(),
+        completionReason: "手動で実施済みにしました",
         updatedAt: U.now()
       };
     }, "予定を完了にしました");
@@ -571,7 +577,7 @@
     const restored = storage.restoreBackup();
     if (!restored) return null;
     cache = restored;
-    emit("直前バックアップに戻しました");
+    emit("直前バックアップに戻しました", "saved");
     return cache;
   }
 

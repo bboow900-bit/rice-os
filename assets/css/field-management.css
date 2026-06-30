@@ -280,6 +280,30 @@
     gap: 7px !important;
   }
 
+  .field-master-menu-stack {
+    display: grid !important;
+    gap: 9px !important;
+  }
+
+  .field-master-menu-block {
+    display: grid !important;
+    gap: 6px !important;
+  }
+
+  .field-master-menu-block > b {
+    display: inline-flex !important;
+    align-items: center !important;
+    width: fit-content !important;
+    min-height: 22px !important;
+    padding: 3px 9px !important;
+    border-radius: 999px !important;
+    background: #eff8e9 !important;
+    color: #216f35 !important;
+    font-size: 10px !important;
+    font-weight: 850 !important;
+    line-height: 1 !important;
+  }
+
   .field-master-menu-button {
     min-height: 82px !important;
     padding: 7px 4px 6px !important;

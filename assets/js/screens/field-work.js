@@ -44,6 +44,7 @@
     const summary = U.$("fwFieldSelectionSummary");
     if (!summary) return;
     const ids = selectedFieldIds();
+    const fields = ids.map((id) => state.field(id)).filter(Boolean);
     const totalArea = ids.reduce((sum, id) => {
       const field = state.field(id);
       return sum + U.number(field && field.areaA, 0);
@@ -51,6 +52,14 @@
     summary.textContent = ids.length
       ? `${ids.length}圃場 / ${Math.round(totalArea * 10) / 10}a を選択中`
       : "未選択";
+    const selectedStrip = U.$("fwSelectedFields");
+    if (selectedStrip) {
+      selectedStrip.innerHTML = fields.length ? fields.map((field) => `
+        <button type="button" data-fw-remove-field="${U.attr(field.fieldId)}">
+          ${U.escapeHTML(field.name)}<span>${U.escapeHTML(String(field.areaA || 0))}a</span>
+        </button>
+      `).join("") : '<span>圃場を選ぶとここに表示されます</span>';
+    }
   }
 
   function setSelectedFieldIds(ids) {
@@ -121,10 +130,11 @@
   function renderFieldCards() {
     const selected = selectedFieldIds();
     if (U.$("fwGroupPicks")) {
+      const current = new Set(selected);
       U.$("fwGroupPicks").innerHTML = fieldGroups().map((group) => `
-        <button class="field-group-pick" type="button" data-fw-group="${U.attr(group.name)}">
+        <button class="field-group-pick ${group.fields.every((field) => current.has(field.fieldId)) ? "active" : ""}" type="button" data-fw-group="${U.attr(group.name)}">
           ${U.escapeHTML(group.name === "未設定" ? "未設定" : `${group.name}グループ`)}
-          <span>${U.escapeHTML(String(group.fields.length))}圃場</span>
+          <span>${U.escapeHTML(String(group.fields.length))}圃場 / ${U.escapeHTML(String(Math.round(group.fields.reduce((sum, field) => sum + U.number(field.areaA, 0), 0) * 10) / 10))}a</span>
         </button>
       `).join("");
     }
@@ -367,11 +377,26 @@
       const groupButton = event.target.closest("[data-fw-group]");
       if (groupButton) {
         const group = groupButton.dataset.fwGroup || "";
+        const current = new Set(selectedFieldIds());
         const ids = state.activeFields()
           .filter((field) => fieldGroupName(field) === group)
           .map((field) => field.fieldId);
-        setSelectedFieldIds(ids);
+        const allSelected = ids.length && ids.every((id) => current.has(id));
+        ids.forEach((id) => {
+          if (allSelected) current.delete(id);
+          else current.add(id);
+        });
+        setSelectedFieldIds(Array.from(current));
         applyWorkPreset(U.$("fwName").value);
+        renderFieldCards();
+        return;
+      }
+      const removeButton = event.target.closest("[data-fw-remove-field]");
+      if (removeButton) {
+        const current = new Set(selectedFieldIds());
+        current.delete(removeButton.dataset.fwRemoveField);
+        setSelectedFieldIds(Array.from(current));
+        renderFieldCards();
       }
     });
 

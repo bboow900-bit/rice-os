@@ -84,14 +84,19 @@
     show(previous || "home", { skipHistory: true });
   }
 
-  function markSaved(message) {
+  function markSaved(message, statusValue) {
     const status = U.$("saveStatus");
     if (!status) return;
+    const state = statusValue || "saved";
+    status.dataset.saveState = state;
     status.textContent = message || "保存しました";
     clearTimeout(window.__riceSaveStatusTimer);
-    window.__riceSaveStatusTimer = setTimeout(() => {
-      status.textContent = "自動保存中";
-    }, 1800);
+    if (state === "saved") {
+      window.__riceSaveStatusTimer = setTimeout(() => {
+        status.textContent = "保存済み";
+        status.dataset.saveState = "idle";
+      }, 1800);
+    }
   }
 
   function bindScreens() {
@@ -193,7 +198,8 @@
       if (meta.weatherLabelRepairVersion !== "20260629_ver80") RiceOS.weather.repairStoredWeatherLabels();
     }
     window.addEventListener("riceos:datachange", (event) => {
-      markSaved(event.detail && event.detail.message);
+      markSaved(event.detail && event.detail.message, event.detail && event.detail.status);
+      if (event.detail && event.detail.status === "saving") return;
       const mod = screenModule(activeScreen);
       if (!mod || !mod.preserveOnDataChange) renderAll();
       if (RiceOS.pwa && RiceOS.alerts) RiceOS.pwa.notifyDueAlerts(RiceOS.alerts.notificationAlerts());
@@ -202,7 +208,7 @@
     initializeFormDefaults();
     show(activeScreen, { skipHistory: true });
     if (RiceOS.pwa && RiceOS.alerts) RiceOS.pwa.notifyDueAlerts(RiceOS.alerts.notificationAlerts());
-    markSaved("保存準備完了");
+    markSaved("保存準備完了", "saved");
   }
 
   RiceOS.app = {
