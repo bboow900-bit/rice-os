@@ -195,7 +195,7 @@
 
   function scheduleKeyword(value) {
     const text = String(value || "");
-    const keys = ["田植", "除草", "中干", "溝切", "草刈", "追肥", "防除", "収穫", "代かき", "播種", "水深", "葉色", "間断", "湿潤"];
+    const keys = ["田植", "除草", "中干", "溝切", "草刈", "追肥", "防除", "出穂", "収穫", "代かき", "播種", "水深", "葉色", "間断", "湿潤"];
     return keys.find((key) => text.includes(key)) || "";
   }
 

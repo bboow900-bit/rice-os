@@ -14,7 +14,7 @@
   <link rel="icon" href="assets/icons/icon-192.png">
   <link rel="apple-touch-icon" href="assets/icons/icon-192.png">
   <title>稲作カルテ</title>
-  <link rel="stylesheet" href="assets/css/app.css?v=20260630_ver85">
+  <link rel="stylesheet" href="assets/css/app.css?v=20260630_ver87">
   <link rel="stylesheet" href="assets/css/field-management.css?v=20260630_ver85">
 </head>
 <body>
@@ -86,6 +86,10 @@
           <input type="hidden" id="editFieldWorkId">
           <details class="form-section" open>
             <summary>基本情報</summary>
+            <div class="work-template-panel">
+              <b>作業テンプレート</b>
+              <div id="fwTemplatePicks"></div>
+            </div>
             <div class="form-grid dense">
               <label>日付<input id="fwDate" type="date" required></label>
               <label>作業者
@@ -97,6 +101,14 @@
               </label>
               <label>作業<select id="fwName"></select></label>
               <label>作業時間<input id="fwHours" placeholder="例: 1時間30分"></label>
+            </div>
+            <div class="work-time-tools">
+              <button type="button" data-fw-hours-step="-15">−15分</button>
+              <button type="button" data-fw-hours="30">30分</button>
+              <button type="button" data-fw-hours="60">1時間</button>
+              <button type="button" data-fw-hours="90">1.5時間</button>
+              <button type="button" data-fw-hours="120">2時間</button>
+              <button type="button" data-fw-hours-step="15">＋15分</button>
             </div>
           </details>
           <details class="form-section" open>
@@ -545,21 +557,21 @@
   <div id="toast" class="toast hidden" role="status"></div>
 
   <script src="assets/js/core/utils.js?v=20260627_ver67"></script>
-  <script src="assets/js/core/schema.js?v=20260630_ver85"></script>
+  <script src="assets/js/core/schema.js?v=20260630_ver87"></script>
   <script src="assets/js/core/storage.js?v=20260627_ver67"></script>
-  <script src="assets/js/core/state.js?v=20260630_ver85"></script>
+  <script src="assets/js/core/state.js?v=20260630_ver87"></script>
   <script src="assets/js/core/agro.js?v=20260627_ver67"></script>
   <script src="assets/js/core/record-actions.js?v=20260627_ver67"></script>
   <script src="assets/js/core/calendar.js?v=20260630_ver85"></script>
   <script src="assets/js/core/alerts.js?v=20260627_ver67"></script>
   <script src="assets/js/core/weather.js?v=20260629_ver81"></script>
   <script src="assets/js/core/pwa.js?v=20260627_ver67"></script>
-  <script src="assets/js/screens/home.js?v=20260630_ver85"></script>
+  <script src="assets/js/screens/home.js?v=20260630_ver87"></script>
   <script src="assets/js/screens/calendar.js?v=20260629_ver83"></script>
   <script src="assets/js/screens/bottom-sheet.js?v=20260629_ver83"></script>
-  <script src="assets/js/screens/recipes.js?v=20260627_ver67"></script>
+  <script src="assets/js/screens/recipes.js?v=20260630_ver87"></script>
   <script src="assets/js/screens/fields.js?v=20260630_ver85"></script>
-  <script src="assets/js/screens/field-work.js?v=20260630_ver85"></script>
+  <script src="assets/js/screens/field-work.js?v=20260630_ver87"></script>
   <script src="assets/js/screens/growth.js?v=20260627_ver67"></script>
   <script src="assets/js/screens/dry-period.js?v=20260627_ver67"></script>
   <script src="assets/js/screens/irrigation.js?v=20260627_ver67"></script>

@@ -47,6 +47,7 @@
     headingDaysAfterPlanting: "85",
     headingAccumulatedTempTarget: "",
     panicleAccumulatedTempTarget: "",
+    ripeningAccumulatedTempTarget: "",
     memo: ""
   };
 

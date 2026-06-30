@@ -487,6 +487,11 @@
     return U.number(variety && variety.panicleAccumulatedTempTarget, 1000) || 1000;
   }
 
+  function ripeningTempTarget(field) {
+    const variety = field ? state.variety(field.varietyId) : null;
+    return U.number(variety && variety.ripeningAccumulatedTempTarget, 1000) || 1000;
+  }
+
   function heatCacheKey(field, planting, date) {
     const location = state.data().meta && state.data().meta.weatherLocation || {};
     return [field && field.fieldId, planting, date, location.latitude, location.longitude, location.updatedAt].join(":");
@@ -539,6 +544,108 @@
     `;
   }
 
+  function validTempRows(rows) {
+    return (rows || [])
+      .filter((row) => row && row.date && row.tempMean !== "" && Number.isFinite(Number(row.tempMean)))
+      .sort((a, b) => String(a.date).localeCompare(String(b.date)));
+  }
+
+  function accumulatedFromRows(rows, startDate, endDate) {
+    const validRows = validTempRows(rows).filter((row) => row.date >= startDate && row.date <= endDate);
+    const total = validRows.reduce((sum, row) => sum + Number(row.tempMean), 0);
+    return {
+      count: validRows.length,
+      total: Math.round(total * 10) / 10
+    };
+  }
+
+  function targetDateFromRows(rows, target) {
+    let sum = 0;
+    for (const row of validTempRows(rows)) {
+      sum += Number(row.tempMean);
+      if (sum >= Number(target)) return row.date;
+    }
+    return "";
+  }
+
+  function actualHeadingDate(field) {
+    if (!field) return "";
+    const workDate = state.workDateForField ? state.workDateForField(field.fieldId, ["出穂", "出穂確認"], "first") : "";
+    if (workDate) return workDate;
+    const log = state.growthLogsFor(field.fieldId)
+      .slice()
+      .sort((a, b) => String(a.date).localeCompare(String(b.date)))
+      .find((row) => String(row.memo || "").includes("出穂"));
+    return log && log.date || "";
+  }
+
+  function headingDateInfo(field, cached, planting, headingTarget) {
+    const actual = actualHeadingDate(field);
+    if (actual) return { date: actual, source: "出穂確認", actual: true };
+    const rows = [
+      ...validTempRows(cached && cached.rows),
+      ...validTempRows(cached && cached.projectionRows)
+    ];
+    const heatDate = targetDateFromRows(rows, headingTarget);
+    if (heatDate) return { date: heatDate, source: "積算気温から推定", actual: false };
+    const variety = field ? state.variety(field.varietyId) : null;
+    const headingDays = varietyDayTarget(variety, "headingDaysAfterPlanting", 85);
+    return planting ? { date: addDays(planting, headingDays), source: "日数目安から推定", actual: false } : { date: "", source: "", actual: false };
+  }
+
+  function renderRipeningHeatMeter(field, cached, planting, headingTarget) {
+    const target = ripeningTempTarget(field);
+    const heading = headingDateInfo(field, cached, planting, headingTarget);
+    const availableRows = validTempRows(cached && cached.rows);
+    const projectionRows = validTempRows(cached && cached.projectionRows);
+    const canUseRows = heading.date && cached && !cached.error;
+    const today = U.today();
+    const actual = canUseRows && heading.date <= today ? accumulatedFromRows(availableRows, heading.date, today) : { count: 0, total: "" };
+    const futureRows = canUseRows && Number(actual.total || 0) < target
+      ? projectionRows.filter((row) => row.date > today && row.date >= heading.date)
+      : [];
+    const percent = actual.total === "" ? 0 : progressPercent(actual.total, target);
+    const projectedEta = futureRows.length
+      ? heatEtaFromProjection(actual.total || 0, target, futureRows, "収穫目安", "収穫目安まで")
+      : heatEtaLabel(actual.total || "", target, heatPace({ rows: availableRows.slice(-10) }), "収穫目安", "収穫目安まで");
+    const title = !heading.date
+      ? "出穂日待ち"
+      : heading.date > today
+        ? "出穂前"
+        : actual.count
+          ? `${Math.round(actual.total)}℃`
+          : "取得中";
+    const note = !planting
+      ? "田植え作業を登録すると計算します"
+      : !heading.date
+        ? "出穂確認か出穂目安が必要です"
+        : `${U.fd(heading.date)}から${actual.count}日分 / ${heading.source}`;
+    return `
+      <section class="farm-heat-meter farm-heat-meter-ripening">
+        <div class="farm-heat-meter-head">
+          <span>🌾</span>
+          <div>
+            <b>出穂後積算</b>
+            <small>${U.escapeHTML(note)}</small>
+          </div>
+          <strong>${U.escapeHTML(title)}</strong>
+        </div>
+        <div class="farm-heat-bar ripening">
+          <em style="width:${U.attr(String(percent))}%"></em>
+        </div>
+        <div class="farm-heat-forecast">
+          <span>${U.escapeHTML(heading.actual ? "実測の出穂確認日を起点に計算" : "出穂日は推定です。実測を記録すると置き換わります")}</span>
+          <b>${U.escapeHTML(projectedEta)}</b>
+        </div>
+        <div class="farm-heat-scale farm-heat-scale-two">
+          <span>出穂</span>
+          <span>登熟</span>
+          <span>収穫目安 ${U.escapeHTML(String(target))}℃</span>
+        </div>
+      </section>
+    `;
+  }
+
   function renderHeatMeter(field) {
     const planting = state.plantingDateForField ? state.plantingDateForField(field.fieldId) : "";
     const target = accumulatedTempTarget(field);
@@ -558,26 +665,29 @@
           ? `${U.fd(planting)}から${count}日分 / 出穂目安 ${target}℃`
           : "圃場付近の天気データを確認中";
     return `
-      <section class="farm-heat-meter" data-heat-field="${U.attr(field.fieldId)}">
-        <div class="farm-heat-meter-head">
-          <span>🔥</span>
-          <div>
-            <b>積算気温</b>
-            <small>${U.escapeHTML(note)}</small>
+      <div class="farm-heat-stack" data-heat-field="${U.attr(field.fieldId)}">
+        <section class="farm-heat-meter">
+          <div class="farm-heat-meter-head">
+            <span>🔥</span>
+            <div>
+              <b>積算気温</b>
+              <small>${U.escapeHTML(note)}</small>
+            </div>
+            <strong>${U.escapeHTML(title)}</strong>
           </div>
-          <strong>${U.escapeHTML(title)}</strong>
-        </div>
-        <div class="farm-heat-bar">
-          <i style="left:${U.attr(String(paniclePercent))}%"></i>
-          <em style="width:${U.attr(String(percent))}%"></em>
-        </div>
-        ${renderHeatForecast(cached, total, panicleTarget, target)}
-        <div class="farm-heat-scale">
-          <span>田植え</span>
-          <span>幼穂 ${U.escapeHTML(String(panicleTarget))}℃</span>
-          <span>出穂 ${U.escapeHTML(String(target))}℃</span>
-        </div>
-      </section>
+          <div class="farm-heat-bar">
+            <i style="left:${U.attr(String(paniclePercent))}%"></i>
+            <em style="width:${U.attr(String(percent))}%"></em>
+          </div>
+          ${renderHeatForecast(cached, total, panicleTarget, target)}
+          <div class="farm-heat-scale">
+            <span>田植え</span>
+            <span>幼穂 ${U.escapeHTML(String(panicleTarget))}℃</span>
+            <span>出穂 ${U.escapeHTML(String(target))}℃</span>
+          </div>
+        </section>
+        ${renderRipeningHeatMeter(field, cached, planting, target)}
+      </div>
     `;
   }
 
@@ -655,6 +765,14 @@
         value: dap === "" ? "未判定" : (dap >= headingDays ? `${dap}日経過` : `あと${headingDays - dap}日`),
         note: headingTemp ? `日数目安 ${headingDays}日 / 積算気温目標 ${headingTemp}` : `田植え後${headingDays}日前後を目安に確認`,
         percent: dap === "" ? 0 : progressPercent(dap, headingDays)
+      },
+      {
+        tone: "amber",
+        icon: "🌾",
+        title: "出穂後積算",
+        value: actualHeadingDate(field) ? "実測あり" : "推定で計算",
+        note: `収穫目安 ${ripeningTempTarget(field)}℃。出穂確認を記録すると精度が上がります`,
+        percent: 0
       },
       {
         tone: "blue",

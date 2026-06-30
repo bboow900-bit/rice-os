@@ -19,6 +19,17 @@
     "稲刈り": { machine: "コンバイン" }
   };
 
+  const WORK_TEMPLATES = [
+    { key: "planting", label: "田植え", workName: "田植え", machine: "田植機", hours: 120, memo: "田植え作業。田植日としてカルテへ自動反映。" },
+    { key: "herbicide", label: "除草剤", workName: "除草剤", machine: "散布機", material: "recipe", hours: 60, memo: "除草剤散布。水深・風を現場確認。" },
+    { key: "mowing", label: "草刈り", workName: "草刈り", machine: "草刈り機", hours: 90, memo: "畦畔・周辺の草刈り。" },
+    { key: "dry-start", label: "中干し開始", workName: "中干し開始", machine: "", hours: 30, memo: "中干し開始。ひび割れ・沈み込みは中干し記録で確認。" },
+    { key: "fertilizer", label: "追肥", workName: "追肥", machine: "散布機", material: "recipe", hours: 60, memo: "追肥。葉色と生育状況を見て判断。" },
+    { key: "pest", label: "防除", workName: "防除", machine: "動力噴霧機", material: "recipe", hours: 90, memo: "防除作業。風・天候を確認。" },
+    { key: "heading", label: "出穂確認", workName: "出穂確認", machine: "", hours: 15, memo: "出穂を確認。出穂後積算気温の起点として使用。" },
+    { key: "harvest", label: "稲刈り", workName: "稲刈り", machine: "コンバイン", hours: 180, memo: "収穫作業。" }
+  ];
+
   function selectedFieldIds() {
     return U.$$("#fwFields .select-card.selected").map((el) => el.dataset.id);
   }
@@ -105,12 +116,70 @@
     }
   }
 
+  function setDirectValue(id, value, autoFilled) {
+    const el = U.$(id);
+    if (!el) return;
+    el.value = value || "";
+    el.dataset.autoFilled = autoFilled ? "1" : "0";
+  }
+
+  function formatDuration(minutes) {
+    const value = Math.max(0, Math.round(Number(minutes) || 0));
+    if (!value) return "";
+    const hours = Math.floor(value / 60);
+    const mins = value % 60;
+    if (!hours) return `${mins}分`;
+    if (!mins) return `${hours}時間`;
+    return `${hours}時間${mins}分`;
+  }
+
+  function parseDurationMinutes(value) {
+    const text = String(value || "").trim();
+    if (!text) return 0;
+    const hourMatch = text.match(/(\d+(?:\.\d+)?)\s*(?:時間|h|H)/);
+    const minMatch = text.match(/(\d+(?:\.\d+)?)\s*(?:分|m|M)/);
+    if (hourMatch || minMatch) {
+      return Math.round((hourMatch ? Number(hourMatch[1]) * 60 : 0) + (minMatch ? Number(minMatch[1]) : 0));
+    }
+    const numeric = Number(text.replace(/[^\d.]/g, ""));
+    if (!Number.isFinite(numeric)) return 0;
+    return Math.round(numeric <= 12 ? numeric * 60 : numeric);
+  }
+
+  function setDuration(minutes) {
+    setDirectValue("fwHours", formatDuration(minutes), false);
+  }
+
+  function adjustDuration(delta) {
+    const current = parseDurationMinutes(U.$("fwHours").value);
+    setDuration(Math.max(0, current + Number(delta || 0)));
+  }
+
   function applyWorkPreset(workName) {
     const preset = WORK_PRESETS[workName] || {};
     const learned = learnedPreset(workName);
     setAutoValue("fwMachine", preset.machine || learned.machine || "");
     setAutoValue("fwMaterial", recommendedMaterial(workName) || learned.material || "");
     setAutoValue("fwAmount", learned.amount || "");
+  }
+
+  function templateMaterial(template) {
+    if (!template || template.material !== "recipe") return template && template.material || "";
+    return recommendedMaterial(template.workName);
+  }
+
+  function applyWorkTemplate(key) {
+    const template = WORK_TEMPLATES.find((item) => item.key === key);
+    if (!template) return;
+    U.$("fwName").value = template.workName;
+    setDirectValue("fwMachine", template.machine || (WORK_PRESETS[template.workName] && WORK_PRESETS[template.workName].machine) || "", true);
+    setDirectValue("fwMaterial", templateMaterial(template), true);
+    if (!U.$("fwAmount").value) U.$("fwAmount").dataset.autoFilled = "1";
+    if (template.hours) setDuration(template.hours);
+    if (!U.$("fwMemo").value || U.$("fwMemo").dataset.templateFilled === "1") {
+      U.$("fwMemo").value = template.memo || "";
+      U.$("fwMemo").dataset.templateFilled = "1";
+    }
   }
 
   function prefillWorkName(workName) {
@@ -150,6 +219,17 @@
     setSelectedFieldIds(selected);
   }
 
+  function renderTemplates() {
+    const root = U.$("fwTemplatePicks");
+    if (!root) return;
+    root.innerHTML = WORK_TEMPLATES.map((template) => `
+      <button type="button" data-fw-template="${U.attr(template.key)}">
+        <span>${U.escapeHTML(template.label)}</span>
+        <small>${U.escapeHTML(formatDuration(template.hours) || "時間未設定")}</small>
+      </button>
+    `).join("");
+  }
+
   function syncWorkerPreset() {
     const value = U.$("fwWorker") ? U.$("fwWorker").value : "";
     U.$$("[data-worker-preset]").forEach((button) => {
@@ -176,6 +256,7 @@
     U.$("fwWeatherAutoJson").value = "";
     U.$("fwWeatherStatus").textContent = "位置情報を設定すると、作業日の天気・気温・降水量を自動取得します。";
     U.$("fwMemo").value = "";
+    U.$("fwMemo").dataset.templateFilled = "0";
     if (U.$("fwPhoto")) U.$("fwPhoto").value = "";
     if (U.$("fwPhotoFile")) U.$("fwPhotoFile").value = "";
     if (U.$("fwPhotoPreview")) {
@@ -267,6 +348,7 @@
 
   function render() {
     U.setOptions(U.$("fwName"), S.FIELD_WORK_NAMES, U.$("fwName").value || "田植え");
+    renderTemplates();
     renderFieldCards();
     syncWorkerPreset();
     renderList();
@@ -374,6 +456,21 @@
         applyWorkPreset(U.$("fwName").value);
         return;
       }
+      const templateButton = event.target.closest("[data-fw-template]");
+      if (templateButton) {
+        applyWorkTemplate(templateButton.dataset.fwTemplate);
+        return;
+      }
+      const hourButton = event.target.closest("[data-fw-hours]");
+      if (hourButton) {
+        setDuration(Number(hourButton.dataset.fwHours || 0));
+        return;
+      }
+      const hourStepButton = event.target.closest("[data-fw-hours-step]");
+      if (hourStepButton) {
+        adjustDuration(Number(hourStepButton.dataset.fwHoursStep || 0));
+        return;
+      }
       const groupButton = event.target.closest("[data-fw-group]");
       if (groupButton) {
         const group = groupButton.dataset.fwGroup || "";
@@ -429,6 +526,9 @@
       U.$(id).addEventListener("input", () => {
         U.$(id).dataset.autoFilled = "0";
       });
+    });
+    U.$("fwMemo").addEventListener("input", () => {
+      U.$("fwMemo").dataset.templateFilled = "0";
     });
 
     U.$("fwDate").addEventListener("change", () => {

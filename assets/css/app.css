@@ -919,10 +919,15 @@
   white-space: nowrap;
 }
 
+.farm-heat-stack {
+  display: grid;
+  gap: 7px;
+  margin: 9px 10px 5px;
+}
+
 .farm-heat-meter {
   display: grid;
   gap: 8px;
-  margin: 9px 10px 5px;
   padding: 10px;
   border: 1px solid #f0d898;
   border-radius: 12px;
@@ -930,6 +935,13 @@
     radial-gradient(circle at 12% 18%, rgba(255, 236, 143, 0.52), transparent 32%),
     linear-gradient(135deg, #fff9df 0%, #f5fff0 56%, #eef9ff 100%);
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.62), 0 5px 14px rgba(123, 104, 34, 0.08);
+}
+
+.farm-heat-meter-ripening {
+  border-color: #cfe6ba;
+  background:
+    radial-gradient(circle at 14% 18%, rgba(215, 242, 164, 0.55), transparent 34%),
+    linear-gradient(135deg, #f6fff1 0%, #fff9df 58%, #fff4e1 100%);
 }
 
 .farm-heat-meter-head {
@@ -984,6 +996,10 @@
   box-shadow: inset 0 0 0 1px rgba(103, 85, 22, 0.12);
 }
 
+.farm-heat-bar.ripening {
+  background: linear-gradient(90deg, #dff0d4, #fff2b2, #ffd198);
+}
+
 .farm-heat-bar em {
   position: absolute;
   inset: 0 auto 0 0;
@@ -991,6 +1007,10 @@
   border-radius: inherit;
   background: linear-gradient(90deg, #2baa47, #8fd84b, #f2be35);
   box-shadow: 0 0 10px rgba(242, 190, 53, 0.34);
+}
+
+.farm-heat-bar.ripening em {
+  background: linear-gradient(90deg, #38ae46, #c8dc3e, #ed9d31);
 }
 
 .farm-heat-bar i {
@@ -1044,6 +1064,10 @@
 
 .farm-heat-scale span:last-child {
   text-align: right;
+}
+
+.farm-heat-scale-two span:nth-child(2) {
+  text-align: center;
 }
 
 .farm-progress-row {
@@ -2065,6 +2089,40 @@
     width: 100% !important;
     max-width: 100% !important;
     overflow-x: auto !important;
+  }
+}
+
+/* Field work mobile lock: keep template and time controls inside phone width. */
+@media (max-width: 900px) {
+  body:has(#screen-field-work.active) .app-shell,
+  body:has(#screen-field-work.active) .content,
+  #screen-field-work.active,
+  #screen-field-work.active .stack-form,
+  #screen-field-work.active .form-section,
+  #screen-field-work.active .work-template-panel,
+  #screen-field-work.active .work-time-tools,
+  #screen-field-work.active .form-grid.dense {
+    box-sizing: border-box !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    overflow-x: hidden !important;
+  }
+
+  #screen-field-work.active .work-template-panel,
+  #screen-field-work.active .work-time-tools {
+    overflow: visible !important;
+  }
+
+  #screen-field-work.active #fwTemplatePicks,
+  #screen-field-work.active .work-time-tools {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  #screen-field-work.active #fwTemplatePicks button,
+  #screen-field-work.active .work-time-tools button {
+    min-width: 0 !important;
+    max-width: 100% !important;
   }
 }
 
@@ -3313,6 +3371,77 @@ h3 {
   border: 1px solid #d9e8d2;
   border-radius: 10px;
   background: linear-gradient(180deg, #f8fff4, #fffdf5);
+}
+
+.work-template-panel {
+  display: grid;
+  gap: 7px;
+  margin: 0 0 10px;
+  padding: 10px;
+  border: 1px solid #dbe9d4;
+  border-radius: 10px;
+  background: linear-gradient(180deg, #fbfff8, #fff8e6);
+}
+
+.work-template-panel > b {
+  color: #17301f;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+#fwTemplatePicks {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+#fwTemplatePicks button {
+  display: grid;
+  gap: 2px;
+  min-height: 48px;
+  padding: 7px 5px;
+  border: 1px solid #cfe2c7;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.94);
+  color: #18251b;
+  box-shadow: 0 3px 8px rgba(55, 80, 42, 0.07);
+  text-align: center;
+}
+
+#fwTemplatePicks button span {
+  overflow: hidden;
+  font-size: 11px;
+  font-weight: 900;
+  line-height: 1.1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#fwTemplatePicks button small {
+  color: #637063;
+  font-size: 9px;
+  font-weight: 780;
+  line-height: 1;
+}
+
+.work-time-tools {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 5px;
+  margin-top: 8px;
+}
+
+.work-time-tools button {
+  min-height: 34px;
+  padding: 0 4px;
+  border-color: #d8e5d1;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #17301f;
+  box-shadow: 0 2px 6px rgba(48, 80, 37, 0.06);
+  font-size: 10.5px;
+  font-weight: 850;
+  white-space: nowrap;
 }
 
 .field-bulk-tools > div:first-child {

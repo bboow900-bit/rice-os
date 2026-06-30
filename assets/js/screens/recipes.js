@@ -49,7 +49,12 @@
     {
       title: "目標",
       fields: [
-        ["targetTillers", "中干し前目標分げつ数"]
+        ["targetTillers", "中干し前目標分げつ数"],
+        ["panicleInitiationDaysAfterPlanting", "幼穂形成 日数目安"],
+        ["panicleAccumulatedTempTarget", "幼穂形成 積算℃"],
+        ["headingDaysAfterPlanting", "出穂 日数目安"],
+        ["headingAccumulatedTempTarget", "出穂 積算℃"],
+        ["ripeningAccumulatedTempTarget", "出穂後 収穫目安℃"]
       ]
     }
   ];
