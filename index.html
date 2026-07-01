@@ -14,7 +14,7 @@
   <link rel="icon" href="assets/icons/icon-192.png">
   <link rel="apple-touch-icon" href="assets/icons/icon-192.png">
   <title>稲作カルテ</title>
-  <link rel="stylesheet" href="assets/css/app.css?v=20260630_ver87">
+  <link rel="stylesheet" href="assets/css/app.css?v=20260701_ver88">
   <link rel="stylesheet" href="assets/css/field-management.css?v=20260630_ver85">
 </head>
 <body>
@@ -211,6 +211,17 @@
               <label>ガス<select id="gGas"></select><div id="gGasChips" class="growth-choice-grid"></div></label>
               <label class="wide">水管理<select id="gWater"></select><div id="gWaterChips" class="growth-choice-grid water"></div></label>
             </div>
+            <label class="growth-observe-toggle">
+              <input id="gHeadingObserved" type="checkbox">
+              <span>
+                <b>出穂確認</b>
+                <small>この日を出穂後積算の起点にする</small>
+              </span>
+            </label>
+            <button class="growth-heading-quick" type="button" data-action="save-heading-observed">
+              <b>出穂だけ登録</b>
+              <small>日付と圃場だけで保存</small>
+            </button>
             <div id="growthTargetPanel" class="growth-target-panel"></div>
           </details>
           <details class="form-section" open>
@@ -557,7 +568,7 @@
   <div id="toast" class="toast hidden" role="status"></div>
 
   <script src="assets/js/core/utils.js?v=20260627_ver67"></script>
-  <script src="assets/js/core/schema.js?v=20260630_ver87"></script>
+  <script src="assets/js/core/schema.js?v=20260701_ver88"></script>
   <script src="assets/js/core/storage.js?v=20260627_ver67"></script>
   <script src="assets/js/core/state.js?v=20260630_ver87"></script>
   <script src="assets/js/core/agro.js?v=20260627_ver67"></script>
@@ -566,13 +577,13 @@
   <script src="assets/js/core/alerts.js?v=20260627_ver67"></script>
   <script src="assets/js/core/weather.js?v=20260629_ver81"></script>
   <script src="assets/js/core/pwa.js?v=20260627_ver67"></script>
-  <script src="assets/js/screens/home.js?v=20260630_ver87"></script>
+  <script src="assets/js/screens/home.js?v=20260701_ver88"></script>
   <script src="assets/js/screens/calendar.js?v=20260629_ver83"></script>
   <script src="assets/js/screens/bottom-sheet.js?v=20260629_ver83"></script>
   <script src="assets/js/screens/recipes.js?v=20260630_ver87"></script>
   <script src="assets/js/screens/fields.js?v=20260630_ver85"></script>
   <script src="assets/js/screens/field-work.js?v=20260630_ver87"></script>
-  <script src="assets/js/screens/growth.js?v=20260627_ver67"></script>
+  <script src="assets/js/screens/growth.js?v=20260701_ver88"></script>
   <script src="assets/js/screens/dry-period.js?v=20260627_ver67"></script>
   <script src="assets/js/screens/irrigation.js?v=20260627_ver67"></script>
   <script src="assets/js/screens/photos.js?v=20260627_ver67"></script>

@@ -570,6 +570,11 @@
 
   function actualHeadingDate(field) {
     if (!field) return "";
+    const observedLog = state.growthLogsFor(field.fieldId)
+      .slice()
+      .sort((a, b) => String(a.date).localeCompare(String(b.date)))
+      .find((row) => row.headingObserved);
+    if (observedLog) return observedLog.date;
     const workDate = state.workDateForField ? state.workDateForField(field.fieldId, ["出穂", "出穂確認"], "first") : "";
     if (workDate) return workDate;
     const log = state.growthLogsFor(field.fieldId)
@@ -593,6 +598,17 @@
     return planting ? { date: addDays(planting, headingDays), source: "日数目安から推定", actual: false } : { date: "", source: "", actual: false };
   }
 
+  function ripeningStatus(total, target, heading) {
+    if (!heading || !heading.date) return { label: "出穂日待ち", tone: "muted", note: "出穂確認を記録すると収穫目安を出します" };
+    if (heading.date > U.today()) return { label: "出穂前", tone: "muted", note: `${U.fd(heading.date)}ごろから登熟計算` };
+    if (total === "") return { label: "計算中", tone: "muted", note: "気温データを確認中" };
+    const ratio = Number(total) / Math.max(1, Number(target));
+    if (ratio >= 1) return { label: "収穫適期近い", tone: "ready", note: "籾水分と天気を見て現場確認" };
+    if (ratio >= 0.85) return { label: "収穫確認候補", tone: "warn", note: "穂色・倒伏・天気を確認" };
+    if (ratio >= 0.55) return { label: "登熟中", tone: "ok", note: "登熟の進みを継続確認" };
+    return { label: "まだ早い", tone: "early", note: "登熟初期。水管理と倒伏を確認" };
+  }
+
   function renderRipeningHeatMeter(field, cached, planting, headingTarget) {
     const target = ripeningTempTarget(field);
     const heading = headingDateInfo(field, cached, planting, headingTarget);
@@ -605,6 +621,7 @@
       ? projectionRows.filter((row) => row.date > today && row.date >= heading.date)
       : [];
     const percent = actual.total === "" ? 0 : progressPercent(actual.total, target);
+    const status = ripeningStatus(actual.total, target, heading);
     const projectedEta = futureRows.length
       ? heatEtaFromProjection(actual.total || 0, target, futureRows, "収穫目安", "収穫目安まで")
       : heatEtaLabel(actual.total || "", target, heatPace({ rows: availableRows.slice(-10) }), "収穫目安", "収穫目安まで");
@@ -635,6 +652,7 @@
         </div>
         <div class="farm-heat-forecast">
           <span>${U.escapeHTML(heading.actual ? "実測の出穂確認日を起点に計算" : "出穂日は推定です。実測を記録すると置き換わります")}</span>
+          <mark class="farm-harvest-status ${U.attr(status.tone)}">${U.escapeHTML(status.label)}<small>${U.escapeHTML(status.note)}</small></mark>
           <b>${U.escapeHTML(projectedEta)}</b>
         </div>
         <div class="farm-heat-scale farm-heat-scale-two">
@@ -725,6 +743,9 @@
     const headingDays = varietyDayTarget(variety, "headingDaysAfterPlanting", 85);
     const panicleTemp = variety && variety.panicleAccumulatedTempTarget || "";
     const headingTemp = variety && variety.headingAccumulatedTempTarget || "";
+    const headingDate = actualHeadingDate(field);
+    const ripeningElapsed = headingDate ? U.daysBetween(headingDate, U.today()) : "";
+    const ripeningTarget = ripeningTempTarget(field);
     return [
       {
         tone: "green",
@@ -767,12 +788,12 @@
         percent: dap === "" ? 0 : progressPercent(dap, headingDays)
       },
       {
-        tone: "amber",
+        tone: headingDate ? "orange" : "amber",
         icon: "🌾",
-        title: "出穂後積算",
-        value: actualHeadingDate(field) ? "実測あり" : "推定で計算",
-        note: `収穫目安 ${ripeningTempTarget(field)}℃。出穂確認を記録すると精度が上がります`,
-        percent: 0
+        title: "収穫目安",
+        value: headingDate ? `出穂後${ripeningElapsed}日` : "出穂未確認",
+        note: headingDate ? `出穂 ${U.fd(headingDate)} / 出穂後積算 ${ripeningTarget}℃目安` : "生育ログで出穂確認を入れると精度が上がります",
+        percent: headingDate ? progressPercent(ripeningElapsed, 45) : 0
       },
       {
         tone: "blue",

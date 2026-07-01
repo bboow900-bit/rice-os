@@ -337,6 +337,7 @@
       weed: String(g.weed || "-"),
       gas: String(g.gas || "-"),
       water: String(g.water || "-"),
+      headingObserved: Boolean(g.headingObserved || g.headingDate || String(g.memo || "").includes("出穂")),
       photo: String(g.photo || ""),
       photoData: String(g.photoData || ""),
       memo: String(g.memo || ""),

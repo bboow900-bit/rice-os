@@ -85,6 +85,7 @@
     U.$("gWeed").value = "-";
     U.$("gGas").value = "-";
     U.$("gWater").value = "-";
+    if (U.$("gHeadingObserved")) U.$("gHeadingObserved").checked = false;
     U.$("gPhoto").value = "";
     U.$("gPhotoFile").value = "";
     U.$("gMemo").value = "";
@@ -205,7 +206,10 @@
                 <b>葉色：${U.escapeHTML(log.leafColor || S.leafColorLabel(score))}</b>
                 <span>${U.escapeHTML(variety && variety.name || "品種未設定")}${dap !== "" ? ` / 田植後${U.escapeHTML(String(dap))}日` : ""}</span>
               </div>
-              ${photo ? '<span class="pill info">写真あり</span>' : log.photo ? '<span class="pill info">写真メモあり</span>' : ""}
+              <div class="timeline-card-badges">
+                ${log.headingObserved ? '<span class="pill ok">出穂確認</span>' : ""}
+                ${photo ? '<span class="pill info">写真あり</span>' : log.photo ? '<span class="pill info">写真メモあり</span>' : ""}
+              </div>
             </div>
             <div class="timeline-leaves" aria-label="葉色${U.attr(String(score))}">
               ${"●".repeat(score)}${"○".repeat(Math.max(0, 5 - score))}
@@ -254,6 +258,7 @@
     U.$("gWeed").value = log.weed || "-";
     U.$("gGas").value = log.gas || "-";
     U.$("gWater").value = log.water || "-";
+    if (U.$("gHeadingObserved")) U.$("gHeadingObserved").checked = Boolean(log.headingObserved);
     U.$("gPhoto").value = log.photo || "";
     U.$("gMemo").value = log.memo || "";
     U.$("gPhotoFile").value = "";
@@ -270,8 +275,34 @@
     if (log) fillEdit(log);
   }
 
+  function saveHeadingObservedOnly() {
+    if (!U.$("gField").value) {
+      alert("圃場を選んでください。");
+      return;
+    }
+    const field = state.field(U.$("gField").value);
+    state.saveGrowthLog({
+      date: U.$("gDate").value || U.today(),
+      fieldId: U.$("gField").value,
+      leafColorScore: U.$("gLeaf").value || "3",
+      leafColor: S.leafColorLabel(U.$("gLeaf").value || "3"),
+      weed: U.$("gWeed").value || "-",
+      gas: U.$("gGas").value || "-",
+      water: U.$("gWater").value || "-",
+      headingObserved: true,
+      memo: U.$("gMemo").value || "出穂確認"
+    });
+    U.toast(`${field && field.name || "圃場"} の出穂を登録しました`);
+    resetForm();
+  }
+
   function bind() {
     U.$("growthForm").addEventListener("click", (event) => {
+      const quickHeading = event.target.closest('[data-action="save-heading-observed"]');
+      if (quickHeading) {
+        saveHeadingObservedOnly();
+        return;
+      }
       const button = event.target.closest("[data-growth-select]");
       if (!button) return;
       const select = U.$(button.dataset.growthSelect);
@@ -281,7 +312,7 @@
       renderTargetPanel();
     });
 
-    ["gField", "gDate", "gTillerCount", "gLeafCount", "gPlantHeight", "gLeaf", "gWeed", "gGas", "gWater"].forEach((id) => {
+    ["gField", "gDate", "gTillerCount", "gLeafCount", "gPlantHeight", "gLeaf", "gWeed", "gGas", "gWater", "gHeadingObserved"].forEach((id) => {
       const el = U.$(id);
       if (!el) return;
       el.addEventListener("input", () => {
@@ -326,6 +357,7 @@
         weed: U.$("gWeed").value,
         gas: U.$("gGas").value,
         water: U.$("gWater").value,
+        headingObserved: U.$("gHeadingObserved") ? U.$("gHeadingObserved").checked : false,
         photo: U.$("gPhoto").value,
         photoData: U.$("gPhotoPreview").dataset.photoData || "",
         memo: U.$("gMemo").value

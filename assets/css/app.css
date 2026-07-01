@@ -1049,6 +1049,44 @@
   line-height: 1.2;
 }
 
+.farm-harvest-status {
+  display: grid;
+  gap: 1px;
+  padding: 6px 7px;
+  border: 1px solid rgba(61, 132, 56, 0.2);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.72);
+  color: #1d3a22;
+  font-size: 11px;
+  font-weight: 950;
+  line-height: 1.15;
+}
+
+.farm-harvest-status small {
+  color: #667064;
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.farm-harvest-status.warn {
+  border-color: rgba(225, 142, 33, 0.28);
+  background: #fff6de;
+  color: #8a4a08;
+}
+
+.farm-harvest-status.ready {
+  border-color: rgba(216, 92, 43, 0.3);
+  background: #fff0df;
+  color: #9a3412;
+}
+
+.farm-harvest-status.early,
+.farm-harvest-status.muted {
+  border-color: rgba(112, 126, 105, 0.2);
+  background: #f8fbf3;
+  color: #586554;
+}
+
 .farm-heat-scale {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -5826,6 +5864,75 @@ label {
   background: var(--primary);
   color: #fff;
   box-shadow: 0 4px 12px rgba(47, 125, 82, 0.18);
+}
+
+.growth-observe-toggle {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0 14px;
+  padding: 9px 10px;
+  border: 1px solid #cfe5bf;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #f8fff3, #fff8df);
+  box-shadow: 0 4px 12px rgba(56, 82, 42, 0.06);
+}
+
+.growth-observe-toggle input {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--primary);
+}
+
+.growth-observe-toggle b {
+  display: block;
+  color: #17301f;
+  font-size: 12.5px;
+  font-weight: 950;
+  line-height: 1.1;
+}
+
+.growth-observe-toggle small {
+  display: block;
+  margin-top: 2px;
+  color: #667064;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.growth-heading-quick {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  min-height: 48px;
+  margin: -6px 0 14px;
+  padding: 9px 10px;
+  border: 1px solid rgba(47, 125, 82, 0.28);
+  border-radius: 10px;
+  background: linear-gradient(135deg, #2baa47, #77bf37);
+  color: #fff;
+  box-shadow: 0 8px 18px rgba(47, 125, 82, 0.18);
+  text-align: center;
+}
+
+.growth-heading-quick b {
+  font-size: 13px;
+  font-weight: 950;
+  line-height: 1.1;
+}
+
+.growth-heading-quick small {
+  color: rgba(255, 255, 255, 0.86);
+  font-size: 10px;
+  font-weight: 820;
+}
+
+.timeline-card-badges {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 4px;
 }
 
 .growth-target-panel {
