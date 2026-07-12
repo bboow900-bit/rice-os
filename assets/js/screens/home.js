@@ -185,7 +185,9 @@
       const rows = [];
       const planting = state.plantingDateForField ? state.plantingDateForField(field.fieldId) : "";
       const dap = planting ? U.daysBetween(planting, date) : "";
-      const dryStart = state.workDateForField ? state.workDateForField(field.fieldId, ["中干し開始"], "first") : "";
+      const dryStart = field.drainageStartDate || (state.workDateForField ? state.workDateForField(field.fieldId, ["中干し開始"], "first") : "");
+      const dryEnd = field.drainageActualEndDate || (state.workDateForField ? state.workDateForField(field.fieldId, ["中干し終了"], "first") : "");
+      const irrigationStart = field.intermittentStartDate || (state.workDateForField ? state.workDateForField(field.fieldId, ["間断灌水開始", "湿潤灌漑開始"], "first") : "");
       if (dap !== "" && dap >= 35 && dap <= 55 && !dryStart) {
         rows.push({
           kind: "candidate",
@@ -196,7 +198,9 @@
         });
       }
       const growth = latestGrowth(field.fieldId);
-      if (!growth || U.daysBetween(growth.date, date) >= 7) {
+      const growthAge = growth ? U.daysBetween(growth.date, date) : "";
+      const importantGrowthWindow = dap !== "" && ((dap >= 35 && dap <= 60) || (dap >= 75 && dap <= 95));
+      if ((!growth && importantGrowthWindow) || (growthAge !== "" && growthAge >= 10 && importantGrowthWindow)) {
         rows.push({
           kind: "candidate",
           title: "葉色確認候補",
@@ -206,7 +210,8 @@
         });
       }
       const water = latestWater(field.fieldId);
-      if (dap !== "" && dap >= 25 && (!water || U.daysBetween(water.date || water.startDate, date) >= 5)) {
+      const waterActive = Boolean((dryStart && !dryEnd) || irrigationStart);
+      if (waterActive && (!water || U.daysBetween(water.date || water.startDate, date) >= 5)) {
         rows.push({
           kind: "candidate",
           title: "水深確認候補",
@@ -715,6 +720,20 @@
       .sort((a, b) => String(b.date).localeCompare(String(a.date)));
   }
 
+  function latestDryPeriod(fieldId) {
+    return (state.dryPeriodsFor ? state.dryPeriodsFor(fieldId) : [])
+      .filter((row) => row.startDate || row.actualEndDate || row.endDate)
+      .slice()
+      .sort((a, b) => String(b.date || b.actualEndDate || b.startDate).localeCompare(String(a.date || a.actualEndDate || a.startDate)))[0] || null;
+  }
+
+  function dryDiffText(planned, actual) {
+    if (planned === "" || actual === "") return "";
+    const diff = actual - planned;
+    if (diff === 0) return "予定どおり";
+    return diff > 0 ? `予定より${diff}日長い` : `予定より${Math.abs(diff)}日短い`;
+  }
+
   function latestProgressGrowth(fieldId) {
     return state.growthLogsFor(fieldId)
       .slice()
@@ -728,8 +747,13 @@
   function progressRowsForField(field) {
     const planting = state.plantingDateForField ? state.plantingDateForField(field.fieldId) : "";
     const dap = planting ? U.daysBetween(planting, U.today()) : "";
-    const dryStart = field.drainageStartDate || (state.workDateForField ? state.workDateForField(field.fieldId, ["中干し開始"], "first") : "");
-    const dryDays = U.number(field.drainageTargetDays, 7) || 7;
+    const dryPeriod = latestDryPeriod(field.fieldId);
+    const dryStart = dryPeriod && dryPeriod.startDate || field.drainageStartDate || (state.workDateForField ? state.workDateForField(field.fieldId, ["中干し開始"], "first") : "");
+    const dryEnd = dryPeriod && dryPeriod.endDate || field.drainagePlannedEndDate || "";
+    const dryActualEnd = dryPeriod && dryPeriod.actualEndDate || field.drainageActualEndDate || (state.workDateForField ? state.workDateForField(field.fieldId, ["中干し終了"], "first") : "");
+    const dryDays = U.number(dryPeriod && dryPeriod.targetDays || field.drainageTargetDays, 7) || 7;
+    const dryPlannedDays = dryStart && dryEnd ? U.daysBetween(dryStart, dryEnd) : dryDays;
+    const dryActualDays = dryStart && dryActualEnd ? U.daysBetween(dryStart, dryActualEnd) : "";
     const dryElapsed = dryStart ? U.daysBetween(dryStart, U.today()) : "";
     const irrigationStart = field.intermittentStartDate || (state.workDateForField ? state.workDateForField(field.fieldId, ["間断灌水開始", "湿潤灌漑開始"], "first") : "");
     const irrigationDays = U.number(field.intermittentIntervalDays, 3) || 3;
@@ -758,10 +782,12 @@
       {
         tone: dryStart ? "water" : "amber",
         icon: "💧",
-        title: dryStart ? "中干し進捗" : "中干し目安",
-        value: dryStart ? `${dryElapsed} / ${dryDays}日` : (dap === "" ? "未判定" : `${dap}日経過`),
-        note: dryStart ? `開始 ${U.fd(dryStart)}` : "田植え後42日前後を目安に現場確認",
-        percent: dryStart ? progressPercent(dryElapsed, dryDays) : (dap === "" ? 0 : progressPercent(dap, 42))
+        title: dryActualEnd ? "中干し完了" : (dryStart ? "中干し進捗" : "中干し目安"),
+        value: dryActualEnd ? (dryActualDays !== "" ? `実績${dryActualDays}日` : "完了") : (dryStart ? `${dryElapsed} / ${dryDays}日` : (dap === "" ? "未判定" : `${dap}日経過`)),
+        note: dryActualEnd
+          ? `完了 ${U.fd(dryActualEnd)} / 予定${dryPlannedDays}日 ${dryDiffText(dryPlannedDays, dryActualDays)}`
+          : (dryStart ? `開始 ${U.fd(dryStart)}` : "田植え後42日前後を目安に現場確認"),
+        percent: dryActualEnd ? 100 : (dryStart ? progressPercent(dryElapsed, dryDays) : (dap === "" ? 0 : progressPercent(dap, 42)))
       },
       {
         tone: herbicide ? "green" : "orange",

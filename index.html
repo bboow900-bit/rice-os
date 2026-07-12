@@ -14,7 +14,7 @@
   <link rel="icon" href="assets/icons/icon-192.png">
   <link rel="apple-touch-icon" href="assets/icons/icon-192.png">
   <title>稲作カルテ</title>
-  <link rel="stylesheet" href="assets/css/app.css?v=20260701_ver88">
+  <link rel="stylesheet" href="assets/css/app.css?v=20260712_ver92">
   <link rel="stylesheet" href="assets/css/field-management.css?v=20260630_ver85">
 </head>
 <body>
@@ -191,25 +191,39 @@
         </div>
         <div id="growthComparePanel" class="growth-compare-panel"></div>
         <div id="growthTimeline" class="growth-timeline"></div>
-        <form class="stack-form" id="growthForm">
+        <form class="stack-form" id="growthForm" data-growth-mode="simple">
           <input type="hidden" id="editGrowthId">
-          <details class="form-section" open>
+          <div class="growth-input-mode" role="group" aria-label="生育入力モード">
+            <button type="button" class="active" data-growth-mode-select="simple">
+              <b>かんたん観察</b>
+              <small>葉色・分げつ・写真</small>
+            </button>
+            <button type="button" data-growth-mode-select="detail">
+              <b>詳細入力</b>
+              <small>水管理・雑草まで</small>
+            </button>
+          </div>
+          <details class="form-section" id="growthBasicSection" open>
             <summary>基本情報</summary>
             <div class="form-grid dense">
               <label>日付<input id="gDate" type="date" required></label>
               <label>圃場<select id="gField"></select></label>
             </div>
+            <button class="growth-heading-quick primary-heading" type="button" data-action="save-heading-observed">
+              <b>この日を出穂日として登録</b>
+              <small>日付と圃場だけで保存</small>
+            </button>
           </details>
-          <details class="form-section" open>
+          <details class="form-section" id="growthStatusSection" open>
             <summary>生育状況</summary>
             <div class="form-grid dense">
-              <label>葉数<input id="gLeafCount" inputmode="decimal" placeholder="例: 7.2"></label>
+              <label class="growth-detail-field">葉数<input id="gLeafCount" inputmode="decimal" placeholder="例: 7.2"></label>
               <label>分げつ数<input id="gTillerCount" inputmode="numeric" placeholder="例: 18"></label>
-              <label>草丈(cm)<input id="gPlantHeight" inputmode="decimal" placeholder="例: 45"></label>
+              <label class="growth-detail-field">草丈(cm)<input id="gPlantHeight" inputmode="decimal" placeholder="例: 45"></label>
               <label class="wide">葉色<select id="gLeaf"></select><div id="gLeafChips" class="growth-choice-grid five"></div></label>
-              <label>雑草<select id="gWeed"></select><div id="gWeedChips" class="growth-choice-grid"></div></label>
-              <label>ガス<select id="gGas"></select><div id="gGasChips" class="growth-choice-grid"></div></label>
-              <label class="wide">水管理<select id="gWater"></select><div id="gWaterChips" class="growth-choice-grid water"></div></label>
+              <label class="growth-detail-field">雑草<select id="gWeed"></select><div id="gWeedChips" class="growth-choice-grid"></div></label>
+              <label class="growth-detail-field">ガス<select id="gGas"></select><div id="gGasChips" class="growth-choice-grid"></div></label>
+              <label class="wide growth-detail-field">水管理<select id="gWater"></select><div id="gWaterChips" class="growth-choice-grid water"></div></label>
             </div>
             <label class="growth-observe-toggle">
               <input id="gHeadingObserved" type="checkbox">
@@ -218,13 +232,9 @@
                 <small>この日を出穂後積算の起点にする</small>
               </span>
             </label>
-            <button class="growth-heading-quick" type="button" data-action="save-heading-observed">
-              <b>出穂だけ登録</b>
-              <small>日付と圃場だけで保存</small>
-            </button>
             <div id="growthTargetPanel" class="growth-target-panel"></div>
           </details>
-          <details class="form-section" open>
+          <details class="form-section" id="growthPhotoSection" open>
             <summary>写真</summary>
             <div class="form-grid dense">
               <label>写真メモ<input id="gPhoto" placeholder="写真名やメモ"></label>
@@ -235,7 +245,7 @@
               <button class="secondary" type="button" data-action="clear-growth-photo">写真を外す</button>
             </div>
           </details>
-          <details class="form-section">
+          <details class="form-section" id="growthMemoSection">
             <summary>メモ</summary>
             <label>メモ<textarea id="gMemo"></textarea></label>
           </details>
@@ -276,6 +286,7 @@
               <label>ガス状態<select id="dryGas"></select></label>
             </div>
             <div id="dryTargetCompare" class="target-compare"></div>
+            <div id="dryWeatherAdjust" class="dry-weather-adjust"></div>
           </details>
           <details class="form-section">
             <summary>写真・メモ</summary>
@@ -558,6 +569,14 @@
           <button class="secondary" type="button" data-sheet-schedule-cancel>閉じる</button>
         </div>
         <label>予定名<input id="sheetScheduleTitle" placeholder="例: 中干し確認、除草剤散布予定"></label>
+        <div class="sheet-schedule-targets">
+          <label>対象<select id="sheetScheduleTargetMode">
+            <option value="field">選択中の圃場</option>
+            <option value="group">圃場グループ</option>
+            <option value="all">全圃場</option>
+          </select></label>
+          <label class="hidden" id="sheetScheduleGroupLabel">グループ<select id="sheetScheduleGroup"></select></label>
+        </div>
         <label>メモ<textarea id="sheetScheduleMemo" placeholder="必要な資材、時間、注意点など"></textarea></label>
         <button class="primary" type="submit">この日の予定として保存</button>
       </form>
@@ -568,23 +587,23 @@
   <div id="toast" class="toast hidden" role="status"></div>
 
   <script src="assets/js/core/utils.js?v=20260627_ver67"></script>
-  <script src="assets/js/core/schema.js?v=20260701_ver88"></script>
+  <script src="assets/js/core/schema.js?v=20260712_ver91"></script>
   <script src="assets/js/core/storage.js?v=20260627_ver67"></script>
-  <script src="assets/js/core/state.js?v=20260630_ver87"></script>
+  <script src="assets/js/core/state.js?v=20260712_ver91"></script>
   <script src="assets/js/core/agro.js?v=20260627_ver67"></script>
   <script src="assets/js/core/record-actions.js?v=20260627_ver67"></script>
   <script src="assets/js/core/calendar.js?v=20260630_ver85"></script>
   <script src="assets/js/core/alerts.js?v=20260627_ver67"></script>
   <script src="assets/js/core/weather.js?v=20260629_ver81"></script>
   <script src="assets/js/core/pwa.js?v=20260627_ver67"></script>
-  <script src="assets/js/screens/home.js?v=20260701_ver88"></script>
+  <script src="assets/js/screens/home.js?v=20260712_ver91"></script>
   <script src="assets/js/screens/calendar.js?v=20260629_ver83"></script>
-  <script src="assets/js/screens/bottom-sheet.js?v=20260629_ver83"></script>
+  <script src="assets/js/screens/bottom-sheet.js?v=20260712_ver92"></script>
   <script src="assets/js/screens/recipes.js?v=20260630_ver87"></script>
-  <script src="assets/js/screens/fields.js?v=20260630_ver85"></script>
+  <script src="assets/js/screens/fields.js?v=20260712_ver91"></script>
   <script src="assets/js/screens/field-work.js?v=20260630_ver87"></script>
-  <script src="assets/js/screens/growth.js?v=20260701_ver88"></script>
-  <script src="assets/js/screens/dry-period.js?v=20260627_ver67"></script>
+  <script src="assets/js/screens/growth.js?v=20260712_ver91"></script>
+  <script src="assets/js/screens/dry-period.js?v=20260712_ver92"></script>
   <script src="assets/js/screens/irrigation.js?v=20260627_ver67"></script>
   <script src="assets/js/screens/photos.js?v=20260627_ver67"></script>
   <script src="assets/js/screens/other-work.js?v=20260627_ver67"></script>

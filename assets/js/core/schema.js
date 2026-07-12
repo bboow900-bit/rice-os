@@ -62,6 +62,9 @@
     plantingDate: "",
     drainageStartDate: "",
     drainageTargetDays: "7",
+    drainagePlannedEndDate: "",
+    drainageActualEndDate: "",
+    drainageActualDays: "",
     intermittentStartDate: "",
     intermittentIntervalDays: "3",
     wetIrrigationTargetDays: "20",
@@ -261,6 +264,9 @@
     f.status = String(f.status || "使用中");
     f.drainageStartDate = String(f.drainageStartDate || "");
     f.drainageTargetDays = String(f.drainageTargetDays || "");
+    f.drainagePlannedEndDate = String(f.drainagePlannedEndDate || "");
+    f.drainageActualEndDate = String(f.drainageActualEndDate || "");
+    f.drainageActualDays = String(f.drainageActualDays || "");
     f.intermittentStartDate = String(f.intermittentStartDate || "");
     f.intermittentIntervalDays = String(f.intermittentIntervalDays || "");
     f.wetIrrigationTargetDays = String(f.wetIrrigationTargetDays || "");

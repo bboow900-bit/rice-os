@@ -100,6 +100,28 @@
     return formatNumber(amount / area * 10, 1);
   }
 
+  function drySummary(field) {
+    const latest = state.dryPeriodsFor ? latestByDate(state.dryPeriodsFor(field.fieldId).filter((row) => row.startDate || row.endDate || row.actualEndDate)) : null;
+    const startDate = latest && latest.startDate || field.drainageStartDate || "";
+    const targetDays = latest && latest.targetDays || field.drainageTargetDays || "";
+    const plannedEndDate = latest && latest.endDate || field.drainagePlannedEndDate || (startDate && targetDays ? U.dateAddDays(startDate, U.number(targetDays, 0)) : "");
+    const actualEndDate = latest && latest.actualEndDate || field.drainageActualEndDate || "";
+    const plannedDays = startDate && plannedEndDate ? U.daysBetween(startDate, plannedEndDate) : (targetDays || "");
+    const actualDays = field.drainageActualDays || (startDate && actualEndDate ? U.daysBetween(startDate, actualEndDate) : "");
+    const diff = plannedDays !== "" && actualDays !== "" ? U.number(actualDays, 0) - U.number(plannedDays, 0) : "";
+    const diffText = diff === "" ? "-" : diff === 0 ? "予定どおり" : diff > 0 ? `+${diff}日` : `${diff}日`;
+    return {
+      startDate,
+      targetDays,
+      plannedEndDate,
+      actualEndDate,
+      plannedDays,
+      actualDays,
+      diffText,
+      status: actualEndDate ? "完了" : (startDate ? "実施中" : "未開始")
+    };
+  }
+
   function fertilizerPlan(variety, field) {
     const area = U.number(field.areaA, 0);
     const kgPer10a = parseKgPer10a(variety && variety.baseFertilizerAmount);
@@ -430,6 +452,7 @@
       : "-";
     const features = featureItems(field);
     const featureText = features.length ? features.slice(0, 3).join("・") + (features.length > 3 ? ` ほか${features.length - 3}` : "") : "未設定";
+    const dry = drySummary(field);
     return `
       <div class="field-karte-dashboard">
         <div class="field-master-panels">
@@ -453,6 +476,32 @@
               ["特徴", featureText]
             ], "green")}
             ${fixedMemo ? `<div class="field-fixed-note compact"><b>固定メモ</b><span>${U.escapeHTML(fixedMemo)}</span></div>` : ""}
+          </section>
+          <section class="field-master-panel water">
+            <div class="field-master-panel-head">
+              <span class="field-master-panel-icon tray"><img src="assets/images/menu-icons/dry-period.png" alt=""></span>
+              <div><h4>中干し実績</h4><p>予定と実績を分けて表示</p></div>
+            </div>
+            <div class="field-master-hero-row">
+              <div class="field-master-hero-main">
+                <span>状態</span>
+                <b>${U.escapeHTML(dry.status)}</b>
+              </div>
+              <div class="field-master-hero-sub">
+                <span>予定</span>
+                <b>${dry.plannedDays !== "" ? `${U.escapeHTML(String(dry.plannedDays))}日` : "-"}</b>
+              </div>
+              <div class="field-master-hero-sub">
+                <span>実績</span>
+                <b>${dry.actualDays !== "" ? `${U.escapeHTML(String(dry.actualDays))}日` : "-"}</b>
+              </div>
+            </div>
+            ${renderMiniTiles([
+              ["開始日", dry.startDate ? U.fd(dry.startDate) : "-"],
+              ["完了予定", dry.plannedEndDate ? U.fd(dry.plannedEndDate) : "-"],
+              ["実際の完了日", dry.actualEndDate ? U.fd(dry.actualEndDate) : "-"],
+              ["差分", dry.diffText]
+            ], "blue")}
           </section>
           <section class="field-master-panel seedling">
             <div class="field-master-panel-head">
@@ -556,7 +605,7 @@
               ${input(field, "intermittentIntervalDays", "間断灌水予定日数", "number")}
               ${input(field, "wetIrrigationTargetDays", "湿潤灌漑予定日数", "number")}
             </div>
-            <div class="hint-text">田植日・中干し開始/終了は作業記録から自動表示します。日付を直す場合は作業記録を編集してください。</div>
+            <div class="hint-text">中干し予定日数は目標値です。開始日・完了予定日・実際の完了日・実績日数は中干し記録または作業記録から自動反映します。</div>
           </details>
 
           <details class="form-section">

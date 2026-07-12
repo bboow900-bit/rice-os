@@ -6,6 +6,9 @@
   const S = RiceOS.schema;
   const state = RiceOS.state;
   let bulkFieldIds = [];
+  let dryWeatherCacheKey = "";
+  let dryWeatherRows = [];
+  let dryWeatherError = "";
 
   function setBulkFields(ids) {
     bulkFieldIds = (ids || []).filter(Boolean);
@@ -52,6 +55,98 @@
     return diff > 0 ? `+${diff}日` : `${diff}日`;
   }
 
+  function soilAdjustment(field) {
+    const reasons = [];
+    let days = 0;
+    const soil = String(field && field.soilType || "");
+    const water = String(field && field.waterHolding || "");
+    const features = Array.isArray(field && field.fieldFeatures) ? field.fieldFeatures : [];
+    if (soil.includes("粘土")) { days += 1; reasons.push("粘土質 +1日"); }
+    if (soil.includes("砂")) { days -= 1; reasons.push("砂質 -1日"); }
+    if (water === "良い") { days += 1; reasons.push("水持ち良い +1日"); }
+    if (water === "悪い") { days -= 1; reasons.push("水持ち悪い -1日"); }
+    if (features.includes("湿田")) { days += 1; reasons.push("湿田 +1日"); }
+    if (features.includes("乾田")) { days -= 1; reasons.push("乾田 -1日"); }
+    return { days, reasons };
+  }
+
+  function weatherAdjustment(rows) {
+    const valid = (rows || []).filter((row) => row && row.date);
+    const rainDays = valid.filter((row) => U.number(row.precipitation, 0) >= 1).length;
+    const rainTotal = valid.reduce((sum, row) => sum + U.number(row.precipitation, 0), 0);
+    const hotDryDays = valid.filter((row) => U.number(row.precipitation, 0) < 1 && U.number(row.tempMean, 0) >= 24).length;
+    let days = 0;
+    const reasons = [];
+    if (rainDays >= 2) { days += 1; reasons.push(`雨${rainDays}日 +1日`); }
+    if (rainTotal >= 20) { days += 1; reasons.push(`降水${Math.round(rainTotal)}mm +1日`); }
+    if (hotDryDays >= 3) { days -= 1; reasons.push(`高温少雨${hotDryDays}日 -1日`); }
+    return { days, reasons, rainDays, rainTotal, hotDryDays };
+  }
+
+  function renderDryAdjustment() {
+    const el = U.$("dryWeatherAdjust");
+    if (!el) return;
+    const field = currentField();
+    const start = U.$("dryStartDate").value;
+    const targetDays = U.number(U.$("dryTargetDays").value, 0);
+    if (!field || !start || !targetDays) {
+      el.innerHTML = "";
+      return;
+    }
+    const soil = soilAdjustment(field);
+    const weather = weatherAdjustment(dryWeatherRows);
+    const total = soil.days + weather.days;
+    const suggestedDays = Math.max(1, targetDays + total);
+    const suggestedDate = U.dateAddDays(start, suggestedDays);
+    const tone = total > 0 ? "slow" : total < 0 ? "fast" : "normal";
+    const reasons = [...soil.reasons, ...weather.reasons];
+    el.innerHTML = `
+      <div class="dry-adjust-card ${U.attr(tone)}">
+        <div>
+          <b>中干し終了確認候補</b>
+          <span>${U.escapeHTML(`予定${targetDays}日 → 目安${suggestedDays}日目ごろ`)}</span>
+        </div>
+        <strong>${U.escapeHTML(U.fd(suggestedDate))}</strong>
+        <p>${U.escapeHTML(total > 0 ? "乾きが遅れそう。現場確認を優先。" : total < 0 ? "乾きが早そう。早めに現場確認。" : "予定どおりを基本に現場確認。")}</p>
+        <small>${U.escapeHTML(reasons.length ? reasons.join(" / ") : "土質・天気補正なし")}</small>
+        ${dryWeatherError ? `<small class="warn-text">${U.escapeHTML(dryWeatherError)}</small>` : ""}
+      </div>
+    `;
+  }
+
+  async function hydrateDryWeather() {
+    if (!RiceOS.weather || !RiceOS.weather.fetchDailyRange) {
+      dryWeatherError = "天気取得機能が利用できません";
+      renderDryAdjustment();
+      return;
+    }
+    const start = U.$("dryDate").value || U.today();
+    const end = U.dateAddDays(start, 7);
+    const location = state.data().meta && state.data().meta.weatherLocation;
+    const key = [start, end, location && location.latitude, location && location.longitude].join(":");
+    if (key === dryWeatherCacheKey) {
+      renderDryAdjustment();
+      return;
+    }
+    dryWeatherCacheKey = key;
+    dryWeatherError = "";
+    try {
+      if (!location || location.latitude === undefined) {
+        dryWeatherRows = [];
+        dryWeatherError = "天気位置未設定のため土質だけで補正中";
+        renderDryAdjustment();
+        return;
+      }
+      const loc = location;
+      const result = await RiceOS.weather.fetchDailyRange(start, end, loc);
+      dryWeatherRows = result.rows || [];
+    } catch (error) {
+      dryWeatherRows = [];
+      dryWeatherError = "天気予報を取得できないため土質だけで補正中";
+    }
+    renderDryAdjustment();
+  }
+
   function renderTargetCompare() {
     const field = currentField();
     const start = U.$("dryStartDate").value;
@@ -59,7 +154,7 @@
     const actualEnd = U.$("dryActualEndDate").value;
     const observed = U.$("dryDate").value || U.today();
     const elapsed = start ? U.daysBetween(start, observed) : "";
-    const remaining = end ? U.daysBetween(observed, end) : "";
+    const remaining = end && !actualEnd ? U.daysBetween(observed, end) : "";
     const stats = periodStats(start, end, actualEnd);
     const crack = U.$("dryCrackCm").value || "-";
     const sink = U.$("drySinkCm").value || "-";
@@ -70,9 +165,11 @@
         <span>沈み込み 目標 ${U.escapeHTML(field && field.targetSinkCm || "-")}cm / 現在 ${U.escapeHTML(sink)}cm</span>
         ${elapsed !== "" ? `<span>中干し ${U.escapeHTML(String(elapsed))}日目</span>` : ""}
         ${remaining !== "" ? `<span class="${remaining <= 1 ? "warn-text" : ""}">終了目安まであと ${U.escapeHTML(String(remaining))}日</span>` : ""}
+        ${actualEnd ? `<span>実際の完了日 ${U.escapeHTML(U.fd(actualEnd))}</span>` : ""}
         ${stats.actual !== "" ? `<span>予定${U.escapeHTML(String(stats.planned))}日 / 実績${U.escapeHTML(String(stats.actual))}日 / ${U.escapeHTML(diffLabel(stats.diff))}</span>` : ""}
       </div>
     `;
+    renderDryAdjustment();
   }
 
   function resetForm() {
@@ -174,6 +271,7 @@
   function render() {
     renderOptions();
     renderTargetCompare();
+    hydrateDryWeather();
     renderList();
   }
 
@@ -213,6 +311,9 @@
   function bind() {
     U.$("dryForm").addEventListener("submit", (event) => {
       event.preventDefault();
+      if (U.$("dryStatus").value === "完了" && !U.$("dryActualEndDate").value) {
+        U.$("dryActualEndDate").value = U.$("dryDate").value || U.today();
+      }
       const common = {
         dryPeriodId: U.$("editDryId").value,
         date: U.$("dryDate").value,
@@ -267,11 +368,14 @@
 
     ["dryField", "dryDate", "dryActualEndDate", "dryStatus", "dryCrackCm", "drySinkCm", "drySurface", "dryGas"].forEach((id) => U.$(id).addEventListener("change", () => {
       if (id === "dryActualEndDate" && U.$("dryActualEndDate").value) U.$("dryStatus").value = "完了";
+      if (id === "dryStatus" && U.$("dryStatus").value === "完了" && !U.$("dryActualEndDate").value) U.$("dryActualEndDate").value = U.$("dryDate").value || U.today();
       renderTargetCompare();
+      if (id === "dryField" || id === "dryDate") hydrateDryWeather();
     }));
     ["dryStartDate", "dryTargetDays"].forEach((id) => U.$(id).addEventListener("change", () => {
       setEndFromDays();
       renderTargetCompare();
+      renderDryAdjustment();
     }));
     U.$("dryEndDate").addEventListener("change", () => {
       setDaysFromEnd();

@@ -162,6 +162,13 @@
     return workTextMatches(workName, ["中干し終了", "荳ｭ蟷ｲ縺礼ｵゆｺ・"]);
   }
 
+  function dryActualDaysForField(field, actualEndDate) {
+    const startDate = field && field.drainageStartDate || "";
+    const actual = actualEndDate || "";
+    const days = startDate && actual ? U.daysBetween(startDate, actual) : "";
+    return days === "" ? "" : String(days);
+  }
+
   function fieldWorksByNameFor(fieldId, names) {
     return data().fieldWorks
       .filter((work) => (work.fieldIds || []).includes(fieldId) && matchesWorkName(work, names))
@@ -274,7 +281,11 @@
       if (isDryEndWorkName(normalized.workName)) {
         normalized.fieldIds.forEach((fieldId) => {
           const fieldIndex = d.fields.findIndex((f) => f.fieldId === fieldId);
-          if (fieldIndex >= 0 && !d.fields[fieldIndex].intermittentStartDate) d.fields[fieldIndex].intermittentStartDate = normalized.date;
+          if (fieldIndex >= 0) {
+            d.fields[fieldIndex].drainageActualEndDate = normalized.date;
+            d.fields[fieldIndex].drainageActualDays = dryActualDaysForField(d.fields[fieldIndex], normalized.date);
+            if (!d.fields[fieldIndex].intermittentStartDate) d.fields[fieldIndex].intermittentStartDate = normalized.date;
+          }
         });
       }
       if (normalized.workName === "田植え") {
@@ -299,7 +310,11 @@
       if (normalized.workName === "中干し終了") {
         normalized.fieldIds.forEach((fieldId) => {
           const fieldIndex = d.fields.findIndex((f) => f.fieldId === fieldId);
-          if (fieldIndex >= 0 && !d.fields[fieldIndex].intermittentStartDate) d.fields[fieldIndex].intermittentStartDate = normalized.date;
+          if (fieldIndex >= 0) {
+            d.fields[fieldIndex].drainageActualEndDate = normalized.date;
+            d.fields[fieldIndex].drainageActualDays = dryActualDaysForField(d.fields[fieldIndex], normalized.date);
+            if (!d.fields[fieldIndex].intermittentStartDate) d.fields[fieldIndex].intermittentStartDate = normalized.date;
+          }
         });
       }
     }, "圃場作業を保存しました");
@@ -512,6 +527,11 @@
       if (fieldIndex >= 0) {
         if (normalized.startDate) d.fields[fieldIndex].drainageStartDate = normalized.startDate;
         if (normalized.targetDays) d.fields[fieldIndex].drainageTargetDays = normalized.targetDays;
+        if (normalized.endDate) d.fields[fieldIndex].drainagePlannedEndDate = normalized.endDate;
+        if (normalized.actualEndDate) {
+          d.fields[fieldIndex].drainageActualEndDate = normalized.actualEndDate;
+          d.fields[fieldIndex].drainageActualDays = dryActualDaysForField(d.fields[fieldIndex], normalized.actualEndDate);
+        }
       }
     }, "中干し記録を保存しました");
   }

@@ -95,6 +95,34 @@
     })), selectedFieldId);
   }
 
+  function fieldGroupName(field) {
+    return String(field && (field.fieldGroupId || field.district) || "").trim();
+  }
+
+  function scheduleGroups() {
+    const map = new Map();
+    state.activeFields().forEach((field) => {
+      const name = fieldGroupName(field);
+      if (!name) return;
+      if (!map.has(name)) map.set(name, []);
+      map.get(name).push(field.fieldId);
+    });
+    return Array.from(map.entries()).map(([name, fieldIds]) => ({ name, fieldIds }));
+  }
+
+  function renderScheduleTargets(record) {
+    const mode = U.$("sheetScheduleTargetMode");
+    const group = U.$("sheetScheduleGroup");
+    const groupLabel = U.$("sheetScheduleGroupLabel");
+    if (!mode || !group || !groupLabel) return;
+    const groups = scheduleGroups();
+    U.setOptions(group, groups.map((item) => ({ value: item.name, label: `${item.name} (${item.fieldIds.length}圃場)` })), group.value || (groups[0] && groups[0].name) || "");
+    mode.value = record ? "field" : (mode.value || "field");
+    groupLabel.classList.toggle("hidden", mode.value !== "group" || !groups.length);
+    mode.disabled = Boolean(record);
+    group.disabled = Boolean(record);
+  }
+
   function hideScheduleForm() {
     const form = U.$("sheetScheduleForm");
     if (!form) return;
@@ -108,6 +136,7 @@
     editingScheduleId = record && record.scheduleId || "";
     U.$("sheetScheduleTitle").value = record ? record.title || record.scheduleType || "" : "";
     U.$("sheetScheduleMemo").value = record ? record.memo || "" : "";
+    renderScheduleTargets(record);
     const head = form.querySelector(".sheet-schedule-head b");
     if (head) head.textContent = editingScheduleId ? "予定を編集" : "予定を登録";
     form.classList.remove("hidden");
@@ -125,14 +154,26 @@
     const existing = editingScheduleId
       ? (state.data().schedules || []).find((schedule) => schedule.scheduleId === editingScheduleId)
       : null;
+    const mode = U.$("sheetScheduleTargetMode") ? U.$("sheetScheduleTargetMode").value : "field";
+    const groups = scheduleGroups();
+    const group = groups.find((item) => item.name === (U.$("sheetScheduleGroup") && U.$("sheetScheduleGroup").value));
+    const targets = existing
+      ? [existing.fieldIds || []]
+      : mode === "all"
+        ? state.activeFields().map((field) => [field.fieldId])
+        : mode === "group" && group
+          ? group.fieldIds.map((fieldId) => [fieldId])
+          : [activeFieldId() ? [activeFieldId()] : []];
+    targets.forEach((fieldIds) => {
     state.saveSchedule({
       ...(existing || {}),
-      scheduleId: editingScheduleId || undefined,
+      scheduleId: existing ? editingScheduleId : undefined,
       date: selectedDate,
-      fieldIds: activeFieldId() ? [activeFieldId()] : [],
+      fieldIds,
       scheduleType: title,
       title,
       memo
+    });
     });
     hideScheduleForm();
     render();
@@ -149,6 +190,9 @@
     U.$("sheetField").addEventListener("change", () => {
       selectedFieldId = U.$("sheetField").value;
     });
+    if (U.$("sheetScheduleTargetMode")) {
+      U.$("sheetScheduleTargetMode").addEventListener("change", () => renderScheduleTargets());
+    }
     U.$("dateSheet").addEventListener("click", (event) => {
       const actionButton = event.target.closest("[data-sheet-action]");
       if (actionButton && RiceOS.recordActions) {

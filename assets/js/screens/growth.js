@@ -6,6 +6,7 @@
   const S = RiceOS.schema;
   const state = RiceOS.state;
   let bulkFieldIds = [];
+  let inputMode = localStorage.getItem("riceGrowthInputMode") || "simple";
 
   function setBulkFields(ids) {
     bulkFieldIds = (ids || []).filter(Boolean);
@@ -13,6 +14,18 @@
 
   function clearBulkFields() {
     bulkFieldIds = [];
+  }
+
+  function setInputMode(mode) {
+    inputMode = mode === "detail" ? "detail" : "simple";
+    localStorage.setItem("riceGrowthInputMode", inputMode);
+    const form = U.$("growthForm");
+    if (form) form.dataset.growthMode = inputMode;
+    if (inputMode === "simple" && U.$("growthMemoSection")) U.$("growthMemoSection").open = true;
+    if (inputMode === "simple" && U.$("growthPhotoSection")) U.$("growthPhotoSection").open = true;
+    U.$$("[data-growth-mode-select]").forEach((button) => {
+      button.classList.toggle("active", button.dataset.growthModeSelect === inputMode);
+    });
   }
 
   function parseTargetRange(value) {
@@ -243,6 +256,7 @@
 
   function render() {
     renderOptions();
+    setInputMode(inputMode);
     renderTimeline();
   }
 
@@ -265,6 +279,9 @@
     U.$("gPhotoPreview").dataset.photoData = log.photoData || "";
     U.$("gPhotoPreview").src = log.photoData || "";
     U.$("gPhotoPreview").classList.toggle("hidden", !log.photoData);
+    if (log.leafCount || log.plantHeightCm || (log.weed && log.weed !== "-") || (log.gas && log.gas !== "-") || (log.water && log.water !== "-")) {
+      setInputMode("detail");
+    }
     renderChoiceControls();
     renderTargetPanel();
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -298,6 +315,11 @@
 
   function bind() {
     U.$("growthForm").addEventListener("click", (event) => {
+      const modeButton = event.target.closest("[data-growth-mode-select]");
+      if (modeButton) {
+        setInputMode(modeButton.dataset.growthModeSelect);
+        return;
+      }
       const quickHeading = event.target.closest('[data-action="save-heading-observed"]');
       if (quickHeading) {
         saveHeadingObservedOnly();
