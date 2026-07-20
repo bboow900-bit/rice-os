@@ -6064,6 +6064,73 @@ label {
   margin: -8px 0 14px;
 }
 
+.growth-panicle-panel {
+  margin: -8px 0 10px;
+}
+
+.growth-panicle-card {
+  display: grid;
+  gap: 5px;
+  padding: 11px;
+  border: 1px solid #b9d99f;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #f7fff1, #fff9e3);
+  box-shadow: 0 4px 12px rgba(51, 104, 43, 0.07);
+}
+
+.growth-panicle-card > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.growth-panicle-card b {
+  color: #1b572d;
+  font-size: 14px;
+}
+
+.growth-panicle-card span,
+.growth-panicle-card small {
+  color: #677157;
+  font-size: 11px;
+  font-weight: 760;
+}
+
+.growth-panicle-card strong {
+  color: #17692d;
+  font-size: 18px;
+  font-weight: 900;
+}
+
+.growth-panicle-card p {
+  margin: 0;
+  color: #3d5b42;
+  font-size: 13px;
+  font-weight: 820;
+}
+
+.growth-panicle-card.idle {
+  border-color: #ead791;
+  background: #fffbee;
+}
+
+.growth-panicle-card.complete {
+  border-color: #a6d4b0;
+  background: #f1fff3;
+}
+
+.timeline-panicle-note {
+  padding: 6px 8px;
+  border: 1px solid #d8e6c3;
+  border-radius: 7px;
+  background: #f7fceb;
+  color: #386331;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
 .growth-target-card {
   display: grid;
   gap: 8px;

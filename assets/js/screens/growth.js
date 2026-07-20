@@ -86,6 +86,58 @@
     `;
   }
 
+  function observedHeadingDate(fieldId) {
+    return state.growthLogsFor(fieldId)
+      .slice()
+      .sort((a, b) => String(a.date).localeCompare(String(b.date)))
+      .find((log) => log.headingObserved)?.date || "";
+  }
+
+  function renderPaniclePanel() {
+    const el = U.$("growthPaniclePanel");
+    if (!el) return;
+    const field = state.field(U.$("gField").value);
+    const variety = field ? state.variety(field.varietyId) : null;
+    const lengthValue = U.$("gPanicleLengthMm") && U.$("gPanicleLengthMm").value;
+    const date = U.$("gDate").value || U.today();
+    if (!field || !/コシヒカリ/.test(String(variety && variety.name || ""))) {
+      el.innerHTML = "";
+      return;
+    }
+    const headingDate = observedHeadingDate(field.fieldId);
+    const estimate = RiceOS.agro && RiceOS.agro.panicleEstimate
+      ? RiceOS.agro.panicleEstimate(field, lengthValue, date)
+      : null;
+    if (headingDate) {
+      el.innerHTML = `
+        <div class="growth-panicle-card complete">
+          <div><b>幼穂・出穂予測</b><span>コシヒカリ基準</span></div>
+          <strong>出穂確認済み</strong>
+          <p>${U.escapeHTML(U.fd(headingDate))} を実績として登録済みです</p>
+        </div>
+      `;
+      return;
+    }
+    if (!estimate || !estimate.supported) {
+      el.innerHTML = `
+        <div class="growth-panicle-card idle">
+          <div><b>幼穂・出穂予測</b><span>コシヒカリ基準</span></div>
+          <p>幼穂長を入力すると、出穂の目安を表示します</p>
+          <small>1mm: 約25日前 / 2mm: 約21日前 / 10mm: 約18日前</small>
+        </div>
+      `;
+      return;
+    }
+    el.innerHTML = `
+      <div class="growth-panicle-card">
+        <div><b>幼穂・出穂予測</b><span>${U.escapeHTML(estimate.source)}</span></div>
+        <strong>出穂まで あと約${U.escapeHTML(String(estimate.daysToHeading))}日</strong>
+        <p>出穂目安 ${U.escapeHTML(U.fd(estimate.date))}ごろ</p>
+        <small>幼穂 ${U.escapeHTML(String(estimate.lengthMm))}mm / ${U.escapeHTML(estimate.stage)} / 予測幅 ${U.escapeHTML(U.fd(estimate.rangeStart))}〜${U.escapeHTML(U.fd(estimate.rangeEnd))}</small>
+      </div>
+    `;
+  }
+
   function resetForm() {
     U.$("growthHeading").textContent = "生育ログ";
     U.$("editGrowthId").value = "";
@@ -94,6 +146,7 @@
     if (U.$("gLeafCount")) U.$("gLeafCount").value = "";
     if (U.$("gTillerCount")) U.$("gTillerCount").value = "";
     if (U.$("gPlantHeight")) U.$("gPlantHeight").value = "";
+    if (U.$("gPanicleLengthMm")) U.$("gPanicleLengthMm").value = "";
     U.$("gLeaf").value = "3";
     U.$("gWeed").value = "-";
     U.$("gGas").value = "-";
@@ -107,6 +160,7 @@
     U.$("gPhotoPreview").classList.add("hidden");
     clearBulkFields();
     renderChoiceControls();
+    renderPaniclePanel();
     renderTargetPanel();
   }
 
@@ -147,6 +201,7 @@
     U.setOptions(U.$("gGas"), S.GROWTH_LEVELS, U.$("gGas").value || "-");
     U.setOptions(U.$("gWater"), S.WATER_LEVELS, U.$("gWater").value || "-");
     renderChoiceControls();
+    renderPaniclePanel();
     renderTargetPanel();
   }
 
@@ -207,6 +262,12 @@
       const target = variety && variety.targetTillers || "";
       const photo = log.photoData || "";
       const targetText = target && log.tillerCount ? `分げつ目標 ${target} / 現在 ${log.tillerCount}本` : "";
+      const panicle = RiceOS.agro && RiceOS.agro.panicleEstimate
+        ? RiceOS.agro.panicleEstimate(field, log.panicleLengthMm, log.date)
+        : null;
+      const panicleText = panicle && panicle.supported
+        ? `幼穂 ${panicle.lengthMm}mm / 出穂まで約${panicle.daysToHeading}日 / ${U.fd(panicle.date)}ごろ`
+        : (log.panicleLengthMm ? `幼穂 ${log.panicleLengthMm}mm` : "");
       return `
         <article class="growth-card timeline-card">
           <div class="growth-date">
@@ -238,6 +299,7 @@
               <span>水 ${U.escapeHTML(log.water || "-")}</span>
             </div>
             ${targetText ? `<div class="target-note">${U.escapeHTML(targetText)}</div>` : ""}
+            ${panicleText ? `<div class="timeline-panicle-note">🌾 ${U.escapeHTML(panicleText)}</div>` : ""}
             ${log.memo ? `<p class="timeline-memo">${U.escapeHTML(log.memo)}</p>` : ""}
             ${log.photo && !photo ? `<small class="muted">写真: ${U.escapeHTML(log.photo)}</small>` : ""}
           </div>
@@ -268,6 +330,7 @@
     if (U.$("gLeafCount")) U.$("gLeafCount").value = log.leafCount || "";
     if (U.$("gTillerCount")) U.$("gTillerCount").value = log.tillerCount || "";
     if (U.$("gPlantHeight")) U.$("gPlantHeight").value = log.plantHeightCm || "";
+    if (U.$("gPanicleLengthMm")) U.$("gPanicleLengthMm").value = log.panicleLengthMm || "";
     U.$("gLeaf").value = log.leafColorScore || S.leafColorScoreFromText(log.leafColor) || "3";
     U.$("gWeed").value = log.weed || "-";
     U.$("gGas").value = log.gas || "-";
@@ -283,6 +346,7 @@
       setInputMode("detail");
     }
     renderChoiceControls();
+    renderPaniclePanel();
     renderTargetPanel();
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
@@ -334,15 +398,17 @@
       renderTargetPanel();
     });
 
-    ["gField", "gDate", "gTillerCount", "gLeafCount", "gPlantHeight", "gLeaf", "gWeed", "gGas", "gWater", "gHeadingObserved"].forEach((id) => {
+    ["gField", "gDate", "gTillerCount", "gLeafCount", "gPlantHeight", "gPanicleLengthMm", "gLeaf", "gWeed", "gGas", "gWater", "gHeadingObserved"].forEach((id) => {
       const el = U.$(id);
       if (!el) return;
       el.addEventListener("input", () => {
         renderChoiceControls();
+        renderPaniclePanel();
         renderTargetPanel();
       });
       el.addEventListener("change", () => {
         renderChoiceControls();
+        renderPaniclePanel();
         renderTargetPanel();
       });
     });
@@ -374,6 +440,7 @@
         leafCount: U.$("gLeafCount") ? U.$("gLeafCount").value : "",
         tillerCount: U.$("gTillerCount") ? U.$("gTillerCount").value : "",
         plantHeightCm: U.$("gPlantHeight") ? U.$("gPlantHeight").value : "",
+        panicleLengthMm: U.$("gPanicleLengthMm") ? U.$("gPanicleLengthMm").value : "",
         leafColorScore: U.$("gLeaf").value,
         leafColor: S.leafColorLabel(U.$("gLeaf").value),
         weed: U.$("gWeed").value,

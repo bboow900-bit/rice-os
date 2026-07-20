@@ -592,6 +592,10 @@
   function headingDateInfo(field, cached, planting, headingTarget) {
     const actual = actualHeadingDate(field);
     if (actual) return { date: actual, source: "出穂確認", actual: true };
+    const panicle = RiceOS.agro && RiceOS.agro.latestPanicleEstimate
+      ? RiceOS.agro.latestPanicleEstimate(field)
+      : null;
+    if (panicle && panicle.date) return { ...panicle, source: panicle.source, actual: false };
     const rows = [
       ...validTempRows(cached && cached.rows),
       ...validTempRows(cached && cached.projectionRows)
@@ -768,6 +772,9 @@
     const panicleTemp = variety && variety.panicleAccumulatedTempTarget || "";
     const headingTemp = variety && variety.headingAccumulatedTempTarget || "";
     const headingDate = actualHeadingDate(field);
+    const panicle = RiceOS.agro && RiceOS.agro.latestPanicleEstimate
+      ? RiceOS.agro.latestPanicleEstimate(field)
+      : null;
     const ripeningElapsed = headingDate ? U.daysBetween(headingDate, U.today()) : "";
     const ripeningTarget = ripeningTempTarget(field);
     return [
@@ -808,10 +815,12 @@
       {
         tone: "green",
         icon: "🌾",
-        title: "出穂目安",
-        value: dap === "" ? "未判定" : (dap >= headingDays ? `${dap}日経過` : `あと${headingDays - dap}日`),
-        note: headingTemp ? `日数目安 ${headingDays}日 / 積算気温目標 ${headingTemp}` : `田植え後${headingDays}日前後を目安に確認`,
-        percent: dap === "" ? 0 : progressPercent(dap, headingDays)
+        title: headingDate ? "出穂" : "出穂目安",
+        value: headingDate ? "確認済み" : (panicle ? `あと約${panicle.daysToHeading}日` : (dap === "" ? "未判定" : (dap >= headingDays ? `${dap}日経過` : `あと${headingDays - dap}日`))),
+        note: headingDate
+          ? `出穂 ${U.fd(headingDate)}`
+          : (panicle ? `幼穂${panicle.lengthMm}mm / ${U.fd(panicle.date)}ごろ` : (headingTemp ? `日数目安 ${headingDays}日 / 積算気温目標 ${headingTemp}` : `田植え後${headingDays}日前後を目安に確認`)),
+        percent: headingDate ? 100 : (panicle && planting ? progressPercent(dap, Math.max(1, U.daysBetween(planting, panicle.date))) : (dap === "" ? 0 : progressPercent(dap, headingDays)))
       },
       {
         tone: headingDate ? "orange" : "amber",

@@ -338,6 +338,7 @@
       leafCount: String(g.leafCount || ""),
       tillerCount: String(g.tillerCount || ""),
       plantHeightCm: String(g.plantHeightCm || g.plantHeight || ""),
+      panicleLengthMm: String(g.panicleLengthMm || g.youhoLengthMm || ""),
       leafColorScore,
       leafColor: leafColorScore ? leafColorLabel(leafColorScore) : String(g.leafColor || g.leaf || "-"),
       weed: String(g.weed || "-"),

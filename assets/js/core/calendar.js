@@ -100,7 +100,7 @@
         tone: "growth",
         title: "生育ログ",
         subtitle: fieldName(x.fieldId),
-        memo: [`葉数:${x.leafCount || "-"}`, `分げつ:${x.tillerCount || "-"}`, `草丈:${x.plantHeightCm || "-"}`, `葉色:${x.leafColor || "-"}`].join(" / "),
+        memo: [`葉数:${x.leafCount || "-"}`, `分げつ:${x.tillerCount || "-"}`, `草丈:${x.plantHeightCm || "-"}`, `幼穂:${x.panicleLengthMm ? `${x.panicleLengthMm}mm` : "-"}`, `葉色:${x.leafColor || "-"}`].join(" / "),
         hasPhoto: Boolean(x.photoData || x.photo),
         record: x
       });

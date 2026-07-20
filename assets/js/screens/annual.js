@@ -654,6 +654,9 @@
     const intermittentStart = state.workDateForField ? state.workDateForField(field.fieldId, "間断灌水開始") : "";
     const wetStart = state.workDateForField ? state.workDateForField(field.fieldId, "湿潤灌漑開始") : "";
     const riceStage = riceStageNumberForField(field);
+    const panicle = RiceOS.agro && RiceOS.agro.latestPanicleEstimate
+      ? RiceOS.agro.latestPanicleEstimate(field)
+      : null;
     return `
       <div class="annual-field-detail-grid">
         <section class="annual-field-detail-card annual-karte-card">
@@ -692,6 +695,16 @@
             ${fieldInput(field, "drainageTargetDays", "中干し目安日数", "number")}
             ${fieldInput(field, "intermittentIntervalDays", "間断灌水目安日数", "number")}
             ${fieldInput(field, "wetIrrigationTargetDays", "湿潤灌漑目安日数", "number")}
+          </div>
+        </section>
+        <section class="annual-field-detail-card annual-target-card annual-panicle-card">
+          <div class="section-title compact">
+            <h3>幼穂・出穂予測</h3>
+          </div>
+          <div class="annual-kv-list">
+            ${targetLine("幼穂長", panicle ? `${panicle.lengthMm}mm (${U.fd(panicle.observedDate)})` : "未入力")}
+            ${targetLine("出穂まで", panicle ? `あと約${panicle.daysToHeading}日` : "幼穂長を記録してください")}
+            ${targetLine("出穂目安", panicle ? `${U.fd(panicle.date)}ごろ` : "-")}
           </div>
         </section>
       </div>
