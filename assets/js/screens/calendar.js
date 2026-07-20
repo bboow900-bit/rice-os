@@ -118,6 +118,10 @@
       const entry = findEntry(button.dataset.kind, button.dataset.id);
       if (!entry) return;
       if (button.dataset.calendarAction === "complete" && entry.kind === "schedule") {
+        if (String(entry.record.title || entry.record.scheduleType || "").includes("追肥") && RiceOS.screens.fertilizer) {
+          RiceOS.screens.fertilizer.open(entry.record, render);
+          return;
+        }
         RiceOS.state.completeSchedule(entry.record.scheduleId);
         render();
         return;

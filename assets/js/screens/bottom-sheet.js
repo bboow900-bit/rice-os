@@ -123,6 +123,36 @@
     group.disabled = Boolean(record);
   }
 
+  function topDressingPlan() {
+    const field = state.field(activeFieldId());
+    const variety = field ? state.variety(field.varietyId) : null;
+    const amountText = String(variety && variety.topDressingAmount || "");
+    const rate = amountText.match(/\d+(?:\.\d+)?/);
+    return {
+      name: variety && variety.topDressingName || "",
+      rate: rate ? rate[0] : ""
+    };
+  }
+
+  function renderFertilizerScheduleFields(record) {
+    const block = U.$("sheetScheduleFertilizerFields");
+    const title = String(U.$("sheetScheduleTitle") && U.$("sheetScheduleTitle").value || "");
+    if (!block) return;
+    const visible = title.includes("追肥");
+    block.classList.toggle("hidden", !visible);
+    if (!visible) return;
+    const plan = topDressingPlan();
+    const name = U.$("sheetScheduleFertilizerName");
+    const rate = U.$("sheetScheduleFertilizerRate");
+    if (record) {
+      name.value = record.plannedFertilizerName || "";
+      rate.value = record.plannedFertilizerRateKg10a || "";
+      return;
+    }
+    if (!name.value) name.value = plan.name;
+    if (!rate.value) rate.value = plan.rate;
+  }
+
   function hideScheduleForm() {
     const form = U.$("sheetScheduleForm");
     if (!form) return;
@@ -136,7 +166,10 @@
     editingScheduleId = record && record.scheduleId || "";
     U.$("sheetScheduleTitle").value = record ? record.title || record.scheduleType || "" : "";
     U.$("sheetScheduleMemo").value = record ? record.memo || "" : "";
+    U.$("sheetScheduleFertilizerName").value = record ? record.plannedFertilizerName || "" : "";
+    U.$("sheetScheduleFertilizerRate").value = record ? record.plannedFertilizerRateKg10a || "" : "";
     renderScheduleTargets(record);
+    renderFertilizerScheduleFields(record);
     const head = form.querySelector(".sheet-schedule-head b");
     if (head) head.textContent = editingScheduleId ? "予定を編集" : "予定を登録";
     form.classList.remove("hidden");
@@ -151,6 +184,7 @@
       return;
     }
     const memo = String(U.$("sheetScheduleMemo").value || "").trim();
+    const isFertilizer = title.includes("追肥");
     const existing = editingScheduleId
       ? (state.data().schedules || []).find((schedule) => schedule.scheduleId === editingScheduleId)
       : null;
@@ -172,7 +206,9 @@
       fieldIds,
       scheduleType: title,
       title,
-      memo
+      memo,
+      plannedFertilizerName: isFertilizer ? String(U.$("sheetScheduleFertilizerName").value || "").trim() : "",
+      plannedFertilizerRateKg10a: isFertilizer ? String(U.$("sheetScheduleFertilizerRate").value || "").trim() : ""
     });
     });
     hideScheduleForm();
@@ -193,12 +229,19 @@
     if (U.$("sheetScheduleTargetMode")) {
       U.$("sheetScheduleTargetMode").addEventListener("change", () => renderScheduleTargets());
     }
+    if (U.$("sheetScheduleTitle")) {
+      U.$("sheetScheduleTitle").addEventListener("input", () => renderFertilizerScheduleFields());
+    }
     U.$("dateSheet").addEventListener("click", (event) => {
       const actionButton = event.target.closest("[data-sheet-action]");
       if (actionButton && RiceOS.recordActions) {
         const entry = findEntry(actionButton.dataset.kind, actionButton.dataset.id);
         if (!entry) return;
         if (actionButton.dataset.sheetAction === "complete" && entry.kind === "schedule") {
+          if (String(entry.record.title || entry.record.scheduleType || "").includes("追肥") && RiceOS.screens.fertilizer) {
+            RiceOS.screens.fertilizer.open(entry.record, render);
+            return;
+          }
           state.completeSchedule(entry.record.scheduleId);
           render();
           return;

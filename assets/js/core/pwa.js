@@ -34,7 +34,7 @@
 
     if (!canUseServiceWorker()) return;
 
-    navigator.serviceWorker.register("./service-worker.js?v=20260626_ver48")
+    navigator.serviceWorker.register("./service-worker.js?v=20260720_ver96")
       .then((registration) => {
         registration.update();
       })

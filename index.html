@@ -14,7 +14,7 @@
   <link rel="icon" href="assets/icons/icon-192.png">
   <link rel="apple-touch-icon" href="assets/icons/icon-192.png">
   <title>稲作カルテ</title>
-  <link rel="stylesheet" href="assets/css/app.css?v=20260720_ver93">
+  <link rel="stylesheet" href="assets/css/app.css?v=20260720_ver96">
   <link rel="stylesheet" href="assets/css/field-management.css?v=20260630_ver85">
 </head>
 <body>
@@ -214,17 +214,20 @@
               <small>日付と圃場だけで保存</small>
             </button>
           </details>
+          <details class="form-section growth-panicle-section" id="growthPanicleSection" open>
+            <summary>幼穂・出穂</summary>
+            <div class="form-grid dense growth-panicle-entry">
+              <label>幼穂長(mm)<input id="gPanicleLengthMm" inputmode="decimal" placeholder="例: 2.0"></label>
+            </div>
+            <div id="growthPaniclePanel" class="growth-panicle-panel"></div>
+          </details>
           <details class="form-section" id="growthStatusSection" open>
             <summary>生育状況</summary>
             <div class="form-grid dense">
               <label class="growth-detail-field">葉数<input id="gLeafCount" inputmode="decimal" placeholder="例: 7.2"></label>
               <label>分げつ数<input id="gTillerCount" inputmode="numeric" placeholder="例: 18"></label>
               <label class="growth-detail-field">草丈(cm)<input id="gPlantHeight" inputmode="decimal" placeholder="例: 45"></label>
-              <label class="growth-panicle-field">幼穂長(mm)<input id="gPanicleLengthMm" inputmode="decimal" placeholder="例: 2"></label>
               <label class="wide">葉色<select id="gLeaf"></select><div id="gLeafChips" class="growth-choice-grid five"></div></label>
-              <label class="growth-detail-field">雑草<select id="gWeed"></select><div id="gWeedChips" class="growth-choice-grid"></div></label>
-              <label class="growth-detail-field">ガス<select id="gGas"></select><div id="gGasChips" class="growth-choice-grid"></div></label>
-              <label class="wide growth-detail-field">水管理<select id="gWater"></select><div id="gWaterChips" class="growth-choice-grid water"></div></label>
             </div>
             <label class="growth-observe-toggle">
               <input id="gHeadingObserved" type="checkbox">
@@ -233,7 +236,6 @@
                 <small>この日を出穂後積算の起点にする</small>
               </span>
             </label>
-            <div id="growthPaniclePanel" class="growth-panicle-panel"></div>
             <div id="growthTargetPanel" class="growth-target-panel"></div>
           </details>
           <details class="form-section" id="growthPhotoSection" open>
@@ -579,6 +581,10 @@
           </select></label>
           <label class="hidden" id="sheetScheduleGroupLabel">グループ<select id="sheetScheduleGroup"></select></label>
         </div>
+        <div id="sheetScheduleFertilizerFields" class="sheet-fertilizer-fields hidden">
+          <label>追肥肥料名<input id="sheetScheduleFertilizerName" placeholder="レシピから自動入力"></label>
+          <label>予定量(kg/10a)<input id="sheetScheduleFertilizerRate" inputmode="decimal" placeholder="例: 10"></label>
+        </div>
         <label>メモ<textarea id="sheetScheduleMemo" placeholder="必要な資材、時間、注意点など"></textarea></label>
         <button class="primary" type="submit">この日の予定として保存</button>
       </form>
@@ -586,25 +592,52 @@
     </section>
   </div>
 
+  <div id="fertilizerSheet" class="bottom-sheet hidden" aria-hidden="true">
+    <div class="sheet-backdrop" data-fertilizer-close></div>
+    <section class="sheet-panel fertilizer-panel" role="dialog" aria-modal="true">
+      <div class="sheet-handle"></div>
+      <div class="section-title compact">
+        <h3>追肥を実施</h3>
+        <button class="secondary icon-button" type="button" data-fertilizer-close>×</button>
+      </div>
+      <form id="fertilizerForm" class="fertilizer-form">
+        <input id="fertilizerScheduleId" type="hidden">
+        <div id="fertilizerScheduleSummary" class="fertilizer-schedule-summary"></div>
+        <div id="fertilizerGrowthContext" class="fertilizer-growth-context"></div>
+        <div class="form-grid dense">
+          <label>実施日<input id="fertilizerDate" type="date"></label>
+          <label>肥料名<input id="fertilizerMaterial" placeholder="例: NK化成"></label>
+          <label>実際の量(kg/10a)<input id="fertilizerRate" inputmode="decimal" placeholder="例: 10"></label>
+          <label>実施袋数<input id="fertilizerBags" inputmode="decimal" placeholder="任意"></label>
+        </div>
+        <button id="fertilizerUsePlan" class="secondary" type="button">予定量を実施量に入れる</button>
+        <div id="fertilizerTotalPreview" class="fertilizer-total-preview"></div>
+        <label>判断メモ<textarea id="fertilizerMemo" placeholder="例: 葉色がやや淡いため予定量で実施"></textarea></label>
+        <button class="primary" type="submit">実施量を保存して予定を完了</button>
+      </form>
+    </section>
+  </div>
+
   <div id="toast" class="toast hidden" role="status"></div>
 
   <script src="assets/js/core/utils.js?v=20260627_ver67"></script>
-  <script src="assets/js/core/schema.js?v=20260720_ver93"></script>
+  <script src="assets/js/core/schema.js?v=20260720_ver96"></script>
   <script src="assets/js/core/storage.js?v=20260627_ver67"></script>
-  <script src="assets/js/core/state.js?v=20260720_ver93"></script>
+  <script src="assets/js/core/state.js?v=20260720_ver96"></script>
   <script src="assets/js/core/agro.js?v=20260720_ver93"></script>
   <script src="assets/js/core/record-actions.js?v=20260627_ver67"></script>
   <script src="assets/js/core/calendar.js?v=20260720_ver93"></script>
   <script src="assets/js/core/alerts.js?v=20260627_ver67"></script>
   <script src="assets/js/core/weather.js?v=20260629_ver81"></script>
-  <script src="assets/js/core/pwa.js?v=20260627_ver67"></script>
+  <script src="assets/js/core/pwa.js?v=20260720_ver96"></script>
   <script src="assets/js/screens/home.js?v=20260720_ver93"></script>
-  <script src="assets/js/screens/calendar.js?v=20260629_ver83"></script>
-  <script src="assets/js/screens/bottom-sheet.js?v=20260712_ver92"></script>
+  <script src="assets/js/screens/calendar.js?v=20260720_ver96"></script>
+  <script src="assets/js/screens/bottom-sheet.js?v=20260720_ver96"></script>
   <script src="assets/js/screens/recipes.js?v=20260630_ver87"></script>
   <script src="assets/js/screens/fields.js?v=20260712_ver91"></script>
   <script src="assets/js/screens/field-work.js?v=20260630_ver87"></script>
-  <script src="assets/js/screens/growth.js?v=20260720_ver93"></script>
+  <script src="assets/js/screens/fertilizer.js?v=20260720_ver96"></script>
+  <script src="assets/js/screens/growth.js?v=20260720_ver96"></script>
   <script src="assets/js/screens/dry-period.js?v=20260712_ver92"></script>
   <script src="assets/js/screens/irrigation.js?v=20260627_ver67"></script>
   <script src="assets/js/screens/photos.js?v=20260627_ver67"></script>

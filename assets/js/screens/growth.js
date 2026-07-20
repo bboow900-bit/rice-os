@@ -49,9 +49,6 @@
 
   function renderChoiceControls() {
     renderChips("gLeafChips", "gLeaf", S.LEAF_COLOR_LEVELS.map((level) => ({ value: level.value, label: level.label, text: `${level.value} ${level.text}` })));
-    renderChips("gWeedChips", "gWeed", S.GROWTH_LEVELS);
-    renderChips("gGasChips", "gGas", S.GROWTH_LEVELS);
-    renderChips("gWaterChips", "gWater", S.WATER_LEVELS);
   }
 
   function renderTargetPanel() {
@@ -101,7 +98,12 @@
     const lengthValue = U.$("gPanicleLengthMm") && U.$("gPanicleLengthMm").value;
     const date = U.$("gDate").value || U.today();
     if (!field || !/コシヒカリ/.test(String(variety && variety.name || ""))) {
-      el.innerHTML = "";
+      el.innerHTML = `
+        <div class="growth-panicle-card idle">
+          <div><b>幼穂の記録</b><span>${U.escapeHTML(variety && variety.name || "品種未設定")}</span></div>
+          <p>幼穂長は記録できます。出穂予測の基準はこの品種では準備中です</p>
+        </div>
+      `;
       return;
     }
     const headingDate = observedHeadingDate(field.fieldId);
@@ -148,9 +150,6 @@
     if (U.$("gPlantHeight")) U.$("gPlantHeight").value = "";
     if (U.$("gPanicleLengthMm")) U.$("gPanicleLengthMm").value = "";
     U.$("gLeaf").value = "3";
-    U.$("gWeed").value = "-";
-    U.$("gGas").value = "-";
-    U.$("gWater").value = "-";
     if (U.$("gHeadingObserved")) U.$("gHeadingObserved").checked = false;
     U.$("gPhoto").value = "";
     U.$("gPhotoFile").value = "";
@@ -197,9 +196,6 @@
       ], U.$("growthRange").value || "season");
     }
     U.setOptions(U.$("gLeaf"), S.LEAF_COLOR_LEVELS.map((level) => ({ value: level.value, label: level.label })), U.$("gLeaf").value || "3");
-    U.setOptions(U.$("gWeed"), S.GROWTH_LEVELS, U.$("gWeed").value || "-");
-    U.setOptions(U.$("gGas"), S.GROWTH_LEVELS, U.$("gGas").value || "-");
-    U.setOptions(U.$("gWater"), S.WATER_LEVELS, U.$("gWater").value || "-");
     renderChoiceControls();
     renderPaniclePanel();
     renderTargetPanel();
@@ -293,11 +289,6 @@
               <span>分げつ <b>${U.escapeHTML(log.tillerCount || "-")}</b></span>
               <span>草丈 <b>${U.escapeHTML(log.plantHeightCm || "-")}</b>cm</span>
             </div>
-            <div class="timeline-status-row">
-              <span>雑草 ${U.escapeHTML(log.weed || "-")}</span>
-              <span>ガス ${U.escapeHTML(log.gas || "-")}</span>
-              <span>水 ${U.escapeHTML(log.water || "-")}</span>
-            </div>
             ${targetText ? `<div class="target-note">${U.escapeHTML(targetText)}</div>` : ""}
             ${panicleText ? `<div class="timeline-panicle-note">🌾 ${U.escapeHTML(panicleText)}</div>` : ""}
             ${log.memo ? `<p class="timeline-memo">${U.escapeHTML(log.memo)}</p>` : ""}
@@ -332,9 +323,6 @@
     if (U.$("gPlantHeight")) U.$("gPlantHeight").value = log.plantHeightCm || "";
     if (U.$("gPanicleLengthMm")) U.$("gPanicleLengthMm").value = log.panicleLengthMm || "";
     U.$("gLeaf").value = log.leafColorScore || S.leafColorScoreFromText(log.leafColor) || "3";
-    U.$("gWeed").value = log.weed || "-";
-    U.$("gGas").value = log.gas || "-";
-    U.$("gWater").value = log.water || "-";
     if (U.$("gHeadingObserved")) U.$("gHeadingObserved").checked = Boolean(log.headingObserved);
     U.$("gPhoto").value = log.photo || "";
     U.$("gMemo").value = log.memo || "";
@@ -342,7 +330,7 @@
     U.$("gPhotoPreview").dataset.photoData = log.photoData || "";
     U.$("gPhotoPreview").src = log.photoData || "";
     U.$("gPhotoPreview").classList.toggle("hidden", !log.photoData);
-    if (log.leafCount || log.plantHeightCm || (log.weed && log.weed !== "-") || (log.gas && log.gas !== "-") || (log.water && log.water !== "-")) {
+    if (log.leafCount || log.plantHeightCm) {
       setInputMode("detail");
     }
     renderChoiceControls();
@@ -367,9 +355,9 @@
       fieldId: U.$("gField").value,
       leafColorScore: U.$("gLeaf").value || "3",
       leafColor: S.leafColorLabel(U.$("gLeaf").value || "3"),
-      weed: U.$("gWeed").value || "-",
-      gas: U.$("gGas").value || "-",
-      water: U.$("gWater").value || "-",
+      weed: "-",
+      gas: "-",
+      water: "-",
       headingObserved: true,
       memo: U.$("gMemo").value || "出穂確認"
     });
@@ -398,7 +386,7 @@
       renderTargetPanel();
     });
 
-    ["gField", "gDate", "gTillerCount", "gLeafCount", "gPlantHeight", "gPanicleLengthMm", "gLeaf", "gWeed", "gGas", "gWater", "gHeadingObserved"].forEach((id) => {
+    ["gField", "gDate", "gTillerCount", "gLeafCount", "gPlantHeight", "gPanicleLengthMm", "gLeaf", "gHeadingObserved"].forEach((id) => {
       const el = U.$(id);
       if (!el) return;
       el.addEventListener("input", () => {
@@ -434,6 +422,7 @@
         alert("圃場を選んでください。");
         return;
       }
+      const existing = state.data().growthLogs.find((log) => log.logId === U.$("editGrowthId").value);
       const common = {
         logId: U.$("editGrowthId").value,
         date: U.$("gDate").value,
@@ -443,9 +432,9 @@
         panicleLengthMm: U.$("gPanicleLengthMm") ? U.$("gPanicleLengthMm").value : "",
         leafColorScore: U.$("gLeaf").value,
         leafColor: S.leafColorLabel(U.$("gLeaf").value),
-        weed: U.$("gWeed").value,
-        gas: U.$("gGas").value,
-        water: U.$("gWater").value,
+        weed: existing ? existing.weed || "-" : "-",
+        gas: existing ? existing.gas || "-" : "-",
+        water: existing ? existing.water || "-" : "-",
         headingObserved: U.$("gHeadingObserved") ? U.$("gHeadingObserved").checked : false,
         photo: U.$("gPhoto").value,
         photoData: U.$("gPhotoPreview").dataset.photoData || "",

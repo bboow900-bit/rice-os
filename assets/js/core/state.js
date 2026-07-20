@@ -247,6 +247,11 @@
         machine: record.machine || "",
         material: record.material || "",
         amount: record.amount || "",
+        fertilizerRateKg10a: record.fertilizerRateKg10a || "",
+        fertilizerTotalKg: record.fertilizerTotalKg || "",
+        fertilizerBagCount: record.fertilizerBagCount || "",
+        sourceScheduleId: record.sourceScheduleId || "",
+        growthSnapshots: record.growthSnapshots || {},
         weather: record.weather || "",
         weatherAuto: record.weatherAuto || null,
         photo: record.photo || "",
@@ -467,6 +472,8 @@
         completedByWorkId: record.completedByWorkId || "",
         completedManuallyAt: record.completedManuallyAt || "",
         completionReason: record.completionReason || "",
+        plannedFertilizerName: record.plannedFertilizerName || "",
+        plannedFertilizerRateKg10a: record.plannedFertilizerRateKg10a || "",
         memo: record.memo || "",
         createdAt: record.createdAt || U.now(),
         updatedAt: U.now()
@@ -490,6 +497,59 @@
         updatedAt: U.now()
       };
     }, "予定を完了にしました");
+  }
+
+  function saveFertilizerCompletion(record) {
+    mutate((d) => {
+      const scheduleIndex = (d.schedules || []).findIndex((schedule) => schedule.scheduleId === record.scheduleId);
+      if (scheduleIndex < 0) return;
+      const schedule = d.schedules[scheduleIndex];
+      const date = record.date || U.today();
+      const workId = U.id("work", date);
+      const rate = String(record.fertilizerRateKg10a || "");
+      const total = String(record.fertilizerTotalKg || "");
+      const bags = String(record.fertilizerBagCount || "");
+      const material = record.material || schedule.plannedFertilizerName || "";
+      const amount = [
+        rate ? `${rate}kg/10a` : "",
+        total ? `合計${total}kg` : "",
+        bags ? `${bags}袋` : ""
+      ].filter(Boolean).join(" / ");
+      const work = {
+        workId,
+        type: "fieldWork",
+        date,
+        season: U.season(date),
+        fieldIds: schedule.fieldIds || [],
+        workName: "追肥",
+        worker: record.worker || "",
+        hours: record.hours || "",
+        machine: "",
+        material,
+        amount,
+        fertilizerRateKg10a: rate,
+        fertilizerTotalKg: total,
+        fertilizerBagCount: bags,
+        sourceScheduleId: schedule.scheduleId,
+        growthSnapshots: record.growthSnapshots || {},
+        weather: "",
+        weatherAuto: null,
+        photo: "",
+        photoData: "",
+        memo: record.memo || "",
+        createdAt: U.now(),
+        updatedAt: U.now()
+      };
+      d.fieldWorks.push(work);
+      d.schedules[scheduleIndex] = {
+        ...schedule,
+        status: "実施済み",
+        completedAt: U.now(),
+        completedByWorkId: workId,
+        completionReason: `追肥 ${date} 実績${amount || "量未入力"}`,
+        updatedAt: U.now()
+      };
+    }, "追肥の実績を保存しました");
   }
 
   function deleteSchedule(scheduleId) {
@@ -655,6 +715,7 @@
     saveResult,
     saveSchedule,
     completeSchedule,
+    saveFertilizerCompletion,
     deleteSchedule,
     saveDryPeriod,
     deleteDryPeriod,

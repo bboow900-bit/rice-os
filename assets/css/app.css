@@ -6065,7 +6065,18 @@ label {
 }
 
 .growth-panicle-panel {
-  margin: -8px 0 10px;
+  margin: 8px 0 0;
+}
+
+.growth-panicle-entry {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.growth-panicle-entry input {
+  min-height: 48px;
+  color: #1c532d;
+  font-size: 22px;
+  font-weight: 900;
 }
 
 .growth-panicle-card {
@@ -6301,6 +6312,158 @@ label {
   border-radius: 26px 26px 22px 22px;
   background: #fff;
   box-shadow: 0 -10px 36px rgba(0, 0, 0, 0.22);
+}
+
+.sheet-fertilizer-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  padding: 9px;
+  border: 1px solid #d8e8ce;
+  border-radius: 14px;
+  background: #f7fcf2;
+}
+
+.sheet-fertilizer-fields.hidden {
+  display: none;
+}
+
+.fertilizer-panel {
+  gap: 9px;
+  background: linear-gradient(180deg, #fffef9 0%, #f8fbf5 100%);
+}
+
+.fertilizer-form {
+  display: grid;
+  gap: 9px;
+  padding: 1px 2px 4px;
+}
+
+.fertilizer-schedule-summary {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid #d8e7ce;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #effbe8, #fffdf3);
+}
+
+.fertilizer-schedule-summary div {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: baseline;
+}
+
+.fertilizer-schedule-summary b {
+  color: #1c5724;
+  font-size: 15px;
+}
+
+.fertilizer-schedule-summary span,
+.fertilizer-schedule-summary small {
+  color: #506150;
+  font-size: 12px;
+  font-weight: 720;
+}
+
+.fertilizer-growth-context {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.fertilizer-context-title {
+  display: flex;
+  grid-column: 1 / -1;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 2px;
+}
+
+.fertilizer-context-title b {
+  color: #204c28;
+  font-size: 14px;
+}
+
+.fertilizer-context-title span {
+  color: #6f7b6c;
+  font-size: 11px;
+  font-weight: 720;
+}
+
+.fertilizer-growth-card {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 4px 7px;
+  min-width: 0;
+  padding: 9px;
+  border: 1px solid #e5eadf;
+  border-radius: 13px;
+  background: #fffefa;
+}
+
+.fertilizer-growth-card b {
+  min-width: 0;
+  overflow: hidden;
+  color: #1d3522;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fertilizer-growth-card > span,
+.fertilizer-growth-card small {
+  color: #778071;
+  font-size: 10px;
+  font-weight: 720;
+}
+
+.fertilizer-growth-card > span {
+  text-align: right;
+}
+
+.fertilizer-growth-card > div {
+  display: flex;
+  grid-column: 1 / -1;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.fertilizer-growth-card em {
+  padding: 2px 5px;
+  border-radius: 999px;
+  background: #edf6e7;
+  color: #356236;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 760;
+}
+
+.fertilizer-growth-card small {
+  grid-column: 1 / -1;
+}
+
+.fertilizer-total-preview {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  min-height: 43px;
+  padding: 8px 11px;
+  border: 1px solid #f0d589;
+  border-radius: 13px;
+  background: #fff8dd;
+}
+
+.fertilizer-total-preview span {
+  color: #756231;
+  font-size: 12px;
+  font-weight: 720;
+}
+
+.fertilizer-total-preview b {
+  color: #72500b;
+  font-size: 15px;
 }
 
 .sheet-handle {
