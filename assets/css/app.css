@@ -8034,6 +8034,146 @@ label {
   line-height: 1.5;
 }
 
+/* Compact growth log: latest status stays visible, history stays optional. */
+.growth-latest-panel {
+  overflow: hidden;
+  margin: 8px 0;
+  border: 1px solid #d8e8cf;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #effbe9 0%, #fffdf4 100%);
+  box-shadow: 0 8px 18px rgba(41, 87, 49, 0.08);
+}
+
+.growth-latest-empty {
+  display: grid;
+  gap: 3px;
+  padding: 13px;
+  color: #31523a;
+}
+
+.growth-latest-empty span {
+  color: #6d7b6d;
+  font-size: 12px;
+}
+
+.growth-latest-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 50px;
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(56, 112, 66, 0.12);
+}
+
+.growth-latest-head > div {
+  display: grid;
+  align-content: center;
+  gap: 3px;
+  min-width: 0;
+}
+
+.growth-latest-head b { color: #1f542d; font-size: 14px; }
+.growth-latest-head span { overflow: hidden; color: #687767; font-size: 11px; font-weight: 760; text-overflow: ellipsis; white-space: nowrap; }
+.growth-latest-head img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; }
+
+.growth-latest-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.growth-latest-metrics span {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  min-height: 57px;
+  padding: 6px 3px;
+  border-right: 1px solid rgba(56, 112, 66, 0.1);
+  color: #63705f;
+  font-size: 10px;
+  font-weight: 760;
+  text-align: center;
+}
+
+.growth-latest-metrics span:last-child { border-right: 0; }
+.growth-latest-metrics b { color: #21442a; font-size: 15px; line-height: 1.15; }
+.growth-latest-metrics small { min-height: 12px; color: #77906e; font-size: 9px; line-height: 1; }
+
+.growth-quick-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.growth-quick-actions button { min-height: 44px; padding: 8px; border-radius: 10px; font-size: 13px; }
+
+.growth-timeline-section {
+  margin: 9px 0 15px;
+  overflow: hidden;
+  border: 1px solid #dfe8d8;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.growth-timeline-section > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 45px;
+  padding: 0 12px;
+  cursor: pointer;
+  color: #24482c;
+  font-weight: 930;
+  list-style: none;
+}
+
+.growth-timeline-section > summary::-webkit-details-marker { display: none; }
+.growth-timeline-section > summary::before { content: "▶"; margin-right: 7px; color: #38a44a; font-size: 11px; }
+.growth-timeline-section[open] > summary::before { content: "▼"; }
+.growth-timeline-section > summary span { margin-right: auto; }
+.growth-timeline-section > summary small { padding: 3px 8px; border-radius: 999px; background: #edf6e9; color: #518052; font-size: 11px; }
+.growth-timeline-section > .growth-timeline,
+.growth-timeline-section > .growth-compare-panel { margin: 0 8px 8px; }
+
+.growth-panicle-targets {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  padding: 0 12px 8px;
+}
+
+.growth-panicle-targets label { min-width: 0; color: #536552; font-size: 11px; font-weight: 820; }
+.growth-panicle-targets select { width: 100%; min-height: 38px; margin-top: 3px; padding: 7px; font-size: 12px; }
+.growth-panicle-target-notice { margin: 0 12px 9px; padding: 7px 9px; border-radius: 8px; background: #f4f9ef; color: #52674f; font-size: 11px; font-weight: 720; line-height: 1.35; }
+
+.recent-work-filter { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.recent-work-filter select { max-width: 145px; min-height: 32px; padding: 4px 25px 4px 8px; border-radius: 8px; font-size: 11px; }
+
+.schedule-preset-picks {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.schedule-preset-picks button {
+  min-height: 34px;
+  padding: 5px 3px;
+  border: 1px solid #dce6d4;
+  border-radius: 8px;
+  background: #fffefa;
+  color: #3e573e;
+  font-size: 10px;
+  font-weight: 850;
+}
+
+.schedule-preset-picks button.active { border-color: #49a354; background: #e7f6e4; color: #1e6a2c; }
+
+@media (max-width: 420px) {
+  .growth-latest-metrics b { font-size: 13px; }
+  .growth-latest-metrics span { font-size: 9px; }
+  .growth-panicle-targets { grid-template-columns: 1fr; }
+}
+
 @media (max-width: 720px) {
   .app-header {
     position: sticky;

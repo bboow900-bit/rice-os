@@ -8,6 +8,16 @@
   let selectedDate = U.today();
   let selectedFieldId = "";
   let editingScheduleId = "";
+  const SCHEDULE_PRESETS = [
+    { label: "草刈り", title: "草刈り予定" },
+    { label: "追肥", title: "追肥予定" },
+    { label: "防除", title: "防除予定" },
+    { label: "除草剤", title: "除草剤散布予定" },
+    { label: "中干し", title: "中干し確認" },
+    { label: "田植え", title: "田植え予定" },
+    { label: "稲刈り", title: "稲刈り予定" },
+    { label: "幼穂確認", title: "幼穂確認" }
+  ];
 
   function scheduleDone(record) {
     return Boolean(record && (record.completedAt || record.completedByWorkId || record.status === "実施済み" || record.status === "手動完了"));
@@ -38,7 +48,7 @@
         ${entry.hasPhoto ? '<span class="pill info">写真あり</span>' : ""}
         ${id ? `
           <div class="record-actions mini-actions">
-            ${canCompleteSchedule ? `<button class="primary" type="button" data-sheet-action="complete" data-kind="${U.attr(entry.kind)}" data-id="${U.attr(id)}">実施済み</button>` : ""}
+            ${canCompleteSchedule ? `<button class="primary" type="button" data-sheet-action="complete" data-kind="${U.attr(entry.kind)}" data-id="${U.attr(id)}">実施を記録</button>` : ""}
             <button class="secondary" type="button" data-sheet-action="edit" data-kind="${U.attr(entry.kind)}" data-id="${U.attr(id)}">編集</button>
             <button class="danger" type="button" data-sheet-action="delete" data-kind="${U.attr(entry.kind)}" data-id="${U.attr(id)}">削除</button>
           </div>
@@ -153,6 +163,15 @@
     if (!rate.value) rate.value = plan.rate;
   }
 
+  function renderSchedulePresets() {
+    const root = U.$("sheetSchedulePresetPicks");
+    if (!root) return;
+    const title = String(U.$("sheetScheduleTitle").value || "");
+    root.innerHTML = SCHEDULE_PRESETS.map((preset) => `
+      <button type="button" class="${title === preset.title ? "active" : ""}" data-schedule-preset="${U.attr(preset.title)}">${U.escapeHTML(preset.label)}</button>
+    `).join("");
+  }
+
   function hideScheduleForm() {
     const form = U.$("sheetScheduleForm");
     if (!form) return;
@@ -168,6 +187,7 @@
     U.$("sheetScheduleMemo").value = record ? record.memo || "" : "";
     U.$("sheetScheduleFertilizerName").value = record ? record.plannedFertilizerName || "" : "";
     U.$("sheetScheduleFertilizerRate").value = record ? record.plannedFertilizerRateKg10a || "" : "";
+    renderSchedulePresets();
     renderScheduleTargets(record);
     renderFertilizerScheduleFields(record);
     const head = form.querySelector(".sheet-schedule-head b");
@@ -230,7 +250,10 @@
       U.$("sheetScheduleTargetMode").addEventListener("change", () => renderScheduleTargets());
     }
     if (U.$("sheetScheduleTitle")) {
-      U.$("sheetScheduleTitle").addEventListener("input", () => renderFertilizerScheduleFields());
+      U.$("sheetScheduleTitle").addEventListener("input", () => {
+        renderFertilizerScheduleFields();
+        renderSchedulePresets();
+      });
     }
     U.$("dateSheet").addEventListener("click", (event) => {
       const actionButton = event.target.closest("[data-sheet-action]");
@@ -242,8 +265,9 @@
             RiceOS.screens.fertilizer.open(entry.record, render);
             return;
           }
-          state.completeSchedule(entry.record.scheduleId);
-          render();
+          close();
+          RiceOS.app.show("field-work");
+          RiceOS.screens.fieldWork.prefillSchedule(entry.record);
           return;
         }
         if (actionButton.dataset.sheetAction === "edit") {
@@ -260,6 +284,13 @@
         return;
       }
       const button = event.target.closest("[data-sheet-add]");
+      const presetButton = event.target.closest("[data-schedule-preset]");
+      if (presetButton) {
+        U.$("sheetScheduleTitle").value = presetButton.dataset.schedulePreset;
+        renderFertilizerScheduleFields();
+        renderSchedulePresets();
+        return;
+      }
       if (!button) return;
       const action = button.dataset.sheetAdd;
       if (action === "growth") {

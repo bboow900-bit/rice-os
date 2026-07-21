@@ -65,7 +65,7 @@
         ${entry.hasPhoto ? '<span class="pill info">写真あり</span>' : ""}
         ${id ? `
           <div class="record-actions mini-actions">
-            ${canCompleteSchedule ? `<button class="primary" type="button" data-calendar-action="complete" data-kind="${U.attr(entry.kind)}" data-id="${U.attr(id)}">実施済み</button>` : ""}
+            ${canCompleteSchedule ? `<button class="primary" type="button" data-calendar-action="complete" data-kind="${U.attr(entry.kind)}" data-id="${U.attr(id)}">実施を記録</button>` : ""}
             <button class="secondary" type="button" data-calendar-action="edit" data-kind="${U.attr(entry.kind)}" data-id="${U.attr(id)}">編集</button>
             <button class="danger" type="button" data-calendar-action="delete" data-kind="${U.attr(entry.kind)}" data-id="${U.attr(id)}">削除</button>
           </div>
@@ -122,8 +122,8 @@
           RiceOS.screens.fertilizer.open(entry.record, render);
           return;
         }
-        RiceOS.state.completeSchedule(entry.record.scheduleId);
-        render();
+        RiceOS.app.show("field-work");
+        RiceOS.screens.fieldWork.prefillSchedule(entry.record);
         return;
       }
       if (button.dataset.calendarAction === "edit") {

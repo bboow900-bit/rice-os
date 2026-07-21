@@ -5,6 +5,8 @@
   const U = RiceOS.utils;
   const S = RiceOS.schema;
   const state = RiceOS.state;
+  let recentScope = localStorage.getItem("riceFieldWorkRecentScope") || "all";
+  let pendingScheduleId = "";
 
   const WORK_PRESETS = {
     "草刈り": { machine: "草刈り機" },
@@ -264,6 +266,7 @@
       U.$("fwPhotoPreview").dataset.photoData = "";
       U.$("fwPhotoPreview").classList.add("hidden");
     }
+    pendingScheduleId = "";
     setSelectedFieldIds([]);
   }
 
@@ -284,9 +287,45 @@
     setSelectedFieldIds(fieldIds || []);
   }
 
+  function workNameFromSchedule(schedule) {
+    const text = String(schedule && (schedule.title || schedule.scheduleType) || "");
+    const names = ["田植え", "代かき", "草刈り", "除草剤", "追肥", "防除", "溝切り", "中干し開始", "中干し終了", "稲刈り", "出穂確認"];
+    return names.find((name) => text.includes(name.replace("開始", "").replace("終了", ""))) || text.replace(/予定|確認候補|確認/g, "").trim() || "その他";
+  }
+
+  function prefillSchedule(schedule) {
+    if (!schedule) return;
+    resetForm();
+    pendingScheduleId = schedule.scheduleId || "";
+    U.$("fieldWorkHeading").textContent = "予定から作業を記録";
+    U.$("fwDate").value = U.today();
+    U.$("fwName").value = workNameFromSchedule(schedule);
+    setSelectedFieldIds(schedule.fieldIds || []);
+    applyWorkPreset(U.$("fwName").value);
+    if (schedule.memo) {
+      U.$("fwMemo").value = schedule.memo;
+      U.$("fwMemo").dataset.templateFilled = "1";
+    }
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function renderRecentScope() {
+    const select = U.$("fieldWorkRecentScope");
+    if (!select) return;
+    const groups = fieldGroups();
+    const options = [
+      { value: "all", label: "全圃場" },
+      ...groups.map((group) => ({ value: `group:${group.name}`, label: `${group.name}グループ` })),
+      ...state.activeFields().map((field) => ({ value: `field:${field.fieldId}`, label: field.name }))
+    ];
+    if (!options.some((option) => option.value === recentScope)) recentScope = "all";
+    U.setOptions(select, options, recentScope);
+  }
+
   function editWork(workId) {
     const work = state.data().fieldWorks.find((item) => item.workId === workId);
     if (!work) return;
+    pendingScheduleId = work.sourceScheduleId || "";
     U.$("fieldWorkHeading").textContent = "圃場作業を編集";
     U.$("editFieldWorkId").value = work.workId;
     U.$("fwDate").value = work.date;
@@ -311,8 +350,17 @@
   }
 
   function renderList() {
-    const rows = state.data().fieldWorks.slice().sort((a, b) => String(b.date).localeCompare(String(a.date))).slice(0, 40);
-    U.$("fieldWorkCount").textContent = `${state.data().fieldWorks.length}件`;
+    let rows = state.data().fieldWorks.slice();
+    if (recentScope.startsWith("field:")) {
+      const fieldId = recentScope.slice("field:".length);
+      rows = rows.filter((work) => (work.fieldIds || []).includes(fieldId));
+    }
+    if (recentScope.startsWith("group:")) {
+      const group = recentScope.slice("group:".length);
+      rows = rows.filter((work) => (work.fieldIds || []).some((id) => fieldGroupName(state.field(id)) === group));
+    }
+    rows = rows.sort((a, b) => String(b.date).localeCompare(String(a.date))).slice(0, 40);
+    U.$("fieldWorkCount").textContent = `${rows.length}件`;
     U.$("fieldWorkList").innerHTML = rows.length ? rows.map((work) => {
       const fieldNames = (work.fieldIds || []).map((id) => state.field(id) && state.field(id).name).filter(Boolean).join("・");
       const dap = daysText(work.fieldIds, work.date);
@@ -350,6 +398,7 @@
     U.setOptions(U.$("fwName"), S.FIELD_WORK_NAMES, U.$("fwName").value || "田植え");
     renderTemplates();
     renderFieldCards();
+    renderRecentScope();
     syncWorkerPreset();
     renderList();
   }
@@ -554,6 +603,7 @@
         machine: U.$("fwMachine").value,
         material: U.$("fwMaterial").value,
         amount: U.$("fwAmount").value,
+        sourceScheduleId: pendingScheduleId,
         weather: U.$("fwWeather").value,
         weatherAuto: weatherAutoValue(),
         photo: U.$("fwPhoto") ? U.$("fwPhoto").value : "",
@@ -597,6 +647,7 @@
         return;
       }
       U.$("fieldWorkHeading").textContent = "圃場作業を編集";
+      pendingScheduleId = work.sourceScheduleId || "";
       U.$("editFieldWorkId").value = work.workId;
       U.$("fwDate").value = work.date;
       U.$("fwName").value = work.workName;
@@ -620,6 +671,11 @@
     });
 
     document.querySelector('[data-action="reset-field-work"]').addEventListener("click", resetForm);
+    if (U.$("fieldWorkRecentScope")) U.$("fieldWorkRecentScope").addEventListener("change", () => {
+      recentScope = U.$("fieldWorkRecentScope").value;
+      localStorage.setItem("riceFieldWorkRecentScope", recentScope);
+      renderList();
+    });
     if (document.querySelector('[data-action="clear-work-photo"]')) {
       document.querySelector('[data-action="clear-work-photo"]').addEventListener("click", () => {
         U.$("fwPhotoFile").value = "";
@@ -635,5 +691,5 @@
   }
 
   RiceOS.screens = RiceOS.screens || {};
-  RiceOS.screens.fieldWork = { render, bind, resetForm, prefillField, prefillDate, prefillFields, prefillWorkName, editWork, daysText };
+  RiceOS.screens.fieldWork = { render, bind, resetForm, prefillField, prefillDate, prefillFields, prefillWorkName, prefillSchedule, editWork, daysText };
 })();

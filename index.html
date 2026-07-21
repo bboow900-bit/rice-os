@@ -14,7 +14,7 @@
   <link rel="icon" href="assets/icons/icon-192.png">
   <link rel="apple-touch-icon" href="assets/icons/icon-192.png">
   <title>稲作カルテ</title>
-  <link rel="stylesheet" href="assets/css/app.css?v=20260720_ver96">
+  <link rel="stylesheet" href="assets/css/app.css?v=20260721_ver97">
   <link rel="stylesheet" href="assets/css/field-management.css?v=20260630_ver85">
 </head>
 <body>
@@ -168,7 +168,7 @@
         </form>
         <div class="section-title">
           <h3>最近の作業</h3>
-          <span class="muted" id="fieldWorkCount"></span>
+          <div class="recent-work-filter"><select id="fieldWorkRecentScope" aria-label="最近の作業の表示対象"></select><span class="muted" id="fieldWorkCount"></span></div>
         </div>
         <div id="fieldWorkList"></div>
       </section>
@@ -185,12 +185,16 @@
           <label class="compact-label">圃場<select id="growthFilterField"></select></label>
           <label class="compact-label">表示<select id="growthRange"></select></label>
         </div>
-        <div class="section-title growth-timeline-title">
-          <h3>生育タイムライン</h3>
-          <span class="muted" id="growthCount"></span>
+        <div id="growthLatestPanel" class="growth-latest-panel"></div>
+        <div class="growth-quick-actions">
+          <button class="primary" type="button" data-action="growth-quick-input">今日すぐ入力</button>
+          <button class="secondary" type="button" data-action="growth-bulk-panicle">幼穂を一括記録</button>
         </div>
-        <div id="growthComparePanel" class="growth-compare-panel"></div>
-        <div id="growthTimeline" class="growth-timeline"></div>
+        <details id="growthTimelineSection" class="growth-timeline-section">
+          <summary><span>生育タイムライン</span><small id="growthCount"></small></summary>
+          <div id="growthComparePanel" class="growth-compare-panel"></div>
+          <div id="growthTimeline" class="growth-timeline"></div>
+        </details>
         <form class="stack-form" id="growthForm" data-growth-mode="simple">
           <input type="hidden" id="editGrowthId">
           <div class="growth-input-mode" role="group" aria-label="生育入力モード">
@@ -216,6 +220,14 @@
           </details>
           <details class="form-section growth-panicle-section" id="growthPanicleSection" open>
             <summary>幼穂・出穂</summary>
+            <div class="growth-panicle-targets">
+              <label>記録対象<select id="gPanicleTargetMode">
+                <option value="field">選択中の圃場</option>
+                <option value="group">圃場グループ</option>
+              </select></label>
+              <label id="gPanicleGroupLabel" class="hidden">グループ<select id="gPanicleGroup"></select></label>
+            </div>
+            <div id="gPanicleTargetNotice" class="growth-panicle-target-notice"></div>
             <div class="form-grid dense growth-panicle-entry">
               <label>幼穂長(mm)<input id="gPanicleLengthMm" inputmode="decimal" placeholder="例: 2.0"></label>
             </div>
@@ -572,6 +584,7 @@
           <b>予定を登録</b>
           <button class="secondary" type="button" data-sheet-schedule-cancel>閉じる</button>
         </div>
+        <div id="sheetSchedulePresetPicks" class="schedule-preset-picks" aria-label="よく使う予定"></div>
         <label>予定名<input id="sheetScheduleTitle" placeholder="例: 中干し確認、除草剤散布予定"></label>
         <div class="sheet-schedule-targets">
           <label>対象<select id="sheetScheduleTargetMode">
@@ -623,21 +636,21 @@
   <script src="assets/js/core/utils.js?v=20260627_ver67"></script>
   <script src="assets/js/core/schema.js?v=20260720_ver96"></script>
   <script src="assets/js/core/storage.js?v=20260627_ver67"></script>
-  <script src="assets/js/core/state.js?v=20260720_ver96"></script>
+  <script src="assets/js/core/state.js?v=20260721_ver97"></script>
   <script src="assets/js/core/agro.js?v=20260720_ver93"></script>
   <script src="assets/js/core/record-actions.js?v=20260627_ver67"></script>
   <script src="assets/js/core/calendar.js?v=20260720_ver93"></script>
   <script src="assets/js/core/alerts.js?v=20260627_ver67"></script>
   <script src="assets/js/core/weather.js?v=20260629_ver81"></script>
-  <script src="assets/js/core/pwa.js?v=20260720_ver96"></script>
+  <script src="assets/js/core/pwa.js?v=20260721_ver97"></script>
   <script src="assets/js/screens/home.js?v=20260720_ver93"></script>
-  <script src="assets/js/screens/calendar.js?v=20260720_ver96"></script>
-  <script src="assets/js/screens/bottom-sheet.js?v=20260720_ver96"></script>
+  <script src="assets/js/screens/calendar.js?v=20260721_ver97"></script>
+  <script src="assets/js/screens/bottom-sheet.js?v=20260721_ver97"></script>
   <script src="assets/js/screens/recipes.js?v=20260630_ver87"></script>
   <script src="assets/js/screens/fields.js?v=20260712_ver91"></script>
-  <script src="assets/js/screens/field-work.js?v=20260630_ver87"></script>
+  <script src="assets/js/screens/field-work.js?v=20260721_ver97"></script>
   <script src="assets/js/screens/fertilizer.js?v=20260720_ver96"></script>
-  <script src="assets/js/screens/growth.js?v=20260720_ver96"></script>
+  <script src="assets/js/screens/growth.js?v=20260721_ver97"></script>
   <script src="assets/js/screens/dry-period.js?v=20260712_ver92"></script>
   <script src="assets/js/screens/irrigation.js?v=20260627_ver67"></script>
   <script src="assets/js/screens/photos.js?v=20260627_ver67"></script>

@@ -263,6 +263,19 @@
       const index = d.fieldWorks.findIndex((w) => w.workId === normalized.workId);
       if (index >= 0) d.fieldWorks[index] = { ...d.fieldWorks[index], ...normalized };
       else d.fieldWorks.push(normalized);
+      if (normalized.sourceScheduleId) {
+        const scheduleIndex = (d.schedules || []).findIndex((schedule) => schedule.scheduleId === normalized.sourceScheduleId);
+        if (scheduleIndex >= 0) {
+          d.schedules[scheduleIndex] = {
+            ...d.schedules[scheduleIndex],
+            status: "実施済み",
+            completedAt: U.now(),
+            completedByWorkId: normalized.workId,
+            completionReason: `${normalized.workName || "作業"}の作業記録により完了`,
+            updatedAt: U.now()
+          };
+        }
+      }
       completeMatchingSchedules(d, normalized);
       if (isPlantingWorkName(normalized.workName)) {
         normalized.fieldIds.forEach((fieldId) => {

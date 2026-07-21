@@ -7,6 +7,7 @@
   const state = RiceOS.state;
   let bulkFieldIds = [];
   let inputMode = localStorage.getItem("riceGrowthInputMode") || "simple";
+  let timelineOpen = localStorage.getItem("riceGrowthTimelineOpen") === "1";
 
   function setBulkFields(ids) {
     bulkFieldIds = (ids || []).filter(Boolean);
@@ -14,6 +15,48 @@
 
   function clearBulkFields() {
     bulkFieldIds = [];
+  }
+
+  function fieldGroupName(field) {
+    const raw = String(field && (field.fieldGroupId || field.district) || "").trim();
+    return raw ? raw.replace(/グループ$/, "") : "";
+  }
+
+  function fieldGroups() {
+    const groups = new Map();
+    state.activeFields().forEach((field) => {
+      const name = fieldGroupName(field);
+      if (!name) return;
+      if (!groups.has(name)) groups.set(name, []);
+      groups.get(name).push(field);
+    });
+    return Array.from(groups.entries()).map(([name, fields]) => ({ name, fields }));
+  }
+
+  function renderPanicleTargets() {
+    const mode = U.$("gPanicleTargetMode");
+    const group = U.$("gPanicleGroup");
+    const label = U.$("gPanicleGroupLabel");
+    const notice = U.$("gPanicleTargetNotice");
+    if (!mode || !group || !label || !notice) return;
+    const groups = fieldGroups();
+    U.setOptions(group, groups.map((item) => ({ value: item.name, label: `${item.name}グループ (${item.fields.length}圃場)` })), group.value || (groups[0] && groups[0].name) || "");
+    const isGroup = mode.value === "group";
+    label.classList.toggle("hidden", !isGroup || !groups.length);
+    const selected = groups.find((item) => item.name === group.value);
+    if (!isGroup) {
+      const field = state.field(U.$("gField").value);
+      notice.textContent = field ? `${field.name} に個別記録します` : "圃場を選択してください";
+      return;
+    }
+    if (!selected) {
+      notice.textContent = "グループを選択してください";
+      return;
+    }
+    const varieties = new Set(selected.fields.map((field) => field.varietyId).filter(Boolean));
+    const plantingDates = new Set(selected.fields.map((field) => state.plantingDateForField(field.fieldId)).filter(Boolean));
+    const caution = varieties.size > 1 || plantingDates.size > 1 ? " 品種または田植日が異なる圃場があります。" : "";
+    notice.textContent = `${selected.name}グループの${selected.fields.length}圃場へ同じ幼穂長を記録します。${caution}`;
   }
 
   function setInputMode(mode) {
@@ -158,7 +201,9 @@
     U.$("gPhotoPreview").dataset.photoData = "";
     U.$("gPhotoPreview").classList.add("hidden");
     clearBulkFields();
+    if (U.$("gPanicleTargetMode")) U.$("gPanicleTargetMode").value = "field";
     renderChoiceControls();
+    renderPanicleTargets();
     renderPaniclePanel();
     renderTargetPanel();
   }
@@ -197,6 +242,7 @@
     }
     U.setOptions(U.$("gLeaf"), S.LEAF_COLOR_LEVELS.map((level) => ({ value: level.value, label: level.label })), U.$("gLeaf").value || "3");
     renderChoiceControls();
+    renderPanicleTargets();
     renderPaniclePanel();
     renderTargetPanel();
   }
@@ -248,7 +294,10 @@
     if (range === "week") rows = rows.filter((log) => U.daysSince(log.date) !== "" && U.daysSince(log.date) <= 7);
     if (range === "month") rows = rows.filter((log) => U.daysSince(log.date) !== "" && U.daysSince(log.date) <= 31);
     rows = rows.sort((a, b) => String(b.date).localeCompare(String(a.date))).slice(0, 80);
-    U.$("growthCount").textContent = `${state.data().growthLogs.length}件`;
+    U.$("growthCount").textContent = `${rows.length}件`;
+    const timeline = U.$("growthTimelineSection");
+    if (timeline) timeline.open = timelineOpen;
+    renderLatestPanel(rows);
     U.$("growthTimeline").innerHTML = rows.length ? rows.map((log) => {
       const field = state.field(log.fieldId);
       const variety = field ? state.variety(field.varietyId) : null;
@@ -305,6 +354,37 @@
       `;
     }).join("") : '<div class="empty timeline-empty"><b>まだ生育ログはありません。</b><span>記録を追加すると、写真・葉色・分げつ・草丈がタイムラインで並びます。</span></div>';
     renderComparePanel();
+  }
+
+  function latestDelta(latest, previous, key, suffix) {
+    const now = U.number(latest && latest[key], NaN);
+    const before = U.number(previous && previous[key], NaN);
+    if (!Number.isFinite(now) || !Number.isFinite(before)) return "前回比較なし";
+    const delta = Math.round((now - before) * 10) / 10;
+    return `${delta > 0 ? "+" : ""}${delta}${suffix || ""}`;
+  }
+
+  function renderLatestPanel(rows) {
+    const panel = U.$("growthLatestPanel");
+    if (!panel) return;
+    const latest = rows[0];
+    if (!latest) {
+      panel.innerHTML = '<div class="growth-latest-empty"><b>まだ生育記録はありません</b><span>今日の観察から始めましょう</span></div>';
+      return;
+    }
+    const field = state.field(latest.fieldId);
+    const previous = rows.filter((item) => item.fieldId === latest.fieldId && item.logId !== latest.logId)[0];
+    const leaf = latest.leafColorScore || S.leafColorScoreFromText(latest.leafColor) || "-";
+    const panicle = latest.panicleLengthMm ? `${latest.panicleLengthMm}mm` : "未入力";
+    panel.innerHTML = `
+      <div class="growth-latest-head"><div><b>最新の生育</b><span>${U.escapeHTML(field && field.name || "圃場")} / ${U.escapeHTML(U.fd(latest.date))}</span></div>${latest.photoData ? `<img src="${U.attr(latest.photoData)}" alt="">` : ""}</div>
+      <div class="growth-latest-metrics">
+        <span>葉色<b>${U.escapeHTML(String(leaf))}</b></span>
+        <span>分げつ<b>${U.escapeHTML(latest.tillerCount || "-")}</b><small>${U.escapeHTML(latestDelta(latest, previous, "tillerCount", "本"))}</small></span>
+        <span>草丈<b>${U.escapeHTML(latest.plantHeightCm || "-")}</b><small>cm</small></span>
+        <span>幼穂<b>${U.escapeHTML(panicle)}</b><small>${U.escapeHTML(latestDelta(latest, previous, "panicleLengthMm", "mm"))}</small></span>
+      </div>
+    `;
   }
 
   function render() {
@@ -392,11 +472,13 @@
       el.addEventListener("input", () => {
         renderChoiceControls();
         renderPaniclePanel();
+        renderPanicleTargets();
         renderTargetPanel();
       });
       el.addEventListener("change", () => {
         renderChoiceControls();
         renderPaniclePanel();
+        renderPanicleTargets();
         renderTargetPanel();
       });
     });
@@ -440,7 +522,11 @@
         photoData: U.$("gPhotoPreview").dataset.photoData || "",
         memo: U.$("gMemo").value
       };
-      const targets = !common.logId && bulkFieldIds.length > 1 ? bulkFieldIds : [U.$("gField").value];
+      const groupName = U.$("gPanicleTargetMode") && U.$("gPanicleTargetMode").value === "group" ? U.$("gPanicleGroup").value : "";
+      const groupFields = groupName ? (fieldGroups().find((group) => group.name === groupName) || { fields: [] }).fields.map((field) => field.fieldId) : [];
+      const targets = !common.logId && groupFields.length && common.panicleLengthMm
+        ? groupFields
+        : (!common.logId && bulkFieldIds.length > 1 ? bulkFieldIds : [U.$("gField").value]);
       targets.forEach((fieldId) => state.saveGrowthLog({
         ...common,
         logId: targets.length > 1 ? "" : common.logId,
@@ -465,6 +551,25 @@
     document.querySelector('[data-action="reset-growth"]').addEventListener("click", resetForm);
     if (U.$("growthFilterField")) U.$("growthFilterField").addEventListener("change", renderTimeline);
     if (U.$("growthRange")) U.$("growthRange").addEventListener("change", renderTimeline);
+    if (U.$("gPanicleTargetMode")) U.$("gPanicleTargetMode").addEventListener("change", renderPanicleTargets);
+    if (U.$("gPanicleGroup")) U.$("gPanicleGroup").addEventListener("change", renderPanicleTargets);
+    if (U.$("growthTimelineSection")) U.$("growthTimelineSection").addEventListener("toggle", () => {
+      timelineOpen = U.$("growthTimelineSection").open;
+      localStorage.setItem("riceGrowthTimelineOpen", timelineOpen ? "1" : "0");
+    });
+    document.querySelector('[data-action="growth-quick-input"]').addEventListener("click", () => {
+      U.$("growthBasicSection").open = true;
+      U.$("gDate").value = U.today();
+      U.$("growthForm").scrollIntoView({ behavior: "smooth", block: "start" });
+      setTimeout(() => U.$("gTillerCount").focus(), 350);
+    });
+    document.querySelector('[data-action="growth-bulk-panicle"]').addEventListener("click", () => {
+      U.$("growthPanicleSection").open = true;
+      U.$("gPanicleTargetMode").value = "group";
+      renderPanicleTargets();
+      U.$("growthPanicleSection").scrollIntoView({ behavior: "smooth", block: "start" });
+      setTimeout(() => U.$("gPanicleLengthMm").focus(), 350);
+    });
     document.querySelector('[data-action="clear-growth-photo"]').addEventListener("click", () => {
       U.$("gPhotoFile").value = "";
       U.$("gPhotoPreview").src = "";
