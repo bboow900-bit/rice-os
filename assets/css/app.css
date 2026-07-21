@@ -8174,6 +8174,132 @@ label {
   .growth-panicle-targets { grid-template-columns: 1fr; }
 }
 
+/* Ver97: a lighter, photo-led growth timeline. */
+.growth-card.timeline-card {
+  position: relative;
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr);
+  grid-template-areas: "date body";
+  align-items: stretch;
+  gap: 9px;
+  min-height: 120px;
+  padding: 10px 36px 10px 10px;
+  border: 1px solid #d9e8d5;
+  border-left: 4px solid #31a85a;
+  border-radius: 12px;
+  background: linear-gradient(118deg, #effbe9 0%, #fffef9 66%);
+  box-shadow: 0 7px 18px rgba(37, 78, 45, 0.07);
+}
+
+.growth-card.timeline-card.has-photo {
+  grid-template-columns: 48px minmax(0, 1fr) 66px;
+  grid-template-areas: "date body photo";
+  padding-right: 36px;
+}
+
+.timeline-date-badge {
+  grid-area: date;
+  display: grid;
+  align-content: start;
+  justify-items: center;
+  gap: 2px;
+  padding-top: 5px;
+  border-right: 1px solid rgba(55, 126, 71, 0.15);
+  color: #2a7e44;
+}
+
+.timeline-date-badge b { font-size: 14px; line-height: 1; }
+.timeline-date-badge span { color: #789175; font-size: 10px; font-weight: 800; }
+.timeline-card-body { gap: 6px; }
+
+.timeline-card-head.compact { align-items: start; min-height: 31px; }
+.timeline-card-head.compact > div:first-child { min-width: 0; }
+.timeline-card-head.compact b { overflow: hidden; color: #1e4f2c; font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
+.timeline-card-head.compact span { overflow: hidden; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+
+.timeline-leaf-gauge {
+  display: grid !important;
+  grid-template-columns: auto auto;
+  grid-template-rows: auto auto;
+  flex: 0 0 auto;
+  gap: 1px 3px !important;
+  min-width: 48px;
+  padding: 3px 5px;
+  border-radius: 8px;
+  background: #f5faef;
+  text-align: right;
+}
+
+.timeline-leaf-gauge small { color: #71846d; font-size: 8px; font-weight: 800; }
+.timeline-leaf-gauge b { color: #298440; font-size: 12px !important; }
+.timeline-leaf-gauge i { grid-column: 1 / -1; color: #35a34a; font-size: 9px; font-style: normal; letter-spacing: -1px; line-height: 1; }
+
+.timeline-metrics { gap: 5px; }
+.timeline-metrics span {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: end;
+  min-height: 35px;
+  padding: 4px 6px;
+  border: 0;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.84);
+}
+
+.timeline-metrics small { grid-column: 1 / -1; color: #829080; font-size: 9px; font-weight: 760; }
+.timeline-metrics b { color: #294d31; font-size: 13px; line-height: 1; }
+.timeline-metrics em { color: #71826f; font-size: 9px; font-style: normal; font-weight: 760; }
+.timeline-target-note { display: none; }
+.timeline-panicle-note.compact { min-height: 27px; padding: 5px 7px; border-radius: 7px; background: #f7fae9; color: #4e6c27; font-size: 10px; font-weight: 760; line-height: 1.25; }
+.timeline-memo { font-size: 10px; line-height: 1.35; }
+
+.timeline-photo-thumb {
+  grid-area: photo;
+  width: 66px;
+  height: 66px;
+  align-self: center;
+  border: 2px solid #fff;
+  border-radius: 10px;
+  object-fit: cover;
+  box-shadow: 0 3px 10px rgba(38, 76, 45, 0.14);
+}
+
+.timeline-menu {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  z-index: 2;
+}
+
+.timeline-menu summary {
+  display: grid;
+  width: 25px;
+  height: 25px;
+  place-items: center;
+  cursor: pointer;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.86);
+  color: #557253;
+  font-size: 19px;
+  font-weight: 900;
+  line-height: 1;
+  list-style: none;
+}
+
+.timeline-menu summary::-webkit-details-marker { display: none; }
+.timeline-menu > div { position: absolute; top: 30px; right: 0; display: grid; gap: 4px; width: 76px; padding: 5px; border: 1px solid #dbe5d8; border-radius: 9px; background: #fffefb; box-shadow: 0 8px 18px rgba(27, 50, 31, 0.16); }
+.timeline-menu button { min-height: 28px; padding: 4px; border-radius: 6px; font-size: 10px; }
+
+@media (max-width: 420px) {
+  .growth-card.timeline-card { gap: 7px; padding-left: 8px; }
+  .growth-card.timeline-card.has-photo { grid-template-columns: 42px minmax(0, 1fr) 58px; }
+  .timeline-date-badge { min-width: 42px; }
+  .timeline-date-badge b { font-size: 13px; }
+  .timeline-photo-thumb { width: 58px; height: 58px; }
+  .timeline-card-head.compact b { font-size: 13px; }
+  .timeline-leaf-gauge { min-width: 43px; }
+}
+
 @media (max-width: 720px) {
   .app-header {
     position: sticky;
