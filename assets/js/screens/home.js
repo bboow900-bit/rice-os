@@ -10,6 +10,7 @@
   let filterFieldId = "all";
   const heatCache = new Map();
   const heatProjectionCache = new Map();
+  const waterForecastCache = new Map();
 
   function toLocal(dateText) {
     return U.localDate ? U.localDate(dateText) : new Date(`${dateText}T00:00:00`);
@@ -738,6 +739,60 @@
     return diff > 0 ? `予定より${diff}日長い` : `予定より${Math.abs(diff)}日短い`;
   }
 
+  function latestIrrigation(fieldId) {
+    return (state.irrigationsFor ? state.irrigationsFor(fieldId) : [])
+      .slice()
+      .sort((a, b) => String(b.date || b.startDate).localeCompare(String(a.date || a.startDate)))[0] || null;
+  }
+
+  function waterStageForField(field, dateText) {
+    const date = dateText || U.today();
+    const planting = state.plantingDateForField ? state.plantingDateForField(field.fieldId) : "";
+    if (!planting) return { key: "waiting", label: "田植え日を待機", value: "未登録", percent: 0, detail: "田植え作業を登録すると、水管理の段階を表示します。" };
+    const dryPeriod = latestDryPeriod(field.fieldId);
+    const dryStart = dryPeriod && dryPeriod.startDate || field.drainageStartDate || (state.workDateForField ? state.workDateForField(field.fieldId, ["中干し開始"], "first") : "");
+    const dryEnd = dryPeriod && dryPeriod.endDate || field.drainagePlannedEndDate || "";
+    const dryActualEnd = dryPeriod && dryPeriod.actualEndDate || field.drainageActualEndDate || (state.workDateForField ? state.workDateForField(field.fieldId, ["中干し終了"], "first") : "");
+    const dryTargetDays = U.number(dryPeriod && dryPeriod.targetDays || field.drainageTargetDays, 7) || 7;
+    const dap = U.daysBetween(planting, date);
+    const heading = actualHeadingDate(field);
+    const irrigation = latestIrrigation(field.fieldId);
+    if (!dryStart) return { key: "tillering", label: "活着・分げつ期", value: `田植後${dap}日`, percent: progressPercent(dap, 42), detail: "中干し前の水管理と分げつを、田面を見ながら確認。" };
+    if (!dryActualEnd) {
+      const elapsed = U.daysBetween(dryStart, date);
+      return { key: "drying", label: "中干し中", value: `${elapsed} / ${dryTargetDays}日`, percent: progressPercent(elapsed, dryTargetDays), detail: dryEnd ? `完了予定 ${U.fd(dryEnd)}。ひび割れ・沈み込み・天気を現地確認。` : "ひび割れ・沈み込み・天気を見て完了時期を確認。" };
+    }
+    if (!heading) {
+      const method = irrigation && irrigation.method || "間断灌水";
+      const target = U.number(irrigation && irrigation.targetDays || field.intermittentIntervalDays, 3) || 3;
+      const elapsed = irrigation && irrigation.startDate ? U.daysBetween(irrigation.startDate, date) : "";
+      return { key: "intermittent", label: "中干し後・水管理", value: irrigation ? method : "開始を確認", percent: elapsed === "" ? 52 : progressPercent(elapsed % target || target, target), detail: irrigation ? `${method} ${irrigation.status || ""}。土質・水持ちを見ながら現地確認。` : "走り水から間断灌水への移行を、田面を見ながら確認。" };
+    }
+    const afterHeading = U.daysBetween(heading, date);
+    if (afterHeading <= 3) return { key: "heading", label: "出穂前後", value: `出穂後${afterHeading}日`, percent: 70, detail: "出穂前後は水を切らさないか、圃場の状態を確認。" };
+    if (afterHeading <= 30) return { key: "filling", label: "登熟期・水管理", value: `出穂後${afterHeading}日`, percent: progressPercent(afterHeading, 30), detail: "乾かし過ぎを避け、天気と田面を見ながら間断灌水を確認。" };
+    return { key: "drainage", label: "落水時期の確認", value: `出穂後${afterHeading}日`, percent: 100, detail: "収穫予定・田面・天気を見ながら落水時期を確認。" };
+  }
+
+  function renderWaterStageCard(field) {
+    const stage = waterStageForField(field);
+    const irrigation = latestIrrigation(field.fieldId);
+    const facts = [
+      field.soilType ? `土質 ${field.soilType}` : "土質 未設定",
+      field.waterHolding ? `水持ち ${field.waterHolding}` : "水持ち 未設定",
+      irrigation ? `直近 ${irrigation.method || "水管理"}` : "水管理記録 なし"
+    ];
+    return `
+      <section class="farm-water-stage ${U.attr(stage.key)}">
+        <div class="farm-water-stage-head"><span>水管理の現在地</span><b>${U.escapeHTML(stage.label)}</b></div>
+        <div class="farm-water-stage-main"><strong>${U.escapeHTML(stage.value)}</strong><p>${U.escapeHTML(stage.detail)}</p></div>
+        <i><em style="width:${U.attr(String(stage.percent))}%"></em></i>
+        <div class="farm-water-stage-facts">${facts.map((fact) => `<span>${U.escapeHTML(fact)}</span>`).join("")}</div>
+        <small data-water-stage-weather="${U.attr(field.fieldId)}">直近の天気予報を確認中</small>
+      </section>
+    `;
+  }
+
   function latestProgressGrowth(fieldId) {
     return state.growthLogsFor(fieldId)
       .slice()
@@ -759,9 +814,6 @@
     const dryPlannedDays = dryStart && dryEnd ? U.daysBetween(dryStart, dryEnd) : dryDays;
     const dryActualDays = dryStart && dryActualEnd ? U.daysBetween(dryStart, dryActualEnd) : "";
     const dryElapsed = dryStart ? U.daysBetween(dryStart, U.today()) : "";
-    const irrigationStart = field.intermittentStartDate || (state.workDateForField ? state.workDateForField(field.fieldId, ["間断灌水開始", "湿潤灌漑開始"], "first") : "");
-    const irrigationDays = U.number(field.intermittentIntervalDays, 3) || 3;
-    const irrigationElapsed = irrigationStart ? U.daysBetween(irrigationStart, U.today()) : "";
     const herbicide = fieldWorksMatching(field.fieldId, ["除草", "除草剤"])[0];
     const growth = latestProgressGrowth(field.fieldId);
     const variety = state.variety(field.varietyId);
@@ -777,6 +829,8 @@
       : null;
     const ripeningElapsed = headingDate ? U.daysBetween(headingDate, U.today()) : "";
     const ripeningTarget = ripeningTempTarget(field);
+    const waterStage = waterStageForField(field);
+    const afterDrying = Boolean(dryStart);
     return [
       {
         tone: "green",
@@ -833,18 +887,18 @@
       {
         tone: "blue",
         icon: "🌱",
-        title: "生育確認",
-        value: growth ? `分げつ${growth.tillerCount || "-"}本` : "未入力",
-        note: targetTillers ? `目標 ${targetTillers}` : "栽培レシピで目標設定",
-        percent: growth && growth.tillerCount ? progressPercent(U.number(growth.tillerCount, 0), U.number(String(targetTillers).match(/\\d+/)?.[0], 22)) : 0
+        title: afterDrying ? "生育確認" : "分げつ確認",
+        value: growth ? (afterDrying && growth.panicleLengthMm ? `幼穂${growth.panicleLengthMm}mm` : `分げつ${growth.tillerCount || "-"}本`) : "未入力",
+        note: afterDrying ? "中干し後は葉色・幼穂長を中心に確認" : (targetTillers ? `中干し前目標 ${targetTillers}` : "栽培レシピで目標設定"),
+        percent: afterDrying ? (growth && growth.panicleLengthMm ? 72 : 55) : (growth && growth.tillerCount ? progressPercent(U.number(growth.tillerCount, 0), U.number(String(targetTillers).match(/\\d+/)?.[0], 22)) : 0)
       },
       {
         tone: "water",
         icon: "〰",
-        title: "間断/湿潤",
-        value: irrigationStart ? `${irrigationElapsed} / ${irrigationDays}日` : "開始未登録",
-        note: irrigationStart ? `開始 ${U.fd(irrigationStart)}` : "中干し後に開始日を登録",
-        percent: irrigationStart ? progressPercent(irrigationElapsed % irrigationDays || irrigationDays, irrigationDays) : 0
+        title: waterStage.label,
+        value: waterStage.value,
+        note: waterStage.detail,
+        percent: waterStage.percent
       }
     ];
   }
@@ -882,6 +936,7 @@
                 </div>
               </header>
               ${renderFieldProgressSummary(field)}
+              ${renderWaterStageCard(field)}
               ${renderHeatMeter(field)}
               ${progressRowsForField(field).map(renderProgressRow).join("")}
             </article>
@@ -1001,6 +1056,36 @@
     return promise;
   }
 
+  function waterForecastText(rows) {
+    const valid = (rows || []).filter((row) => row && row.date);
+    if (!valid.length) return "天気予報を取得できませんでした";
+    const rainDays = valid.filter((row) => U.number(row.precipitation, 0) >= 1).length;
+    const rainTotal = valid.reduce((sum, row) => sum + U.number(row.precipitation, 0), 0);
+    const hotDryDays = valid.filter((row) => U.number(row.precipitation, 0) < 1 && U.number(row.tempMean, 0) >= 28).length;
+    const parts = [`直近${valid.length}日予報`];
+    if (rainDays) parts.push(`雨${rainDays}日 ${Math.round(rainTotal)}mm`);
+    else parts.push("まとまった雨なし");
+    if (hotDryDays) parts.push(`高温少雨${hotDryDays}日`);
+    return `${parts.join(" / ")}。水管理の確認材料です。`;
+  }
+
+  async function hydrateWaterStageForecasts(location) {
+    const targets = Array.from(document.querySelectorAll("[data-water-stage-weather]"));
+    if (!targets.length || !RiceOS.weather || !RiceOS.weather.fetchDailyRange) return;
+    try {
+      const loc = location || await RiceOS.weather.ensureLocation();
+      const key = [U.today(), loc.latitude, loc.longitude].join(":");
+      if (!waterForecastCache.has(key)) {
+        waterForecastCache.set(key, RiceOS.weather.fetchDailyRange(addDays(U.today(), 1), addDays(U.today(), 7), loc));
+      }
+      const result = await waterForecastCache.get(key);
+      const text = waterForecastText(result && result.rows);
+      targets.forEach((target) => { target.textContent = text; });
+    } catch (error) {
+      targets.forEach((target) => { target.textContent = "天気予報は取得できないため、田面と現地天気を確認"; });
+    }
+  }
+
   async function hydrateHeatMeters() {
     if (viewMode !== "progress" || !RiceOS.weather || !RiceOS.weather.fetchDailyRange) return;
     const visibleFields = fields().slice(0, 8);
@@ -1035,6 +1120,7 @@
       const target = document.querySelector(`[data-heat-field="${CSS.escape(field.fieldId)}"]`);
       if (target) target.outerHTML = renderHeatMeter(field);
     }
+    hydrateWaterStageForecasts(location);
   }
 
   function openDate(date, fieldId) {

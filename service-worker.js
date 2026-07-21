@@ -1,5 +1,5 @@
-const CACHE_NAME = "rice-karte-20260721-101";
-const APP_VERSION = "20260721_ver101";
+const CACHE_NAME = "rice-karte-20260721-102";
+const APP_VERSION = "20260721_ver102";
 
 const APP_SHELL = [
   "./",
