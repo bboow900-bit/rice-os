@@ -103,10 +103,16 @@
     const dap = U.daysAfterPlanting(field, date);
     const tillers = U.number(U.$("gTillerCount") && U.$("gTillerCount").value, 0);
     const target = variety && variety.targetTillers || "";
+    const drainageStarted = !!(field && field.drainageStartDate && String(field.drainageStartDate) <= String(date));
+    const panicleLength = U.number(U.$("gPanicleLengthMm") && U.$("gPanicleLengthMm").value, 0);
     const range = parseTargetRange(target);
     let targetLine = "分げつ目標は栽培レシピで設定できます。";
     let pct = 0;
-    if (range && tillers > 0) {
+    if (drainageStarted) {
+      targetLine = panicleLength > 0
+        ? `中干し後 / 幼穂 ${panicleLength}mm を記録中。葉色・幼穂長を確認`
+        : "中干し後 / 分げつ目標は完了。葉色・幼穂長を中心に記録";
+    } else if (range && tillers > 0) {
       pct = Math.max(5, Math.min(100, (tillers / Math.max(1, range.min)) * 100));
       if (tillers < range.min) targetLine = `目標 ${target} / 現在 ${tillers}本 / あと${Math.round((range.min - tillers) * 10) / 10}本`;
       else if (tillers <= range.max) targetLine = `目標 ${target} / 現在 ${tillers}本 / 目標圏内`;
@@ -121,7 +127,7 @@
           <span>${U.escapeHTML(variety && variety.name || "品種未設定")}${dap !== "" ? ` / 田植後${U.escapeHTML(String(dap))}日` : ""}</span>
         </div>
         <p>${U.escapeHTML(targetLine)}</p>
-        <i><span style="width:${U.attr(String(pct || 18))}%"></span></i>
+        ${drainageStarted ? "" : `<i><span style="width:${U.attr(String(pct || 18))}%"></span></i>`}
       </div>
     `;
   }

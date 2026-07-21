@@ -6180,6 +6180,35 @@ label {
   background: #65a832;
 }
 
+.water-stage-navigator {
+  margin: 0 0 12px;
+}
+
+.water-stage-card {
+  display: grid;
+  gap: 7px;
+  padding: 13px;
+  border: 1px solid #cae2be;
+  border-left: 5px solid #329343;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #f5fff1, #fffdf4);
+  box-shadow: 0 7px 17px rgba(41, 101, 42, .07);
+}
+
+.water-stage-card.drying { border-left-color: #dc9e32; background: linear-gradient(135deg, #fff8df, #fffdf4); }
+.water-stage-card.heading { border-left-color: #3695c7; background: linear-gradient(135deg, #edf9ff, #fffdf4); }
+.water-stage-card.filling { border-left-color: #6f9d45; background: linear-gradient(135deg, #f7fbe8, #fffdf4); }
+.water-stage-card.drainage { border-left-color: #927555; background: linear-gradient(135deg, #fff6e8, #fffdf4); }
+
+.water-stage-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.water-stage-top span { color: #5b7957; font-size: 11px; font-weight: 800; }
+.water-stage-top b { color: #1a5628; font-size: 15px; }
+.water-stage-card p { margin: 0; color: #263b2c; font-size: 13px; font-weight: 900; }
+.water-stage-card strong { color: #38493b; font-size: 12px; line-height: 1.55; }
+.water-stage-facts { display: flex; flex-wrap: wrap; gap: 5px; }
+.water-stage-facts span { padding: 4px 7px; border-radius: 999px; background: #fff; color: #557052; font-size: 10px; font-weight: 800; box-shadow: inset 0 0 0 1px #e2eadc; }
+.water-stage-card small { color: #7a7b6d; font-size: 10px; line-height: 1.45; }
+
 .growth-compare-panel {
   display: grid;
   gap: 8px;

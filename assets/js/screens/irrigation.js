@@ -24,6 +24,56 @@
     return state.field(U.$("irrigationField").value) || state.field(firstFieldId());
   }
 
+  function observedHeadingDate(fieldId) {
+    return state.growthLogsFor(fieldId)
+      .slice()
+      .sort((a, b) => String(a.date).localeCompare(String(b.date)))
+      .find((log) => log.headingObserved)?.date || "";
+  }
+
+  function latestWaterRecord(fieldId) {
+    return (state.data().irrigations || [])
+      .filter((item) => item.fieldId === fieldId)
+      .slice()
+      .sort((a, b) => String(b.date).localeCompare(String(a.date)))[0] || null;
+  }
+
+  function waterStage(field, date) {
+    const planting = field && state.plantingDateForField(field.fieldId);
+    if (!field || !planting) return { key: "waiting", label: "田植え日を待機", detail: "田植え作業を登録すると、水管理の目安を表示します。" };
+    const heading = observedHeadingDate(field.fieldId);
+    const dap = U.daysAfterPlanting(field, date);
+    if (!field.drainageStartDate) return { key: "tillering", label: "活着・分げつ期", detail: `田植後${dap}日。中干し前の水管理と分げつを現地確認。` };
+    if (!field.drainageActualEndDate) return { key: "drying", label: "中干し中", detail: "ひび割れ幅・足の沈み込み・天気を見て完了時期を確認。" };
+    if (!heading) return { key: "intermittent", label: "中干し後・間断灌水", detail: "走り水から間断灌水へ。土質・水持ちを見ながら現地確認。" };
+    const dah = U.daysBetween(heading, date);
+    if (dah <= 3) return { key: "heading", label: "出穂前後", detail: "出穂前後は水を切らさないか、圃場の状態を確認。" };
+    if (dah <= 30) return { key: "filling", label: "登熟期・間断灌水", detail: `出穂後${dah}日。乾かし過ぎを避け、天気と田面を確認。` };
+    return { key: "drainage", label: "落水時期の確認", detail: `出穂後${dah}日。収穫予定・田面・天気を見て落水時期を確認。` };
+  }
+
+  function renderWaterStageNavigator() {
+    const el = U.$("waterStageNavigator");
+    if (!el) return;
+    const field = currentField();
+    const stage = waterStage(field, U.$("irrigationDate").value || U.today());
+    const recent = field ? latestWaterRecord(field.fieldId) : null;
+    const facts = [
+      field && field.soilType ? `土質 ${field.soilType}` : "土質 未設定",
+      field && field.waterHolding ? `水持ち ${field.waterHolding}` : "水持ち 未設定",
+      recent ? `直近 ${recent.method || "水管理"} ${U.fd(recent.date)}` : "水管理記録 なし"
+    ];
+    el.innerHTML = `
+      <section class="water-stage-card ${U.attr(stage.key)}">
+        <div class="water-stage-top"><span>水管理の現在地</span><b>${U.escapeHTML(stage.label)}</b></div>
+        <p>${U.escapeHTML(field && field.name || "圃場を選択")}</p>
+        <strong>${U.escapeHTML(stage.detail)}</strong>
+        <div class="water-stage-facts">${facts.map((fact) => `<span>${U.escapeHTML(fact)}</span>`).join("")}</div>
+        <small>目安です。実際の水管理は田面・天気・生育を見て判断してください。</small>
+      </section>
+    `;
+  }
+
   function setEndFromDays() {
     const start = U.$("irrigationStartDate").value;
     const days = U.number(U.$("irrigationTargetDays").value, 0);
@@ -68,6 +118,7 @@
     U.$("irrigationStatus").value = "入水中";
     U.$("irrigationMemo").value = "";
     clearBulkFields();
+    renderWaterStageNavigator();
   }
 
   function renderOptions() {
@@ -135,6 +186,7 @@
 
   function render() {
     renderOptions();
+    renderWaterStageNavigator();
     renderList();
   }
 
@@ -218,7 +270,9 @@
         U.$("irrigationTargetDays").value = field.intermittentIntervalDays || U.$("irrigationTargetDays").value;
         setEndFromDays();
       }
+      renderWaterStageNavigator();
     });
+    U.$("irrigationDate").addEventListener("change", renderWaterStageNavigator);
     document.querySelector('[data-action="reset-irrigation"]').addEventListener("click", resetForm);
   }
 

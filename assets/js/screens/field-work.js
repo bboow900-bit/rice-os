@@ -23,7 +23,7 @@
 
   const WORK_TEMPLATES = [
     { key: "planting", label: "田植え", workName: "田植え", machine: "田植機", hours: 120, memo: "田植え作業。田植日としてカルテへ自動反映。" },
-    { key: "herbicide", label: "除草剤", workName: "除草剤", machine: "散布機", material: "recipe", hours: 60, memo: "除草剤散布。水深・風を現場確認。" },
+    { key: "herbicide", label: "除草剤", workName: "除草剤", machine: "散布機", material: "recipe", hours: 60, memo: "除草剤散布。薬剤名・水深・風を現場確認。" },
     { key: "mowing", label: "草刈り", workName: "草刈り", machine: "草刈り機", hours: 90, memo: "畦畔・周辺の草刈り。" },
     { key: "dry-start", label: "中干し開始", workName: "中干し開始", machine: "", hours: 30, memo: "中干し開始。ひび割れ・沈み込みは中干し記録で確認。" },
     { key: "fertilizer", label: "追肥", workName: "追肥", machine: "散布機", material: "recipe", hours: 60, memo: "追肥。葉色と生育状況を見て判断。" },
