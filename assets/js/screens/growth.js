@@ -33,6 +33,55 @@
     return Array.from(groups.entries()).map(([name, fields]) => ({ name, fields }));
   }
 
+  function cropYear(dateText) {
+    return String(dateText || U.today()).slice(0, 4);
+  }
+
+  function latestPanicleLog(fieldId, dateText) {
+    const year = cropYear(dateText);
+    return state.growthLogsFor(fieldId)
+      .filter((log) => String(log.date || "").startsWith(`${year}-`) && U.number(log.panicleLengthMm, 0) > 0)
+      .slice()
+      .sort((a, b) => String(b.date).localeCompare(String(a.date)))[0] || null;
+  }
+
+  function plantingDateForYear(fieldId, year) {
+    return state.fieldWorksFor(fieldId)
+      .filter((work) => String(work.date || "").startsWith(`${year}-`) && /田植/.test(String(work.workName || "")))
+      .slice()
+      .sort((a, b) => String(a.date).localeCompare(String(b.date)))[0]?.date || "";
+  }
+
+  function previousPanicleReference(fieldId, dateText) {
+    const year = Number(cropYear(dateText));
+    if (!Number.isFinite(year)) return null;
+    const previousYear = String(year - 1);
+    const log = state.growthLogsFor(fieldId)
+      .filter((item) => String(item.date || "").startsWith(`${previousYear}-`) && U.number(item.panicleLengthMm, 0) > 0)
+      .slice()
+      .sort((a, b) => String(a.date).localeCompare(String(b.date)))[0] || null;
+    if (!log) return null;
+    const planting = plantingDateForYear(fieldId, previousYear);
+    const dap = planting ? U.daysBetween(planting, log.date) : "";
+    return { log, planting, dap };
+  }
+
+  function renderPanicleEntryState() {
+    const field = state.field(U.$("gField").value);
+    const latest = field && latestPanicleLog(field.fieldId, U.$("gDate").value);
+    const editing = U.$("editGrowthId").value;
+    const section = U.$("growthPanicleSection");
+    const input = U.$("gPanicleLengthMm");
+    const bulk = document.querySelector('[data-action="growth-bulk-panicle"]');
+    const locked = Boolean(latest && !editing);
+    if (section) {
+      section.classList.toggle("panicle-recorded", locked);
+      if (locked) section.open = false;
+    }
+    if (input) input.disabled = locked;
+    if (bulk) bulk.classList.toggle("hidden", locked);
+  }
+
   function renderPanicleTargets() {
     const mode = U.$("gPanicleTargetMode");
     const group = U.$("gPanicleGroup");
@@ -54,7 +103,7 @@
       return;
     }
     const varieties = new Set(selected.fields.map((field) => field.varietyId).filter(Boolean));
-    const plantingDates = new Set(selected.fields.map((field) => state.plantingDateForField(field.fieldId)).filter(Boolean));
+    const plantingDates = new Set(selected.fields.map((field) => plantingDateForYear(field.fieldId, cropYear(U.$("gDate").value))).filter(Boolean));
     const caution = varieties.size > 1 || plantingDates.size > 1 ? " 品種または田植日が異なる圃場があります。" : "";
     notice.textContent = `${selected.name}グループの${selected.fields.length}圃場へ同じ幼穂長を記録します。${caution}`;
   }
@@ -108,10 +157,11 @@
     const range = parseTargetRange(target);
     let targetLine = "分げつ目標は栽培レシピで設定できます。";
     let pct = 0;
+    const latestPanicle = field && latestPanicleLog(field.fieldId, date);
     if (drainageStarted) {
       targetLine = panicleLength > 0
         ? `中干し後 / 幼穂 ${panicleLength}mm を記録中。葉色・幼穂長を確認`
-        : "中干し後 / 分げつ目標は完了。葉色・幼穂長を中心に記録";
+        : (latestPanicle ? `中干し後 / 幼穂確認済み (${U.fd(latestPanicle.date)})。葉色・出穂を中心に記録` : "中干し後 / 分げつ目標は完了。葉色・幼穂長を中心に記録");
     } else if (range && tillers > 0) {
       pct = Math.max(5, Math.min(100, (tillers / Math.max(1, range.min)) * 100));
       if (tillers < range.min) targetLine = `目標 ${target} / 現在 ${tillers}本 / あと${Math.round((range.min - tillers) * 10) / 10}本`;
@@ -156,8 +206,12 @@
       return;
     }
     const headingDate = observedHeadingDate(field.fieldId);
+    const latest = latestPanicleLog(field.fieldId, date);
+    const previous = previousPanicleReference(field.fieldId, date);
+    const existingLength = latest && latest.panicleLengthMm;
+    const observedDate = lengthValue || !latest ? date : latest.date;
     const estimate = RiceOS.agro && RiceOS.agro.panicleEstimate
-      ? RiceOS.agro.panicleEstimate(field, lengthValue, date)
+      ? RiceOS.agro.panicleEstimate(field, lengthValue || existingLength, observedDate)
       : null;
     if (headingDate) {
       el.innerHTML = `
@@ -169,12 +223,23 @@
       `;
       return;
     }
+    if (latest && !lengthValue) {
+      el.innerHTML = `
+        <div class="growth-panicle-card complete">
+          <div><b>幼穂確認済み</b><span>再測定は不要</span></div>
+          <strong>${U.escapeHTML(String(existingLength))}mm を ${U.escapeHTML(U.fd(latest.date))} に記録</strong>
+          <p>${estimate && estimate.supported ? `出穂目安 ${U.fd(estimate.date)}ごろ` : "次は葉色と出穂確認を記録"}</p>
+          <small>${previous ? `前年は ${U.fd(previous.log.date)}${previous.dap === "" ? "" : `（田植後${previous.dap}日）`}` : "修正する場合は生育タイムラインからこの記録を編集します"}</small>
+        </div>
+      `;
+      return;
+    }
     if (!estimate || !estimate.supported) {
       el.innerHTML = `
         <div class="growth-panicle-card idle">
           <div><b>幼穂・出穂予測</b><span>コシヒカリ基準</span></div>
           <p>幼穂長を入力すると、出穂の目安を表示します</p>
-          <small>1mm: 約25日前 / 2mm: 約21日前 / 10mm: 約18日前</small>
+          <small>${previous ? `前年の確認: ${U.fd(previous.log.date)}${previous.dap === "" ? "" : ` / 田植後${previous.dap}日`}` : "1mm: 約25日前 / 2mm: 約21日前 / 10mm: 約18日前"}</small>
         </div>
       `;
       return;
@@ -184,7 +249,7 @@
         <div><b>幼穂・出穂予測</b><span>${U.escapeHTML(estimate.source)}</span></div>
         <strong>出穂まで あと約${U.escapeHTML(String(estimate.daysToHeading))}日</strong>
         <p>出穂目安 ${U.escapeHTML(U.fd(estimate.date))}ごろ</p>
-        <small>幼穂 ${U.escapeHTML(String(estimate.lengthMm))}mm / ${U.escapeHTML(estimate.stage)} / 予測幅 ${U.escapeHTML(U.fd(estimate.rangeStart))}〜${U.escapeHTML(U.fd(estimate.rangeEnd))}</small>
+        <small>幼穂 ${U.escapeHTML(String(estimate.lengthMm))}mm / ${U.escapeHTML(estimate.stage)} / 予測幅 ${U.escapeHTML(U.fd(estimate.rangeStart))}〜${U.escapeHTML(U.fd(estimate.rangeEnd))}${previous ? ` / 前年確認 ${U.escapeHTML(U.fd(previous.log.date))}${previous.dap === "" ? "" : `（田植後${U.escapeHTML(String(previous.dap))}日）`}` : ""}</small>
       </div>
     `;
   }
@@ -209,6 +274,7 @@
     clearBulkFields();
     if (U.$("gPanicleTargetMode")) U.$("gPanicleTargetMode").value = "field";
     renderChoiceControls();
+    renderPanicleEntryState();
     renderPanicleTargets();
     renderPaniclePanel();
     renderTargetPanel();
@@ -217,12 +283,20 @@
   function prefillField(fieldId) {
     resetForm();
     U.$("gField").value = fieldId;
+    renderPanicleEntryState();
+    renderPanicleTargets();
+    renderPaniclePanel();
+    renderTargetPanel();
   }
 
   function prefillDate(date, fieldId) {
     resetForm();
     U.$("gDate").value = date || U.today();
     if (fieldId) U.$("gField").value = fieldId;
+    renderPanicleEntryState();
+    renderPanicleTargets();
+    renderPaniclePanel();
+    renderTargetPanel();
   }
 
   function prefillFields(date, fieldIds) {
@@ -230,6 +304,10 @@
     U.$("gDate").value = date || U.today();
     setBulkFields(fieldIds || []);
     if (bulkFieldIds[0]) U.$("gField").value = bulkFieldIds[0];
+    renderPanicleEntryState();
+    renderPanicleTargets();
+    renderPaniclePanel();
+    renderTargetPanel();
     U.toast(`${bulkFieldIds.length}圃場へ同じ生育ログを登録します`);
   }
 
@@ -248,6 +326,7 @@
     }
     U.setOptions(U.$("gLeaf"), S.LEAF_COLOR_LEVELS.map((level) => ({ value: level.value, label: level.label })), U.$("gLeaf").value || "3");
     renderChoiceControls();
+    renderPanicleEntryState();
     renderPanicleTargets();
     renderPaniclePanel();
     renderTargetPanel();
@@ -416,6 +495,7 @@
       setInputMode("detail");
     }
     renderChoiceControls();
+    renderPanicleEntryState();
     renderPaniclePanel();
     renderTargetPanel();
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -473,12 +553,14 @@
       if (!el) return;
       el.addEventListener("input", () => {
         renderChoiceControls();
+        renderPanicleEntryState();
         renderPaniclePanel();
         renderPanicleTargets();
         renderTargetPanel();
       });
       el.addEventListener("change", () => {
         renderChoiceControls();
+        renderPanicleEntryState();
         renderPaniclePanel();
         renderPanicleTargets();
         renderTargetPanel();
