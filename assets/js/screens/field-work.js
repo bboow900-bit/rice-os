@@ -198,6 +198,24 @@
     }).filter(Boolean).join(" / ");
   }
 
+  function workVisual(name) {
+    const text = String(name || "");
+    if (/田植え|補植/.test(text)) return { key: "planting", src: "assets/images/light-icons/transplanter-light.png", alt: "田植機" };
+    if (/追肥|肥料|基肥|元肥/.test(text)) return { key: "fertilizer", src: "assets/images/light-icons/fertilizer-bag.png", alt: "肥料" };
+    if (/中干し|落水|入水|間断|湿潤|溝切り/.test(text)) return { key: "water", src: "assets/images/light-icons/water-channel.png", alt: "水管理" };
+    if (/稲刈り|収穫/.test(text)) return { key: "harvest", src: "assets/images/light-icons/rice-sack.png", alt: "収穫" };
+    if (/除草|防除|草刈り|代かき|耕起/.test(text)) return { key: "field", src: "assets/images/light-icons/paddy-field.png", alt: "圃場作業" };
+    return { key: "other", src: "assets/images/light-icons/karte-notebook.png", alt: "作業記録" };
+  }
+
+  function compactWeather(weather) {
+    const text = String(weather || "").trim();
+    if (!text) return "";
+    const label = text.split("/")[0].trim();
+    const average = text.match(/平均\s*([\d.]+)℃/);
+    return [label, average ? `${average[1]}°C` : ""].filter(Boolean).join(" / ");
+  }
+
   function renderFieldCards() {
     const selected = selectedFieldIds();
     if (U.$("fwGroupPicks")) {
@@ -364,31 +382,28 @@
     U.$("fieldWorkList").innerHTML = rows.length ? rows.map((work) => {
       const fieldNames = (work.fieldIds || []).map((id) => state.field(id) && state.field(id).name).filter(Boolean).join("・");
       const dap = daysText(work.fieldIds, work.date);
+      const visual = workVisual(work.workName);
+      const weather = compactWeather(work.weather);
+      const details = [
+        work.machine ? `機械: ${work.machine}` : "",
+        work.material ? `資材: ${work.material}${work.amount ? ` ${work.amount}` : ""}` : "",
+        work.weather ? `天気: ${work.weather}` : "",
+        work.weatherAuto ? `自動取得: ${work.weatherAuto.source || ""} / ${work.weatherAuto.label || ""}` : "",
+        work.memo || "",
+        work.photo && !work.photoData ? `写真: ${work.photo}` : ""
+      ].filter(Boolean);
       return `
-        <article class="record">
-          <div class="record-head">
-            <div>
-              <b>${U.escapeHTML(U.fd(work.date))} ${U.escapeHTML(work.workName)}</b><br>
-              <span class="pill info">${U.escapeHTML(fieldNames || "圃場なし")}</span>
-              ${work.worker ? `<span class="pill ok">${U.escapeHTML(work.worker)}</span>` : ""}
-              ${work.hours ? `<span class="pill warn">${U.escapeHTML(work.hours)}</span>` : ""}
-              ${dap ? `<span class="pill purple">${U.escapeHTML(dap)}</span>` : ""}
-            </div>
+        <article class="work-log-card work-log-${U.attr(visual.key)}">
+          <img class="work-log-icon" src="${U.attr(visual.src)}" alt="${U.attr(visual.alt)}">
+          <div class="work-log-main">
+            <div class="work-log-title"><b>${U.escapeHTML(work.workName)}</b><span>${U.escapeHTML(U.fd(work.date))}</span></div>
+            <div class="work-log-tags"><span class="work-log-field">${U.escapeHTML(fieldNames || "圃場なし")}</span>${work.worker ? `<span>${U.escapeHTML(work.worker)}</span>` : ""}${work.hours ? `<span>${U.escapeHTML(work.hours)}</span>` : ""}</div>
+            <div class="work-log-meta">${work.machine ? `<span>${U.escapeHTML(work.machine)}</span>` : ""}${work.material ? `<span>${U.escapeHTML(work.material)}${work.amount ? ` ${U.escapeHTML(work.amount)}` : ""}</span>` : ""}${weather ? `<span>${U.escapeHTML(weather)}</span>` : ""}</div>
+            ${dap ? `<small class="work-log-dap">${U.escapeHTML(dap)}</small>` : ""}
           </div>
-          <div class="record-body">
-              ${work.machine ? `<div>機械: ${U.escapeHTML(work.machine)}</div>` : ""}
-              ${work.material ? `<div>資材: ${U.escapeHTML(work.material)} ${U.escapeHTML(work.amount || "")}</div>` : ""}
-              ${work.weather ? `<div>天気: ${U.escapeHTML(work.weather)}</div>` : ""}
-              ${work.photoData ? `<img class="thumb" src="${U.attr(work.photoData)}" alt="">` : ""}
-              ${work.photo && !work.photoData ? `<div>写真: ${U.escapeHTML(work.photo)}</div>` : ""}
-              ${work.weatherAuto ? `<div class="muted">自動取得: ${U.escapeHTML(work.weatherAuto.source || "")} / ${U.escapeHTML(work.weatherAuto.label || "")}</div>` : ""}
-              ${work.memo ? `<div>${U.escapeHTML(work.memo)}</div>` : ""}
-          </div>
-          <div class="record-actions">
-            <button class="secondary" data-work-action="edit" data-id="${U.attr(work.workId)}">編集</button>
-            <button class="secondary" data-work-action="duplicate" data-id="${U.attr(work.workId)}">複製</button>
-            <button class="danger" data-work-action="delete" data-id="${U.attr(work.workId)}">削除</button>
-          </div>
+          ${work.photoData ? `<img class="work-log-photo" src="${U.attr(work.photoData)}" alt="作業写真">` : ""}
+          <details class="work-log-menu"><summary aria-label="この作業を操作" title="操作メニュー">…</summary><div><button class="secondary" data-work-action="edit" data-id="${U.attr(work.workId)}">編集</button><button class="secondary" data-work-action="duplicate" data-id="${U.attr(work.workId)}">複製</button><button class="danger" data-work-action="delete" data-id="${U.attr(work.workId)}">削除</button></div></details>
+          ${details.length ? `<details class="work-log-detail"><summary>詳細を見る</summary><div>${details.map((detail) => `<p>${U.escapeHTML(detail)}</p>`).join("")}</div></details>` : ""}
         </article>
       `;
     }).join("") : '<div class="empty">圃場作業はまだありません。</div>';
