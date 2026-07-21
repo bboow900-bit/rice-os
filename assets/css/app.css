@@ -8323,6 +8323,10 @@ label {
 .work-log-field .work-log-icon { background: #eff8e9; }
 .work-log-fertilizer .work-log-icon { background: #fff6db; }
 .work-log-water .work-log-icon { background: #e9f7ff; }
+.work-log-dry .work-log-icon { background: #fff3d7; }
+.work-log-mowing .work-log-icon { background: #eef8e8; }
+.work-log-spraying .work-log-icon { background: #e9f6ff; }
+.work-log-tractor .work-log-icon { background: #fff0e7; }
 .work-log-harvest .work-log-icon { background: #fff2dc; }
 .work-log-other .work-log-icon { background: #f0f1ed; }
 

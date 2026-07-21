@@ -202,9 +202,13 @@
     const text = String(name || "");
     if (/田植え|補植/.test(text)) return { key: "planting", src: "assets/images/light-icons/transplanter-light.png", alt: "田植機" };
     if (/追肥|肥料|基肥|元肥/.test(text)) return { key: "fertilizer", src: "assets/images/light-icons/fertilizer-bag.png", alt: "肥料" };
-    if (/中干し|落水|入水|間断|湿潤|溝切り/.test(text)) return { key: "water", src: "assets/images/light-icons/water-channel.png", alt: "水管理" };
+    if (/中干し/.test(text)) return { key: "dry", src: "assets/images/light-icons/dry-paddy.png", alt: "中干しの田面" };
+    if (/落水|入水|間断|湿潤|溝切り/.test(text)) return { key: "water", src: "assets/images/light-icons/water-channel.png", alt: "水管理" };
     if (/稲刈り|収穫/.test(text)) return { key: "harvest", src: "assets/images/light-icons/rice-sack.png", alt: "収穫" };
-    if (/除草|防除|草刈り|代かき|耕起/.test(text)) return { key: "field", src: "assets/images/light-icons/paddy-field.png", alt: "圃場作業" };
+    if (/草刈り/.test(text)) return { key: "mowing", src: "assets/images/light-icons/mowing-worker.png", alt: "草刈り作業" };
+    if (/除草|防除/.test(text)) return { key: "spraying", src: "assets/images/light-icons/spraying-worker.png", alt: "散布作業" };
+    if (/代かき|耕起/.test(text)) return { key: "tractor", src: "assets/images/light-icons/tractor-puddling.png", alt: "トラクター作業" };
+    if (/畦/.test(text)) return { key: "field", src: "assets/images/light-icons/paddy-field.png", alt: "圃場作業" };
     return { key: "other", src: "assets/images/light-icons/karte-notebook.png", alt: "作業記録" };
   }
 
