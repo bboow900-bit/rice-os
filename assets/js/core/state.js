@@ -159,7 +159,7 @@
   }
 
   function isDryEndWorkName(workName) {
-    return workTextMatches(workName, ["中干し終了", "荳ｭ蟷ｲ縺礼ｵゆｺ・"]);
+    return workTextMatches(workName, ["中干し終了", "中干し完了", "中干完了", "荳ｭ蟷ｲ縺礼ｵゆｺ・"]);
   }
 
   function dryActualDaysForField(field, actualEndDate) {
@@ -230,6 +230,28 @@
       schedule.completionReason = `${work.workName || "作業"}の作業記録により完了`;
       schedule.updatedAt = U.now();
     });
+  }
+
+  function fieldNameForFeedback(fieldId) {
+    const found = field(fieldId);
+    return found && found.name || "圃場";
+  }
+
+  function workSaveFeedback(record) {
+    const ids = record.fieldIds || [];
+    const place = ids.length > 1 ? `${fieldNameForFeedback(ids[0])}ほか${ids.length - 1}圃場` : fieldNameForFeedback(ids[0]);
+    const workName = record.workName || "作業";
+    if (isPlantingWorkName(workName)) return `${place}に田植えを残しました。次は活着・分げつの様子を見てみましょう。`;
+    if (isDryEndWorkName(workName)) return `${place}の中干し完了を残しました。次は水管理の様子を見てみましょう。`;
+    if (/収穫|稲刈り/.test(workName)) return `${place}に収穫を残しました。今年のひとことも振り返りに残せます。`;
+    return `${place}に${workName}を残しました。圃場カードの季節ステージを更新しました。`;
+  }
+
+  function growthSaveFeedback(record) {
+    const place = fieldNameForFeedback(record.fieldId);
+    if (U.number(record.panicleLengthMm, 0) > 0) return `${place}に幼穂 ${record.panicleLengthMm}mm を残しました。出穂の目安を確かめてみましょう。`;
+    if (record.headingObserved) return `${place}に出穂を残しました。これからは登熟と水管理を見守りましょう。`;
+    return `${place}に生育を残しました。次も葉色か分げつをひとつ残すと比較しやすくなります。`;
   }
 
   function saveFieldWork(record) {
@@ -335,7 +357,7 @@
           }
         });
       }
-    }, "圃場作業を保存しました");
+    }, workSaveFeedback(record));
   }
 
   function deleteFieldWork(workId) {
@@ -381,7 +403,7 @@
       const index = d.growthLogs.findIndex((g) => g.logId === normalized.logId);
       if (index >= 0) d.growthLogs[index] = { ...d.growthLogs[index], ...normalized };
       else d.growthLogs.push(normalized);
-    }, "生育ログを保存しました");
+    }, growthSaveFeedback(record));
   }
 
   function deleteGrowthLog(logId) {
@@ -608,7 +630,7 @@
           d.fields[fieldIndex].drainageActualDays = dryActualDaysForField(d.fields[fieldIndex], normalized.actualEndDate);
         }
       }
-    }, "中干し記録を保存しました");
+    }, `${fieldNameForFeedback(record.fieldId)}の中干し記録を残しました。圃場カードの水管理も更新しました。`);
   }
 
   function deleteDryPeriod(dryPeriodId) {

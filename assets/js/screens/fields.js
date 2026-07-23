@@ -102,10 +102,12 @@
 
   function drySummary(field) {
     const latest = state.dryPeriodsFor ? latestByDate(state.dryPeriodsFor(field.fieldId).filter((row) => row.startDate || row.endDate || row.actualEndDate)) : null;
-    const startDate = latest && latest.startDate || field.drainageStartDate || "";
+    const workStartDate = state.workDateForField ? state.workDateForField(field.fieldId, "中干し開始", "last") : "";
+    const workEndDate = state.workDateForField ? state.workDateForField(field.fieldId, ["中干し終了", "中干し完了", "中干完了"], "last") : "";
+    const startDate = latest && latest.startDate || field.drainageStartDate || workStartDate || "";
     const targetDays = latest && latest.targetDays || field.drainageTargetDays || "";
     const plannedEndDate = latest && latest.endDate || field.drainagePlannedEndDate || (startDate && targetDays ? U.dateAddDays(startDate, U.number(targetDays, 0)) : "");
-    const actualEndDate = latest && latest.actualEndDate || field.drainageActualEndDate || "";
+    const actualEndDate = latest && latest.actualEndDate || field.drainageActualEndDate || workEndDate || "";
     const plannedDays = startDate && plannedEndDate ? U.daysBetween(startDate, plannedEndDate) : (targetDays || "");
     const actualDays = field.drainageActualDays || (startDate && actualEndDate ? U.daysBetween(startDate, actualEndDate) : "");
     const diff = plannedDays !== "" && actualDays !== "" ? U.number(actualDays, 0) - U.number(plannedDays, 0) : "";

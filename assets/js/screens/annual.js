@@ -646,6 +646,29 @@
     return values.map((value) => `<option value="${U.attr(value)}" ${String(value) === String(selected || "") ? "selected" : ""}>${U.escapeHTML(value || "未設定")}</option>`).join("");
   }
 
+  function latestPanicleLogForYear(fieldId, year) {
+    return state.growthLogsFor(fieldId)
+      .filter((row) => String(row.season || String(row.date || "").slice(0, 4)) === String(year) && U.number(row.panicleLengthMm, 0) > 0)
+      .slice()
+      .sort((a, b) => String(b.date).localeCompare(String(a.date)))[0] || null;
+  }
+
+  function dryCompletionForYear(fieldId, year) {
+    const dryDate = state.dryPeriodsFor(fieldId)
+      .filter((row) => String(row.season || String(row.date || "").slice(0, 4)) === String(year))
+      .map((row) => row.actualEndDate)
+      .filter(Boolean)
+      .sort()
+      .pop() || "";
+    const workDate = fieldYearRows(fieldId, year)
+      .filter((row) => row.kind === "fieldWork" && /中干し終了|中干し完了|中干完了/.test(String(row.title || "")))
+      .map((row) => row.date)
+      .filter(Boolean)
+      .sort()
+      .pop() || "";
+    return dryDate || workDate;
+  }
+
   function renderKarteTab(field) {
     const variety = state.variety(field.varietyId);
     const planting = firstDate(fieldYearRows(field.fieldId, yearValue()), (row) => row.kind === "fieldWork" && /田植/.test(String(row.title || "")));
@@ -654,9 +677,11 @@
     const intermittentStart = state.workDateForField ? state.workDateForField(field.fieldId, "間断灌水開始") : "";
     const wetStart = state.workDateForField ? state.workDateForField(field.fieldId, "湿潤灌漑開始") : "";
     const riceStage = riceStageNumberForField(field);
+    const panicleLog = latestPanicleLogForYear(field.fieldId, yearValue());
     const panicle = RiceOS.agro && RiceOS.agro.latestPanicleEstimate
       ? RiceOS.agro.latestPanicleEstimate(field)
       : null;
+    const dryCompleted = dryCompletionForYear(field.fieldId, yearValue());
     return `
       <div class="annual-field-detail-grid">
         <section class="annual-field-detail-card annual-karte-card">
@@ -688,6 +713,7 @@
             ${targetLine("中干し目安日数", field.drainageTargetDays ? `${field.drainageTargetDays}日` : "")}
             ${targetLine("間断灌水目安日数", field.intermittentIntervalDays ? `${field.intermittentIntervalDays}日` : "")}
             ${targetLine("湿潤灌漑目安日数", field.wetIrrigationTargetDays ? `${field.wetIrrigationTargetDays}日` : "")}
+            ${targetLine("中干し完了日", dryCompleted || "未記録")}
           </div>
           <div class="form-grid dense annual-edit-grid">
             ${fieldInput(field, "targetCrackCm", "ひび割れ幅(cm)")}
@@ -703,6 +729,7 @@
           </div>
           <div class="annual-kv-list">
             ${targetLine("幼穂長", panicle ? `${panicle.lengthMm}mm (${U.fd(panicle.observedDate)})` : "未入力")}
+            ${targetLine("入力済み幼穂長", panicleLog ? `${panicleLog.panicleLengthMm}mm (${U.fd(panicleLog.date)})` : "未入力")}
             ${targetLine("出穂まで", panicle ? `あと約${panicle.daysToHeading}日` : "幼穂長を記録してください")}
             ${targetLine("出穂目安", panicle ? `${U.fd(panicle.date)}ごろ` : "-")}
           </div>
@@ -803,7 +830,7 @@
 
   function renderWorkTab(field) {
     const rows = rowsForField(rowsForYear(allRows()), field.fieldId)
-      .filter((row) => row.kind === "fieldWork")
+      .filter((row) => ["fieldWork", "dry", "irrigation"].includes(row.kind))
       .sort((a, b) => String(b.date).localeCompare(String(a.date)));
     if (!rows.length) return '<div class="empty">作業記録はまだありません。</div>';
     return `<div class="annual-entry-list field-view">${rows.map((row) => renderEntry(row, true)).join("")}</div>`;

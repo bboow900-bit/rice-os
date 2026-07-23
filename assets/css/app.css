@@ -1481,7 +1481,8 @@
 .home-decision-card.alert { border-left-color: #e89b28; background: #fffdf4; }
 .home-decision-card.notice { border-left-color: #559ac8; background: #fbfdff; }
 .home-decision-card-head { display: grid; grid-template-columns: 42px minmax(0, 1fr) auto; align-items: center; gap: 9px; }
-.home-decision-card-head img { width: 42px; height: 42px; object-fit: contain; }
+.home-decision-card-head img { width: 42px; height: 42px; border-radius: 10px; object-fit: cover; background: #eff8ea; }
+.home-decision-card-head img.stage { object-fit: contain; }
 .home-decision-card-head b, .home-decision-card-head small { display: block; }
 .home-decision-card-head b { color: #1e2c22; font-size: 16px; }
 .home-decision-card-head small { margin-top: 2px; color: #69736b; font-size: 11px; }
@@ -1493,6 +1494,27 @@
 .home-decision-facts span { min-width: 0; padding: 6px 7px; border-radius: 8px; background: #f4f7ef; color: #4a5a4c; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .home-decision-facts b { margin-right: 4px; color: #2f843e; }
 .home-decision-card > p { margin: 8px 0 0; color: #8a8170; font-size: 11px; }
+.home-season-title { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-top: 9px; }
+.home-season-title span { color: #317e3d; font-size: 12px; font-weight: 850; }
+.home-season-title small { overflow: hidden; color: #748073; font-size: 10px; text-align: right; text-overflow: ellipsis; white-space: nowrap; }
+.home-season-track { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 2px; margin-top: 5px; }
+.home-season-track span { position: relative; min-width: 0; padding-top: 8px; color: #a2aaa0; font-size: 8px; text-align: center; }
+.home-season-track span::before { position: absolute; top: 2px; right: 50%; left: -50%; height: 2px; background: #dfe7dc; content: ""; }
+.home-season-track span:first-child::before { left: 50%; }
+.home-season-track i { position: absolute; top: 0; left: 50%; z-index: 1; width: 6px; height: 6px; border: 2px solid #d7e1d5; border-radius: 50%; background: #fffefa; transform: translateX(-50%); }
+.home-season-track b { display: block; overflow: hidden; font-size: inherit; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+.home-season-track .done { color: #54885e; }
+.home-season-track .done::before, .home-season-track .current::before { background: #69af68; }
+.home-season-track .done i { border-color: #5aa45e; background: #5aa45e; }
+.home-season-track .current { color: #247e39; font-weight: 850; }
+.home-season-track .current i { width: 8px; height: 8px; border-color: #26843c; background: #fffbe8; box-shadow: 0 0 0 2px #dcefd6; }
+.home-field-note { padding: 7px 8px; border-radius: 8px; background: #fff7dd; color: #6b5830 !important; line-height: 1.4; }
+.home-field-note.empty-note { background: #f4f7ef; color: #7d897b !important; }
+.home-field-memory, .home-field-memory-empty { display: flex; align-items: center; gap: 8px; margin-top: 8px; padding-top: 8px; border-top: 1px dashed #dce4d7; }
+.home-field-memory img { width: 30px; height: 30px; border-radius: 7px; object-fit: cover; background: #eff8ea; }
+.home-field-memory b, .home-field-memory small { display: block; }
+.home-field-memory b { color: #7f6c3a; font-size: 10px; }
+.home-field-memory small, .home-field-memory-empty { color: #857b65; font-size: 10px; line-height: 1.35; }
 .annual-compare-card { margin: 12px 0; overflow: hidden; border: 1px solid #d8dfcf; border-radius: 14px; background: #fffefa; box-shadow: 0 4px 12px rgba(53, 76, 52, .05); }
 .annual-compare-head { display: flex; align-items: end; justify-content: space-between; gap: 10px; padding: 12px 13px; background: linear-gradient(100deg, #eaf7df, #fff6d8); }
 .annual-compare-head span { color: #2d883e; font-size: 11px; font-weight: 800; }
@@ -1531,6 +1553,8 @@
   .home-decision-card-head strong { grid-column: 2; justify-self: start; }
   .home-decision-status { display: block; }
   .home-decision-status small { display: block; margin-top: 3px; white-space: normal; }
+  .home-season-title { display: block; }
+  .home-season-title small { display: block; margin-top: 2px; text-align: left; white-space: normal; }
 }
 
 .app-back-button {
