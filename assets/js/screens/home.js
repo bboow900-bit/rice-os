@@ -395,14 +395,15 @@
     if (heading) { index = 4; next = "登熟期。水管理と葉色の様子を残しましょう"; }
     if (heading && dap !== "" && dap >= 30) { index = 5; next = "収穫日を残すと、来年の作業計画に生かせます"; }
     if (harvest) { index = 6; next = "今年の収穫を振り返り、来年へのひとことを残しましょう"; }
-    return { index, current: SEASON_STAGES[Math.max(0, index - 1)] || null, next, dap };
+    return { index, current: index > 0 ? SEASON_STAGES[index - 1] : null, next, dap };
   }
 
   function latestFieldPhoto(fieldId, year) {
     const rows = [
       ...state.growthLogsFor(fieldId),
       ...state.fieldWorksFor(fieldId),
-      ...(state.dryPeriodsFor ? state.dryPeriodsFor(fieldId) : [])
+      ...(state.dryPeriodsFor ? state.dryPeriodsFor(fieldId) : []),
+      ...(state.irrigationsFor ? state.irrigationsFor(fieldId) : [])
     ].filter((row) => String(row.season || String(row.date || "").slice(0, 4)) === String(year) && (row.photoData || row.photo));
     return rows.sort((a, b) => String(b.date).localeCompare(String(a.date)))[0] || null;
   }
@@ -413,7 +414,8 @@
     const candidates = [
       ...state.fieldWorksFor(field.fieldId).map((row) => ({ ...row, kind: "作業", title: row.workName, text: row.memo || "" })),
       ...state.growthLogsFor(field.fieldId).map((row) => ({ ...row, kind: "生育", title: row.tillerCount ? `分げつ ${row.tillerCount}本` : "生育記録", text: row.memo || "" })),
-      ...(state.dryPeriodsFor ? state.dryPeriodsFor(field.fieldId) : []).map((row) => ({ ...row, kind: "中干し", title: row.actualEndDate ? "中干し完了" : "中干し記録", text: row.memo || "" }))
+      ...(state.dryPeriodsFor ? state.dryPeriodsFor(field.fieldId) : []).map((row) => ({ ...row, kind: "中干し", title: row.actualEndDate ? "中干し完了" : "中干し記録", text: row.memo || "" })),
+      ...(state.irrigationsFor ? state.irrigationsFor(field.fieldId) : []).map((row) => ({ ...row, kind: "水管理", title: row.method || "水管理記録", text: row.memo || "" }))
     ].filter((row) => String(row.season || String(row.date || "").slice(0, 4)) === previousYear && row.date);
     const samePeriod = candidates.sort((a, b) => Math.abs(U.daysBetween(a.date, previousDate)) - Math.abs(U.daysBetween(b.date, previousDate)))[0];
     if (!samePeriod) return null;
@@ -438,23 +440,29 @@
     const stage = seasonStageForField(field, date);
     const photo = latestFieldPhoto(field.fieldId, cropYear(date));
     const memory = fieldMemory(field, date);
-    const note = String(field.nextSeasonMemo || field.fixedMemo || (growth && growth.memo) || "").trim();
+    const note = String(field.yearMemo || field.nextSeasonMemo || field.fixedMemo || (growth && growth.memo) || "").trim();
     const stageImage = stage.current ? `assets/images/rice-stages/rice-stage-${String(stage.current.image).padStart(2, "0")}.png` : "assets/images/rice-stages/rice-stage-01.png";
+    const stageKey = stage.current ? stage.current.key : "waiting";
     return `
-      <article class="home-decision-card ${U.attr(need.tone)}" data-home-open-field="${U.attr(field.fieldId)}">
+      <article class="home-decision-card ${U.attr(need.tone)} stage-${U.attr(stageKey)}" data-home-open-field="${U.attr(field.fieldId)}">
         <div class="home-decision-card-head">
           <img class="${photo && photo.photoData ? "photo" : "stage"}" src="${U.attr(photo && photo.photoData || stageImage)}" alt="">
           <div><b>${U.escapeHTML(field.name)}</b><small>${U.escapeHTML(fieldVariety(field))} / ${U.escapeHTML(areaText(field))}</small></div>
           <strong>${U.escapeHTML(dap === "" ? "田植え未登録" : `田植後 ${dap}日`)}</strong>
         </div>
-        <div class="home-season-title"><span>${U.escapeHTML(stage.current ? `いまは ${stage.current.label}` : "季節の記録待ち")}</span><small>${U.escapeHTML(stage.next)}</small></div>
+        ${note ? `<p class="home-field-story"><b>今年のひとこと</b><span>${U.escapeHTML(note)}</span></p>` : ""}
+        <div class="home-season-focus stage-${U.attr(stageKey)}">
+          <img src="${U.attr(stageImage)}" alt="">
+          <div><small>今年のステージ</small><b>${U.escapeHTML(stage.current ? stage.current.label : "記録待ち")}</b></div>
+          <span>${U.escapeHTML(stage.current ? "現在地" : "次の一歩")}</span>
+        </div>
+        <div class="home-season-title"><span>${U.escapeHTML(stage.current ? `次に残す：${stage.next}` : stage.next)}</span></div>
         ${renderSeasonTrack(stage)}
         <div class="home-decision-status"><span>${U.escapeHTML(need.label)}</span><small>${U.escapeHTML(need.detail)}</small></div>
         <div class="home-decision-facts">
           <span><b>水管理</b>${U.escapeHTML(water.label)}</span>
           <span><b>生育</b>${U.escapeHTML(growth ? `葉色 ${growth.leafColor || "-"} / 分げつ ${growth.tillerCount || "-"}` : "未入力")}</span>
         </div>
-        ${note ? `<p class="home-field-note">今年のひとこと: ${U.escapeHTML(note)}</p>` : '<p class="home-field-note empty-note">今年のひとことを残すと、この田んぼらしさが育ちます</p>'}
         ${memory ? `<div class="home-field-memory"><img src="${U.attr(memory.photoData || stageImage)}" alt=""><span><b>${U.escapeHTML(memory.label)}</b><small>${U.escapeHTML(U.fd(memory.date))} / ${U.escapeHTML(memory.title || "記録")}${memory.text ? ` / ${U.escapeHTML(memory.text)}` : ""}</small></span></div>` : `<p class="home-field-memory-empty">${U.escapeHTML(previousYearHint(field, date))}</p>`}
       </article>
     `;

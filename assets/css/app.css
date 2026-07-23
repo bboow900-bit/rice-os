@@ -1480,6 +1480,10 @@
 .home-decision-card { padding: 12px; border: 1px solid #dce5d6; border-left: 5px solid #44a35a; border-radius: 15px; background: #fffefa; box-shadow: 0 4px 12px rgba(53, 76, 52, .06); cursor: pointer; }
 .home-decision-card.alert { border-left-color: #e89b28; background: #fffdf4; }
 .home-decision-card.notice { border-left-color: #559ac8; background: #fbfdff; }
+.home-decision-card.stage-panicle { border-left-color: #65a946; }
+.home-decision-card.stage-heading { border-left-color: #3697b9; }
+.home-decision-card.stage-ripening { border-left-color: #c79a35; }
+.home-decision-card.stage-harvest { border-left-color: #b77b2d; }
 .home-decision-card-head { display: grid; grid-template-columns: 42px minmax(0, 1fr) auto; align-items: center; gap: 9px; }
 .home-decision-card-head img { width: 42px; height: 42px; border-radius: 10px; object-fit: cover; background: #eff8ea; }
 .home-decision-card-head img.stage { object-fit: contain; }
@@ -1497,6 +1501,27 @@
 .home-season-title { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-top: 9px; }
 .home-season-title span { color: #317e3d; font-size: 12px; font-weight: 850; }
 .home-season-title small { overflow: hidden; color: #748073; font-size: 10px; text-align: right; text-overflow: ellipsis; white-space: nowrap; }
+.home-field-story { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: baseline; gap: 6px; margin: 9px 0 0; padding: 7px 8px; border-radius: 9px; background: #fff7dd; color: #69562f; font-size: 11px; line-height: 1.4; }
+.home-field-story b { color: #8b6d27; font-size: 10px; font-weight: 900; white-space: nowrap; }
+.home-field-story span { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; font-weight: 750; }
+.home-season-focus { display: grid; grid-template-columns: 39px minmax(0, 1fr) auto; align-items: center; gap: 8px; margin-top: 9px; padding: 7px 8px; border: 1px solid #d4e8ce; border-radius: 10px; background: #f3faef; }
+.home-season-focus img { width: 35px; height: 35px; object-fit: contain; }
+.home-season-focus small, .home-season-focus b { display: block; }
+.home-season-focus small { color: #6d7d70; font-size: 10px; font-weight: 750; }
+.home-season-focus b { margin-top: 1px; color: #226f34; font-size: 16px; font-weight: 900; }
+.home-season-focus > span { padding: 4px 6px; border-radius: 999px; background: #dcefd5; color: #297e3d; font-size: 10px; font-weight: 900; white-space: nowrap; }
+.home-season-focus.stage-heading { border-color: #c6e5ef; background: #f0fbff; }
+.home-season-focus.stage-heading b, .home-season-focus.stage-heading > span { color: #247f9d; }
+.home-season-focus.stage-heading > span { background: #d9eff7; }
+.home-season-focus.stage-ripening { border-color: #ead9a9; background: #fffbed; }
+.home-season-focus.stage-ripening b, .home-season-focus.stage-ripening > span { color: #9b7121; }
+.home-season-focus.stage-ripening > span { background: #f6e9be; }
+.home-season-focus.stage-harvest { border-color: #ead2ad; background: #fff7e8; }
+.home-season-focus.stage-harvest b, .home-season-focus.stage-harvest > span { color: #986128; }
+.home-season-focus.stage-harvest > span { background: #f5e2bd; }
+.home-season-focus.stage-waiting { border-color: #dce4d8; background: #f7f9f5; }
+.home-season-focus.stage-waiting b, .home-season-focus.stage-waiting > span { color: #7d887e; }
+.home-season-focus.stage-waiting > span { background: #e8ede6; }
 .home-season-track { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 2px; margin-top: 5px; }
 .home-season-track span { position: relative; min-width: 0; padding-top: 8px; color: #a2aaa0; font-size: 8px; text-align: center; }
 .home-season-track span::before { position: absolute; top: 2px; right: 50%; left: -50%; height: 2px; background: #dfe7dc; content: ""; }
@@ -10700,12 +10725,210 @@ label {
     linear-gradient(#d24430, #d24430) 0 6px / 100% 2px no-repeat;
 }
 
+.annual-field-tabs button[data-annual-tab="water"]::before {
+  border: 1.8px solid #3a9ed8;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 35%, #dff4ff 0 26%, #6bbce8 30% 48%, transparent 52%);
+}
+
 .annual-field-tabs button[data-annual-tab="photos"]::before {
   border: 1.8px solid currentColor;
   border-radius: 2px;
   background:
     radial-gradient(circle at 70% 32%, currentColor 0 2px, transparent 2.5px),
     linear-gradient(135deg, transparent 47%, currentColor 48% 56%, transparent 57%);
+}
+
+.annual-water-periods {
+  display: grid;
+  gap: 10px;
+}
+
+.annual-water-periods-heading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 2px 2px 1px;
+}
+
+.annual-water-periods-heading span,
+.annual-water-periods-heading small {
+  color: #75816f;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.annual-water-periods-heading h3 {
+  margin: 2px 0 0;
+  color: #173724;
+  font-size: 17px;
+  font-weight: 900;
+}
+
+.annual-water-period {
+  --water-accent: #329f67;
+  --water-soft: #f2faef;
+  --water-line: #c7e3ca;
+  border: 1px solid var(--water-line);
+  border-left: 5px solid var(--water-accent);
+  border-radius: 13px;
+  background: linear-gradient(125deg, var(--water-soft), #fff 52%);
+  box-shadow: 0 4px 12px rgba(55, 83, 46, .07);
+  overflow: hidden;
+}
+
+.annual-water-period-dry {
+  --water-accent: #d88927;
+  --water-soft: #fff7e7;
+  --water-line: #f0d5a3;
+}
+
+.annual-water-period-intermittent {
+  --water-accent: #338fca;
+  --water-soft: #eff9ff;
+  --water-line: #b9dcf0;
+}
+
+.annual-water-period-wet {
+  --water-accent: #258d9e;
+  --water-soft: #edf9f7;
+  --water-line: #bae0dd;
+}
+
+.annual-water-period-drainage {
+  --water-accent: #ad8230;
+  --water-soft: #fffae8;
+  --water-line: #e8d49b;
+}
+
+.annual-water-period-head {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 10px 8px;
+}
+
+.annual-water-period-icon {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--water-soft) 72%, white);
+  color: var(--water-accent);
+}
+
+.annual-water-svg {
+  width: 24px;
+  height: 24px;
+}
+
+.annual-water-period-head b,
+.annual-water-period-head small {
+  display: block;
+}
+
+.annual-water-period-head b {
+  color: #183525;
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.annual-water-period-head small {
+  margin-top: 2px;
+  color: #6d7a70;
+  font-size: 10px;
+  font-weight: 750;
+}
+
+.annual-water-period-head strong {
+  color: var(--water-accent);
+  font-size: 12px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.annual-water-period-dates {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin: 0 10px;
+  border: 1px solid color-mix(in srgb, var(--water-line) 70%, white);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, .76);
+}
+
+.annual-water-period-dates span {
+  min-width: 0;
+  padding: 7px 6px;
+  text-align: center;
+}
+
+.annual-water-period-dates span + span {
+  border-left: 1px solid color-mix(in srgb, var(--water-line) 65%, white);
+}
+
+.annual-water-period-dates small,
+.annual-water-period-dates b {
+  display: block;
+}
+
+.annual-water-period-dates small {
+  color: #7b857c;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.annual-water-period-dates b {
+  overflow: hidden;
+  margin-top: 2px;
+  color: #294132;
+  font-size: 11px;
+  font-weight: 900;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.annual-water-period-progress {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 10px 10px;
+}
+
+.annual-water-period-progress i {
+  flex: 1;
+  height: 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--water-line) 52%, white);
+  overflow: hidden;
+}
+
+.annual-water-period-progress em {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--water-accent);
+}
+
+.annual-water-period-progress span {
+  color: #667569;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.annual-water-period-memo {
+  margin: -1px 10px 10px;
+  padding: 7px 8px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, .64);
+  color: #536356;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.45;
 }
 
 .annual-card-title h3,

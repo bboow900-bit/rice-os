@@ -830,10 +830,146 @@
 
   function renderWorkTab(field) {
     const rows = rowsForField(rowsForYear(allRows()), field.fieldId)
-      .filter((row) => ["fieldWork", "dry", "irrigation"].includes(row.kind))
+      .filter((row) => row.kind === "fieldWork" && !/中干し|間断灌水|湿潤灌漑|入水|落水/.test(String(row.title || "")))
       .sort((a, b) => String(b.date).localeCompare(String(a.date)));
     if (!rows.length) return '<div class="empty">作業記録はまだありません。</div>';
     return `<div class="annual-entry-list field-view">${rows.map((row) => renderEntry(row, true)).join("")}</div>`;
+  }
+
+  function waterPeriodDays(startDate, endDate) {
+    if (!startDate || !endDate) return "";
+    const days = U.daysBetween(startDate, endDate);
+    return days === "" || days < 0 ? "" : days;
+  }
+
+  function waterPeriodLabel(method) {
+    const text = String(method || "");
+    if (/中干し/.test(text)) return "中干し";
+    if (/湿潤/.test(text)) return "湿潤灌漑";
+    if (/間断/.test(text)) return "間断灌水";
+    if (/落水/.test(text)) return "稲刈り前の落水";
+    return text || "水管理";
+  }
+
+  function waterPeriodTone(label) {
+    if (/中干し/.test(label)) return "dry";
+    if (/湿潤/.test(label)) return "wet";
+    if (/間断/.test(label)) return "intermittent";
+    if (/落水/.test(label)) return "drainage";
+    return "water";
+  }
+
+  function waterPeriodsForField(field) {
+    const selectedYear = yearValue();
+    const isSelectedYear = (item) => selectedYear === "all" || String(item.season || String(item.date || "").slice(0, 4)) === String(selectedYear);
+    const d = state.data();
+    const periods = [];
+    const directLabels = new Set();
+
+    (d.dryPeriods || []).filter((item) => item.fieldId === field.fieldId && isSelectedYear(item)).forEach((item) => {
+      const label = "中干し";
+      directLabels.add(label);
+      periods.push({
+        id: item.dryPeriodId,
+        label,
+        tone: waterPeriodTone(label),
+        startDate: item.startDate || item.date || "",
+        plannedEndDate: item.endDate || "",
+        actualEndDate: item.actualEndDate || "",
+        targetDays: item.targetDays || "",
+        status: item.status || "",
+        memo: item.memo || "",
+        source: "専用記録"
+      });
+    });
+
+    (d.irrigations || []).filter((item) => item.fieldId === field.fieldId && isSelectedYear(item)).forEach((item) => {
+      const label = waterPeriodLabel(item.method);
+      directLabels.add(label);
+      periods.push({
+        id: item.irrigationId,
+        label,
+        tone: waterPeriodTone(label),
+        startDate: item.startDate || item.date || "",
+        plannedEndDate: item.endDate || "",
+        actualEndDate: item.actualEndDate || "",
+        targetDays: item.targetDays || "",
+        status: item.periodStatus || item.status || "",
+        memo: item.memo || "",
+        source: "専用記録"
+      });
+    });
+
+    const works = (d.fieldWorks || []).filter((item) => (item.fieldIds || []).includes(field.fieldId) && isSelectedYear(item));
+    const firstWorkDate = (test) => works.filter((item) => test(String(item.workName || ""))).map((item) => item.date).filter(Boolean).sort()[0] || "";
+    const lastWorkDate = (test) => works.filter((item) => test(String(item.workName || ""))).map((item) => item.date).filter(Boolean).sort().at(-1) || "";
+    const harvestDate = firstWorkDate((name) => /稲刈り|収穫/.test(name));
+    const manualDefinitions = [
+      { label: "中干し", start: (name) => /中干し.*開始|中干し開始/.test(name), end: (name) => /中干し.*終了|中干し.*完了|中干完了/.test(name) },
+      { label: "間断灌水", start: (name) => /間断灌水.*開始|間断灌水開始/.test(name), end: (name) => /間断灌水.*終了|間断灌水.*完了/.test(name) },
+      { label: "湿潤灌漑", start: (name) => /湿潤灌漑.*開始|湿潤灌漑開始/.test(name), end: (name) => /湿潤灌漑.*終了|湿潤灌漑.*完了/.test(name) },
+      { label: "稲刈り前の落水", start: (name) => /稲刈り前.*落水|落水開始|^落水$/.test(name), end: () => Boolean(harvestDate) }
+    ];
+
+    manualDefinitions.forEach((definition) => {
+      if (directLabels.has(definition.label)) return;
+      const startDate = firstWorkDate(definition.start);
+      const actualEndDate = definition.label === "稲刈り前の落水" ? harvestDate : lastWorkDate(definition.end);
+      if (!startDate && !actualEndDate) return;
+      periods.push({
+        id: `work-${definition.label}-${startDate || actualEndDate}`,
+        label: definition.label,
+        tone: waterPeriodTone(definition.label),
+        startDate,
+        plannedEndDate: "",
+        actualEndDate,
+        targetDays: "",
+        status: actualEndDate ? "完了" : "実施中",
+        memo: "",
+        source: "作業記録から反映"
+      });
+    });
+
+    return periods
+      .sort((a, b) => String(b.startDate || b.actualEndDate).localeCompare(String(a.startDate || a.actualEndDate)))
+      .map((period, index, list) => ({
+        ...period,
+        sequence: list.filter((other, otherIndex) => otherIndex <= index && other.label === period.label).length
+      }));
+  }
+
+  function renderWaterPeriod(period) {
+    const plannedDays = Number(period.targetDays) || waterPeriodDays(period.startDate, period.plannedEndDate);
+    const completed = Boolean(period.actualEndDate) || /完了|終了/.test(String(period.status || ""));
+    const displayEnd = period.actualEndDate || (String(yearValue()) === String(new Date().getFullYear()) ? U.today() : "");
+    const elapsedDays = waterPeriodDays(period.startDate, displayEnd);
+    const actualDays = completed ? waterPeriodDays(period.startDate, period.actualEndDate) : "";
+    const progressDays = actualDays !== "" ? actualDays : elapsedDays;
+    const progress = plannedDays ? Math.max(0, Math.min(100, Math.round((Number(progressDays || 0) / Number(plannedDays)) * 100))) : 0;
+    const subtitle = completed ? (period.label === "稲刈り前の落水" ? "収穫で完了" : "完了") : (period.startDate ? "継続中" : "開始日を記録してください");
+    const heading = `${period.label}${period.sequence > 1 ? ` ${period.sequence}回目` : ""}`;
+    return `
+      <article class="annual-water-period annual-water-period-${U.attr(period.tone)}">
+        <div class="annual-water-period-head">
+          <span class="annual-water-period-icon">${iconSvg("water", "annual-water-svg")}</span>
+          <div><b>${U.escapeHTML(heading)}</b><small>${U.escapeHTML(subtitle)}${period.source ? ` / ${U.escapeHTML(period.source)}` : ""}</small></div>
+          <strong>${actualDays !== "" ? `実績 ${actualDays}日` : (plannedDays ? `目安 ${plannedDays}日` : "期間確認")}</strong>
+        </div>
+        <div class="annual-water-period-dates">
+          <span><small>開始</small><b>${U.escapeHTML(period.startDate ? U.fd(period.startDate) : "未記録")}</b></span>
+          <span><small>予定終了</small><b>${U.escapeHTML(period.plannedEndDate ? U.fd(period.plannedEndDate) : "未設定")}</b></span>
+          <span><small>実績終了</small><b>${U.escapeHTML(period.actualEndDate ? U.fd(period.actualEndDate) : (completed ? "未記録" : "継続中"))}</b></span>
+        </div>
+        ${plannedDays ? `<div class="annual-water-period-progress"><i><em style="width:${progress}%"></em></i><span>予定 ${plannedDays}日${progressDays !== "" ? ` / ${completed ? "実績" : "経過"} ${progressDays}日` : ""}</span></div>` : ""}
+        ${period.memo ? `<p class="annual-water-period-memo">${U.escapeHTML(period.memo)}</p>` : ""}
+      </article>
+    `;
+  }
+
+  function renderWaterTab(field) {
+    const periods = waterPeriodsForField(field);
+    if (!periods.length) return '<div class="empty">中干し・間断灌水・湿潤灌漑・稲刈り前の落水を記録すると、期間をここで振り返れます。</div>';
+    return `<section class="annual-water-periods"><div class="annual-water-periods-heading"><div><span>水管理の振り返り</span><h3>いつから、いつまで行ったか</h3></div><small>${periods.length}件</small></div>${periods.map(renderWaterPeriod).join("")}</section>`;
   }
 
   function renderPhotoTab(field) {
@@ -857,6 +993,7 @@
       ["karte", "karte", "カルテ"],
       ["growth", "growthTab", "生育記録"],
       ["work", "workTab", "作業記録"],
+      ["water", "water", "水管理"],
       ["photos", "photoTab", "写真"]
     ];
     return `
@@ -866,6 +1003,7 @@
       <div class="annual-field-tab-body">
         ${selectedTab === "growth" ? renderGrowthTab(field) : ""}
         ${selectedTab === "work" ? renderWorkTab(field) : ""}
+        ${selectedTab === "water" ? renderWaterTab(field) : ""}
         ${selectedTab === "photos" ? renderPhotoTab(field) : ""}
         ${selectedTab === "karte" ? renderKarteTab(field) : ""}
       </div>
@@ -886,6 +1024,7 @@
     const growth = rows.filter((row) => row.kind === "growth");
     const dry = rows.filter((row) => row.kind === "dry");
     const water = rows.filter((row) => row.kind === "irrigation");
+    const waterWorks = works.filter((row) => /中干し|間断灌水|湿潤灌漑|入水|落水/.test(String(row.title || "")));
     const planting = firstDate(works, (row) => /田植/.test(String(row.title || "")));
     const heading = firstDate(growth, (row) => Boolean(row.record && row.record.headingObserved)) || firstDate(works, (row) => /出穂/.test(String(row.title || "")));
     const harvest = firstDate(works, (row) => /収穫|稲刈/.test(String(row.title || "")));
@@ -894,8 +1033,8 @@
       year,
       planting,
       trays: field.seedlingBoxes || "",
-      dry: dry.length ? `${dry.length}件` : "",
-      water: water.length ? `${water.length}件` : "",
+      dry: dry.length || waterWorks.filter((row) => /中干し/.test(String(row.title || ""))).length ? `${dry.length + waterWorks.filter((row) => /中干し/.test(String(row.title || ""))).length}件` : "",
+      water: water.length || waterWorks.filter((row) => !/中干し/.test(String(row.title || ""))).length ? `${water.length + waterWorks.filter((row) => !/中干し/.test(String(row.title || ""))).length}件` : "",
       heading,
       growth: growth.length ? `${growth.length}件` : "",
       workHours: totalHours(works),
