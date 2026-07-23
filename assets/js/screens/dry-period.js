@@ -178,12 +178,20 @@
     U.$("editDryId").value = "";
     U.$("dryDate").value = U.today();
     U.$("dryField").value = field ? field.fieldId : "";
+    U.$("dryPlannedStartDate").value = "";
     U.$("dryStartDate").value = field && field.drainageStartDate || U.today();
     U.$("dryTargetDays").value = field && field.drainageTargetDays || "7";
     U.$("dryEndDate").value = "";
     setEndFromDays();
     U.$("dryActualEndDate").value = "";
     U.$("dryStatus").value = "実施中";
+    U.$("dryStartReason").value = "";
+    U.$("dryStartTillerCount").value = "";
+    U.$("dryStartLeafColor").value = "";
+    U.$("dryStartSurface").value = "";
+    U.$("dryEndSurface").value = "";
+    U.$("dryInterruptionDays").value = "";
+    U.$("dryObservationSummary").value = "";
     U.$("dryCrackCm").value = "";
     U.$("drySinkCm").value = "";
     U.$("drySurface").value = "-";
@@ -211,11 +219,19 @@
     U.$("editDryId").value = item.dryPeriodId;
     U.$("dryField").value = item.fieldId;
     U.$("dryDate").value = item.date;
+    U.$("dryPlannedStartDate").value = item.plannedStartDate || "";
     U.$("dryStartDate").value = item.startDate || "";
     U.$("dryEndDate").value = item.endDate || "";
     U.$("dryActualEndDate").value = item.actualEndDate || "";
     U.$("dryTargetDays").value = item.targetDays || "";
     U.$("dryStatus").value = item.status || (item.actualEndDate ? "完了" : "実施中");
+    U.$("dryStartReason").value = item.startReason || "";
+    U.$("dryStartTillerCount").value = item.startTillerCount || "";
+    U.$("dryStartLeafColor").value = item.startLeafColor || "";
+    U.$("dryStartSurface").value = item.startSurface || "";
+    U.$("dryEndSurface").value = item.endSurface || "";
+    U.$("dryInterruptionDays").value = item.interruptionDays || "";
+    U.$("dryObservationSummary").value = item.observationSummary || "";
     U.$("dryCrackCm").value = item.crackCm || "";
     U.$("drySinkCm").value = item.sinkCm || "";
     U.$("drySurface").value = item.surface || "-";
@@ -256,6 +272,9 @@
               <span>田面 <b>${U.escapeHTML(item.surface || "-")}</b></span>
               <span>ガス <b>${U.escapeHTML(item.gas || "-")}</b></span>
             </div>
+            ${item.startReason ? `<div><b>開始理由</b> ${U.escapeHTML(item.startReason)}</div>` : ""}
+            ${item.observationSummary ? `<div><b>観察</b> ${U.escapeHTML(item.observationSummary)}</div>` : ""}
+            ${item.interruptionDays ? `<div><b>差し水・中断</b> ${U.escapeHTML(String(item.interruptionDays))}日</div>` : ""}
             ${item.photoData ? `<img class="thumb" src="${U.attr(item.photoData)}" alt="">` : ""}
             ${item.memo ? `<div>${U.escapeHTML(item.memo)}</div>` : ""}
           </div>
@@ -318,10 +337,18 @@
         dryPeriodId: U.$("editDryId").value,
         date: U.$("dryDate").value,
         status: U.$("dryStatus").value,
+        plannedStartDate: U.$("dryPlannedStartDate").value,
         startDate: U.$("dryStartDate").value,
         endDate: U.$("dryEndDate").value,
         actualEndDate: U.$("dryActualEndDate").value,
         targetDays: U.$("dryTargetDays").value,
+        startReason: U.$("dryStartReason").value,
+        startTillerCount: U.$("dryStartTillerCount").value,
+        startLeafColor: U.$("dryStartLeafColor").value,
+        startSurface: U.$("dryStartSurface").value,
+        endSurface: U.$("dryEndSurface").value,
+        interruptionDays: U.$("dryInterruptionDays").value,
+        observationSummary: U.$("dryObservationSummary").value,
         crackCm: U.$("dryCrackCm").value,
         sinkCm: U.$("drySinkCm").value,
         surface: U.$("drySurface").value,

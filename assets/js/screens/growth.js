@@ -264,6 +264,12 @@
     if (U.$("gPlantHeight")) U.$("gPlantHeight").value = "";
     if (U.$("gPanicleLengthMm")) U.$("gPanicleLengthMm").value = "";
     U.$("gLeaf").value = "3";
+    if (U.$("gObservedStage")) U.$("gObservedStage").value = "";
+    if (U.$("gStageConfirmed")) U.$("gStageConfirmed").checked = false;
+    if (U.$("gMeasurementCount")) U.$("gMeasurementCount").value = "";
+    if (U.$("gMeasurementMethod")) U.$("gMeasurementMethod").value = "";
+    if (U.$("gRecordedBy")) U.$("gRecordedBy").value = "";
+    if (U.$("gCorrectionReason")) U.$("gCorrectionReason").value = "";
     if (U.$("gHeadingObserved")) U.$("gHeadingObserved").checked = false;
     U.$("gPhoto").value = "";
     U.$("gPhotoFile").value = "";
@@ -484,6 +490,12 @@
     if (U.$("gPlantHeight")) U.$("gPlantHeight").value = log.plantHeightCm || "";
     if (U.$("gPanicleLengthMm")) U.$("gPanicleLengthMm").value = log.panicleLengthMm || "";
     U.$("gLeaf").value = log.leafColorScore || S.leafColorScoreFromText(log.leafColor) || "3";
+    if (U.$("gObservedStage")) U.$("gObservedStage").value = log.observedStage || "";
+    if (U.$("gStageConfirmed")) U.$("gStageConfirmed").checked = Boolean(log.stageConfirmed);
+    if (U.$("gMeasurementCount")) U.$("gMeasurementCount").value = log.measurementCount || "";
+    if (U.$("gMeasurementMethod")) U.$("gMeasurementMethod").value = log.measurementMethod || "";
+    if (U.$("gRecordedBy")) U.$("gRecordedBy").value = log.recordedBy || "";
+    if (U.$("gCorrectionReason")) U.$("gCorrectionReason").value = log.correctionReason || "";
     if (U.$("gHeadingObserved")) U.$("gHeadingObserved").checked = Boolean(log.headingObserved);
     U.$("gPhoto").value = log.photo || "";
     U.$("gMemo").value = log.memo || "";
@@ -521,6 +533,9 @@
       gas: "-",
       water: "-",
       headingObserved: true,
+      observedStage: "heading",
+      stageConfirmed: true,
+      recordedBy: U.$("gRecordedBy") ? U.$("gRecordedBy").value : "",
       memo: U.$("gMemo").value || "出穂確認"
     });
     U.toast(`${field && field.name || "圃場"} の出穂を登録しました`);
@@ -548,7 +563,7 @@
       renderTargetPanel();
     });
 
-    ["gField", "gDate", "gTillerCount", "gLeafCount", "gPlantHeight", "gPanicleLengthMm", "gLeaf", "gHeadingObserved"].forEach((id) => {
+    ["gField", "gDate", "gTillerCount", "gLeafCount", "gPlantHeight", "gPanicleLengthMm", "gLeaf", "gObservedStage", "gStageConfirmed", "gHeadingObserved"].forEach((id) => {
       const el = U.$(id);
       if (!el) return;
       el.addEventListener("input", () => {
@@ -589,6 +604,11 @@
         return;
       }
       const existing = state.data().growthLogs.find((log) => log.logId === U.$("editGrowthId").value);
+      const headingObserved = U.$("gHeadingObserved") ? U.$("gHeadingObserved").checked : false;
+      const selectedStage = U.$("gObservedStage") ? U.$("gObservedStage").value : "";
+      const inferredStage = headingObserved
+        ? "heading"
+        : selectedStage || (U.number(U.$("gPanicleLengthMm") && U.$("gPanicleLengthMm").value, 0) > 0 ? "panicle" : (U.$("gTillerCount") && U.$("gTillerCount").value !== "" ? "tillering" : ""));
       const common = {
         logId: U.$("editGrowthId").value,
         date: U.$("gDate").value,
@@ -601,7 +621,14 @@
         weed: existing ? existing.weed || "-" : "-",
         gas: existing ? existing.gas || "-" : "-",
         water: existing ? existing.water || "-" : "-",
-        headingObserved: U.$("gHeadingObserved") ? U.$("gHeadingObserved").checked : false,
+        headingObserved,
+        observedStage: inferredStage,
+        stageConfirmed: headingObserved || Boolean(U.$("gStageConfirmed") && U.$("gStageConfirmed").checked),
+        measurementCount: U.$("gMeasurementCount") ? U.$("gMeasurementCount").value : "",
+        measurementMethod: U.$("gMeasurementMethod") ? U.$("gMeasurementMethod").value : "",
+        stageEvidenceId: existing && existing.stageEvidenceId || "",
+        recordedBy: U.$("gRecordedBy") ? U.$("gRecordedBy").value : "",
+        correctionReason: U.$("gCorrectionReason") ? U.$("gCorrectionReason").value : existing && existing.correctionReason || "",
         photo: U.$("gPhoto").value,
         photoData: U.$("gPhotoPreview").dataset.photoData || "",
         memo: U.$("gMemo").value

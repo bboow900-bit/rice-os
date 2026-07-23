@@ -38,8 +38,25 @@
   }
 
   function loadData() {
-    const current = safeParse(readRaw(S.STORE_KEY));
-    if (current) return S.normalize(current);
+    const currentRaw = readRaw(S.STORE_KEY);
+    const current = safeParse(currentRaw);
+    if (current) {
+      const normalized = S.normalize(current);
+      const previousVersion = Number(current.schemaVersion || 0);
+      if (previousVersion < S.SCHEMA_VERSION) {
+        try {
+          if (currentRaw) writeRaw(S.BACKUP_KEY, currentRaw);
+          normalized.meta = normalized.meta || {};
+          normalized.meta.lastBackupAt = U.now();
+          normalized.meta.migratedFromSchemaVersion = previousVersion;
+          normalized.meta.migratedAt = U.now();
+          writeRaw(S.STORE_KEY, JSON.stringify(normalized));
+        } catch (error) {
+          // Keep using the normalized in-memory copy if migration persistence fails.
+        }
+      }
+      return normalized;
+    }
 
     const backup = safeParse(readRaw(S.BACKUP_KEY));
     if (backup) return S.normalize(backup);
@@ -66,14 +83,18 @@
 
   function saveData(data) {
     const normalized = S.normalize(data);
-    const raw = JSON.stringify(normalized);
     const currentRaw = readRaw(S.STORE_KEY);
     try {
-      if (currentRaw) writeRaw(S.BACKUP_KEY, currentRaw);
+      if (currentRaw) {
+        writeRaw(S.BACKUP_KEY, currentRaw);
+        normalized.meta = normalized.meta || {};
+        normalized.meta.lastBackupAt = U.now();
+      }
     } catch (error) {
       // Backup failure must not erase current data.
     }
     try {
+      const raw = JSON.stringify(normalized);
       writeRaw(S.STORE_KEY, raw);
       window.__riceMemoryData = normalized;
       return normalized;
@@ -90,6 +111,133 @@
   function importJsonText(text) {
     const parsed = JSON.parse(text);
     return replaceData({ ...parsed, importedFrom: "json" });
+  }
+
+  const COLLECTION_IDS = {
+    varieties: "varietyId",
+    fields: "fieldId",
+    fieldWorks: "workId",
+    growthLogs: "logId",
+    otherWorks: "otherWorkId",
+    materials: "materialId",
+    varietyResults: "resultId",
+    schedules: "scheduleId",
+    dryPeriods: "dryPeriodId",
+    irrigations: "irrigationId",
+    confirmationCandidates: "candidateId"
+  };
+
+  function duplicateIds(rows, idKey) {
+    if (!Array.isArray(rows)) return [];
+    const seen = new Set();
+    const duplicates = new Set();
+    (rows || []).forEach((row) => {
+      const id = String(row && row[idKey] || "");
+      if (!id) return;
+      if (seen.has(id)) duplicates.add(id);
+      seen.add(id);
+    });
+    return Array.from(duplicates);
+  }
+
+  function countSummary(data) {
+    const d = S.normalize(data || {});
+    return Object.fromEntries(Object.keys(COLLECTION_IDS).map((key) => [key, (d[key] || []).length]));
+  }
+
+  function rawBrokenFieldIds(data) {
+    const fields = Array.isArray(data.fields) ? data.fields : [];
+    const fieldIds = new Set(fields.map((field) => String(field && (field.fieldId || field.id) || "")).filter(Boolean));
+    const referenced = [];
+    const add = (value) => {
+      if (Array.isArray(value)) value.forEach(add);
+      else if (value !== undefined && value !== null && String(value)) referenced.push(String(value));
+    };
+    [
+      ...(Array.isArray(data.fieldWorks) ? data.fieldWorks.map((row) => row && (row.fieldIds || row.fieldId)) : []),
+      ...(Array.isArray(data.growthLogs) ? data.growthLogs.map((row) => row && row.fieldId) : []),
+      ...(Array.isArray(data.dryPeriods) ? data.dryPeriods.map((row) => row && row.fieldId) : []),
+      ...(Array.isArray(data.irrigations) ? data.irrigations.map((row) => row && row.fieldId) : []),
+      ...(Array.isArray(data.schedules) ? data.schedules.map((row) => row && (row.fieldIds || row.fieldId)) : []),
+      ...(Array.isArray(data.confirmationCandidates) ? data.confirmationCandidates.map((row) => row && row.fieldId) : []),
+      ...(Array.isArray(data.varietyResults) ? data.varietyResults.map((row) => row && row.fieldId) : [])
+    ].forEach(add);
+    return Array.from(new Set(referenced.filter((id) => !fieldIds.has(id))));
+  }
+
+  function inspectJsonText(text, currentData) {
+    const errors = [];
+    const warnings = [];
+    let parsed = null;
+    try {
+      parsed = JSON.parse(text);
+    } catch (error) {
+      return { ok: false, errors: [`JSON形式を読み取れません: ${error.message}`], warnings, parsed: null, normalized: null };
+    }
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return { ok: false, errors: ["ルートはJSONオブジェクトである必要があります。"], warnings, parsed, normalized: null };
+    }
+    Object.entries(COLLECTION_IDS).forEach(([key, idKey]) => {
+      if (parsed[key] !== undefined && !Array.isArray(parsed[key])) errors.push(`${key} は配列ではありません。`);
+      const duplicates = duplicateIds(parsed[key], idKey);
+      if (duplicates.length) warnings.push(`${key} に重複IDが${duplicates.length}件あります。先頭の記録を優先します。`);
+    });
+    const rawBroken = rawBrokenFieldIds(parsed);
+    if (rawBroken.length) warnings.push(`元JSONに参照先のない圃場IDが${rawBroken.length}件あります。復元前に内容を確認してください。`);
+    let normalized = null;
+    try {
+      normalized = S.normalize({ ...parsed, importedFrom: "json" });
+    } catch (error) {
+      errors.push(`データ移行に失敗しました: ${error.message}`);
+    }
+    if (normalized) {
+      const fieldIds = new Set(normalized.fields.map((field) => field.fieldId));
+      const broken = [
+        ...normalized.fieldWorks.flatMap((row) => (row.fieldIds || []).filter((id) => !fieldIds.has(id))),
+        ...normalized.growthLogs.map((row) => row.fieldId).filter((id) => id && !fieldIds.has(id)),
+        ...(normalized.dryPeriods || []).map((row) => row.fieldId).filter((id) => id && !fieldIds.has(id)),
+        ...(normalized.irrigations || []).map((row) => row.fieldId).filter((id) => id && !fieldIds.has(id))
+      ];
+      if (broken.length) warnings.push(`参照先のない圃場IDが${new Set(broken).size}件あります。`);
+    }
+    const incoming = normalized ? countSummary(normalized) : {};
+    const current = countSummary(currentData || loadData());
+    const diff = Object.fromEntries(Object.keys(COLLECTION_IDS).map((key) => [key, (incoming[key] || 0) - (current[key] || 0)]));
+    return {
+      ok: errors.length === 0 && Boolean(normalized),
+      errors,
+      warnings,
+      parsed,
+      normalized,
+      schemaVersion: parsed.schemaVersion || 0,
+      appVersion: parsed.appVersion || parsed.meta && parsed.meta.appVersion || "",
+      exportedAt: parsed.exportedAt || "",
+      incoming,
+      current,
+      diff
+    };
+  }
+
+  function mergeData(currentData, incomingData) {
+    const current = S.normalize(currentData || {});
+    const incoming = S.normalize(incomingData || {});
+    const merged = U.clone(current);
+    const added = {};
+    const skipped = {};
+    Object.entries(COLLECTION_IDS).forEach(([key, idKey]) => {
+      const existingIds = new Set((merged[key] || []).map((row) => String(row[idKey] || "")));
+      const additions = (incoming[key] || []).filter((row) => !existingIds.has(String(row[idKey] || "")));
+      merged[key] = [...(merged[key] || []), ...additions];
+      added[key] = additions.length;
+      skipped[key] = (incoming[key] || []).length - additions.length;
+    });
+    merged.meta = {
+      ...(current.meta || {}),
+      lastImportAt: U.now(),
+      lastImportMode: "merge",
+      lastImportSourceVersion: incoming.appVersion || incoming.meta && incoming.meta.appVersion || ""
+    };
+    return { data: S.normalize(merged), added, skipped };
   }
 
   function importLegacyNow() {
@@ -111,8 +259,23 @@
 
   function exportJson(data) {
     const normalized = S.normalize(data);
+    const exportId = U.id("export", U.today());
+    const exportedAt = U.now();
+    const payload = {
+      ...normalized,
+      schemaVersion: S.SCHEMA_VERSION,
+      appVersion: S.APP_VERSION,
+      exportedAt,
+      exportId,
+      meta: {
+        ...(normalized.meta || {}),
+        appVersion: S.APP_VERSION,
+        lastExportId: exportId
+      }
+    };
     const filename = `rice_karte_${U.today()}.json`;
-    U.download(filename, JSON.stringify(normalized, null, 2), "application/json;charset=utf-8");
+    U.download(filename, JSON.stringify(payload, null, 2), "application/json;charset=utf-8");
+    return payload;
   }
 
   function byteSize(text) {
@@ -139,8 +302,38 @@
       materials: d.materials.length,
       varietyResults: d.varietyResults.length,
       updatedAt: d.meta && d.meta.updatedAt || "",
-      lastJsonExportAt: d.meta && d.meta.lastJsonExportAt || ""
+      lastJsonExportAt: d.meta && d.meta.lastJsonExportAt || "",
+      lastBackupAt: d.meta && d.meta.lastBackupAt || "",
+      storagePersisted: d.meta && d.meta.storagePersisted
     };
+  }
+
+  async function storageStatus() {
+    const result = { supported: Boolean(navigator.storage), persisted: false, usage: "", quota: "", percent: "" };
+    if (!navigator.storage) return result;
+    try {
+      result.persisted = navigator.storage.persisted ? await navigator.storage.persisted() : false;
+      if (navigator.storage.estimate) {
+        const estimate = await navigator.storage.estimate();
+        result.usage = Number(estimate.usage || 0);
+        result.quota = Number(estimate.quota || 0);
+        result.percent = result.quota ? Math.round(result.usage / result.quota * 1000) / 10 : "";
+      }
+    } catch (error) {
+      result.error = error.message;
+    }
+    return result;
+  }
+
+  async function requestPersistentStorage() {
+    const before = await storageStatus();
+    if (!before.supported || !navigator.storage.persist) return before;
+    try {
+      await navigator.storage.persist();
+    } catch (error) {
+      before.error = error.message;
+    }
+    return storageStatus();
   }
 
   function csvCell(value) {
@@ -288,12 +481,16 @@
     saveData,
     replaceData,
     importJsonText,
+    inspectJsonText,
+    mergeData,
     importLegacyNow,
     restoreBackup,
     backupData,
     exportJson,
     exportCsv,
     findLegacy,
-    info
+    info,
+    storageStatus,
+    requestPersistentStorage
   };
 })();

@@ -214,9 +214,11 @@
       const rows = [];
       const planting = plantingDateForYear(field.fieldId, cropYear(date));
       const dap = planting ? U.daysBetween(planting, date) : "";
-      const dryStart = field.drainageStartDate || (state.workDateForField ? state.workDateForField(field.fieldId, ["中干し開始"], "first") : "");
-      const dryEnd = field.drainageActualEndDate || (state.workDateForField ? state.workDateForField(field.fieldId, ["中干し終了"], "first") : "");
-      const irrigationStart = field.intermittentStartDate || (state.workDateForField ? state.workDateForField(field.fieldId, ["間断灌水開始", "湿潤灌漑開始"], "first") : "");
+      const dryRecord = latestDryPeriod(field.fieldId);
+      const irrigationRecord = latestIrrigation(field.fieldId);
+      const dryStart = dryRecord && dryRecord.startDate || (state.workDateForField ? state.workDateForField(field.fieldId, ["中干し開始"], "first") : "");
+      const dryEnd = dryRecord && dryRecord.actualEndDate || (state.workDateForField ? state.workDateForField(field.fieldId, ["中干し終了"], "first") : "");
+      const irrigationStart = irrigationRecord && irrigationRecord.startDate || (state.workDateForField ? state.workDateForField(field.fieldId, ["間断灌水開始", "湿潤灌漑開始"], "first") : "");
       if (dap !== "" && dap >= 35 && dap <= 55 && !dryStart) {
         rows.push({
           kind: "candidate",
@@ -454,9 +456,10 @@
         ${note ? `<p class="home-field-story"><b>今年のひとこと</b><span>${U.escapeHTML(note)}</span></p>` : ""}
         <div class="home-season-focus stage-${U.attr(stageKey)}">
           <img src="${U.attr(stageImage)}" alt="">
-          <div><small>今年のステージ</small><b>${U.escapeHTML(stage.current ? stage.current.label : "記録待ち")}</b></div>
-          <span>${U.escapeHTML(stage.current ? "現在地" : "次の一歩")}</span>
+          <div><small>確認済みの生育</small><b>${U.escapeHTML(stage.current ? stage.current.label : "記録待ち")}</b></div>
+          <span>${U.escapeHTML(stage.current ? "実績" : "次の一歩")}</span>
         </div>
+        ${stage.suggested ? `<div class="home-stage-suggestion"><b>確認目安</b><span>${U.escapeHTML(stage.suggested.label)}</span><small>${U.escapeHTML(stage.suggested.basis)} / 現地確認が必要です</small></div>` : ""}
         <div class="home-season-title"><span>${U.escapeHTML(stage.current ? `次に残す：${stage.next}` : stage.next)}</span></div>
         ${renderSeasonTrack(stage)}
         <div class="home-decision-status"><span>${U.escapeHTML(need.label)}</span><small>${U.escapeHTML(need.detail)}</small></div>
@@ -469,11 +472,42 @@
     `;
   }
 
+  function lastFieldActivityDate(fieldId) {
+    const rows = [
+      ...state.fieldWorksFor(fieldId),
+      ...state.growthLogsFor(fieldId),
+      ...(state.dryPeriodsFor ? state.dryPeriodsFor(fieldId) : []),
+      ...(state.irrigationsFor ? state.irrigationsFor(fieldId) : [])
+    ];
+    return rows.map((row) => row.date || row.startDate || row.updatedAt || "").filter(Boolean).sort().pop() || "";
+  }
+
+  function prioritizedDecisionFields(dateText, candidates, overdue) {
+    const nearSchedules = (state.data().schedules || []).filter((schedule) => {
+      if (scheduleDone(schedule) || !schedule.date || schedule.date < dateText) return false;
+      const days = U.daysBetween(dateText, schedule.date);
+      return days !== "" && days <= 7;
+    });
+    return state.activeFields().map((field) => {
+      let score = 0;
+      if (overdue.some((schedule) => (schedule.fieldIds || []).includes(field.fieldId))) score += 100;
+      if (candidates.some((entry) => entryFieldIds(entry).includes(field.fieldId))) score += 70;
+      if (nearSchedules.some((schedule) => (schedule.fieldIds || []).includes(field.fieldId))) score += 45;
+      if (!plantingDateForYear(field.fieldId, cropYear(dateText))) score += 35;
+      else if (!latestGrowthForYear(field.fieldId, cropYear(dateText))) score += 25;
+      const lastDate = lastFieldActivityDate(field.fieldId);
+      const age = lastDate ? U.daysBetween(lastDate, dateText) : 999;
+      if (age === "" || age >= 14) score += 20;
+      return { field, score, lastDate };
+    }).sort((a, b) => b.score - a.score || String(a.lastDate || "").localeCompare(String(b.lastDate || "")) || String(a.field.name).localeCompare(String(b.field.name)));
+  }
+
   function renderDecisionDashboard() {
     const todayEntries = entriesForDate(U.today()).filter((entry) => entry.kind !== "candidate");
     const candidates = candidatesForDate(U.today());
     const overdue = overdueSchedules();
-    const rows = fields();
+    const ranked = prioritizedDecisionFields(U.today(), candidates, overdue);
+    const rows = ranked.slice(0, 3).map((item) => item.field);
     return `
       <section class="home-decision-hero">
         <div><p>今日・今週の判断</p><h2>田んぼの今を、先に見る</h2><small>${U.escapeHTML(U.fd(U.today()))} / ${U.escapeHTML(todayEntries.length ? `今日の記録 ${todayEntries.length}件` : "今日の記録はありません")}</small></div>
@@ -487,6 +521,7 @@
       <section class="home-decision-section">
         <div class="home-decision-section-head"><div><h3>圃場ごとの判断</h3><small>気になる圃場から記録へ進めます</small></div><button type="button" data-home-open-calendar>カレンダー</button></div>
         <div class="home-decision-list">${rows.length ? rows.map(renderDecisionFieldCard).join("") : '<div class="farm-empty">圃場を登録すると、ここに判断カードを表示します。</div>'}</div>
+        ${ranked.length > 3 ? `<button type="button" class="home-all-fields-button" data-home-all-fields>すべての圃場を見る (${U.escapeHTML(String(ranked.length))})</button>` : ""}
       </section>
     `;
   }
@@ -1361,6 +1396,10 @@
       }
       if (event.target.closest("[data-home-open-calendar]")) {
         if (RiceOS.app) RiceOS.app.show("calendar");
+        return;
+      }
+      if (event.target.closest("[data-home-all-fields]")) {
+        if (RiceOS.app) RiceOS.app.show("fields");
         return;
       }
       if (event.target.closest("[data-home-quick-record]")) {

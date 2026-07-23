@@ -297,11 +297,16 @@
         openScreen("growth", (fieldId) => RiceOS.screens.growth.prefillDate(selectedDate, fieldId));
       } else if (action === "work") {
         openScreen("field-work", (fieldId) => RiceOS.screens.fieldWork.prefillDate(selectedDate, fieldId));
+      } else if (action === "water") {
+        openScreen("irrigation", (fieldId) => RiceOS.screens.irrigation.prefillDate(selectedDate, fieldId));
+      } else if (action === "photo") {
+        openScreen("growth", (fieldId) => {
+          RiceOS.screens.growth.prefillDate(selectedDate, fieldId);
+          if (U.$("growthPhotoSection")) U.$("growthPhotoSection").open = true;
+        });
       } else if (action === "schedule") {
         showScheduleForm();
-      } else if (action === "harvest") {
-        openScreen("results");
-      } else if (action === "shipment") {
+      } else if (action === "result") {
         openScreen("results");
       }
     });

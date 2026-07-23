@@ -149,13 +149,28 @@
     }).join("");
   }
 
-  function toast(message) {
+  function toast(message, options) {
     const el = $("toast");
     if (!el) return;
-    el.textContent = message;
+    const config = options || {};
+    el.replaceChildren();
+    const text = document.createElement("span");
+    text.textContent = message;
+    el.appendChild(text);
+    if (config.actionLabel && typeof config.onAction === "function") {
+      const action = document.createElement("button");
+      action.type = "button";
+      action.textContent = config.actionLabel;
+      action.addEventListener("click", () => {
+        clearTimeout(window.__riceToastTimer);
+        el.classList.add("hidden");
+        config.onAction();
+      }, { once: true });
+      el.appendChild(action);
+    }
     el.classList.remove("hidden");
     clearTimeout(window.__riceToastTimer);
-    window.__riceToastTimer = setTimeout(() => el.classList.add("hidden"), 1800);
+    window.__riceToastTimer = setTimeout(() => el.classList.add("hidden"), config.duration || 3000);
   }
 
   function download(filename, content, type) {

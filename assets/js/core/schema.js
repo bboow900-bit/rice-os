@@ -4,7 +4,8 @@
   const RiceOS = window.RiceOS = window.RiceOS || {};
   const U = RiceOS.utils;
 
-  const SCHEMA_VERSION = 11;
+  const SCHEMA_VERSION = 12;
+  const APP_VERSION = "20260723_ver118";
   const STORE_KEY = "rice_os_v8_stable";
   const BACKUP_KEY = "rice_os_v8_stable_backup";
   const LEGACY_STORES = [
@@ -263,6 +264,8 @@
     f.areaA = U.number(f.areaA, 0);
     f.seedlingBoxes = String(f.seedlingBoxes || "");
     f.status = String(f.status || "使用中");
+    f.archivedAt = String(f.archivedAt || "");
+    f.archivedReason = String(f.archivedReason || "");
     f.drainageStartDate = String(f.drainageStartDate || "");
     f.drainageTargetDays = String(f.drainageTargetDays || "");
     f.drainagePlannedEndDate = String(f.drainagePlannedEndDate || "");
@@ -311,6 +314,11 @@
       date,
       season: U.number(w.season, U.season(date)),
       fieldIds: ensureArray(w.fieldIds).length ? ensureArray(w.fieldIds).map(String) : (w.fieldId ? [String(w.fieldId)] : []),
+      batchId: String(w.batchId || ""),
+      batchFieldIds: ensureArray(w.batchFieldIds || w.fieldIds).map(String),
+      timeAccounting: String(w.timeAccounting || (ensureArray(w.fieldIds).length > 1 ? "shared" : "single")),
+      totalHours: String(w.totalHours || w.hours || ""),
+      fieldAllocatedHours: w.fieldAllocatedHours && typeof w.fieldAllocatedHours === "object" ? w.fieldAllocatedHours : {},
       workName: String(w.workName || w.name || "その他"),
       worker: String(w.worker || ""),
       hours: String(w.hours || ""),
@@ -336,6 +344,10 @@
     const g = input || {};
     const date = String(g.date || U.today());
     const leafColorScore = String(g.leafColorScore || leafColorScoreFromText(g.leafColor || g.leaf));
+    const inferredStage = g.observedStage
+      || (g.headingObserved || g.headingDate ? "heading" : "")
+      || (Number(g.panicleLengthMm || g.youhoLengthMm || 0) > 0 ? "panicle" : "")
+      || (g.tillerCount !== undefined && String(g.tillerCount) !== "" ? "tillering" : "");
     return {
       logId: String(g.logId || g.id || U.id("growth", date)),
       type: "growthLog",
@@ -352,6 +364,13 @@
       gas: String(g.gas || "-"),
       water: String(g.water || "-"),
       headingObserved: Boolean(g.headingObserved || g.headingDate || String(g.memo || "").includes("出穂")),
+      observedStage: String(inferredStage || ""),
+      stageConfirmed: g.stageConfirmed === undefined ? Boolean(g.headingObserved || g.headingDate) : Boolean(g.stageConfirmed),
+      measurementCount: String(g.measurementCount || ""),
+      measurementMethod: String(g.measurementMethod || ""),
+      stageEvidenceId: String(g.stageEvidenceId || g.logId || g.id || ""),
+      recordedBy: String(g.recordedBy || ""),
+      correctionReason: String(g.correctionReason || ""),
       photo: String(g.photo || ""),
       photoData: String(g.photoData || ""),
       memo: String(g.memo || ""),
@@ -403,6 +422,7 @@
       resultId: String(r.resultId || r.id || U.id("result", U.today())),
       season: U.number(r.season, new Date().getFullYear()),
       varietyId: String(r.varietyId || ""),
+      fieldId: String(r.fieldId || ""),
       areaA: String(r.areaA || ""),
       yield: String(r.yield || ""),
       yieldPer10a: String(r.yieldPer10a || ""),
@@ -456,6 +476,15 @@
       endDate: String(d.endDate || d.expectedEndDate || ""),
       actualEndDate: String(d.actualEndDate || ""),
       targetDays: String(d.targetDays || d.drainageTargetDays || ""),
+      plannedStartDate: String(d.plannedStartDate || ""),
+      startReason: String(d.startReason || ""),
+      startTillerCount: String(d.startTillerCount || ""),
+      startLeafColor: String(d.startLeafColor || ""),
+      startSurface: String(d.startSurface || ""),
+      endSurface: String(d.endSurface || ""),
+      observationSummary: String(d.observationSummary || ""),
+      interruptionDays: String(d.interruptionDays || ""),
+      referenceRecordIds: ensureArray(d.referenceRecordIds).map(String),
       crackCm: String(d.crackCm || ""),
       sinkCm: String(d.sinkCm || ""),
       surface: String(d.surface || ""),
@@ -483,7 +512,18 @@
       endDate: String(i.endDate || ""),
       actualEndDate: String(i.actualEndDate || ""),
       targetDays: String(i.targetDays || ""),
+      plannedStartDate: String(i.plannedStartDate || ""),
+      startReason: String(i.startReason || ""),
+      startTillerCount: String(i.startTillerCount || ""),
+      startLeafColor: String(i.startLeafColor || ""),
+      startSurface: String(i.startSurface || ""),
+      endSurface: String(i.endSurface || ""),
+      observationSummary: String(i.observationSummary || ""),
+      interruptionDays: String(i.interruptionDays || ""),
+      referenceRecordIds: ensureArray(i.referenceRecordIds).map(String),
       status: String(i.status || "入水中"),
+      photo: String(i.photo || ""),
+      photoData: String(i.photoData || ""),
       memo: String(i.memo || ""),
       createdAt: String(i.createdAt || U.now()),
       updatedAt: String(i.updatedAt || U.now())
@@ -504,6 +544,30 @@
       memo: String(s.memo || ""),
       createdAt: String(s.createdAt || U.now()),
       updatedAt: String(s.updatedAt || U.now())
+    };
+  }
+
+  function normalizeConfirmationCandidate(input) {
+    const c = input || {};
+    const createdAt = String(c.createdAt || U.now());
+    return {
+      candidateId: String(c.candidateId || c.id || U.id("candidate", String(createdAt).slice(0, 10))),
+      candidateType: String(c.candidateType || ""),
+      fieldId: String(c.fieldId || ""),
+      season: U.number(c.season, U.season(String(c.periodStart || createdAt).slice(0, 10))),
+      periodStart: String(c.periodStart || ""),
+      periodEnd: String(c.periodEnd || ""),
+      basisData: c.basisData && typeof c.basisData === "object" ? c.basisData : {},
+      missingData: ensureArray(c.missingData).map(String),
+      regionProfile: String(c.regionProfile || ""),
+      varietyProfile: String(c.varietyProfile || ""),
+      calculationMethod: String(c.calculationMethod || ""),
+      calculationVersion: String(c.calculationVersion || ""),
+      status: String(c.status || "active"),
+      actualRecordId: String(c.actualRecordId || ""),
+      actualDifferenceDays: c.actualDifferenceDays === "" || c.actualDifferenceDays === undefined ? "" : U.number(c.actualDifferenceDays, 0),
+      createdAt,
+      updatedAt: String(c.updatedAt || createdAt)
     };
   }
 
@@ -560,7 +624,8 @@
       ...convertedWorks
     ], "workId").map((w) => ({
       ...w,
-      fieldIds: ensureArray(w.fieldIds).filter((id) => fieldIds.has(id))
+      fieldIds: ensureArray(w.fieldIds).filter((id) => fieldIds.has(id)),
+      batchFieldIds: ensureArray(w.batchFieldIds || w.fieldIds).filter((id) => fieldIds.has(id))
     }));
 
     const growthLogs = dedupeBy([
@@ -587,10 +652,13 @@
       fieldId: fieldIds.has(i.fieldId) ? i.fieldId : (fields[0] && fields[0].fieldId) || ""
     }));
     const shipments = dedupeBy(ensureArray(source.shipments).map(normalizeShipment), "shipmentId");
+    const confirmationCandidates = dedupeBy(ensureArray(source.confirmationCandidates).map(normalizeConfirmationCandidate), "candidateId")
+      .filter((candidate) => !candidate.fieldId || fieldIds.has(candidate.fieldId));
     const workers = Array.from(new Set([...WORKERS, ...ensureArray(source.workers).map(String), ...fieldWorks.map((w) => w.worker).filter(Boolean)]));
 
     return {
       schemaVersion: SCHEMA_VERSION,
+      appVersion: String(source.appVersion || source.meta && source.meta.appVersion || APP_VERSION),
       varieties,
       fields,
       fieldWorks,
@@ -602,9 +670,11 @@
       materials,
       varietyResults,
       shipments,
+      confirmationCandidates,
       photos: ensureArray(source.photos),
       workers,
       meta: {
+        ...(source.meta || {}),
         app: "稲作カルテ",
         appName: "稲作カルテ",
         createdAt: source.meta && source.meta.createdAt || source.createdAt || U.now(),
@@ -612,7 +682,12 @@
         importedFrom: source.meta && source.meta.importedFrom || source.importedFrom || "",
         lastJsonExportAt: source.meta && source.meta.lastJsonExportAt || "",
         lastNotificationCheck: source.meta && source.meta.lastNotificationCheck || "",
-        weatherLocation: source.meta && source.meta.weatherLocation || source.weatherLocation || null
+        weatherLocation: source.meta && source.meta.weatherLocation || source.weatherLocation || null,
+        appVersion: source.meta && source.meta.appVersion || source.appVersion || APP_VERSION,
+        lastBackupAt: source.meta && source.meta.lastBackupAt || "",
+        storagePersisted: source.meta && source.meta.storagePersisted,
+        storagePersistCheckedAt: source.meta && source.meta.storagePersistCheckedAt || "",
+        lastExportId: source.meta && source.meta.lastExportId || source.exportId || ""
       }
     };
   }
@@ -630,6 +705,7 @@
       materials: [],
       varietyResults: [],
       shipments: [],
+      confirmationCandidates: [],
       workers: U.clone(WORKERS)
     });
   }
@@ -647,6 +723,7 @@
 
   RiceOS.schema = {
     SCHEMA_VERSION,
+    APP_VERSION,
     STORE_KEY,
     BACKUP_KEY,
     LEGACY_STORES,

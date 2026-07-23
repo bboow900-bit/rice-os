@@ -390,6 +390,20 @@
     return rows.reduce((sum, row) => sum + U.parseWorkHours(row.hours), 0);
   }
 
+  function hoursForField(row, fieldId) {
+    const record = row && row.raw || {};
+    const allocated = record.fieldAllocatedHours && record.fieldAllocatedHours[fieldId];
+    if (allocated !== undefined && allocated !== "") return U.parseWorkHours(allocated);
+    const ids = record.batchFieldIds && record.batchFieldIds.length ? record.batchFieldIds : (row.fieldIds || []);
+    const total = U.parseWorkHours(record.totalHours || row.hours);
+    if (record.timeAccounting === "shared" && ids.length > 1) return total / ids.length;
+    return total;
+  }
+
+  function totalHoursForField(rows, fieldId) {
+    return rows.reduce((sum, row) => sum + hoursForField(row, fieldId), 0);
+  }
+
   function summaryCard(label, value, tone) {
     const text = String(value || "");
     const match = text.match(/^(.*?)(件|時間|圃場)$/);
@@ -572,10 +586,9 @@
     const fields = filteredFields();
     return `
       <div class="annual-v2-top">
-        ${renderSummary(rows)}
         <section class="annual-field-picker">
           <div class="section-title compact">
-            <h3>圃場一覧</h3>
+            <h3>圃場から振り返る</h3>
           </div>
           <div class="annual-filter-row annual-picker-controls">
             <label class="annual-search-label" aria-label="圃場検索">
@@ -593,6 +606,7 @@
             ${fields.length ? fields.map(renderFieldPickerCard).join("") : '<div class="empty">条件に合う圃場がありません。</div>'}
           </div>
         </section>
+        ${renderSummary(rows)}
         ${renderAnnualFab()}
       </div>
     `;
@@ -1019,6 +1033,28 @@
     return rows.filter(test).map((row) => row.date).filter(Boolean).sort()[0] || "";
   }
 
+  function periodSnapshot(items) {
+    const rows = items.map((row) => row.raw || row)
+      .filter((row) => row.startDate || row.actualEndDate)
+      .slice()
+      .sort((a, b) => String(a.startDate || a.date).localeCompare(String(b.startDate || b.date)));
+    if (!rows.length) return { text: "", days: "", startDate: "", endDate: "" };
+    const first = rows[0];
+    const startDate = first.startDate || first.date || "";
+    const endDate = first.actualEndDate || "";
+    const days = startDate && endDate ? U.daysBetween(startDate, endDate) : "";
+    return {
+      text: endDate ? `${U.fd(startDate)}〜${U.fd(endDate)}${days === "" ? "" : ` (${days}日)`}` : `${U.fd(startDate)}〜実施中`,
+      days,
+      startDate,
+      endDate
+    };
+  }
+
+  function waterPeriodSnapshot(rows, pattern) {
+    return periodSnapshot(rows.filter((row) => pattern.test(String(row.raw && row.raw.method || row.title || ""))));
+  }
+
   function fieldYearSnapshot(field, year) {
     const rows = fieldYearRows(field.fieldId, year);
     const works = rows.filter((row) => row.kind === "fieldWork");
@@ -1027,22 +1063,36 @@
     const water = rows.filter((row) => row.kind === "irrigation");
     const waterWorks = works.filter((row) => /中干し|間断灌水|湿潤灌漑|入水|落水/.test(String(row.title || "")));
     const planting = firstDate(works, (row) => /田植/.test(String(row.title || "")));
-    const heading = firstDate(growth, (row) => Boolean(row.record && row.record.headingObserved)) || firstDate(works, (row) => /出穂/.test(String(row.title || "")));
+    const heading = firstDate(growth, (row) => Boolean(row.raw && (row.raw.headingObserved || row.raw.observedStage === "heading" && row.raw.stageConfirmed))) || firstDate(works, (row) => /出穂/.test(String(row.title || "")));
     const harvest = firstDate(works, (row) => /収穫|稲刈/.test(String(row.title || "")));
-    const materialRows = works.filter((row) => String(row.record && row.record.material || "").trim());
+    const materialRows = works.filter((row) => String(row.raw && row.raw.material || "").trim());
+    const panicle = growth.map((row) => row.raw).filter((row) => U.number(row && row.panicleLengthMm, 0) > 0).sort((a, b) => String(a.date).localeCompare(String(b.date)))[0] || null;
+    const dryPeriod = periodSnapshot(dry);
+    const intermittent = waterPeriodSnapshot(water, /間断/);
+    const wet = waterPeriodSnapshot(water, /湿潤/);
+    const drainage = waterPeriodSnapshot(water, /落水/);
+    const resultRows = (state.data().varietyResults || []).filter((row) => String(row.season) === String(year) && row.varietyId === field.varietyId);
+    const result = resultRows.find((row) => row.fieldId === field.fieldId) || resultRows.find((row) => !row.fieldId) || null;
+    const resultScope = result && result.fieldId ? "" : (result ? "（品種集計）" : "");
     return {
       year,
       planting,
       trays: field.seedlingBoxes || "",
-      dry: dry.length || waterWorks.filter((row) => /中干し/.test(String(row.title || ""))).length ? `${dry.length + waterWorks.filter((row) => /中干し/.test(String(row.title || ""))).length}件` : "",
-      water: water.length || waterWorks.filter((row) => !/中干し/.test(String(row.title || ""))).length ? `${water.length + waterWorks.filter((row) => !/中干し/.test(String(row.title || ""))).length}件` : "",
+      dry: dryPeriod.text || (waterWorks.some((row) => /中干し/.test(String(row.title || ""))) ? "作業実績あり（期間未記録）" : ""),
+      dryDays: dryPeriod.days,
+      intermittent: intermittent.text,
+      wet: wet.text,
+      drainage: drainage.text,
       heading,
-      growth: growth.length ? `${growth.length}件` : "",
-      workHours: totalHours(works),
-      materials: materialRows.length ? `${materialRows.length}件` : "",
+      panicle: panicle ? `${U.fd(panicle.date)} / ${panicle.panicleLengthMm}mm` : "",
+      workHours: totalHoursForField(works, field.fieldId),
+      materials: materialRows.length ? unique(materialRows.map((row) => row.raw.material)).join("・") : "",
       harvest,
       photos: rows.filter((row) => row.photoData || row.photo).length,
-      memo: rows.map((row) => row.record && row.record.memo).find(Boolean) || ""
+      yield: result && result.yield ? `${result.yield}${resultScope}` : "",
+      yieldPer10a: result && result.yieldPer10a ? `${result.yieldPer10a}${resultScope}` : "",
+      quality: result && (result.quality || result.grade) ? `${result.quality || result.grade}${resultScope}` : "",
+      memo: rows.map((row) => row.raw && row.raw.memo).find(Boolean) || ""
     };
   }
 
@@ -1060,12 +1110,17 @@
       ["田植え日", snapshotText(current.planting), snapshotText(previous.planting)],
       ["苗箱数", snapshotText(current.trays, "箱"), snapshotText(previous.trays, "箱")],
       ["中干し", snapshotText(current.dry), snapshotText(previous.dry)],
-      ["水管理", snapshotText(current.water), snapshotText(previous.water)],
+      ["間断灌水", snapshotText(current.intermittent), snapshotText(previous.intermittent)],
+      ["湿潤灌漑", snapshotText(current.wet), snapshotText(previous.wet)],
+      ["落水", snapshotText(current.drainage), snapshotText(previous.drainage)],
+      ["幼穂確認", snapshotText(current.panicle), snapshotText(previous.panicle)],
       ["出穂日", snapshotText(current.heading), snapshotText(previous.heading)],
-      ["生育記録", snapshotText(current.growth), snapshotText(previous.growth)],
-      ["作業時間", current.workHours ? U.formatHours(current.workHours) : "未記録", previous.workHours ? U.formatHours(previous.workHours) : "未記録"],
+      ["作業時間（圃場配賦）", current.workHours ? U.formatHours(current.workHours) : "未記録", previous.workHours ? U.formatHours(previous.workHours) : "未記録"],
       ["資材使用", snapshotText(current.materials), snapshotText(previous.materials)],
       ["収穫日", snapshotText(current.harvest), snapshotText(previous.harvest)],
+      ["収穫量", snapshotText(current.yield), snapshotText(previous.yield)],
+      ["10a当たり収量", snapshotText(current.yieldPer10a), snapshotText(previous.yieldPer10a)],
+      ["品質", snapshotText(current.quality), snapshotText(previous.quality)],
       ["写真", current.photos ? `${current.photos}枚` : "未記録", previous.photos ? `${previous.photos}枚` : "未記録"]
     ];
     const missing = rows.filter((row) => row[1] === "未記録").map((row) => row[0]);

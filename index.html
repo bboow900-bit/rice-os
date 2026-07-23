@@ -10,11 +10,11 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="稲作カルテ">
-  <link rel="manifest" href="manifest.webmanifest?v=20260627_ver67">
+  <link rel="manifest" href="manifest.webmanifest?v=20260723_ver118">
   <link rel="icon" href="assets/icons/icon-192.png">
   <link rel="apple-touch-icon" href="assets/icons/icon-192.png">
   <title>稲作カルテ</title>
-  <link rel="stylesheet" href="assets/css/app.css?v=20260723_ver111">
+  <link rel="stylesheet" href="assets/css/app.css?v=20260723_ver118">
   <link rel="stylesheet" href="assets/css/field-management.css?v=20260630_ver85">
 </head>
 <body>
@@ -240,11 +240,30 @@
           <details class="form-section" id="growthStatusSection" open>
             <summary>生育状況</summary>
             <div class="form-grid dense">
+              <label>観察したステージ<select id="gObservedStage">
+                <option value="">選択しない</option>
+                <option value="tillering">分げつ</option>
+                <option value="panicle">幼穂</option>
+                <option value="heading">出穂</option>
+                <option value="ripening">登熟</option>
+                <option value="harvest">収穫</option>
+              </select></label>
+              <label>記録者<input id="gRecordedBy" placeholder="例: 自分"></label>
               <label class="growth-detail-field">葉数<input id="gLeafCount" inputmode="decimal" placeholder="例: 7.2"></label>
               <label>分げつ数<input id="gTillerCount" inputmode="numeric" placeholder="例: 18"></label>
               <label class="growth-detail-field">草丈(cm)<input id="gPlantHeight" inputmode="decimal" placeholder="例: 45"></label>
               <label class="wide">葉色<select id="gLeaf"></select><div id="gLeafChips" class="growth-choice-grid five"></div></label>
+              <label class="growth-detail-field">測定本数<input id="gMeasurementCount" type="number" min="0" inputmode="numeric" placeholder="例: 10"></label>
+              <label class="growth-detail-field">測定方法・補足<input id="gMeasurementMethod" placeholder="例: 圃場中央10株"></label>
+              <label class="wide growth-detail-field">ステージ訂正理由<input id="gCorrectionReason" placeholder="誤入力を訂正するときだけ入力"></label>
             </div>
+            <label class="growth-observe-toggle">
+              <input id="gStageConfirmed" type="checkbox">
+              <span>
+                <b>現地で確認済み</b>
+                <small>予測ではなく、実際に観察したステージとして記録します</small>
+              </span>
+            </label>
             <label class="growth-observe-toggle">
               <input id="gHeadingObserved" type="checkbox">
               <span>
@@ -290,20 +309,28 @@
             <div class="form-grid dense">
               <label>圃場<select id="dryField"></select></label>
               <label>観察日<input id="dryDate" type="date"></label>
+              <label>予定開始日<input id="dryPlannedStartDate" type="date"></label>
               <label>開始日<input id="dryStartDate" type="date"></label>
               <label>予定日数<input id="dryTargetDays" type="number" inputmode="numeric"></label>
               <label>完了予定日<input id="dryEndDate" type="date"></label>
               <label>実際の完了日<input id="dryActualEndDate" type="date"></label>
               <label>状態<select id="dryStatus"></select></label>
+              <label class="wide">開始理由<input id="dryStartReason" placeholder="例: 目標分げつ数を現地確認"></label>
             </div>
           </details>
           <details class="form-section" open>
             <summary>中干し観察</summary>
             <div class="form-grid dense">
+              <label>開始時の茎数<input id="dryStartTillerCount" inputmode="decimal"></label>
+              <label>開始時の葉色<input id="dryStartLeafColor" inputmode="decimal"></label>
+              <label>開始時の田面<input id="dryStartSurface" placeholder="例: 湿っている"></label>
+              <label>終了時の田面<input id="dryEndSurface" placeholder="例: 小ヒビ"></label>
               <label>ひび割れ幅(cm)<input id="dryCrackCm" inputmode="decimal"></label>
               <label>足の沈み込み(cm)<input id="drySinkCm" inputmode="decimal"></label>
               <label>田面状態<select id="drySurface"></select></label>
               <label>ガス状態<select id="dryGas"></select></label>
+              <label>差し水・中断日数<input id="dryInterruptionDays" type="number" min="0" inputmode="numeric"></label>
+              <label class="wide">観察の要約<input id="dryObservationSummary" placeholder="例: 小ヒビ、足跡2cm、表面は湿り"></label>
             </div>
             <div id="dryTargetCompare" class="target-compare"></div>
             <div id="dryWeatherAdjust" class="dry-weather-adjust"></div>
@@ -344,16 +371,26 @@
               <label>種別<select id="irrigationMethod"></select></label>
               <label>圃場<select id="irrigationField"></select></label>
               <label>記録日<input id="irrigationDate" type="date"></label>
+              <label>予定開始日<input id="irrigationPlannedStartDate" type="date"></label>
               <label>開始日<input id="irrigationStartDate" type="date"></label>
               <label>予定日数<input id="irrigationTargetDays" type="number" inputmode="numeric"></label>
               <label>完了予定日<input id="irrigationEndDate" type="date"></label>
               <label>実際の完了日<input id="irrigationActualEndDate" type="date"></label>
               <label>進行状態<select id="irrigationPeriodStatus"></select></label>
               <label>水状態<select id="irrigationStatus"></select></label>
+              <label class="wide">開始理由<input id="irrigationStartReason" placeholder="例: 中干し完了後の水管理"></label>
             </div>
           </details>
-          <details class="form-section">
-            <summary>メモ</summary>
+          <details class="form-section" open>
+            <summary>観察・メモ</summary>
+            <div class="form-grid dense">
+              <label>開始時の茎数<input id="irrigationStartTillerCount" inputmode="decimal"></label>
+              <label>開始時の葉色<input id="irrigationStartLeafColor" inputmode="decimal"></label>
+              <label>開始時の田面<input id="irrigationStartSurface" placeholder="例: 小ヒビ"></label>
+              <label>終了時の田面<input id="irrigationEndSurface" placeholder="例: 湿りあり"></label>
+              <label>差し水・中断日数<input id="irrigationInterruptionDays" type="number" min="0" inputmode="numeric"></label>
+              <label>観察の要約<input id="irrigationObservationSummary" placeholder="例: 足跡が残る程度"></label>
+            </div>
             <label>メモ<textarea id="irrigationMemo"></textarea></label>
           </details>
           <div class="form-actions">
@@ -546,13 +583,21 @@
           <button class="primary" data-action="export-json">JSON保存</button>
           <button class="secondary" data-action="export-csv">CSV出力</button>
           <label class="file-button">JSONを選択<input id="importFile" type="file" accept=".json,application/json"></label>
-          <button class="secondary" data-action="import-json">JSON復元</button>
+          <label>読み込み方法<select id="importMode">
+            <option value="inspect">検査のみ</option>
+            <option value="merge">現在データへ追加・統合</option>
+            <option value="replace">完全置換</option>
+          </select></label>
+          <button class="secondary" data-action="import-json">JSONを検査・実行</button>
           <button class="secondary" data-action="import-legacy">旧版取り込み</button>
           <button class="secondary" data-action="restore-backup">直前バックアップ復旧</button>
           <button class="secondary" data-action="undo-last-save">直前に戻す</button>
+          <button class="secondary" data-action="request-persistent-storage">永続保存を確認</button>
           <button class="secondary" data-action="enable-notifications">通知を許可</button>
           <button class="secondary" data-action="force-update">最新版に更新</button>
         </div>
+        <div id="dataImportReport" class="data-import-report hidden"></div>
+        <div id="dataStorageStatus" class="data-storage-status"></div>
         <div class="data-status" id="dataStatus"></div>
         <div class="section-title">
           <h3>保存内容</h3>
@@ -580,9 +625,10 @@
       <div class="sheet-actions">
         <button class="sheet-action growth" data-sheet-add="growth"><span>生</span><b>生育記録</b></button>
         <button class="sheet-action work" data-sheet-add="work"><span>作</span><b>作業記録</b></button>
+        <button class="sheet-action water" data-sheet-add="water"><span>水</span><b>水管理</b></button>
+        <button class="sheet-action photo" data-sheet-add="photo"><span>写</span><b>写真</b></button>
         <button class="sheet-action schedule" data-sheet-add="schedule"><span>予</span><b>予定登録</b></button>
-        <button class="sheet-action harvest" data-sheet-add="harvest"><span>収</span><b>収穫記録</b></button>
-        <button class="sheet-action harvest" data-sheet-add="shipment"><span>出</span><b>出荷記録</b></button>
+        <button class="sheet-action harvest" data-sheet-add="result"><span>収</span><b>収穫・結果</b></button>
       </div>
       <form id="sheetScheduleForm" class="sheet-schedule-form hidden">
         <div class="sheet-schedule-head">
@@ -638,33 +684,33 @@
 
   <div id="toast" class="toast hidden" role="status"></div>
 
-  <script src="assets/js/core/utils.js?v=20260627_ver67"></script>
-  <script src="assets/js/core/schema.js?v=20260723_ver104"></script>
-  <script src="assets/js/core/storage.js?v=20260627_ver67"></script>
-  <script src="assets/js/core/state.js?v=20260723_ver111"></script>
-  <script src="assets/js/core/agro.js?v=20260723_ver115"></script>
+  <script src="assets/js/core/utils.js?v=20260723_ver118"></script>
+  <script src="assets/js/core/schema.js?v=20260723_ver118"></script>
+  <script src="assets/js/core/storage.js?v=20260723_ver118"></script>
+  <script src="assets/js/core/state.js?v=20260723_ver118"></script>
+  <script src="assets/js/core/agro.js?v=20260723_ver118"></script>
   <script src="assets/js/core/record-actions.js?v=20260627_ver67"></script>
   <script src="assets/js/core/calendar.js?v=20260720_ver93"></script>
   <script src="assets/js/core/alerts.js?v=20260723_ver111"></script>
-  <script src="assets/js/core/weather.js?v=20260629_ver81"></script>
-  <script src="assets/js/core/pwa.js?v=20260723_ver115"></script>
-  <script src="assets/js/screens/home.js?v=20260723_ver115"></script>
+  <script src="assets/js/core/weather.js?v=20260723_ver118"></script>
+  <script src="assets/js/core/pwa.js?v=20260723_ver118"></script>
+  <script src="assets/js/screens/home.js?v=20260723_ver118"></script>
   <script src="assets/js/screens/calendar.js?v=20260723_ver114"></script>
-  <script src="assets/js/screens/bottom-sheet.js?v=20260721_ver97"></script>
+  <script src="assets/js/screens/bottom-sheet.js?v=20260723_ver118"></script>
   <script src="assets/js/screens/recipes.js?v=20260630_ver87"></script>
-  <script src="assets/js/screens/fields.js?v=20260723_ver115"></script>
+  <script src="assets/js/screens/fields.js?v=20260723_ver118"></script>
   <script src="assets/js/screens/field-work.js?v=20260723_ver104"></script>
   <script src="assets/js/screens/fertilizer.js?v=20260720_ver96"></script>
-  <script src="assets/js/screens/growth.js?v=20260721_ver103"></script>
-  <script src="assets/js/screens/dry-period.js?v=20260712_ver92"></script>
-  <script src="assets/js/screens/irrigation.js?v=20260721_ver101"></script>
+  <script src="assets/js/screens/growth.js?v=20260723_ver118"></script>
+  <script src="assets/js/screens/dry-period.js?v=20260723_ver118"></script>
+  <script src="assets/js/screens/irrigation.js?v=20260723_ver118"></script>
   <script src="assets/js/screens/photos.js?v=20260627_ver67"></script>
   <script src="assets/js/screens/other-work.js?v=20260627_ver67"></script>
-  <script src="assets/js/screens/annual.js?v=20260723_ver115"></script>
+  <script src="assets/js/screens/annual.js?v=20260723_ver118"></script>
   <script src="assets/js/screens/materials.js?v=20260627_ver67"></script>
   <script src="assets/js/screens/results.js?v=20260627_ver67"></script>
   <script src="assets/js/screens/notices.js?v=20260723_ver113"></script>
-  <script src="assets/js/screens/data.js?v=20260627_ver67"></script>
-  <script src="assets/js/app.js?v=20260723_ver111"></script>
+  <script src="assets/js/screens/data.js?v=20260723_ver118"></script>
+  <script src="assets/js/app.js?v=20260723_ver118"></script>
 </body>
 </html>

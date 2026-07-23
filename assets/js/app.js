@@ -121,7 +121,13 @@
       if (label) label.textContent = primaryLabels[screenId];
     });
     U.$$(".nav-item").forEach((button) => {
-      button.addEventListener("click", () => show(button.dataset.screen));
+      button.addEventListener("click", () => {
+        if (button.dataset.screen === "field-work" && RiceOS.bottomSheet) {
+          RiceOS.bottomSheet.open(U.today());
+          return;
+        }
+        show(button.dataset.screen);
+      });
     });
     const backButton = U.$("appBackButton");
     if (backButton) backButton.addEventListener("click", back);
@@ -215,7 +221,13 @@
       const mod = screenModule(activeScreen);
       if (!mod || !mod.preserveOnDataChange) renderAll();
       if (RiceOS.pwa && RiceOS.alerts) RiceOS.pwa.notifyDueAlerts(RiceOS.alerts.notificationAlerts());
-      U.toast(event.detail && event.detail.message || "保存しました");
+      const message = event.detail && event.detail.message || "保存しました";
+      const canUndo = event.detail && event.detail.status === "saved" && !/戻しました|復元しました/.test(message);
+      U.toast(message, canUndo ? {
+        actionLabel: "取り消す",
+        duration: 4500,
+        onAction: () => RiceOS.state.undoLastSave()
+      } : undefined);
     });
     initializeFormDefaults();
     show(activeScreen, { skipHistory: true });

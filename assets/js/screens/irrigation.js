@@ -109,6 +109,7 @@
     U.$("irrigationDate").value = U.today();
     U.$("irrigationMethod").value = "間断灌水";
     U.$("irrigationField").value = field ? field.fieldId : "";
+    U.$("irrigationPlannedStartDate").value = "";
     U.$("irrigationStartDate").value = field && field.intermittentStartDate || U.today();
     U.$("irrigationTargetDays").value = field && field.intermittentIntervalDays || "3";
     U.$("irrigationEndDate").value = "";
@@ -116,6 +117,13 @@
     U.$("irrigationActualEndDate").value = "";
     U.$("irrigationPeriodStatus").value = "実施中";
     U.$("irrigationStatus").value = "入水中";
+    U.$("irrigationStartReason").value = "";
+    U.$("irrigationStartTillerCount").value = "";
+    U.$("irrigationStartLeafColor").value = "";
+    U.$("irrigationStartSurface").value = "";
+    U.$("irrigationEndSurface").value = "";
+    U.$("irrigationInterruptionDays").value = "";
+    U.$("irrigationObservationSummary").value = "";
     U.$("irrigationMemo").value = "";
     clearBulkFields();
     renderWaterStageNavigator();
@@ -135,12 +143,20 @@
     U.$("irrigationMethod").value = item.method || "間断灌水";
     U.$("irrigationField").value = item.fieldId;
     U.$("irrigationDate").value = item.date;
+    U.$("irrigationPlannedStartDate").value = item.plannedStartDate || "";
     U.$("irrigationStartDate").value = item.startDate || "";
     U.$("irrigationEndDate").value = item.endDate || "";
     U.$("irrigationActualEndDate").value = item.actualEndDate || "";
     U.$("irrigationTargetDays").value = item.targetDays || "";
     U.$("irrigationPeriodStatus").value = item.periodStatus || (item.actualEndDate ? "完了" : "実施中");
     U.$("irrigationStatus").value = item.status || "入水中";
+    U.$("irrigationStartReason").value = item.startReason || "";
+    U.$("irrigationStartTillerCount").value = item.startTillerCount || "";
+    U.$("irrigationStartLeafColor").value = item.startLeafColor || "";
+    U.$("irrigationStartSurface").value = item.startSurface || "";
+    U.$("irrigationEndSurface").value = item.endSurface || "";
+    U.$("irrigationInterruptionDays").value = item.interruptionDays || "";
+    U.$("irrigationObservationSummary").value = item.observationSummary || "";
     U.$("irrigationMemo").value = item.memo || "";
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
@@ -173,6 +189,9 @@
               <span>実完了 <b>${U.escapeHTML(U.fd(item.actualEndDate) || "-")}</b></span>
               <span>予定日数 <b>${U.escapeHTML(item.targetDays || "-")}</b></span>
             </div>
+            ${item.startReason ? `<div><b>開始理由</b> ${U.escapeHTML(item.startReason)}</div>` : ""}
+            ${item.observationSummary ? `<div><b>観察</b> ${U.escapeHTML(item.observationSummary)}</div>` : ""}
+            ${item.interruptionDays ? `<div><b>差し水・中断</b> ${U.escapeHTML(String(item.interruptionDays))}日</div>` : ""}
             ${item.memo ? `<div>${U.escapeHTML(item.memo)}</div>` : ""}
           </div>
           <div class="record-actions">
@@ -228,12 +247,20 @@
         irrigationId: U.$("editIrrigationId").value,
         method: U.$("irrigationMethod").value,
         date: U.$("irrigationDate").value,
+        plannedStartDate: U.$("irrigationPlannedStartDate").value,
         startDate: U.$("irrigationStartDate").value,
         endDate: U.$("irrigationEndDate").value,
         actualEndDate: U.$("irrigationActualEndDate").value,
         targetDays: U.$("irrigationTargetDays").value,
         periodStatus: U.$("irrigationPeriodStatus").value,
         status: U.$("irrigationStatus").value,
+        startReason: U.$("irrigationStartReason").value,
+        startTillerCount: U.$("irrigationStartTillerCount").value,
+        startLeafColor: U.$("irrigationStartLeafColor").value,
+        startSurface: U.$("irrigationStartSurface").value,
+        endSurface: U.$("irrigationEndSurface").value,
+        interruptionDays: U.$("irrigationInterruptionDays").value,
+        observationSummary: U.$("irrigationObservationSummary").value,
         memo: U.$("irrigationMemo").value
       };
       const targets = !common.irrigationId && bulkFieldIds.length > 1 ? bulkFieldIds : [U.$("irrigationField").value];

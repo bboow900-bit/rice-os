@@ -184,7 +184,7 @@
 
   function groupedFields() {
     const map = new Map();
-    state.fields().forEach((field) => {
+    state.activeFields().forEach((field) => {
       const name = groupName(field);
       if (!map.has(name)) map.set(name, []);
       map.get(name).push(field);
@@ -649,10 +649,19 @@
     return photosForField(field.fieldId)[0] || null;
   }
 
+  function latestIrrigationForField(fieldId) {
+    return state.irrigationsFor(fieldId)
+      .filter((row) => row.startDate)
+      .slice()
+      .sort((a, b) => String(b.startDate || b.date).localeCompare(String(a.startDate || a.date)))[0] || null;
+  }
+
   function fieldStatusText(field) {
     const growth = latestGrowthForField(field.fieldId);
     const dry = drySummary(field);
-    if (dry.actualEndDate && field.intermittentStartDate) return "中干し完了・間断灌水へ";
+    const irrigation = latestIrrigationForField(field.fieldId);
+    if (irrigation && !irrigation.actualEndDate) return `${irrigation.method || "水管理"} 実施中`;
+    if (dry.actualEndDate) return "中干し完了・次の水管理は未開始";
     if (dry.startDate && !dry.actualEndDate) return `中干し ${dry.status}`;
     if (growth) return `生育 ${U.fd(growth.date)}`;
     return field.status || "記録待ち";
@@ -685,7 +694,7 @@
     const groups = groupedFields();
     const groupOptions = [`<option value="all">すべてのグループ</option>`, ...groups.map((group) => `<option value="${U.attr(group.name)}">${U.escapeHTML(group.name)} (${group.fields.length})</option>`)].join("");
     const query = fieldSearch.trim().toLowerCase();
-    const visible = state.fields()
+    const visible = state.activeFields()
       .filter((field) => fieldGroupFilter === "all" || groupName(field) === fieldGroupFilter)
       .filter((field) => !query || `${field.name} ${state.variety(field.varietyId) && state.variety(field.varietyId).name || ""} ${field.district || ""}`.toLowerCase().includes(query))
       .slice()
@@ -706,7 +715,12 @@
     const photo = latestPhotoForField(field);
     const growth = latestGrowthForField(field.fieldId);
     const dry = drySummary(field);
-    const waterText = dry.actualEndDate && field.intermittentStartDate ? `中干し完了 ${U.fd(dry.actualEndDate)} → 間断灌水` : dry.startDate ? `中干し ${dry.status}` : "水管理未記録";
+    const irrigation = latestIrrigationForField(field.fieldId);
+    const waterText = irrigation
+      ? `${irrigation.method || "水管理"} ${irrigation.actualEndDate ? `完了 ${U.fd(irrigation.actualEndDate)}` : `実施中 ${U.fd(irrigation.startDate)}`}`
+      : dry.actualEndDate
+        ? `中干し完了 ${U.fd(dry.actualEndDate)} / 次の水管理は未開始`
+        : dry.startDate ? `中干し ${dry.status}` : "水管理未記録";
     return `
       <section class="field-hub-detail">
         <div class="field-hub-detail-head"><button type="button" class="field-hub-back" data-field-view="list" aria-label="圃場一覧へ戻る">‹</button><div><span>圃場詳細</span><h3>${U.escapeHTML(field.name)}</h3><small>${U.escapeHTML(variety && variety.name || "品種未設定")} / ${U.escapeHTML(String(field.areaA || 0))}a</small></div><button type="button" class="secondary" data-field-view="settings">編集</button></div>
@@ -715,7 +729,7 @@
           <div><small>いまのステージ</small><b>${U.escapeHTML(stage.label)}</b><p>${U.escapeHTML(fieldNextRecord(field))}を残すと、この圃場の一年がつながります。</p></div>
         </section>
         <div class="field-hub-summary"><span><b>生育</b>${U.escapeHTML(growth ? `${U.fd(growth.date)} / 葉色 ${growth.leafColor || "-"}` : "未入力")}</span><span><b>水管理</b>${U.escapeHTML(waterText)}</span></div>
-        ${dry.actualEndDate ? `<section class="field-water-transition"><b>中干し完了</b><span>${U.escapeHTML(U.fd(dry.actualEndDate))}から間断灌水へ移行</span><button type="button" data-field-action="add-irrigation" data-field-id="${U.attr(field.fieldId)}">間断灌水を記録</button></section>` : ""}
+        ${dry.actualEndDate && !irrigation ? `<section class="field-water-transition"><b>中干し完了</b><span>${U.escapeHTML(U.fd(dry.actualEndDate))}。田面を確認して次の水管理を記録してください</span><button type="button" data-field-action="add-irrigation" data-field-id="${U.attr(field.fieldId)}">間断灌水を開始・記録</button><small>自動では開始しません</small></section>` : ""}
         <section class="field-hub-actions"><button type="button" data-field-action="add-work" data-field-id="${U.attr(field.fieldId)}">作業を記録</button><button type="button" data-field-action="add-growth" data-field-id="${U.attr(field.fieldId)}">生育を記録</button><button type="button" data-field-action="add-irrigation" data-field-id="${U.attr(field.fieldId)}">水管理</button><button type="button" data-field-action="photos" data-field-id="${U.attr(field.fieldId)}">写真</button></section>
         <section class="field-hub-history"><div><span>今年のひとこと</span><b>${U.escapeHTML(field.yearMemo || field.nextSeasonMemo || field.fixedMemo || "まだありません")}</b></div><button type="button" class="secondary" data-field-action="history" data-field-id="${U.attr(field.fieldId)}">前年比較・振り返り</button></section>
       </section>
@@ -893,7 +907,7 @@
       if (!field) return;
       const action = button.dataset.fieldAction;
       if (action === "delete") {
-        const ok = confirm(`${field.name} を削除しますか？\n\nこの圃場の生育・水管理記録は削除され、作業記録からはこの圃場だけ外れます。`);
+        const ok = confirm(`${field.name} を一覧から外しますか？\n\n過去の作業・生育・水管理・写真は削除せず、年間履歴に残します。`);
         if (!ok) return;
         state.deleteField(field.fieldId);
         activeFieldId = "";

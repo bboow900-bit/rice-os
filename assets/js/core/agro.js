@@ -199,28 +199,59 @@
       .filter((row) => String(row.date || "").startsWith(`${year}-`) && beforeOrOn(row));
     const growth = state().growthLogsFor(field.fieldId)
       .filter((row) => String(row.date || "").startsWith(`${year}-`) && beforeOrOn(row));
-    const planting = works.filter((row) => /田植/.test(String(row.workName || "")))
-      .map((row) => row.date).filter(Boolean).sort()[0] || "";
-    const hasWork = (pattern) => works.some((row) => pattern.test(String(row.workName || "")));
-    const panicle = growth.some((row) => Number(row.panicleLengthMm || 0) > 0);
-    const headingDates = [
-      ...growth.filter((row) => Boolean(row.headingObserved)).map((row) => row.date),
-      ...works.filter((row) => /出穂/.test(String(row.workName || ""))).map((row) => row.date)
-    ].filter(Boolean).sort();
+    const plantingRows = works.filter((row) => /田植/.test(String(row.workName || "")));
+    const planting = plantingRows.map((row) => row.date).filter(Boolean).sort()[0] || "";
+    const headingDates = growth.filter((row) => Boolean(row.headingObserved)).map((row) => row.date)
+      .concat(works.filter((row) => /出穂/.test(String(row.workName || ""))).map((row) => row.date))
+      .filter(Boolean).sort();
     const headingDate = headingDates[0] || "";
-    const heading = Boolean(headingDate);
-    const harvest = hasWork(/稲刈り|収穫/);
     const dap = planting ? U.daysBetween(planting, date) : "";
-    let index = 0;
+    const stageIndex = { planting: 1, tillering: 2, panicle: 3, heading: 4, ripening: 5, harvest: 6 };
+    const evidence = [];
+    plantingRows.forEach((row) => evidence.push({ date: row.date, index: 1, source: "work", recordId: row.workId || "" }));
+    growth.forEach((row) => {
+      const observed = String(row.observedStage || "");
+      const confirmedIndex = row.stageConfirmed ? stageIndex[observed] : 0;
+      if (confirmedIndex) {
+        evidence.push({ date: row.date, index: confirmedIndex, source: "confirmed", recordId: row.logId || "", correctionReason: row.correctionReason || "" });
+        return;
+      }
+      if (row.headingObserved) evidence.push({ date: row.date, index: 4, source: "measured", recordId: row.logId || "" });
+      else if (Number(row.panicleLengthMm || 0) > 0) evidence.push({ date: row.date, index: 3, source: "measured", recordId: row.logId || "" });
+      else if (row.tillerCount !== undefined && String(row.tillerCount) !== "") evidence.push({ date: row.date, index: 2, source: "measured", recordId: row.logId || "" });
+    });
+    works.filter((row) => /出穂/.test(String(row.workName || "")))
+      .forEach((row) => evidence.push({ date: row.date, index: 4, source: "work", recordId: row.workId || "" }));
+    works.filter((row) => /稲刈り|収穫/.test(String(row.workName || "")))
+      .forEach((row) => evidence.push({ date: row.date, index: 6, source: "work", recordId: row.workId || "" }));
+    const explicitCorrection = evidence.filter((item) => item.source === "confirmed" && item.correctionReason)
+      .sort((a, b) => String(a.date).localeCompare(String(b.date))).pop() || null;
+    evidence.sort((a, b) => a.index - b.index
+      || String(a.date).localeCompare(String(b.date))
+      || ({ measured: 1, work: 2, confirmed: 3 }[a.source] - { measured: 1, work: 2, confirmed: 3 }[b.source]));
+    const latestEvidence = explicitCorrection || evidence[evidence.length - 1] || null;
+    let index = latestEvidence ? latestEvidence.index : 0;
     let next = "田植え作業を残すと、今年の比較が始まります";
-    if (planting) { index = 1; next = "活着・分げつの様子を記録しましょう"; }
-    if (growth.length) { index = 2; next = "幼穂長を確認できたら残しましょう"; }
-    if (panicle) { index = 3; next = "出穂を確認したら記録しましょう"; }
-    if (heading) { index = 4; next = "登熟期の水管理と稲姿を残しましょう"; }
-    if (headingDate && U.daysBetween(headingDate, date) >= 7) { index = 5; next = "収穫日と今年の振り返りを残しましょう"; }
-    if (harvest) { index = 6; next = "来年への引き継ぎを残しましょう"; }
+    if (index === 1) next = "活着・分げつの様子を記録しましょう";
+    if (index === 2) next = "幼穂長を確認できたら残しましょう";
+    if (index === 3) next = "出穂を確認したら記録しましょう";
+    if (index === 4) next = "登熟の様子を現地で確認して残しましょう";
+    if (index === 5) next = "収穫日と今年の振り返りを残しましょう";
+    if (index === 6) next = "来年への引き継ぎを残しましょう";
     const current = index ? SEASON_STAGES[index - 1] : null;
-    return { index, current, next, dap, image: current ? current.image : 1 };
+    const suggested = headingDate && index === 4 && U.daysBetween(headingDate, date) >= 7
+      ? { type: "ripening", label: "登熟の確認目安", basis: `出穂確認から${U.daysBetween(headingDate, date)}日` }
+      : null;
+    return {
+      index,
+      current,
+      next,
+      dap,
+      image: current ? current.image : 1,
+      evidenceSource: latestEvidence && latestEvidence.source || "",
+      evidenceRecordId: latestEvidence && latestEvidence.recordId || "",
+      suggested
+    };
   }
 
   RiceOS.agro = {

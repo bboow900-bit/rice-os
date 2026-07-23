@@ -9,7 +9,8 @@
     "temperature_2m_max",
     "temperature_2m_min",
     "temperature_2m_mean",
-    "precipitation_sum"
+    "precipitation_sum",
+    "precipitation_hours"
   ].join(",");
 
   const WEATHER_LABELS = {
@@ -173,12 +174,20 @@
       longitude: Number(location.longitude),
       label: location.label || "取得位置",
       weatherCode: code,
+      rawWmoWeatherCode: code,
       weather: weatherLabel(code, precipitation),
       tempMax: round(dailyValue(daily, "temperature_2m_max")),
       tempMin: round(dailyValue(daily, "temperature_2m_min")),
       tempMean: round(dailyValue(daily, "temperature_2m_mean")),
       precipitation,
-      fetchedAt: U.now()
+      precipitationHours: round(dailyValue(daily, "precipitation_hours")),
+      dataset: isPastDate(dateText) ? "Open-Meteo Historical Weather API" : "Open-Meteo Forecast API",
+      model: "best_match",
+      timezone: json.timezone || "Asia/Tokyo",
+      utcOffsetSeconds: json.utc_offset_seconds ?? "",
+      fetchedAt: U.now(),
+      retrievedAt: U.now(),
+      manualCorrection: null
     };
     result.summary = formatSummary(result);
     return result;
@@ -221,10 +230,16 @@
           date,
           source: range.source,
           weatherCode: Array.isArray(daily.weather_code) ? daily.weather_code[index] : "",
+          rawWmoWeatherCode: Array.isArray(daily.weather_code) ? daily.weather_code[index] : "",
           tempMax: round(Array.isArray(daily.temperature_2m_max) ? daily.temperature_2m_max[index] : ""),
           tempMin: round(Array.isArray(daily.temperature_2m_min) ? daily.temperature_2m_min[index] : ""),
           tempMean: round(Array.isArray(daily.temperature_2m_mean) ? daily.temperature_2m_mean[index] : ""),
-          precipitation: round(Array.isArray(daily.precipitation_sum) ? daily.precipitation_sum[index] : "")
+          precipitation: round(Array.isArray(daily.precipitation_sum) ? daily.precipitation_sum[index] : ""),
+          precipitationHours: round(Array.isArray(daily.precipitation_hours) ? daily.precipitation_hours[index] : ""),
+          dataset: range.source,
+          model: "best_match",
+          timezone: json.timezone || "Asia/Tokyo",
+          retrievedAt: U.now()
         });
       });
     }
@@ -238,7 +253,10 @@
       count: valid.length,
       total: Math.round(total * 10) / 10,
       location,
-      fetchedAt: U.now()
+      fetchedAt: U.now(),
+      retrievedAt: U.now(),
+      timezone: "Asia/Tokyo",
+      model: "best_match"
     };
   }
 

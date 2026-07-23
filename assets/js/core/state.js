@@ -118,21 +118,16 @@
 
   function deleteField(fieldId) {
     mutate((d) => {
-      d.fields = (d.fields || []).filter((f) => f.fieldId !== fieldId);
-      d.fieldWorks = (d.fieldWorks || [])
-        .map((work) => ({ ...work, fieldIds: (work.fieldIds || []).filter((id) => id !== fieldId) }))
-        .filter((work) => (work.fieldIds || []).length);
-      d.otherWorks = (d.otherWorks || []).map((work) => ({
-        ...work,
-        relatedFieldIds: (work.relatedFieldIds || []).filter((id) => id !== fieldId)
-      }));
-      d.schedules = (d.schedules || [])
-        .map((schedule) => ({ ...schedule, fieldIds: (schedule.fieldIds || []).filter((id) => id !== fieldId) }))
-        .filter((schedule) => (schedule.fieldIds || []).length);
-      d.growthLogs = (d.growthLogs || []).filter((log) => log.fieldId !== fieldId);
-      d.dryPeriods = (d.dryPeriods || []).filter((row) => row.fieldId !== fieldId);
-      d.irrigations = (d.irrigations || []).filter((row) => row.fieldId !== fieldId);
-    }, "圃場を削除しました");
+      const index = (d.fields || []).findIndex((field) => field.fieldId === fieldId);
+      if (index < 0) return;
+      d.fields[index] = {
+        ...d.fields[index],
+        status: "終了",
+        archivedAt: U.now(),
+        archivedReason: "利用者による削除",
+        updatedAt: U.now()
+      };
+    }, "圃場を一覧から外しました。過去記録は年間履歴に残ります");
   }
 
   function matchesWorkName(work, names) {
@@ -257,12 +252,26 @@
   function saveFieldWork(record) {
     mutate((d) => {
       const date = record.date || U.today();
+      const previous = record.workId ? d.fieldWorks.find((work) => work.workId === record.workId) : null;
+      const targetFieldIds = (record.fieldIds || []).slice();
+      const batchId = String(record.batchId || previous && previous.batchId || (targetFieldIds.length > 1 ? U.id("batch", date) : ""));
+      const timeAccounting = record.timeAccounting || previous && previous.timeAccounting || (targetFieldIds.length > 1 ? "shared" : "single");
+      const totalHours = record.totalHours || record.hours || previous && previous.totalHours || "";
+      const totalHoursValue = U.parseWorkHours(totalHours);
+      const fieldAllocatedHours = record.fieldAllocatedHours || (timeAccounting === "shared" && targetFieldIds.length > 1 && totalHoursValue
+        ? Object.fromEntries(targetFieldIds.map((fieldId) => [fieldId, Math.round(totalHoursValue / targetFieldIds.length * 100) / 100]))
+        : previous && previous.fieldAllocatedHours || {});
       const normalized = {
         workId: record.workId || U.id("work", date),
         type: "fieldWork",
         date,
         season: U.season(date),
-        fieldIds: record.fieldIds || [],
+        fieldIds: targetFieldIds,
+        batchId,
+        batchFieldIds: (record.batchFieldIds || previous && previous.batchFieldIds || targetFieldIds).slice(),
+        timeAccounting,
+        totalHours,
+        fieldAllocatedHours,
         workName: record.workName || "その他",
         worker: record.worker || "",
         hours: record.hours || "",
@@ -279,7 +288,7 @@
         photo: record.photo || "",
         photoData: record.photoData || "",
         memo: record.memo || "",
-        createdAt: record.createdAt || U.now(),
+        createdAt: record.createdAt || previous && previous.createdAt || U.now(),
         updatedAt: U.now()
       };
       const index = d.fieldWorks.findIndex((w) => w.workId === normalized.workId);
@@ -324,7 +333,6 @@
           if (fieldIndex >= 0) {
             d.fields[fieldIndex].drainageActualEndDate = normalized.date;
             d.fields[fieldIndex].drainageActualDays = dryActualDaysForField(d.fields[fieldIndex], normalized.date);
-            if (!d.fields[fieldIndex].intermittentStartDate) d.fields[fieldIndex].intermittentStartDate = normalized.date;
           }
         });
       }
@@ -353,7 +361,6 @@
           if (fieldIndex >= 0) {
             d.fields[fieldIndex].drainageActualEndDate = normalized.date;
             d.fields[fieldIndex].drainageActualDays = dryActualDaysForField(d.fields[fieldIndex], normalized.date);
-            if (!d.fields[fieldIndex].intermittentStartDate) d.fields[fieldIndex].intermittentStartDate = normalized.date;
           }
         });
       }
@@ -377,9 +384,11 @@
   function saveGrowthLog(record) {
     mutate((d) => {
       const date = record.date || U.today();
+      const logId = record.logId || U.id("growth", date);
+      const previous = d.growthLogs.find((g) => g.logId === logId) || null;
       const leafColorScore = String(record.leafColorScore || RiceOS.schema.leafColorScoreFromText(record.leafColor || ""));
       const normalized = {
-        logId: record.logId || U.id("growth", date),
+        logId,
         type: "growthLog",
         date,
         season: U.season(date),
@@ -394,15 +403,64 @@
         gas: record.gas || "-",
         water: record.water || "-",
         headingObserved: Boolean(record.headingObserved),
+        observedStage: record.observedStage || previous && previous.observedStage || "",
+        stageConfirmed: record.stageConfirmed === undefined ? Boolean(previous && previous.stageConfirmed) : Boolean(record.stageConfirmed),
+        measurementCount: record.measurementCount || previous && previous.measurementCount || "",
+        measurementMethod: record.measurementMethod || previous && previous.measurementMethod || "",
+        stageEvidenceId: record.stageEvidenceId || previous && previous.stageEvidenceId || logId,
+        recordedBy: record.recordedBy || previous && previous.recordedBy || "",
+        correctionReason: record.correctionReason || previous && previous.correctionReason || "",
         photo: record.photo || "",
         photoData: record.photoData || "",
         memo: record.memo || "",
-        createdAt: record.createdAt || U.now(),
+        createdAt: record.createdAt || previous && previous.createdAt || U.now(),
         updatedAt: U.now()
       };
       const index = d.growthLogs.findIndex((g) => g.logId === normalized.logId);
       if (index >= 0) d.growthLogs[index] = { ...d.growthLogs[index], ...normalized };
       else d.growthLogs.push(normalized);
+      d.confirmationCandidates = d.confirmationCandidates || [];
+      if (U.number(normalized.panicleLengthMm, 0) > 0 && RiceOS.agro && RiceOS.agro.panicleEstimate) {
+        const estimate = RiceOS.agro.panicleEstimate(normalized.fieldId, normalized.panicleLengthMm, normalized.date);
+        if (estimate && estimate.supported) {
+          const candidateIndex = d.confirmationCandidates.findIndex((item) => item.candidateType === "heading" && item.fieldId === normalized.fieldId && item.basisData && item.basisData.recordId === normalized.logId);
+          const candidate = {
+            candidateId: candidateIndex >= 0 ? d.confirmationCandidates[candidateIndex].candidateId : U.id("candidate", normalized.date),
+            candidateType: "heading",
+            fieldId: normalized.fieldId,
+            season: normalized.season,
+            periodStart: estimate.rangeStart,
+            periodEnd: estimate.rangeEnd,
+            basisData: {
+              recordId: normalized.logId,
+              panicleLengthMm: normalized.panicleLengthMm,
+              observedDate: normalized.date,
+              source: estimate.source
+            },
+            missingData: [],
+            regionProfile: "",
+            varietyProfile: (d.varieties.find((item) => item.varietyId === (d.fields.find((item) => item.fieldId === normalized.fieldId) || {}).varietyId) || {}).name || "",
+            calculationMethod: "panicle-length-heading-window",
+            calculationVersion: "1",
+            status: candidateIndex >= 0 ? d.confirmationCandidates[candidateIndex].status || "active" : "active",
+            actualRecordId: candidateIndex >= 0 ? d.confirmationCandidates[candidateIndex].actualRecordId || "" : "",
+            actualDifferenceDays: candidateIndex >= 0 ? d.confirmationCandidates[candidateIndex].actualDifferenceDays ?? "" : "",
+            createdAt: candidateIndex >= 0 ? d.confirmationCandidates[candidateIndex].createdAt : U.now(),
+            updatedAt: U.now()
+          };
+          if (candidateIndex >= 0) d.confirmationCandidates[candidateIndex] = candidate;
+          else d.confirmationCandidates.push(candidate);
+        }
+      }
+      if (normalized.headingObserved || normalized.stageConfirmed && normalized.observedStage === "heading") {
+        d.confirmationCandidates.forEach((candidate) => {
+          if (candidate.candidateType !== "heading" || candidate.fieldId !== normalized.fieldId || String(candidate.season) !== String(normalized.season)) return;
+          candidate.status = "confirmed";
+          candidate.actualRecordId = normalized.logId;
+          candidate.actualDifferenceDays = candidate.periodStart ? U.daysBetween(candidate.periodStart, normalized.date) : "";
+          candidate.updatedAt = U.now();
+        });
+      }
     }, growthSaveFeedback(record));
   }
 
@@ -467,6 +525,7 @@
         resultId: record.resultId || U.id("result", U.today()),
         season: U.number(record.season, new Date().getFullYear()),
         varietyId: record.varietyId || "",
+        fieldId: record.fieldId || "",
         areaA: record.areaA || "",
         yield: record.yield || "",
         yieldPer10a: record.yieldPer10a || "",
@@ -556,6 +615,11 @@
         date,
         season: U.season(date),
         fieldIds: schedule.fieldIds || [],
+        batchId: (schedule.fieldIds || []).length > 1 ? U.id("batch", date) : "",
+        batchFieldIds: (schedule.fieldIds || []).slice(),
+        timeAccounting: (schedule.fieldIds || []).length > 1 ? "shared" : "single",
+        totalHours: record.hours || "",
+        fieldAllocatedHours: {},
         workName: "追肥",
         worker: record.worker || "",
         hours: record.hours || "",
@@ -596,8 +660,10 @@
   function saveDryPeriod(record) {
     mutate((d) => {
       const date = record.date || U.today();
+      const dryPeriodId = record.dryPeriodId || U.id("dry", date);
+      const previous = d.dryPeriods.find((item) => item.dryPeriodId === dryPeriodId) || null;
       const normalized = {
-        dryPeriodId: record.dryPeriodId || U.id("dry", date),
+        dryPeriodId,
         type: "dryPeriod",
         date,
         season: U.season(date),
@@ -607,6 +673,15 @@
         endDate: record.endDate || "",
         actualEndDate: record.actualEndDate || "",
         targetDays: record.targetDays || "",
+        plannedStartDate: record.plannedStartDate || "",
+        startReason: record.startReason || "",
+        startTillerCount: record.startTillerCount || "",
+        startLeafColor: record.startLeafColor || "",
+        startSurface: record.startSurface || "",
+        endSurface: record.endSurface || "",
+        observationSummary: record.observationSummary || "",
+        interruptionDays: record.interruptionDays || "",
+        referenceRecordIds: record.referenceRecordIds || [],
         crackCm: record.crackCm || "",
         sinkCm: record.sinkCm || "",
         surface: record.surface || "",
@@ -614,7 +689,7 @@
         photo: record.photo || "",
         photoData: record.photoData || "",
         memo: record.memo || "",
-        createdAt: record.createdAt || U.now(),
+        createdAt: record.createdAt || previous && previous.createdAt || U.now(),
         updatedAt: U.now()
       };
       const index = d.dryPeriods.findIndex((item) => item.dryPeriodId === normalized.dryPeriodId);
@@ -628,7 +703,6 @@
         if (normalized.actualEndDate) {
           d.fields[fieldIndex].drainageActualEndDate = normalized.actualEndDate;
           d.fields[fieldIndex].drainageActualDays = dryActualDaysForField(d.fields[fieldIndex], normalized.actualEndDate);
-          if (!d.fields[fieldIndex].intermittentStartDate) d.fields[fieldIndex].intermittentStartDate = normalized.actualEndDate;
         }
       }
     }, `${fieldNameForFeedback(record.fieldId)}の中干し記録を残しました。圃場カードの水管理も更新しました。`);
@@ -643,8 +717,10 @@
   function saveIrrigation(record) {
     mutate((d) => {
       const date = record.date || U.today();
+      const irrigationId = record.irrigationId || U.id("irrigation", date);
+      const previous = d.irrigations.find((item) => item.irrigationId === irrigationId) || null;
       const normalized = {
-        irrigationId: record.irrigationId || U.id("irrigation", date),
+        irrigationId,
         type: "irrigation",
         date,
         season: U.season(date),
@@ -655,9 +731,20 @@
         endDate: record.endDate || "",
         actualEndDate: record.actualEndDate || "",
         targetDays: record.targetDays || "",
+        plannedStartDate: record.plannedStartDate || "",
+        startReason: record.startReason || "",
+        startTillerCount: record.startTillerCount || "",
+        startLeafColor: record.startLeafColor || "",
+        startSurface: record.startSurface || "",
+        endSurface: record.endSurface || "",
+        observationSummary: record.observationSummary || "",
+        interruptionDays: record.interruptionDays || "",
+        referenceRecordIds: record.referenceRecordIds || [],
         status: record.status || "入水中",
+        photo: record.photo || "",
+        photoData: record.photoData || "",
         memo: record.memo || "",
-        createdAt: record.createdAt || U.now(),
+        createdAt: record.createdAt || previous && previous.createdAt || U.now(),
         updatedAt: U.now()
       };
       const index = d.irrigations.findIndex((item) => item.irrigationId === normalized.irrigationId);
