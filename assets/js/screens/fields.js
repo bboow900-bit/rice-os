@@ -207,6 +207,7 @@
   }
 
   function riceStageNumberForField(field) {
+    if (RiceOS.agro && RiceOS.agro.seasonStageForField) return RiceOS.agro.seasonStageForField(field).image;
     const latest = latestGrowthForField(field.fieldId);
     const planting = state.plantingDateForField ? state.plantingDateForField(field.fieldId) : "";
     const baseDate = latest && latest.date || U.today();
@@ -632,6 +633,10 @@
   }
 
   function fieldStage(field) {
+    if (RiceOS.agro && RiceOS.agro.seasonStageForField) {
+      const shared = RiceOS.agro.seasonStageForField(field);
+      return { number: shared.index ? shared.image : 0, label: shared.current ? shared.current.label : "記録待ち" };
+    }
     const planting = state.plantingDateForField ? state.plantingDateForField(field.fieldId) : "";
     const growth = latestGrowthForField(field.fieldId);
     if (!planting && !growth) return { number: 0, label: "記録待ち" };

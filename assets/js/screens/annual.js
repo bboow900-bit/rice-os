@@ -470,6 +470,7 @@
   }
 
   function riceStageNumberForField(field) {
+    if (RiceOS.agro && RiceOS.agro.seasonStageForField) return RiceOS.agro.seasonStageForField(field, `${yearValue()}-12-31`).image;
     const latest = latestGrowthForField(field.fieldId);
     const planting = firstDate(fieldYearRows(field.fieldId, yearValue()), (row) => row.kind === "fieldWork" && /田植/.test(String(row.title || "")));
     const baseDate = latest && latest.date || U.today();

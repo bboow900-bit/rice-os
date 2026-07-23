@@ -376,6 +376,7 @@
   }
 
   function seasonStageForField(field, dateText) {
+    if (RiceOS.agro && RiceOS.agro.seasonStageForField) return RiceOS.agro.seasonStageForField(field, dateText);
     const year = cropYear(dateText);
     const works = seasonRowsForField(field.fieldId, year);
     const growth = latestGrowthForYear(field.fieldId, year);

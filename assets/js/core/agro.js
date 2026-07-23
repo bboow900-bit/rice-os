@@ -178,10 +178,56 @@
     return `${dap} / 積算気温 ${item.tempText}`;
   }
 
+  const SEASON_STAGES = [
+    { key: "planting", label: "田植え", image: 2 },
+    { key: "tillering", label: "分げつ", image: 3 },
+    { key: "panicle", label: "幼穂", image: 5 },
+    { key: "heading", label: "出穂", image: 6 },
+    { key: "ripening", label: "登熟", image: 7 },
+    { key: "harvest", label: "収穫", image: 8 }
+  ];
+
+  // Every screen uses this same record-based stage to keep field progress aligned.
+  function seasonStageForField(fieldOrId, dateText) {
+    const field = fieldOf(fieldOrId);
+    const date = dateText || U.today();
+    if (!field) return { index: 0, current: null, next: "圃場を選択してください", dap: "", image: 1 };
+
+    const year = String(date).slice(0, 4);
+    const beforeOrOn = (row) => String(row.date || "") <= date;
+    const works = state().fieldWorksFor(field.fieldId)
+      .filter((row) => String(row.date || "").startsWith(`${year}-`) && beforeOrOn(row));
+    const growth = state().growthLogsFor(field.fieldId)
+      .filter((row) => String(row.date || "").startsWith(`${year}-`) && beforeOrOn(row));
+    const planting = works.filter((row) => /田植/.test(String(row.workName || "")))
+      .map((row) => row.date).filter(Boolean).sort()[0] || "";
+    const hasWork = (pattern) => works.some((row) => pattern.test(String(row.workName || "")));
+    const panicle = growth.some((row) => Number(row.panicleLengthMm || 0) > 0);
+    const headingDates = [
+      ...growth.filter((row) => Boolean(row.headingObserved)).map((row) => row.date),
+      ...works.filter((row) => /出穂/.test(String(row.workName || ""))).map((row) => row.date)
+    ].filter(Boolean).sort();
+    const headingDate = headingDates[0] || "";
+    const heading = Boolean(headingDate);
+    const harvest = hasWork(/稲刈り|収穫/);
+    const dap = planting ? U.daysBetween(planting, date) : "";
+    let index = 0;
+    let next = "田植え作業を残すと、今年の比較が始まります";
+    if (planting) { index = 1; next = "活着・分げつの様子を記録しましょう"; }
+    if (growth.length) { index = 2; next = "幼穂長を確認できたら残しましょう"; }
+    if (panicle) { index = 3; next = "出穂を確認したら記録しましょう"; }
+    if (heading) { index = 4; next = "登熟期の水管理と稲姿を残しましょう"; }
+    if (headingDate && U.daysBetween(headingDate, date) >= 7) { index = 5; next = "収穫日と今年の振り返りを残しましょう"; }
+    if (harvest) { index = 6; next = "来年への引き継ぎを残しましょう"; }
+    const current = index ? SEASON_STAGES[index - 1] : null;
+    return { index, current, next, dap, image: current ? current.image : 1 };
+  }
+
   RiceOS.agro = {
     progress,
     compactLine,
     panicleEstimate,
-    latestPanicleEstimate
+    latestPanicleEstimate,
+    seasonStageForField
   };
 })();
