@@ -440,7 +440,7 @@
 
   function fieldStatus(field, stats) {
     if (!stats.total) return { label: "記録なし", tone: "muted" };
-    const planting = state.plantingDateForField ? state.plantingDateForField(field.fieldId) : "";
+    const planting = firstDate(fieldYearRows(field.fieldId, yearValue()), (row) => row.kind === "fieldWork" && /田植/.test(String(row.title || "")));
     const dap = planting ? U.daysBetween(planting, U.today()) : "";
     const dryStart = state.workDateForField ? state.workDateForField(field.fieldId, "中干し開始") : "";
     if (dap !== "" && dap >= 30 && dap <= 50 && !dryStart) return { label: "中干し候補", tone: "warn" };
@@ -471,7 +471,7 @@
 
   function riceStageNumberForField(field) {
     const latest = latestGrowthForField(field.fieldId);
-    const planting = state.plantingDateForField ? state.plantingDateForField(field.fieldId) : "";
+    const planting = firstDate(fieldYearRows(field.fieldId, yearValue()), (row) => row.kind === "fieldWork" && /田植/.test(String(row.title || "")));
     const baseDate = latest && latest.date || U.today();
     const dap = planting ? U.daysBetween(planting, baseDate) : "";
     const tillers = latest ? U.number(latest.tillerCount, 0) : 0;
@@ -648,7 +648,7 @@
 
   function renderKarteTab(field) {
     const variety = state.variety(field.varietyId);
-    const planting = state.plantingDateForField ? state.plantingDateForField(field.fieldId) : "";
+    const planting = firstDate(fieldYearRows(field.fieldId, yearValue()), (row) => row.kind === "fieldWork" && /田植/.test(String(row.title || "")));
     const dryStart = state.workDateForField ? state.workDateForField(field.fieldId, "中干し開始") : "";
     const dryEnd = state.workDateForField ? state.workDateForField(field.fieldId, "中干し終了") : "";
     const intermittentStart = state.workDateForField ? state.workDateForField(field.fieldId, "間断灌水開始") : "";
@@ -845,8 +845,75 @@
     `;
   }
 
+  function fieldYearRows(fieldId, year) {
+    return allRows().filter((row) => (row.fieldIds || []).includes(fieldId) && String(row.season || String(row.date || "").slice(0, 4)) === String(year));
+  }
+
+  function firstDate(rows, test) {
+    return rows.filter(test).map((row) => row.date).filter(Boolean).sort()[0] || "";
+  }
+
+  function fieldYearSnapshot(field, year) {
+    const rows = fieldYearRows(field.fieldId, year);
+    const works = rows.filter((row) => row.kind === "fieldWork");
+    const growth = rows.filter((row) => row.kind === "growth");
+    const dry = rows.filter((row) => row.kind === "dry");
+    const water = rows.filter((row) => row.kind === "irrigation");
+    const planting = firstDate(works, (row) => /田植/.test(String(row.title || "")));
+    const heading = firstDate(growth, (row) => Boolean(row.record && row.record.headingObserved)) || firstDate(works, (row) => /出穂/.test(String(row.title || "")));
+    const harvest = firstDate(works, (row) => /収穫|稲刈/.test(String(row.title || "")));
+    const materialRows = works.filter((row) => String(row.record && row.record.material || "").trim());
+    return {
+      year,
+      planting,
+      trays: field.seedlingBoxes || "",
+      dry: dry.length ? `${dry.length}件` : "",
+      water: water.length ? `${water.length}件` : "",
+      heading,
+      growth: growth.length ? `${growth.length}件` : "",
+      workHours: totalHours(works),
+      materials: materialRows.length ? `${materialRows.length}件` : "",
+      harvest,
+      photos: rows.filter((row) => row.photoData || row.photo).length,
+      memo: rows.map((row) => row.record && row.record.memo).find(Boolean) || ""
+    };
+  }
+
+  function snapshotText(value, suffix) {
+    if (value === "" || value === null || typeof value === "undefined" || value === 0) return "未記録";
+    return suffix ? `${value}${suffix}` : String(value);
+  }
+
+  function renderYearCompare(field) {
+    const currentYear = yearValue() === "all" ? String(new Date().getFullYear()) : String(yearValue());
+    const previousYear = String(Number(currentYear) - 1);
+    const current = fieldYearSnapshot(field, currentYear);
+    const previous = fieldYearSnapshot(field, previousYear);
+    const rows = [
+      ["田植え日", snapshotText(current.planting), snapshotText(previous.planting)],
+      ["苗箱数", snapshotText(current.trays, "箱"), snapshotText(previous.trays, "箱")],
+      ["中干し", snapshotText(current.dry), snapshotText(previous.dry)],
+      ["水管理", snapshotText(current.water), snapshotText(previous.water)],
+      ["出穂日", snapshotText(current.heading), snapshotText(previous.heading)],
+      ["生育記録", snapshotText(current.growth), snapshotText(previous.growth)],
+      ["作業時間", current.workHours ? U.formatHours(current.workHours) : "未記録", previous.workHours ? U.formatHours(previous.workHours) : "未記録"],
+      ["資材使用", snapshotText(current.materials), snapshotText(previous.materials)],
+      ["収穫日", snapshotText(current.harvest), snapshotText(previous.harvest)],
+      ["写真", current.photos ? `${current.photos}枚` : "未記録", previous.photos ? `${previous.photos}枚` : "未記録"]
+    ];
+    const missing = rows.filter((row) => row[1] === "未記録").map((row) => row[0]);
+    return `
+      <section class="annual-compare-card">
+        <div class="annual-compare-head"><div><span>来年につなぐ比較</span><h3>${U.escapeHTML(currentYear)}年と${U.escapeHTML(previousYear)}年</h3></div><small>${U.escapeHTML(field.name)} / ${U.escapeHTML(varietyName(field))}</small></div>
+        <div class="annual-compare-table"><div class="annual-compare-row annual-compare-label"><b>比較項目</b><b>${U.escapeHTML(currentYear)}年</b><b>${U.escapeHTML(previousYear)}年</b></div>${rows.map((row) => `<div class="annual-compare-row"><span>${U.escapeHTML(row[0])}</span><b class="${row[1] === "未記録" ? "missing" : ""}">${U.escapeHTML(row[1])}</b><b class="${row[2] === "未記録" ? "missing" : ""}">${U.escapeHTML(row[2])}</b></div>`).join("")}</div>
+        ${missing.length ? `<div class="annual-compare-check"><b>翌年比較のため、今年はここを残す</b><span>${U.escapeHTML(missing.join(" / "))}</span></div>` : '<div class="annual-compare-check complete"><b>比較に必要な基本記録がそろっています</b><span>来年の判断材料として使えます</span></div>'}
+        <label class="annual-carryover-note"><span>来年に引き継ぐメモ</span><textarea data-annual-field-edit="nextSeasonMemo" placeholder="例: この圃場は中干しを早めに始める。穂肥量は葉色を見て控えめに。">${U.escapeHTML(field.nextSeasonMemo || "")}</textarea><small>圃場マスターに保存され、年度をまたいで確認できます。</small></label>
+      </section>
+    `;
+  }
+
   function renderFieldDetail(field) {
-    const planting = state.plantingDateForField ? state.plantingDateForField(field.fieldId) : "";
+    const planting = firstDate(fieldYearRows(field.fieldId, yearValue()), (row) => row.kind === "fieldWork" && /田植/.test(String(row.title || "")));
     return `
       <div class="annual-field-detail">
         <div class="annual-detail-head">
@@ -858,6 +925,7 @@
           </div>
           <button type="button" class="annual-detail-menu" aria-label="メニュー">…</button>
         </div>
+        ${renderYearCompare(field)}
         ${renderTabs(field)}
         ${renderAnnualFab(field.fieldId)}
       </div>

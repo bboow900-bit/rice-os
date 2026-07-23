@@ -76,6 +76,7 @@
     targetCrackCm: "1〜2",
     targetSinkCm: "2〜4",
     fixedMemo: "",
+    nextSeasonMemo: "",
     memo: "",
     status: "使用中",
     waterHabit: "",
@@ -277,6 +278,7 @@
     f.fieldFeatures = ensureArray(f.fieldFeatures).map(String);
     f.targetCrackCm = String(f.targetCrackCm || "");
     f.targetSinkCm = String(f.targetSinkCm || "");
+    f.nextSeasonMemo = String(f.nextSeasonMemo || "");
     f.sortOrder = U.number(f.sortOrder, index * 10);
     return f;
   }

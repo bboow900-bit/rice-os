@@ -109,6 +109,17 @@
   }
 
   function bindNav() {
+    const primaryLabels = {
+      home: "ホーム",
+      calendar: "カレンダー",
+      "field-work": "記録入力",
+      fields: "圃場",
+      annual: "振り返り"
+    };
+    Object.keys(primaryLabels).forEach((screenId) => {
+      const label = document.querySelector(`[data-screen="${screenId}"] .nav-label`);
+      if (label) label.textContent = primaryLabels[screenId];
+    });
     U.$$(".nav-item").forEach((button) => {
       button.addEventListener("click", () => show(button.dataset.screen));
     });

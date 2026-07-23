@@ -7,6 +7,7 @@
   const state = RiceOS.state;
   let recentScope = localStorage.getItem("riceFieldWorkRecentScope") || "all";
   let pendingScheduleId = "";
+  let workInputMode = localStorage.getItem("riceFieldWorkInputMode") || "simple";
 
   const WORK_PRESETS = {
     "草刈り": { machine: "草刈り機" },
@@ -419,7 +420,25 @@
     renderFieldCards();
     renderRecentScope();
     syncWorkerPreset();
+    setWorkInputMode(workInputMode, true);
     renderList();
+  }
+
+  function setWorkInputMode(mode, silent) {
+    workInputMode = mode === "detail" ? "detail" : "simple";
+    localStorage.setItem("riceFieldWorkInputMode", workInputMode);
+    const form = U.$("fieldWorkForm");
+    if (!form) return;
+    form.dataset.workMode = workInputMode;
+    const sections = form.querySelectorAll("details.form-section");
+    const detail = sections[1];
+    if (detail) {
+      detail.hidden = workInputMode !== "detail";
+      if (workInputMode === "detail" && !silent) detail.open = true;
+    }
+    form.querySelectorAll("[data-work-mode-select]").forEach((button) => {
+      button.classList.toggle("active", button.dataset.workModeSelect === workInputMode);
+    });
   }
 
   function setWeatherStatus(message) {
@@ -516,6 +535,11 @@
 
     const bulkTools = U.$("fieldWorkForm");
     bulkTools.addEventListener("click", (event) => {
+      const modeButton = event.target.closest("[data-work-mode-select]");
+      if (modeButton) {
+        setWorkInputMode(modeButton.dataset.workModeSelect);
+        return;
+      }
       const actionButton = event.target.closest("[data-fw-select]");
       if (actionButton) {
         const action = actionButton.dataset.fwSelect;

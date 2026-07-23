@@ -14,7 +14,7 @@
   <link rel="icon" href="assets/icons/icon-192.png">
   <link rel="apple-touch-icon" href="assets/icons/icon-192.png">
   <title>稲作カルテ</title>
-  <link rel="stylesheet" href="assets/css/app.css?v=20260721_ver102">
+  <link rel="stylesheet" href="assets/css/app.css?v=20260723_ver104">
   <link rel="stylesheet" href="assets/css/field-management.css?v=20260630_ver85">
 </head>
 <body>
@@ -82,8 +82,12 @@
           </div>
           <button class="secondary" data-action="reset-field-work">リセット</button>
         </div>
-        <form class="stack-form" id="fieldWorkForm">
+        <form class="stack-form" id="fieldWorkForm" data-work-mode="simple">
           <input type="hidden" id="editFieldWorkId">
+          <div class="growth-input-mode work-input-mode" role="group" aria-label="作業入力モード">
+            <button type="button" class="active" data-work-mode-select="simple"><b>かんたん入力</b><small>圃場・日付・作業・時間・写真・メモ</small></button>
+            <button type="button" data-work-mode-select="detail"><b>詳細入力</b><small>機械・資材・天気まで記録</small></button>
+          </div>
           <details class="form-section" open>
             <summary>基本情報</summary>
             <div class="work-template-panel">
@@ -635,7 +639,7 @@
   <div id="toast" class="toast hidden" role="status"></div>
 
   <script src="assets/js/core/utils.js?v=20260627_ver67"></script>
-  <script src="assets/js/core/schema.js?v=20260721_ver101"></script>
+  <script src="assets/js/core/schema.js?v=20260723_ver104"></script>
   <script src="assets/js/core/storage.js?v=20260627_ver67"></script>
   <script src="assets/js/core/state.js?v=20260721_ver97"></script>
   <script src="assets/js/core/agro.js?v=20260720_ver93"></script>
@@ -643,24 +647,24 @@
   <script src="assets/js/core/calendar.js?v=20260720_ver93"></script>
   <script src="assets/js/core/alerts.js?v=20260627_ver67"></script>
   <script src="assets/js/core/weather.js?v=20260629_ver81"></script>
-  <script src="assets/js/core/pwa.js?v=20260721_ver103"></script>
-  <script src="assets/js/screens/home.js?v=20260721_ver103"></script>
+  <script src="assets/js/core/pwa.js?v=20260723_ver104"></script>
+  <script src="assets/js/screens/home.js?v=20260723_ver104"></script>
   <script src="assets/js/screens/calendar.js?v=20260721_ver97"></script>
   <script src="assets/js/screens/bottom-sheet.js?v=20260721_ver97"></script>
   <script src="assets/js/screens/recipes.js?v=20260630_ver87"></script>
   <script src="assets/js/screens/fields.js?v=20260712_ver91"></script>
-  <script src="assets/js/screens/field-work.js?v=20260721_ver101"></script>
+  <script src="assets/js/screens/field-work.js?v=20260723_ver104"></script>
   <script src="assets/js/screens/fertilizer.js?v=20260720_ver96"></script>
   <script src="assets/js/screens/growth.js?v=20260721_ver103"></script>
   <script src="assets/js/screens/dry-period.js?v=20260712_ver92"></script>
   <script src="assets/js/screens/irrigation.js?v=20260721_ver101"></script>
   <script src="assets/js/screens/photos.js?v=20260627_ver67"></script>
   <script src="assets/js/screens/other-work.js?v=20260627_ver67"></script>
-  <script src="assets/js/screens/annual.js?v=20260720_ver93"></script>
+  <script src="assets/js/screens/annual.js?v=20260723_ver104"></script>
   <script src="assets/js/screens/materials.js?v=20260627_ver67"></script>
   <script src="assets/js/screens/results.js?v=20260627_ver67"></script>
   <script src="assets/js/screens/notices.js?v=20260627_ver67"></script>
   <script src="assets/js/screens/data.js?v=20260627_ver67"></script>
-  <script src="assets/js/app.js?v=20260630_ver85"></script>
+  <script src="assets/js/app.js?v=20260723_ver104"></script>
 </body>
 </html>

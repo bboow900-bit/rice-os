@@ -5,7 +5,7 @@
   const U = RiceOS.utils;
   const state = RiceOS.state;
 
-  let viewMode = "week";
+  let viewMode = "dashboard";
   let anchorDate = U.today();
   let filterFieldId = "all";
   const heatCache = new Map();
@@ -334,7 +334,88 @@
     `;
   }
 
+  function latestGrowthForYear(fieldId, year) {
+    return state.growthLogsFor(fieldId)
+      .filter((log) => String(log.date || "").startsWith(`${year}-`))
+      .slice()
+      .sort((a, b) => String(b.date).localeCompare(String(a.date)))[0] || null;
+  }
+
+  function previousYearHint(field, dateText) {
+    const previousDate = addYears(dateText, -1);
+    const work = state.fieldWorksFor(field.fieldId).find((row) => String(row.date || "") === previousDate);
+    const growth = state.growthLogsFor(field.fieldId).find((row) => String(row.date || "") === previousDate);
+    if (work) return `前年 ${U.fd(previousDate)}: ${work.workName || "作業記録"}`;
+    if (growth) return `前年 ${U.fd(previousDate)}: 分げつ ${growth.tillerCount || "-"}本`;
+    return "前年同日の記録なし";
+  }
+
+  function dashboardNeed(field, dateText) {
+    const year = cropYear(dateText);
+    const planting = plantingDateForYear(field.fieldId, year);
+    const growth = latestGrowthForYear(field.fieldId, year);
+    const candidate = candidatesForDate(dateText).find((entry) => entryFieldIds(entry).includes(field.fieldId));
+    if (!planting) return { tone: "alert", label: "田植え日を記録", detail: "田植え作業を登録すると日数と進捗が使えます" };
+    if (candidate) return { tone: "alert", label: candidate.title, detail: candidate.reason || "現地を確認して判断" };
+    if (!growth) return { tone: "notice", label: "生育の初回記録", detail: "分げつ数か葉色だけでも残せます" };
+    return { tone: "ok", label: "記録は順調", detail: `最終生育 ${U.fd(growth.date)}` };
+  }
+
+  function renderDecisionFieldCard(field) {
+    const date = U.today();
+    const planting = plantingDateForYear(field.fieldId, cropYear(date));
+    const dap = planting ? U.daysBetween(planting, date) : "";
+    const growth = latestGrowthForYear(field.fieldId, cropYear(date));
+    const water = waterStageForField(field, date);
+    const need = dashboardNeed(field, date);
+    return `
+      <article class="home-decision-card ${U.attr(need.tone)}" data-home-open-field="${U.attr(field.fieldId)}">
+        <div class="home-decision-card-head">
+          <img src="assets/images/light-icons/rice-panicle.png" alt="">
+          <div><b>${U.escapeHTML(field.name)}</b><small>${U.escapeHTML(fieldVariety(field))} / ${U.escapeHTML(areaText(field))}</small></div>
+          <strong>${U.escapeHTML(dap === "" ? "田植え未登録" : `田植後 ${dap}日`)}</strong>
+        </div>
+        <div class="home-decision-status"><span>${U.escapeHTML(need.label)}</span><small>${U.escapeHTML(need.detail)}</small></div>
+        <div class="home-decision-facts">
+          <span><b>水管理</b>${U.escapeHTML(water.label)}</span>
+          <span><b>生育</b>${U.escapeHTML(growth ? `葉色 ${growth.leafColor || "-"} / 分げつ ${growth.tillerCount || "-"}` : "未入力")}</span>
+        </div>
+        <p>${U.escapeHTML(previousYearHint(field, date))}</p>
+      </article>
+    `;
+  }
+
+  function renderDecisionDashboard() {
+    const todayEntries = entriesForDate(U.today()).filter((entry) => entry.kind !== "candidate");
+    const candidates = candidatesForDate(U.today());
+    const overdue = overdueSchedules();
+    const rows = fields();
+    return `
+      <section class="home-decision-hero">
+        <div><p>今日・今週の判断</p><h2>田んぼの今を、先に見る</h2><small>${U.escapeHTML(U.fd(U.today()))} / ${U.escapeHTML(todayEntries.length ? `今日の記録 ${todayEntries.length}件` : "今日の記録はありません")}</small></div>
+        <button type="button" class="primary" data-home-quick-record>記録を追加</button>
+      </section>
+      <section class="home-decision-summary">
+        <button type="button" data-home-dashboard-list="candidate"><b>${U.escapeHTML(String(candidates.length))}</b><span>確認候補</span></button>
+        <button type="button" data-home-dashboard-list="overdue"><b>${U.escapeHTML(String(overdue.length))}</b><span>期限超過</span></button>
+        <button type="button" data-home-dashboard-list="today"><b>${U.escapeHTML(String(todayEntries.length))}</b><span>今日の記録</span></button>
+      </section>
+      <section class="home-decision-section">
+        <div class="home-decision-section-head"><div><h3>圃場ごとの判断</h3><small>気になる圃場から記録へ進めます</small></div><button type="button" data-home-open-calendar>カレンダー</button></div>
+        <div class="home-decision-list">${rows.length ? rows.map(renderDecisionFieldCard).join("") : '<div class="farm-empty">圃場を登録すると、ここに判断カードを表示します。</div>'}</div>
+      </section>
+    `;
+  }
+
   function renderHeader() {
+    if (viewMode === "dashboard") {
+      return `
+        <header class="farm-calendar-header home-dashboard-header">
+          <div><h1>ホーム</h1><p>今年の記録を、来年の判断につなげます</p></div>
+          <div class="farm-calendar-actions"><button type="button" class="farm-year-button" data-home-open-calendar>カレンダー</button></div>
+        </header>
+      `;
+    }
     const year = toLocal(anchorDate).getFullYear();
     return `
       <header class="farm-calendar-header">
@@ -1049,6 +1130,7 @@
     root.innerHTML = `
       <div class="farm-calendar-home">
         ${renderHeader()}
+        ${viewMode === "dashboard" ? renderDecisionDashboard() : ""}
         ${viewMode === "week" ? renderWeekView() : ""}
         ${viewMode === "month" ? renderMonthView() : ""}
         ${viewMode === "list" ? renderListView() : ""}
@@ -1190,6 +1272,20 @@
       const view = event.target.closest("[data-home-view]");
       if (view) {
         viewMode = view.dataset.homeView;
+        render();
+        return;
+      }
+      if (event.target.closest("[data-home-open-calendar]")) {
+        if (RiceOS.app) RiceOS.app.show("calendar");
+        return;
+      }
+      if (event.target.closest("[data-home-quick-record]")) {
+        openDate(U.today(), filterFieldId === "all" ? "" : filterFieldId);
+        return;
+      }
+      if (event.target.closest("[data-home-dashboard-list]")) {
+        viewMode = "list";
+        anchorDate = U.today();
         render();
         return;
       }
