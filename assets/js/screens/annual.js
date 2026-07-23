@@ -1199,6 +1199,11 @@
     U.$("annualTimeline").addEventListener("click", (event) => {
       const open = event.target.closest("[data-annual-open-field]");
       if (open) {
+        if (RiceOS.app && RiceOS.screens.fields && RiceOS.screens.fields.openField) {
+          RiceOS.app.show("fields");
+          RiceOS.screens.fields.openField(open.dataset.annualOpenField, "detail");
+          return;
+        }
         selectedFieldId = open.dataset.annualOpenField;
         selectedTab = "karte";
         render();

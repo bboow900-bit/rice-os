@@ -1395,6 +1395,7 @@
       const fieldButton = event.target.closest("[data-home-open-field]");
       if (fieldButton && RiceOS.app) {
         RiceOS.app.show("fields");
+        if (RiceOS.screens.fields && RiceOS.screens.fields.openField) RiceOS.screens.fields.openField(fieldButton.dataset.homeOpenField, "detail");
         return;
       }
       const dateButton = event.target.closest("[data-home-date]");

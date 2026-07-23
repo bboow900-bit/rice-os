@@ -138,8 +138,9 @@
     document.querySelector('[data-action="add-field"]').addEventListener("click", () => {
       const name = prompt("追加する圃場名");
       if (name === null) return;
-      RiceOS.state.addField(name);
+      const fieldId = RiceOS.state.addField(name);
       show("fields");
+      if (RiceOS.screens.fields && RiceOS.screens.fields.openField) RiceOS.screens.fields.openField(fieldId, "settings");
     });
 
     document.addEventListener("click", (event) => {

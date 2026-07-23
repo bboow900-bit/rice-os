@@ -243,7 +243,34 @@
   }
 
   function notificationAlerts() {
-    return todayFocusItems().filter((item) => item.notify);
+    return scheduledAlerts().filter((item) => item.notify);
+  }
+
+  function scheduleDone(schedule) {
+    return Boolean(schedule && (schedule.completedAt || schedule.completedByWorkId || schedule.completedManuallyAt || schedule.status === "実施済み" || schedule.status === "手動完了"));
+  }
+
+  function scheduledAlerts(today) {
+    const date = today || U.today();
+    return (state().data().schedules || [])
+      .filter((schedule) => !scheduleDone(schedule) && schedule.date && schedule.date <= date)
+      .map((schedule) => {
+        const overdue = U.daysBetween(schedule.date, date);
+        const fieldNames = (schedule.fieldIds || []).map((fieldId) => state().field(fieldId)).filter(Boolean).map((field) => field.name);
+        return {
+          key: `schedule:${schedule.scheduleId}:${schedule.date}`,
+          type: "schedule",
+          title: schedule.title || schedule.scheduleType || "予定",
+          message: overdue > 0 ? `${overdue}日過ぎています` : "今日の予定です",
+          fieldId: (schedule.fieldIds || [])[0] || "",
+          fieldName: fieldNames.join("・") || "全圃場",
+          date: schedule.date,
+          priority: overdue > 0 ? "urgent" : "warn",
+          notify: true,
+          record: schedule
+        };
+      })
+      .sort((a, b) => String(a.date).localeCompare(String(b.date)));
   }
 
   function icsDate(dateText) {
@@ -331,6 +358,7 @@
     backupAlert,
     todayFocusItems,
     notificationAlerts,
+    scheduledAlerts,
     calendarEventsForField,
     downloadFieldCalendar
   };

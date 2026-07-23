@@ -32,10 +32,10 @@
   function render() {
     const list = U.$("noticeList");
     if (!list) return;
-    const items = RiceOS.alerts ? RiceOS.alerts.todayFocusItems() : [];
+    const items = RiceOS.alerts && RiceOS.alerts.scheduledAlerts ? RiceOS.alerts.scheduledAlerts() : [];
     list.innerHTML = items.length
       ? items.map(renderNotice).join("")
-      : '<div class="notice-empty"><b>今すぐ確認するお知らせはありません</b><span>中干し・水管理・生育ログ・JSON保存の確認がここに出ます。</span></div>';
+      : '<div class="notice-empty"><b>今日のお知らせはありません</b><span>予定登録した作業だけを、当日と期限超過時に表示します。</span></div>';
   }
 
   RiceOS.screens = RiceOS.screens || {};

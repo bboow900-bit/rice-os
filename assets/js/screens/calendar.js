@@ -56,6 +56,11 @@
     const id = RiceOS.recordActions ? RiceOS.recordActions.idFor(entry.kind, entry.record) : "";
     const toneClass = entry.tone || "";
     const canCompleteSchedule = entry.kind === "schedule" && id && !scheduleDone(entry.record);
+    const fieldId = entry.record && (entry.record.fieldId || (entry.record.fieldIds || [])[0]) || "";
+    const fieldIds = entry.record && (entry.record.fieldIds || (fieldId ? [fieldId] : [])) || [];
+    const targetFields = fieldIds.map((id) => RiceOS.state.field(id)).filter(Boolean);
+    const groupNames = [...new Set(targetFields.map((field) => String(field.fieldGroupId || field.district || "").trim()).filter(Boolean))];
+    const groupName = fieldIds.length > 1 && groupNames.length === 1 ? groupNames[0] : "";
     return `
       <div class="mini-card ${U.attr(entry.kind)} ${U.attr(toneClass)}">
         <b>${U.escapeHTML(entry.title)}</b>
@@ -65,6 +70,9 @@
         ${entry.hasPhoto ? '<span class="pill info">写真あり</span>' : ""}
         ${id ? `
           <div class="record-actions mini-actions">
+            ${groupName ? `<button class="secondary" type="button" data-calendar-open-group="${U.attr(groupName)}">${U.escapeHTML(groupName)}グループを見る</button>` : ""}
+            ${!groupName && fieldIds.length === 1 ? `<button class="secondary" type="button" data-calendar-open-field="${U.attr(fieldId)}">圃場を見る</button>` : ""}
+            ${!groupName && fieldIds.length > 1 ? '<button class="secondary" type="button" data-calendar-open-group="">対象圃場を見る</button>' : ""}
             ${canCompleteSchedule ? `<button class="primary" type="button" data-calendar-action="complete" data-kind="${U.attr(entry.kind)}" data-id="${U.attr(id)}">実施を記録</button>` : ""}
             <button class="secondary" type="button" data-calendar-action="edit" data-kind="${U.attr(entry.kind)}" data-id="${U.attr(id)}">編集</button>
             <button class="danger" type="button" data-calendar-action="delete" data-kind="${U.attr(entry.kind)}" data-id="${U.attr(id)}">削除</button>
@@ -113,6 +121,18 @@
       if (RiceOS.bottomSheet) RiceOS.bottomSheet.open(selectedDate);
     });
     U.$("selectedDateEntries").addEventListener("click", (event) => {
+      const fieldButton = event.target.closest("[data-calendar-open-field]");
+      if (fieldButton && RiceOS.app && RiceOS.screens.fields && RiceOS.screens.fields.openField) {
+        RiceOS.app.show("fields");
+        RiceOS.screens.fields.openField(fieldButton.dataset.calendarOpenField, "detail");
+        return;
+      }
+      const groupButton = event.target.closest("[data-calendar-open-group]");
+      if (groupButton && RiceOS.app && RiceOS.screens.fields && RiceOS.screens.fields.openGroup) {
+        RiceOS.app.show("fields");
+        RiceOS.screens.fields.openGroup(groupButton.dataset.calendarOpenGroup || "");
+        return;
+      }
       const button = event.target.closest("[data-calendar-action]");
       if (!button || !RiceOS.recordActions) return;
       const entry = findEntry(button.dataset.kind, button.dataset.id);

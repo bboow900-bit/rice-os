@@ -628,6 +628,7 @@
         if (normalized.actualEndDate) {
           d.fields[fieldIndex].drainageActualEndDate = normalized.actualEndDate;
           d.fields[fieldIndex].drainageActualDays = dryActualDaysForField(d.fields[fieldIndex], normalized.actualEndDate);
+          if (!d.fields[fieldIndex].intermittentStartDate) d.fields[fieldIndex].intermittentStartDate = normalized.actualEndDate;
         }
       }
     }, `${fieldNameForFeedback(record.fieldId)}の中干し記録を残しました。圃場カードの水管理も更新しました。`);
