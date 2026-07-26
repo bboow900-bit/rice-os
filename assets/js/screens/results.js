@@ -57,7 +57,7 @@
   function bind() {
     U.$("resultForm").addEventListener("submit", (event) => {
       event.preventDefault();
-      state.saveResult({
+      const saved = state.saveResult({
         season: U.$("rSeason").value,
         varietyId: U.$("rVariety").value,
         areaA: U.$("rAreaA").value,
@@ -70,6 +70,7 @@
         quality: U.$("rQuality").value,
         reflection: U.$("rReflection").value
       });
+      if (!saved) return;
       resetForm();
     });
   }

@@ -92,7 +92,7 @@
 
     U.$("otherWorkForm").addEventListener("submit", (event) => {
       event.preventDefault();
-      state.saveOtherWork({
+      const saved = state.saveOtherWork({
         otherWorkId: U.$("editOtherWorkId").value,
         date: U.$("owDate").value,
         workName: U.$("owName").value,
@@ -102,6 +102,7 @@
         varietyIds: selected("owVarieties"),
         relatedFieldIds: selected("owFields")
       });
+      if (!saved) return;
       resetForm();
     });
 

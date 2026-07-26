@@ -1,8 +1,9 @@
-﻿(function () {
+(function () {
   "use strict";
 
   const RiceOS = window.RiceOS = window.RiceOS || {};
   const NOTIFIED_KEY = "rice_os_notified_alerts";
+  const APP_VERSION = "20260726_ver122";
 
   let deferredPrompt = null;
 
@@ -34,7 +35,7 @@
 
     if (!canUseServiceWorker()) return;
 
-    navigator.serviceWorker.register("./service-worker.js?v=20260723_ver118")
+    navigator.serviceWorker.register(`./service-worker.js?v=${APP_VERSION}`)
       .then((registration) => {
         registration.update();
       })
@@ -125,10 +126,6 @@
     if (canUseServiceWorker()) {
       const registrations = await navigator.serviceWorker.getRegistrations();
       await Promise.all(registrations.map((registration) => registration.update()));
-    }
-    if ("caches" in window) {
-      const keys = await caches.keys();
-      await Promise.all(keys.filter((key) => key.startsWith("rice-os-") || key.startsWith("rice-karte-")).map((key) => caches.delete(key)));
     }
     location.reload();
   }

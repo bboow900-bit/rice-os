@@ -778,7 +778,8 @@
     if (name === null) return;
     const cleanName = name.trim() || defaultName;
     const fieldId = state.addField(cleanName);
-    if (groupNameValue) state.updateField(fieldId, { fieldGroupId: groupNameValue });
+    if (!fieldId) return;
+    if (groupNameValue && !state.updateField(fieldId, { fieldGroupId: groupNameValue })) return;
     activeBulkGroup = group;
     activeFieldId = fieldId;
     render();
@@ -877,12 +878,13 @@
           const nextName = prompt("グループ名を入力してください", group === "未設定" ? "" : group);
           if (nextName === null) return;
           const cleanName = nextName.trim();
-          state.mutate((d) => {
+          const saved = state.mutate((d) => {
             const ids = new Set(fields.map((field) => field.fieldId));
             d.fields.forEach((field) => {
               if (ids.has(field.fieldId)) field.fieldGroupId = cleanName;
             });
           }, "圃場グループを更新しました");
+          if (!saved) return;
           activeBulkGroup = cleanName;
           render();
           return;
@@ -914,7 +916,8 @@
       if (action === "delete") {
         const ok = confirm(`${field.name} を一覧から外しますか？\n\n過去の作業・生育・水管理・写真は削除せず、年間履歴に残します。`);
         if (!ok) return;
-        state.deleteField(field.fieldId);
+        const saved = state.deleteField(field.fieldId);
+        if (!saved) return;
         activeFieldId = "";
         activeBulkGroup = "";
         render();

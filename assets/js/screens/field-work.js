@@ -636,7 +636,7 @@
         alert("対象圃場を選んでください。");
         return;
       }
-      state.saveFieldWork({
+      const saved = state.saveFieldWork({
         workId: U.$("editFieldWorkId").value,
         date: U.$("fwDate").value,
         workName: U.$("fwName").value,
@@ -653,6 +653,7 @@
         photoData: U.$("fwPhotoPreview") ? U.$("fwPhotoPreview").dataset.photoData || "" : "",
         memo: U.$("fwMemo").value
       });
+      if (saved === null) return;
       resetForm();
     });
 

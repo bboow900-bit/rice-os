@@ -264,11 +264,14 @@
         memo: U.$("irrigationMemo").value
       };
       const targets = !common.irrigationId && bulkFieldIds.length > 1 ? bulkFieldIds : [U.$("irrigationField").value];
-      targets.forEach((fieldId) => state.saveIrrigation({
-        ...common,
-        irrigationId: targets.length > 1 ? "" : common.irrigationId,
-        fieldId
-      }));
+      for (const fieldId of targets) {
+        const saved = state.saveIrrigation({
+          ...common,
+          irrigationId: targets.length > 1 ? "" : common.irrigationId,
+          fieldId
+        });
+        if (saved === null) return;
+      }
       resetForm();
     });
 

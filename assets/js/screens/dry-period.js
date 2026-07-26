@@ -358,11 +358,14 @@
         memo: U.$("dryMemo").value
       };
       const targets = !common.dryPeriodId && bulkFieldIds.length > 1 ? bulkFieldIds : [U.$("dryField").value];
-      targets.forEach((fieldId) => state.saveDryPeriod({
-        ...common,
-        dryPeriodId: targets.length > 1 ? "" : common.dryPeriodId,
-        fieldId
-      }));
+      for (const fieldId of targets) {
+        const saved = state.saveDryPeriod({
+          ...common,
+          dryPeriodId: targets.length > 1 ? "" : common.dryPeriodId,
+          fieldId
+        });
+        if (saved === null) return;
+      }
       resetForm();
     });
 

@@ -7,6 +7,7 @@
   const storage = RiceOS.storage;
 
   let cache = storage.loadData();
+  let lastError = null;
 
   function emit(message, status) {
     window.dispatchEvent(new CustomEvent("riceos:datachange", { detail: { message: message || "保存しました", status: status || "saved" } }));
@@ -16,34 +17,49 @@
     return cache;
   }
 
+  // Save APIs return data on success and null on failure.
+  function lastSaveError() {
+    return lastError;
+  }
+
   function save(next, message) {
+    let saved = false;
     try {
-      emit("自動保存中", "saving");
       cache = storage.saveData(next);
+      saved = true;
+      lastError = null;
       emit(message, "saved");
     } catch (error) {
-      alert(error.message);
-      emit("保存に失敗しました", "error");
+      lastError = error instanceof Error ? error : new Error(String(error || "Save failed"));
+      alert(lastError.message);
     }
-    return cache;
+    return saved ? cache : null;
   }
 
   function replace(next, message) {
+    let saved = false;
     try {
-      emit("復元中", "saving");
       cache = storage.replaceData(next);
+      saved = true;
+      lastError = null;
       emit(message || "復元しました", "saved");
     } catch (error) {
-      alert(error.message);
-      emit("復元に失敗しました", "error");
+      lastError = error instanceof Error ? error : new Error(String(error || "Replace failed"));
+      alert(lastError.message);
     }
-    return cache;
+    return saved ? cache : null;
   }
 
   function mutate(fn, message) {
-    const draft = U.clone(cache);
-    fn(draft);
-    return save(draft, message);
+    try {
+      const draft = U.clone(cache);
+      fn(draft);
+      return save(draft, message);
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error || "Mutation failed"));
+      alert(lastError.message);
+      return null;
+    }
   }
 
   function varieties() {
@@ -69,7 +85,7 @@
   function addVariety(name) {
     const cleanName = String(name || "").trim() || "新しい品種";
     let newId = "";
-    mutate((d) => {
+    const saved = mutate((d) => {
       newId = U.id("variety", U.today());
       d.varieties.push({
         ...S.DEFAULT_VARIETIES[0],
@@ -78,11 +94,11 @@
         memo: ""
       });
     }, "品種を追加しました");
-    return newId;
+    return saved ? newId : "";
   }
 
   function updateVariety(varietyId, patch) {
-    mutate((d) => {
+    return mutate((d) => {
       const index = d.varieties.findIndex((v) => v.varietyId === varietyId);
       if (index >= 0) d.varieties[index] = { ...d.varieties[index], ...patch, updatedAt: U.now() };
     }, "栽培レシピを保存しました");
@@ -92,7 +108,7 @@
     const cleanName = String(name || "").trim() || "新しい圃場";
     const base = fields();
     let newId = "";
-    mutate((d) => {
+    const saved = mutate((d) => {
       newId = U.id("field", U.today());
       d.fields.push({
         ...S.DEFAULT_FIELDS[0],
@@ -106,18 +122,18 @@
         sortOrder: (base.length + 1) * 10
       });
     }, "圃場を追加しました");
-    return newId;
+    return saved ? newId : "";
   }
 
   function updateField(fieldId, patch) {
-    mutate((d) => {
+    return mutate((d) => {
       const index = d.fields.findIndex((f) => f.fieldId === fieldId);
       if (index >= 0) d.fields[index] = { ...d.fields[index], ...patch, updatedAt: U.now() };
     }, "圃場マスターを保存しました");
   }
 
   function deleteField(fieldId) {
-    mutate((d) => {
+    return mutate((d) => {
       const index = (d.fields || []).findIndex((field) => field.fieldId === fieldId);
       if (index < 0) return;
       d.fields[index] = {
@@ -328,7 +344,7 @@
   }
 
   function saveFieldWork(record) {
-    mutate((d) => {
+    return mutate((d) => {
       const date = record.date || U.today();
       const previous = record.workId ? d.fieldWorks.find((work) => work.workId === record.workId) : null;
       const targetFieldIds = (record.fieldIds || []).slice();
@@ -452,7 +468,7 @@
   }
 
   function deleteFieldWork(workId) {
-    mutate((d) => {
+    return mutate((d) => {
       const removed = d.fieldWorks.find((work) => work.workId === workId);
       d.fieldWorks = d.fieldWorks.filter((w) => w.workId !== workId);
       if (removed && isDryEndWorkName(removed.workName)) {
@@ -473,7 +489,7 @@
   }
 
   function saveGrowthLog(record) {
-    mutate((d) => {
+    return mutate((d) => {
       const date = record.date || U.today();
       const logId = record.logId || U.id("growth", date);
       const previous = d.growthLogs.find((g) => g.logId === logId) || null;
@@ -556,13 +572,13 @@
   }
 
   function deleteGrowthLog(logId) {
-    mutate((d) => {
+    return mutate((d) => {
       d.growthLogs = d.growthLogs.filter((g) => g.logId !== logId);
     }, "生育ログを削除しました");
   }
 
   function saveOtherWork(record) {
-    mutate((d) => {
+    return mutate((d) => {
       const date = record.date || U.today();
       const normalized = {
         otherWorkId: record.otherWorkId || U.id("other", date),
@@ -585,13 +601,13 @@
   }
 
   function deleteOtherWork(otherWorkId) {
-    mutate((d) => {
+    return mutate((d) => {
       d.otherWorks = d.otherWorks.filter((o) => o.otherWorkId !== otherWorkId);
     }, "その他作業を削除しました");
   }
 
   function saveMaterial(record) {
-    mutate((d) => {
+    return mutate((d) => {
       const normalized = {
         materialId: record.materialId || U.id("material", U.today()),
         season: U.number(record.season, new Date().getFullYear()),
@@ -611,7 +627,7 @@
   }
 
   function saveResult(record) {
-    mutate((d) => {
+    return mutate((d) => {
       const normalized = {
         resultId: record.resultId || U.id("result", U.today()),
         season: U.number(record.season, new Date().getFullYear()),
@@ -635,14 +651,14 @@
   }
 
   function updateWeatherLocation(location) {
-    mutate((d) => {
+    return mutate((d) => {
       d.meta = d.meta || {};
       d.meta.weatherLocation = location;
     }, "天気取得位置を保存しました");
   }
 
   function saveSchedule(record) {
-    mutate((d) => {
+    return mutate((d) => {
       const date = record.date || U.today();
       const normalized = {
         scheduleId: record.scheduleId || U.id("schedule", date),
@@ -670,7 +686,7 @@
   }
 
   function completeSchedule(scheduleId) {
-    mutate((d) => {
+    return mutate((d) => {
       const index = (d.schedules || []).findIndex((s) => s.scheduleId === scheduleId);
       if (index < 0) return;
       d.schedules[index] = {
@@ -685,7 +701,7 @@
   }
 
   function saveFertilizerCompletion(record) {
-    mutate((d) => {
+    return mutate((d) => {
       const scheduleIndex = (d.schedules || []).findIndex((schedule) => schedule.scheduleId === record.scheduleId);
       if (scheduleIndex < 0) return;
       const schedule = d.schedules[scheduleIndex];
@@ -743,13 +759,13 @@
   }
 
   function deleteSchedule(scheduleId) {
-    mutate((d) => {
+    return mutate((d) => {
       d.schedules = (d.schedules || []).filter((s) => s.scheduleId !== scheduleId);
     }, "予定を削除しました");
   }
 
   function saveDryPeriod(record) {
-    mutate((d) => {
+    return mutate((d) => {
       const date = record.date || U.today();
       const dryPeriodId = record.dryPeriodId || U.id("dry", date);
       const previous = d.dryPeriods.find((item) => item.dryPeriodId === dryPeriodId) || null;
@@ -804,7 +820,7 @@
   }
 
   function deleteDryPeriod(dryPeriodId) {
-    mutate((d) => {
+    return mutate((d) => {
       const removed = (d.dryPeriods || []).find((item) => item.dryPeriodId === dryPeriodId);
       d.dryPeriods = (d.dryPeriods || []).filter((item) => item.dryPeriodId !== dryPeriodId);
       if (removed) {
@@ -815,7 +831,7 @@
   }
 
   function saveIrrigation(record) {
-    mutate((d) => {
+    return mutate((d) => {
       const date = record.date || U.today();
       const irrigationId = record.irrigationId || U.id("irrigation", date);
       const previous = d.irrigations.find((item) => item.irrigationId === irrigationId) || null;
@@ -861,29 +877,37 @@
   }
 
   function deleteIrrigation(irrigationId) {
-    mutate((d) => {
+    return mutate((d) => {
       d.irrigations = (d.irrigations || []).filter((item) => item.irrigationId !== irrigationId);
     }, "水管理を削除しました");
   }
 
   function markJsonExported() {
-    mutate((d) => {
+    return mutate((d) => {
       d.meta = d.meta || {};
       d.meta.lastJsonExportAt = U.now();
     }, "JSONバックアップ日を記録しました");
   }
 
   function markNotificationCheck() {
-    mutate((d) => {
+    return mutate((d) => {
       d.meta = d.meta || {};
       d.meta.lastNotificationCheck = U.today();
     }, "通知確認日を記録しました");
   }
 
   function undoLastSave() {
-    const restored = storage.restoreBackup();
+    let restored = null;
+    try {
+      restored = storage.restoreBackup();
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error || "Restore failed"));
+      alert(lastError.message);
+      return null;
+    }
     if (!restored) return null;
     cache = restored;
+    lastError = null;
     emit("直前バックアップに戻しました", "saved");
     return cache;
   }
@@ -914,6 +938,7 @@
 
   RiceOS.state = {
     data,
+    lastSaveError,
     save,
     replace,
     mutate,

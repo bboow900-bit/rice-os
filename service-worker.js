@@ -1,5 +1,7 @@
-const CACHE_NAME = "rice-karte-20260726-121";
-const APP_VERSION = "20260726_ver121";
+const CACHE_NAME = "rice-karte-20260726-122";
+const APP_VERSION = "20260726_ver122";
+const CACHE_PREFIX = "rice-karte-";
+const RETAINED_APP_CACHES = 2;
 
 const APP_SHELL = [
   "./",
@@ -82,6 +84,7 @@ const APP_SHELL = [
   `./assets/js/screens/annual.js?v=${APP_VERSION}`,
   `./assets/js/screens/materials.js?v=${APP_VERSION}`,
   `./assets/js/screens/results.js?v=${APP_VERSION}`,
+  `./assets/js/screens/notices.js?v=${APP_VERSION}`,
   `./assets/js/screens/data.js?v=${APP_VERSION}`,
   `./assets/js/app.js?v=${APP_VERSION}`,
   "./assets/icons/icon-192.png",
@@ -99,7 +102,16 @@ self.addEventListener("install", (event) => {
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches.keys()
-      .then((keys) => Promise.all(keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))))
+      .then((keys) => {
+        // Keep one known-good offline shell while a new release takes over.
+        const previousCaches = keys
+          .filter((key) => key.startsWith(CACHE_PREFIX) && key !== CACHE_NAME)
+          .sort()
+          .reverse();
+        const retainedCaches = new Set([CACHE_NAME, ...previousCaches.slice(0, RETAINED_APP_CACHES - 1)]);
+        return keys.filter((key) => key.startsWith(CACHE_PREFIX) && !retainedCaches.has(key));
+      })
+      .then((obsoleteKeys) => Promise.all(obsoleteKeys.map((key) => caches.delete(key))))
       .then(() => self.clients.claim())
   );
 });

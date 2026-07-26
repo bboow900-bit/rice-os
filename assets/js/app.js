@@ -137,7 +137,8 @@
     document.querySelector('[data-action="add-variety"]').addEventListener("click", () => {
       const name = prompt("追加する品種名");
       if (name === null) return;
-      RiceOS.state.addVariety(name);
+      const varietyId = RiceOS.state.addVariety(name);
+      if (!varietyId) return;
       show("recipes");
     });
 
@@ -145,6 +146,7 @@
       const name = prompt("追加する圃場名");
       if (name === null) return;
       const fieldId = RiceOS.state.addField(name);
+      if (!fieldId) return;
       show("fields");
       if (RiceOS.screens.fields && RiceOS.screens.fields.openField) RiceOS.screens.fields.openField(fieldId, "settings");
     });

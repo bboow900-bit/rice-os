@@ -94,7 +94,7 @@
         alert("資材名を入力してください。");
         return;
       }
-      state.saveMaterial({
+      const saved = state.saveMaterial({
         season: U.$("mSeason").value,
         category: U.$("mCategory").value,
         name: U.$("mName").value,
@@ -105,6 +105,7 @@
         remaining: U.$("mRemaining").value,
         nextYearMemo: U.$("mMemo").value
       });
+      if (!saved) return;
       resetForm();
     });
   }

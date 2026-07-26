@@ -101,12 +101,14 @@
         const ok = confirm("現在のデータを残し、同じIDではない記録だけを追加しますか？\n実行前の状態は自動退避されます。");
         if (!ok) return;
         const merged = storage.mergeData(state.data(), inspection.normalized);
-        state.replace(merged.data, "JSONから新しい記録を追加しました");
+        const saved = state.replace(merged.data, "JSONから新しい記録を追加しました");
+        if (!saved) return;
         importReport(inspection, "merge", merged);
       } else {
         const ok = confirm("現在のデータを完全に置き換えますか？\n現在の状態は実行直前に自動退避されます。");
         if (!ok) return;
-        state.replace({ ...inspection.normalized, importedFrom: "json-replace" }, "JSONで完全置換しました");
+        const saved = state.replace({ ...inspection.normalized, importedFrom: "json-replace" }, "JSONで完全置換しました");
+        if (!saved) return;
         importReport(inspection, "replace");
       }
       U.$("importFile").value = "";

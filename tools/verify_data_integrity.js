@@ -193,6 +193,45 @@ const afterRoundTrip = storage.info(roundTrip);
 });
 assert(storage.loadData().fieldWorks.length === state.data().fieldWorks.length, "再起動相当の読み込みで記録が消えた");
 
+const failureEvents = [];
+const failureAlerts = [];
+const originalDispatchEvent = global.dispatchEvent;
+const originalAlert = global.alert;
+const originalSaveData = storage.saveData;
+const originalReplaceData = storage.replaceData;
+const beforeSaveFailure = state.data();
+const beforeSaveFailureRaw = memory.get(S.STORE_KEY);
+global.dispatchEvent = (event) => {
+  failureEvents.push(event);
+  return true;
+};
+global.alert = (message) => failureAlerts.push(message);
+storage.saveData = () => {
+  throw new Error("simulated save failure");
+};
+storage.replaceData = () => {
+  throw new Error("simulated replace failure");
+};
+try {
+  assert(state.save({ ...beforeSaveFailure }, "must not emit") === null, "save failure must return null");
+  assert(state.replace({ ...beforeSaveFailure }, "must not emit") === null, "replace failure must return null");
+  assert(state.mutate((draft) => {
+    draft.fields[0].name = "must not persist";
+  }, "must not emit") === null, "mutate failure must return null");
+  assert(state.updateField("field_a", { name: "must not persist" }) === null, "record update failure must return null");
+  assert(state.addField("must not persist") === "", "new record failure must not return an unsaved ID");
+  assert(state.lastSaveError() instanceof Error, "save failure must retain an error");
+  assert(state.data() === beforeSaveFailure, "save failure must preserve the in-memory cache");
+  assert(memory.get(S.STORE_KEY) === beforeSaveFailureRaw, "save failure must preserve localStorage");
+  assert(failureEvents.length === 0, "save failure must not emit a datachange event");
+  assert(failureAlerts.length === 5, "save failure must remain visible to the user");
+} finally {
+  storage.saveData = originalSaveData;
+  storage.replaceData = originalReplaceData;
+  global.dispatchEvent = originalDispatchEvent;
+  global.alert = originalAlert;
+}
+
 console.log("PASS data integrity");
 console.log(JSON.stringify({
   schemaVersion: S.SCHEMA_VERSION,

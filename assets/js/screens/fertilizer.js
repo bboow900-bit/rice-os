@@ -142,7 +142,7 @@
       snapshots[field.fieldId] = growthSnapshot(field.fieldId, date);
     });
     const area = totalArea();
-    state.saveFertilizerCompletion({
+    const saved = state.saveFertilizerCompletion({
       scheduleId: activeSchedule.scheduleId,
       date,
       material: U.$("fertilizerMaterial").value,
@@ -152,6 +152,7 @@
       growthSnapshots: snapshots,
       memo: U.$("fertilizerMemo").value
     });
+    if (!saved) return;
     const callback = afterSave;
     close();
     if (typeof callback === "function") callback();

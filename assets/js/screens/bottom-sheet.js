@@ -8,6 +8,7 @@
   let selectedDate = U.today();
   let selectedFieldId = "";
   let editingScheduleId = "";
+  let savingSchedule = false;
   const SCHEDULE_PRESETS = [
     { label: "草刈り", title: "草刈り予定" },
     { label: "追肥", title: "追肥予定" },
@@ -65,7 +66,7 @@
 
   function render() {
     U.$("sheetDateTitle").textContent = `${U.fd(selectedDate)} の記録`;
-    hideScheduleForm();
+    if (!savingSchedule) hideScheduleForm();
     renderFieldSelect();
     const rows = RiceOS.calendar.entriesForDate(selectedDate);
     U.$("sheetEntries").innerHTML = rows.length ? rows.map(entryHtml).join("") : '<div class="empty">この日の記録はまだありません。</div>';
@@ -218,8 +219,8 @@
         : mode === "group" && group
           ? group.fieldIds.map((fieldId) => [fieldId])
           : [activeFieldId() ? [activeFieldId()] : []];
-    targets.forEach((fieldIds) => {
-    state.saveSchedule({
+    savingSchedule = true;
+    const saved = targets.every((fieldIds) => state.saveSchedule({
       ...(existing || {}),
       scheduleId: existing ? editingScheduleId : undefined,
       date: selectedDate,
@@ -229,8 +230,9 @@
       memo,
       plannedFertilizerName: isFertilizer ? String(U.$("sheetScheduleFertilizerName").value || "").trim() : "",
       plannedFertilizerRateKg10a: isFertilizer ? String(U.$("sheetScheduleFertilizerRate").value || "").trim() : ""
-    });
-    });
+    }) !== null);
+    savingSchedule = false;
+    if (!saved) return;
     hideScheduleForm();
     render();
   }

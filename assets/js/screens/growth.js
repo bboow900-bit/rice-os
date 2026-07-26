@@ -524,7 +524,7 @@
       return;
     }
     const field = state.field(U.$("gField").value);
-    state.saveGrowthLog({
+    const saved = state.saveGrowthLog({
       date: U.$("gDate").value || U.today(),
       fieldId: U.$("gField").value,
       leafColorScore: U.$("gLeaf").value || "3",
@@ -538,6 +538,7 @@
       recordedBy: U.$("gRecordedBy") ? U.$("gRecordedBy").value : "",
       memo: U.$("gMemo").value || "出穂確認"
     });
+    if (saved === null) return;
     U.toast(`${field && field.name || "圃場"} の出穂を登録しました`);
     resetForm();
   }
@@ -638,11 +639,14 @@
       const targets = !common.logId && groupFields.length && common.panicleLengthMm
         ? groupFields
         : (!common.logId && bulkFieldIds.length > 1 ? bulkFieldIds : [U.$("gField").value]);
-      targets.forEach((fieldId) => state.saveGrowthLog({
-        ...common,
-        logId: targets.length > 1 ? "" : common.logId,
-        fieldId
-      }));
+      for (const fieldId of targets) {
+        const saved = state.saveGrowthLog({
+          ...common,
+          logId: targets.length > 1 ? "" : common.logId,
+          fieldId
+        });
+        if (saved === null) return;
+      }
       resetForm();
     });
 
