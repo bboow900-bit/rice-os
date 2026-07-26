@@ -9,6 +9,7 @@
   let selectedTab = "karte";
   let annualSearchValue = "";
   let annualSortValue = "updated";
+  let seasonNoteDraft = null;
 
   const KIND_META = {
     fieldWork: { label: "作業", className: "work", icon: "作" },
@@ -1128,6 +1129,40 @@
     return suffix ? `${value}${suffix}` : String(value);
   }
 
+  function reviewYearValue() {
+    return yearValue() === "all" ? String(new Date().getFullYear()) : String(yearValue());
+  }
+
+  function seasonNotesForReview(fieldId) {
+    if (!state.seasonNotesForField) return [];
+    return (state.seasonNotesForField(fieldId, reviewYearValue()) || []).slice()
+      .sort((a, b) => String(b.date || b.updatedAt || "").localeCompare(String(a.date || a.updatedAt || "")));
+  }
+
+  function seasonNoteId(note) {
+    return String(note && (note.noteId || note.seasonNoteId || note.id) || "");
+  }
+
+  function defaultSeasonNoteDate(year) {
+    const today = U.today();
+    return String(today).startsWith(`${year}-`) ? today : `${year}-01-01`;
+  }
+
+  function renderSeasonNotes(field) {
+    const year = reviewYearValue();
+    const notes = seasonNotesForReview(field.fieldId);
+    const draft = seasonNoteDraft && seasonNoteDraft.fieldId === field.fieldId && String(seasonNoteDraft.year) === year ? seasonNoteDraft : null;
+    return `
+      <section class="annual-season-notes" aria-label="${U.escapeHTML(year)}年の気づき">
+        <div class="annual-season-notes-head"><div><span>${U.escapeHTML(year)}年の記録</span><h3>今年の気づき</h3></div><button type="button" class="secondary" data-season-note-add="${U.attr(field.fieldId)}">追加</button></div>
+        ${draft ? `<div class="annual-season-note-editor" data-season-note-editor="${U.attr(field.fieldId)}"><label>日付<input type="date" data-season-note-date value="${U.attr(draft.date || defaultSeasonNoteDate(year))}"></label><label>気づき<textarea data-season-note-memo placeholder="例: この時期は水持ちが良く、落水を急がなかった。">${U.escapeHTML(draft.memo || "")}</textarea></label><div><button type="button" class="secondary" data-season-note-cancel>閉じる</button><button type="button" class="primary" data-season-note-save="${U.attr(field.fieldId)}" data-season-note-id="${U.attr(draft.noteId || "")}">保存</button></div></div>` : ""}
+        <div class="annual-season-note-list">
+          ${notes.length ? notes.map((note) => `<article><time>${U.escapeHTML(note.date ? U.fd(note.date) : "日付未登録")}</time><p>${U.escapeHTML(note.text || note.memo || note.note || "")}</p><div><button type="button" data-season-note-edit="${U.attr(seasonNoteId(note))}">編集</button><button type="button" class="danger" data-season-note-delete="${U.attr(seasonNoteId(note))}">削除</button></div></article>`).join("") : '<p class="annual-season-note-empty">今年の気づきを残すと、翌年の比較で思い出せます。</p>'}
+        </div>
+      </section>
+    `;
+  }
+
   function renderYearCompare(field) {
     const currentYear = yearValue() === "all" ? String(new Date().getFullYear()) : String(yearValue());
     const previousYear = String(Number(currentYear) - 1);
@@ -1154,6 +1189,7 @@
         <div class="annual-compare-head"><div><span>来年につなぐ比較</span><h3>${U.escapeHTML(currentYear)}年と${U.escapeHTML(previousYear)}年</h3></div><small>${U.escapeHTML(field.name)} / ${U.escapeHTML(varietyName(field))}</small></div>
         <div class="annual-compare-table"><div class="annual-compare-row annual-compare-label"><b>比較項目</b><b>${U.escapeHTML(currentYear)}年</b><b>${U.escapeHTML(previousYear)}年</b></div>${rows.map((row) => `<div class="annual-compare-row"><span>${U.escapeHTML(row[0])}</span><b class="${row[1] === "未記録" ? "missing" : ""}">${U.escapeHTML(row[1])}</b><b class="${row[2] === "未記録" ? "missing" : ""}">${U.escapeHTML(row[2])}</b></div>`).join("")}</div>
         ${missing.length ? `<div class="annual-compare-check"><b>翌年比較のため、今年はここを残す</b><span>${U.escapeHTML(missing.join(" / "))}</span></div>` : '<div class="annual-compare-check complete"><b>比較に必要な基本記録がそろっています</b><span>来年の判断材料として使えます</span></div>'}
+        ${renderSeasonNotes(field)}
         <label class="annual-carryover-note"><span>来年に引き継ぐメモ</span><textarea data-annual-field-edit="nextSeasonMemo" placeholder="例: この圃場は中干しを早めに始める。穂肥量は葉色を見て控えめに。">${U.escapeHTML(field.nextSeasonMemo || "")}</textarea><small>圃場マスターに保存され、年度をまたいで確認できます。</small></label>
       </section>
     `;
@@ -1314,6 +1350,49 @@
       const fab = event.target.closest("[data-annual-fab]");
       if (fab) {
         openAdd(fab.dataset.annualFab);
+        return;
+      }
+      const noteAdd = event.target.closest("[data-season-note-add]");
+      if (noteAdd) {
+        seasonNoteDraft = { fieldId: noteAdd.dataset.seasonNoteAdd, year: reviewYearValue(), date: defaultSeasonNoteDate(reviewYearValue()), memo: "" };
+        render();
+        return;
+      }
+      if (event.target.closest("[data-season-note-cancel]")) {
+        seasonNoteDraft = null;
+        render();
+        return;
+      }
+      const noteEdit = event.target.closest("[data-season-note-edit]");
+      if (noteEdit && selectedFieldId) {
+        const note = seasonNotesForReview(selectedFieldId).find((item) => seasonNoteId(item) === noteEdit.dataset.seasonNoteEdit);
+        if (!note) return;
+        seasonNoteDraft = { fieldId: selectedFieldId, year: reviewYearValue(), noteId: seasonNoteId(note), date: note.date || defaultSeasonNoteDate(reviewYearValue()), memo: note.text || note.memo || note.note || "" };
+        render();
+        return;
+      }
+      const noteSave = event.target.closest("[data-season-note-save]");
+      if (noteSave && selectedFieldId && state.saveSeasonNote) {
+        const editor = noteSave.closest("[data-season-note-editor]");
+        const date = editor && editor.querySelector("[data-season-note-date]") && editor.querySelector("[data-season-note-date]").value || "";
+        const memo = editor && editor.querySelector("[data-season-note-memo]") && editor.querySelector("[data-season-note-memo]").value.trim() || "";
+        if (!memo) return;
+        if (!String(date).startsWith(`${reviewYearValue()}-`)) {
+          alert(`${reviewYearValue()}年の気づきとして保存するため、日付も同じ年にしてください。`);
+          return;
+        }
+        const saved = state.saveSeasonNote({ noteId: noteSave.dataset.seasonNoteId || "", fieldId: selectedFieldId, season: reviewYearValue(), date, text: memo });
+        if (!saved) return;
+        seasonNoteDraft = null;
+        render();
+        return;
+      }
+      const noteDelete = event.target.closest("[data-season-note-delete]");
+      if (noteDelete && state.deleteSeasonNote && confirm("この気づきを削除しますか？")) {
+        const saved = state.deleteSeasonNote(noteDelete.dataset.seasonNoteDelete, selectedFieldId);
+        if (!saved) return;
+        seasonNoteDraft = null;
+        render();
         return;
       }
       const action = event.target.closest("[data-annual-action]");

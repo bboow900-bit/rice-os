@@ -4,7 +4,7 @@
   const RiceOS = window.RiceOS = window.RiceOS || {};
   const U = RiceOS.utils;
 
-  const SCHEMA_VERSION = 12;
+  const SCHEMA_VERSION = 13;
   const APP_VERSION = "20260723_ver118";
   const STORE_KEY = "rice_os_v8_stable";
   const BACKUP_KEY = "rice_os_v8_stable_backup";
@@ -78,6 +78,7 @@
     targetSinkCm: "2〜4",
     fixedMemo: "",
     nextSeasonMemo: "",
+    seasonNotes: [],
     memo: "",
     status: "使用中",
     waterHabit: "",
@@ -282,8 +283,27 @@
     f.targetCrackCm = String(f.targetCrackCm || "");
     f.targetSinkCm = String(f.targetSinkCm || "");
     f.nextSeasonMemo = String(f.nextSeasonMemo || "");
+    f.seasonNotes = dedupeBy(ensureArray(f.seasonNotes)
+      .map((note, noteIndex) => normalizeSeasonNote(note, f.fieldId, noteIndex)), "noteId");
     f.sortOrder = U.number(f.sortOrder, index * 10);
     return f;
+  }
+
+  function normalizeSeasonNote(input, fieldId, index) {
+    const note = input || {};
+    const date = String(note.date || U.today());
+    // A reflection belongs to the year in its date. Ignore a conflicting
+    // imported season value so JSON restoration cannot leak it into another year.
+    const season = U.number(U.dateYear(date), U.season(date));
+    return {
+      noteId: canonicalId("season-note", note.noteId || note.id, `${fieldId}_${season}_${date}_${index + 1}`),
+      fieldId: String(note.fieldId || fieldId || ""),
+      season,
+      date,
+      text: String(note.text ?? note.memo ?? ""),
+      createdAt: String(note.createdAt || note.updatedAt || U.now()),
+      updatedAt: String(note.updatedAt || note.createdAt || U.now())
+    };
   }
 
   function leafColorScoreFromText(value) {
@@ -747,6 +767,7 @@
     leafColorLabel,
     leafColorScoreFromText,
     normalize,
+    normalizeSeasonNote,
     emptyData,
     phase
   };

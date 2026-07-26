@@ -678,6 +678,12 @@
       .sort((a, b) => String(b.startDate || b.date).localeCompare(String(a.startDate || a.date)))[0] || null;
   }
 
+  function latestSeasonNoteForField(fieldId) {
+    if (!state.seasonNotesForField) return null;
+    return (state.seasonNotesForField(fieldId, currentSeasonYear()) || []).slice()
+      .sort((a, b) => String(b.date || b.updatedAt || "").localeCompare(String(a.date || a.updatedAt || "")))[0] || null;
+  }
+
   function periodDayLabel(value) {
     return value === "" || value == null ? "-" : `${value}日`;
   }
@@ -819,6 +825,7 @@
     const growth = latestGrowthForField(field.fieldId);
     const dry = drySummary(field);
     const irrigation = latestIrrigationForField(field.fieldId);
+    const latestSeasonNote = latestSeasonNoteForField(field.fieldId);
     const nextRecord = fieldNextRecordInfo(field);
     const waterText = irrigation
       ? `${irrigation.method || "水管理"} ${irrigation.actualEndDate ? `完了 ${U.fd(irrigation.actualEndDate)}` : `実施中 ${U.fd(irrigation.startDate)}`}`
@@ -839,7 +846,7 @@
           ? `<section class="field-next-action"><button type="button" data-field-action="${U.attr(nextRecord.action)}" data-field-id="${U.attr(field.fieldId)}"><span>記録が不足しています</span><b>${U.escapeHTML(nextRecord.label)}</b><i aria-hidden="true">›</i></button></section>`
           : '<section class="field-next-guide"><b>記録を追加</b><span>現場の様子に合わせて、下から種類を選べます</span></section>'}
         <section class="field-hub-actions"><button type="button" data-field-action="add-work" data-field-id="${U.attr(field.fieldId)}">作業</button><button type="button" data-field-action="add-growth" data-field-id="${U.attr(field.fieldId)}">生育</button><button type="button" data-field-action="add-irrigation" data-field-id="${U.attr(field.fieldId)}">水管理</button><button type="button" data-field-action="photos" data-field-id="${U.attr(field.fieldId)}">写真</button></section>
-        <section class="field-hub-history"><div><span>今年のひとこと</span><b>${U.escapeHTML(field.yearMemo || field.nextSeasonMemo || field.fixedMemo || "まだありません")}</b></div><button type="button" class="secondary" data-field-action="history" data-field-id="${U.attr(field.fieldId)}">前年比較・振り返り</button></section>
+        <section class="field-hub-history"><div><span>今年の気づき${latestSeasonNote && latestSeasonNote.date ? ` / ${U.escapeHTML(U.fd(latestSeasonNote.date))}` : ""}</span><b>${U.escapeHTML(latestSeasonNote && (latestSeasonNote.text || latestSeasonNote.memo || latestSeasonNote.note) || "年間履歴で気づきを残せます")}</b></div><button type="button" class="secondary" data-field-action="history" data-field-id="${U.attr(field.fieldId)}">前年比較・振り返り</button></section>
       </section>
     `;
   }

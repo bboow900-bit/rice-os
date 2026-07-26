@@ -984,6 +984,58 @@
     return (data().irrigations || []).filter((i) => i.fieldId === fieldId && isInYear(i, year));
   }
 
+  function seasonNotesForField(fieldId, year) {
+    const fieldRecord = field(fieldId);
+    return (fieldRecord && Array.isArray(fieldRecord.seasonNotes) ? fieldRecord.seasonNotes : [])
+      .filter((note) => year === undefined || year === null || String(year).trim() === "" || String(note.season) === String(year))
+      .slice()
+      .sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")) || String(b.updatedAt || "").localeCompare(String(a.updatedAt || "")));
+  }
+
+  function saveSeasonNote(record) {
+    const input = record || {};
+    const fieldId = String(input.fieldId || "");
+    const text = String(input.text ?? input.memo ?? "");
+    const date = String(input.date || U.today());
+    const inputSeason = input.season === undefined || input.season === null || String(input.season).trim() === "" ? "" : String(input.season);
+    if (!fieldId || !field(fieldId) || !text.trim() || !date || inputSeason && U.dateYear(date) !== inputSeason) return "";
+    const noteId = String(input.noteId || input.id || U.id("season-note", input.date || U.today()));
+    const saved = mutate((d) => {
+      const fieldIndex = d.fields.findIndex((item) => item.fieldId === fieldId);
+      if (fieldIndex < 0) return;
+      const notes = Array.isArray(d.fields[fieldIndex].seasonNotes) ? d.fields[fieldIndex].seasonNotes : [];
+      const existingIndex = notes.findIndex((item) => item.noteId === noteId);
+      const existing = existingIndex >= 0 ? notes[existingIndex] : null;
+      const normalized = S.normalizeSeasonNote({
+        ...input,
+        noteId,
+        fieldId,
+        text,
+        createdAt: input.createdAt || existing && existing.createdAt || U.now(),
+        date,
+        season: inputSeason || U.dateYear(date),
+        updatedAt: U.now()
+      }, fieldId, existingIndex >= 0 ? existingIndex : notes.length);
+      if (existingIndex >= 0) notes[existingIndex] = { ...existing, ...normalized };
+      else notes.push(normalized);
+      d.fields[fieldIndex].seasonNotes = notes;
+    }, "今年の気づきを保存しました");
+    return saved ? noteId : "";
+  }
+
+  function deleteSeasonNote(noteId, fieldId) {
+    const safeNoteId = String(noteId || "");
+    const safeFieldId = String(fieldId || "");
+    if (!safeNoteId || !safeFieldId || !field(safeFieldId)) return null;
+    if (!seasonNotesForField(safeFieldId).some((item) => item.noteId === safeNoteId)) return null;
+    return mutate((d) => {
+      const fieldIndex = d.fields.findIndex((item) => item.fieldId === safeFieldId);
+      if (fieldIndex < 0) return;
+      d.fields[fieldIndex].seasonNotes = (d.fields[fieldIndex].seasonNotes || [])
+        .filter((item) => item.noteId !== safeNoteId);
+    }, "今年の気づきを削除しました");
+  }
+
   function lastFieldWork(fieldId) {
     return fieldWorksFor(fieldId).slice().sort((a, b) => String(b.date).localeCompare(String(a.date)))[0] || null;
   }
@@ -1036,6 +1088,9 @@
     growthLogsFor,
     dryPeriodsFor,
     irrigationsFor,
+    seasonNotesForField,
+    saveSeasonNote,
+    deleteSeasonNote,
     lastFieldWork,
     lastGrowthLog
   };

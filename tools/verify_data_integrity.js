@@ -65,6 +65,25 @@ const oldData = {
   materials: [],
   varietyResults: []
 };
+const legacyNotesData = S.normalize({
+  varieties: oldData.varieties,
+  fields: [{
+    fieldId: "field_legacy_notes",
+    name: "legacy notes",
+    varietyId: "variety_test",
+    seasonNotes: [{ id: "legacy_note_2025", date: "2025-09-20", memo: "legacy carryover" }]
+  }]
+});
+const legacySeasonNote = legacyNotesData.fields.find((field) => field.fieldId === "field_legacy_notes").seasonNotes[0];
+assert(legacySeasonNote.noteId === "legacy_note_2025", "legacy season note id was not preserved");
+assert(legacySeasonNote.fieldId === "field_legacy_notes" && legacySeasonNote.season === 2025, "legacy season note was not normalized by field and year");
+assert(legacySeasonNote.text === "legacy carryover" && legacySeasonNote.createdAt && legacySeasonNote.updatedAt, "legacy season note text or timestamps were not normalized");
+const mismatchedSeasonData = S.normalize({
+  varieties: oldData.varieties,
+  fields: [{ fieldId: "field_mismatched_note", name: "mismatched note", varietyId: "variety_test", seasonNotes: [{ date: "2025-08-01", season: 2026, text: "must follow date" }] }]
+});
+assert(mismatchedSeasonData.fields[0].seasonNotes[0].season === 2025, "imported season note did not follow its date year");
+
 memory.set(S.STORE_KEY, JSON.stringify(oldData));
 
 load("assets/js/core/storage.js");
@@ -81,6 +100,26 @@ assert(state.fieldWorksFor("field_a").some((row) => row.workId === "work_plantin
 
 state.updateField("field_a", { name: "新名A" });
 assert(state.fieldWorksFor("field_a").some((row) => row.workId === "work_planting"), "圃場名変更で過去作業が消えた");
+
+state.updateField("field_a", { nextSeasonMemo: "keep this carryover" });
+const carryoverBeforeSeasonNotes = state.field("field_a").nextSeasonMemo;
+const currentSeasonNoteId = state.saveSeasonNote({
+  fieldId: "field_a",
+  date: "2026-08-01",
+  text: "confirm next season timing"
+});
+assert(currentSeasonNoteId, "season note could not be saved");
+assert(state.seasonNotesForField("field_a", 2026).some((note) => note.noteId === currentSeasonNoteId), "current-year season note was not found");
+assert(!state.seasonNotesForField("field_a", 2025).some((note) => note.noteId === currentSeasonNoteId), "current-year season note leaked into a prior year");
+assert(state.saveSeasonNote({ fieldId: "field_a", season: 2026, date: "2025-08-01", text: "must be rejected" }) === "", "season note accepted a date from a different year");
+const reimportedSeasonNotes = S.normalize(JSON.parse(JSON.stringify(state.data()))).fields
+  .find((field) => field.fieldId === "field_a").seasonNotes;
+assert(reimportedSeasonNotes.some((note) => note.noteId === currentSeasonNoteId), "season note was lost by JSON export and import normalization");
+assert(state.deleteSeasonNote(currentSeasonNoteId, "field_b") === null, "a different field could delete this season note");
+assert(state.seasonNotesForField("field_a", 2026).some((note) => note.noteId === currentSeasonNoteId), "wrong-field deletion removed a season note");
+assert(state.deleteSeasonNote(currentSeasonNoteId, "field_a"), "season note could not be deleted from its field");
+assert(!state.seasonNotesForField("field_a", 2026).some((note) => note.noteId === currentSeasonNoteId), "deleted season note remained in the current year");
+assert(state.field("field_a").nextSeasonMemo === carryoverBeforeSeasonNotes, "season note changes altered next-season carryover memo");
 
 state.saveFieldWork({
   date: "2026-06-01",
