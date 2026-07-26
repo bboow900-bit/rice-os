@@ -452,14 +452,24 @@
     return maxDate(fieldRows(fieldId).map((row) => row.date));
   }
 
+  function stageAsOfDateForField(fieldId) {
+    const selectedYear = yearValue();
+    const currentYear = String(new Date().getFullYear());
+    if (selectedYear === "all" || String(selectedYear) === currentYear) return U.today();
+
+    const latestRecordDate = maxDate(fieldYearRows(fieldId, selectedYear).map((row) => row.date));
+    return latestRecordDate || `${selectedYear}-12-31`;
+  }
+
   function fieldStatus(field, stats) {
     if (!stats.total) return { label: "記録なし", tone: "muted" };
     const planting = firstDate(fieldYearRows(field.fieldId, yearValue()), (row) => row.kind === "fieldWork" && /田植/.test(String(row.title || "")));
-    const dap = planting ? U.daysBetween(planting, U.today()) : "";
-    const dryStart = state.workDateForField ? state.workDateForField(field.fieldId, "中干し開始") : "";
+    const asOfDate = stageAsOfDateForField(field.fieldId);
+    const dap = planting ? U.daysBetween(planting, asOfDate) : "";
+    const dryStart = workDateForAnnualYear(field.fieldId, "中干し開始");
     if (dap !== "" && dap >= 30 && dap <= 50 && !dryStart) return { label: "中干し候補", tone: "warn" };
     if (!stats.growth) return { label: "生育記録未入力", tone: "warn" };
-    const lastDays = stats.lastDate ? U.daysBetween(stats.lastDate, U.today()) : "";
+    const lastDays = stats.lastDate ? U.daysBetween(stats.lastDate, asOfDate) : "";
     if (lastDays !== "" && lastDays <= 14) return { label: "順調", tone: "ok" };
     return { label: "要確認", tone: "warn" };
   }
@@ -478,13 +488,29 @@
   }
 
   function latestGrowthForField(fieldId) {
-    return (state.growthLogsFor ? state.growthLogsFor(fieldId) : [])
+    return fieldRows(fieldId)
+      .filter((row) => row.kind === "growth")
       .slice()
       .sort((a, b) => String(b.date).localeCompare(String(a.date)))[0] || null;
   }
 
+  function workDateForAnnualYear(fieldId, names, mode) {
+    const matched = fieldRows(fieldId)
+      .filter((row) => row.kind === "fieldWork" && (Array.isArray(names) ? names : [names]).some((name) => String(row.title || "").includes(name)))
+      .map((row) => row.date)
+      .filter(Boolean)
+      .sort();
+    return mode === "last" ? matched[matched.length - 1] || "" : matched[0] || "";
+  }
+
+  function annualStageForField(field) {
+    if (!RiceOS.agro || !RiceOS.agro.seasonStageForField) return null;
+    return RiceOS.agro.seasonStageForField(field, stageAsOfDateForField(field.fieldId));
+  }
+
   function riceStageNumberForField(field) {
-    if (RiceOS.agro && RiceOS.agro.seasonStageForField) return RiceOS.agro.seasonStageForField(field, `${yearValue()}-12-31`).image;
+    const stage = annualStageForField(field);
+    if (stage) return stage.image;
     const latest = latestGrowthForField(field.fieldId);
     const planting = firstDate(fieldYearRows(field.fieldId, yearValue()), (row) => row.kind === "fieldWork" && /田植/.test(String(row.title || "")));
     const baseDate = latest && latest.date || U.today();
@@ -557,6 +583,7 @@
   function renderFieldPickerCard(item) {
     const { field, stats, status } = item;
     const last = stats.lastDate ? U.fd(stats.lastDate) : "記録なし";
+    const stage = annualStageForField(field);
     const riceStage = riceStageNumberForField(field);
     const district = field.district ? ` / ${U.escapeHTML(field.district)}` : "";
     return `
@@ -571,6 +598,7 @@
             <strong>${U.escapeHTML(field.areaA ? `${field.areaA}a` : "面積未設定")}</strong>
           </div>
           <small>最終更新：${U.escapeHTML(last)}${district}</small>
+          <small class="annual-field-stage">現在：${U.escapeHTML(stage && stage.current ? stage.current.label : "記録待ち")} / ${U.escapeHTML(stage && stage.certainty || "記録待ち")}</small>
           <div class="annual-field-pick-metrics">
             <span class="growth"><i aria-hidden="true"></i>生育 ${U.escapeHTML(String(stats.growth))}件</span>
             <span class="water"><i aria-hidden="true"></i>水管理 ${U.escapeHTML(String(stats.water))}件</span>
@@ -687,10 +715,10 @@
   function renderKarteTab(field) {
     const variety = state.variety(field.varietyId);
     const planting = firstDate(fieldYearRows(field.fieldId, yearValue()), (row) => row.kind === "fieldWork" && /田植/.test(String(row.title || "")));
-    const dryStart = state.workDateForField ? state.workDateForField(field.fieldId, "中干し開始") : "";
-    const dryEnd = state.workDateForField ? state.workDateForField(field.fieldId, "中干し終了") : "";
-    const intermittentStart = state.workDateForField ? state.workDateForField(field.fieldId, "間断灌水開始") : "";
-    const wetStart = state.workDateForField ? state.workDateForField(field.fieldId, "湿潤灌漑開始") : "";
+    const dryStart = workDateForAnnualYear(field.fieldId, "中干し開始");
+    const dryEnd = workDateForAnnualYear(field.fieldId, ["中干し終了", "中干し完了", "中干完了"], "last");
+    const intermittentStart = workDateForAnnualYear(field.fieldId, "間断灌水開始");
+    const wetStart = workDateForAnnualYear(field.fieldId, "湿潤灌漑開始");
     const riceStage = riceStageNumberForField(field);
     const panicleLog = latestPanicleLogForYear(field.fieldId, yearValue());
     const panicle = RiceOS.agro && RiceOS.agro.latestPanicleEstimate
@@ -1136,6 +1164,9 @@
 
   function renderFieldDetail(field) {
     const planting = firstDate(fieldYearRows(field.fieldId, yearValue()), (row) => row.kind === "fieldWork" && /田植/.test(String(row.title || "")));
+    const stage = annualStageForField(field);
+    const stageImage = stage && stage.image || riceStageNumberForField(field);
+    const asOfDate = stageAsOfDateForField(field.fieldId);
     return `
       <div class="annual-field-detail">
         <div class="annual-detail-head">
@@ -1143,10 +1174,14 @@
           <div>
             <span>圃場履歴</span>
             <h2>${U.escapeHTML(field.name)}</h2>
-            <p>${U.escapeHTML(varietyName(field))} / ${U.escapeHTML(field.areaA ? `${field.areaA}a` : "面積未設定")}${planting ? ` / 田植後${U.escapeHTML(String(U.daysAfterPlanting(field, U.today())))}日` : ""}</p>
+            <p>${U.escapeHTML(varietyName(field))} / ${U.escapeHTML(field.areaA ? `${field.areaA}a` : "面積未設定")}${planting ? ` / 田植後${U.escapeHTML(String(U.daysBetween(planting, asOfDate)))}日` : ""}</p>
           </div>
           <button type="button" class="annual-detail-menu" aria-label="メニュー">…</button>
         </div>
+        <section class="annual-stage-strip stage-${U.attr(stage && stage.current && stage.current.key || "waiting")}">
+          <span class="annual-stage-strip-image">${annualPickerRiceImage(stageImage)}</span>
+          <div><small>現在の生育ステージ / ${U.escapeHTML(stage && stage.certainty || "記録待ち")}</small><b>${U.escapeHTML(stage && stage.current && stage.current.label || "記録待ち")}</b><p>管理状況：${U.escapeHTML(stage && stage.management && stage.management.label || "中干し未実施")}</p></div>
+        </section>
         ${renderYearCompare(field)}
         ${renderTabs(field)}
         ${renderAnnualFab(field.fieldId)}

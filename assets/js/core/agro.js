@@ -333,12 +333,13 @@
       .forEach((row) => evidence.push({ date: row.date, key: "maturity", source: "work", recordId: row.workId || "" }));
     const explicitCorrection = evidence.filter((item) => item.source === "confirmed" && item.correctionReason)
       .sort((a, b) => String(a.date).localeCompare(String(b.date))).pop() || null;
-    evidence.sort((a, b) => (STAGE_INDEX[a.key] || 0) - (STAGE_INDEX[b.key] || 0)
-      || String(a.date).localeCompare(String(b.date))
+    evidence.sort((a, b) => String(a.date).localeCompare(String(b.date))
+      || (STAGE_INDEX[a.key] || 0) - (STAGE_INDEX[b.key] || 0)
       || ({ measured: 1, work: 2, confirmed: 3 }[a.source] - { measured: 1, work: 2, confirmed: 3 }[b.source]));
     const latestEvidence = explicitCorrection || evidence[evidence.length - 1] || null;
     const historicalHeading = !headingDate ? estimatedHeading(field, planting, year) : null;
-    const headingReference = headingDate ? { date: headingDate, basis: "今年の出穂日" } : null;
+    const headingReference = headingDate ? { date: headingDate, basis: "今年の出穂日" }
+      : (historicalHeading ? { date: historicalHeading.date, basis: historicalHeading.basis } : null);
     const prediction = headingReference ? {
       key: estimatedStageKey(U.daysBetween(headingReference.date, date)),
       date: headingReference.date,
@@ -350,13 +351,12 @@
     });
     const actual = latestEvidence ? stageFromKey(latestEvidence.key) : stageFromKey("");
     const predicted = prediction ? stageFromKey(prediction.key) : stageFromKey("");
-    // Planting establishes the season, but should not freeze a field at 活着期.
-    // Any observed growth measurement, confirmed stage, heading work, or harvest work
-    // is treated as the current factual stage instead of a calendar estimate.
-    const hasDirectStageEvidence = evidence.some((item) => item.source === "measured"
-      || item.source === "confirmed"
-      || (item.source === "work" && item.key !== "establishment"));
-    const usePrediction = !hasDirectStageEvidence && Boolean(prediction)
+    const evidenceIsToday = latestEvidence && latestEvidence.date === date
+      && latestEvidence.source !== "work";
+    // A field observation is certain on its recorded day. On later days, the
+    // calendar may progress from that observation until another field check
+    // confirms or corrects the stage.
+    const usePrediction = Boolean(prediction) && !evidenceIsToday
       && (!actual.index || predicted.index >= actual.index);
     const resolved = usePrediction ? predicted : actual;
     const index = resolved.index;

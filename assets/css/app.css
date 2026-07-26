@@ -20,6 +20,58 @@
   --radius: 8px;
 }
 
+/* Shared stage result in annual history: same facts as Home and field detail. */
+#screen-annual .annual-field-stage {
+  display: block;
+  margin-top: 2px;
+  color: #2a7e3f;
+  font-size: 11px;
+  font-weight: 850;
+}
+
+#screen-annual .annual-stage-strip {
+  display: grid;
+  grid-template-columns: 62px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  min-height: 76px;
+  padding: 9px 12px;
+  border: 1px solid #b9ddbd;
+  border-radius: 8px;
+  background: linear-gradient(100deg, #f2fff2, #fffef5);
+  box-shadow: 0 4px 10px rgba(48, 113, 51, 0.08);
+}
+
+#screen-annual .annual-stage-strip-image {
+  display: grid;
+  place-items: center;
+  width: 60px;
+  height: 60px;
+}
+
+#screen-annual .annual-stage-strip-image img {
+  width: 58px;
+  height: 58px;
+  object-fit: contain;
+}
+
+#screen-annual .annual-stage-strip small,
+#screen-annual .annual-stage-strip p {
+  display: block;
+  margin: 0;
+  color: #506355;
+  font-size: 11px;
+  font-weight: 760;
+}
+
+#screen-annual .annual-stage-strip b {
+  display: block;
+  margin: 2px 0;
+  color: #123c20;
+  font-size: 17px;
+  font-weight: 950;
+}
+
 /* Home calendar hub */
 #screen-home {
   overflow-x: hidden;
