@@ -201,6 +201,27 @@
     return rows[0] || null;
   }
 
+  function latestDecisionRecord(fieldId, year) {
+    const today = U.today();
+    const isActualDate = (value) => Boolean(value) && String(value).startsWith(`${year}-`) && String(value) <= today;
+    const periodRecord = (row, type, startTitle, doneTitle) => {
+      if (/予定|未開始/.test(String(row.status || row.periodStatus || ""))) return null;
+      if (isActualDate(row.actualEndDate)) return { date: row.actualEndDate, type, title: doneTitle };
+      const startDate = row.startDate || row.date || "";
+      return isActualDate(startDate) ? { date: startDate, type, title: startTitle } : null;
+    };
+    const records = [
+      ...state.fieldWorksFor(fieldId, year).map((row) => ({ date: row.date, type: "作業", title: row.workName || "作業記録" })),
+      ...state.growthLogsFor(fieldId, year).map((row) => ({ date: row.date, type: "生育", title: row.tillerCount ? `分げつ ${row.tillerCount}本` : "生育記録" })),
+      ...(state.dryPeriodsFor ? state.dryPeriodsFor(fieldId, year) : []).map((row) => periodRecord(row, "中干し", "中干し開始", "中干し完了")),
+      ...(state.irrigationsFor ? state.irrigationsFor(fieldId, year) : [])
+        .filter((row) => /間断/.test(String(row.method || "")))
+        .map((row) => periodRecord(row, "水管理", "間断灌水開始", "間断灌水完了"))
+    ];
+    return records.filter((row) => row && isActualDate(row.date))
+      .sort((a, b) => String(b.date).localeCompare(String(a.date)))[0] || null;
+  }
+
   function candidatesForDate(date) {
     if (date !== U.today()) return [];
     const year = cropYear(date);
@@ -440,6 +461,7 @@
     const stage = seasonStageForField(field, date);
     const photo = latestFieldPhoto(field.fieldId, cropYear(date));
     const memory = fieldMemory(field, date);
+    const latestRecord = latestDecisionRecord(field.fieldId, cropYear(date));
     const note = String(field.yearMemo || field.nextSeasonMemo || field.fixedMemo || (growth && growth.memo) || "").trim();
     const stageImage = stage.current ? `assets/images/rice-stages/rice-stage-${String(stage.current.image).padStart(2, "0")}.png` : "assets/images/rice-stages/rice-stage-01.png";
     const stageKey = stage.current ? stage.current.key : "waiting";
@@ -460,6 +482,7 @@
         <div class="home-season-title"><span>${U.escapeHTML(stage.current ? `次に残す：${stage.next}` : stage.next)}</span></div>
         ${renderSeasonTrack(stage)}
         <div class="home-decision-status"><span>${U.escapeHTML(need.label)}</span><small>${U.escapeHTML(need.detail)}</small></div>
+        ${latestRecord ? `<div class="home-latest-record"><b>最新の記録</b><span><time>${U.escapeHTML(U.fd(latestRecord.date))}</time><i>${U.escapeHTML(latestRecord.type)}</i><em>${U.escapeHTML(latestRecord.title)}</em></span></div>` : ""}
         ${memory ? `<div class="home-field-memory"><img src="${U.attr(memory.photoData || stageImage)}" alt=""><span><b>${U.escapeHTML(memory.label)}</b><small>${U.escapeHTML(U.fd(memory.date))} / ${U.escapeHTML(memory.title || "記録")}${memory.text ? ` / ${U.escapeHTML(memory.text)}` : ""}</small></span></div>` : `<p class="home-field-memory-empty">${U.escapeHTML(previousYearHint(field, date))}</p>`}
       </article>
     `;
