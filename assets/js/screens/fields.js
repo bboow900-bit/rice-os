@@ -424,14 +424,53 @@
     `;
   }
 
-  function photosForField(fieldId) {
-    const year = currentSeasonYear();
+  function photosForField(fieldId, year, limit = 4) {
+    const targetYear = year || currentSeasonYear();
     const photos = [
-      ...state.growthLogsFor(fieldId, year).map((row) => ({ date: row.date, photoData: row.photoData, photo: row.photo, title: "生育" })),
-      ...state.fieldWorksFor(fieldId, year).map((row) => ({ date: row.date, photoData: row.photoData, photo: row.photo, title: row.workName || "作業" })),
-      ...state.dryPeriodsFor(fieldId, year).map((row) => ({ date: row.date, photoData: row.photoData, photo: row.photo, title: "中干し" }))
+      ...state.growthLogsFor(fieldId, targetYear).map((row) => ({ date: row.date, photoData: row.photoData, photo: row.photo, title: "生育" })),
+      ...state.fieldWorksFor(fieldId, targetYear).map((row) => ({ date: row.date, photoData: row.photoData, photo: row.photo, title: row.workName || "作業" })),
+      ...state.dryPeriodsFor(fieldId, targetYear).map((row) => ({ date: row.date, photoData: row.photoData, photo: row.photo, title: "中干し" }))
     ].filter((row) => row.photoData || row.photo);
-    return photos.sort((a, b) => String(b.date).localeCompare(String(a.date))).slice(0, 4);
+    const sorted = photos.sort((a, b) => String(b.date).localeCompare(String(a.date)));
+    return limit ? sorted.slice(0, limit) : sorted;
+  }
+
+  function calendarDistance(dateA, dateB) {
+    const a = String(dateA || "").slice(5);
+    const b = String(dateB || "").slice(5);
+    if (!a || !b) return Number.MAX_SAFE_INTEGER;
+    return Math.abs(new Date(`2000-${a}T00:00:00`).getTime() - new Date(`2000-${b}T00:00:00`).getTime());
+  }
+
+  function photoComparisonForField(field) {
+    const currentYear = currentSeasonYear();
+    const previousYear = String(Number(currentYear) - 1);
+    const current = photosForField(field.fieldId, currentYear)[0] || null;
+    // The comparison needs every prior-year photo. The compact strip remains capped at four.
+    const previousPhotos = photosForField(field.fieldId, previousYear, 0);
+    if (!current) return { currentYear, previousYear, current: null, previous: null, label: "今年の写真がありません" };
+    if (!previousPhotos.length) return { currentYear, previousYear, current, previous: null, label: "前年の写真がありません" };
+    const currentPlanting = state.plantingDateForField && state.plantingDateForField(field.fieldId, currentYear);
+    const previousPlanting = state.plantingDateForField && state.plantingDateForField(field.fieldId, previousYear);
+    if (currentPlanting && previousPlanting) {
+      const currentDap = U.daysBetween(currentPlanting, current.date);
+      const previous = previousPhotos.slice().sort((a, b) => Math.abs(U.daysBetween(previousPlanting, a.date) - currentDap) - Math.abs(U.daysBetween(previousPlanting, b.date) - currentDap))[0];
+      const previousDap = U.daysBetween(previousPlanting, previous.date);
+      return { currentYear, previousYear, current, previous, label: `田植後 ${currentDap}日 / 前年 ${previousDap}日で比較` };
+    }
+    const previous = previousPhotos.slice().sort((a, b) => calendarDistance(a.date, current.date) - calendarDistance(b.date, current.date))[0];
+    return { currentYear, previousYear, current, previous, label: "同じ暦日の近傍で比較" };
+  }
+
+  function renderPhotoComparison(field) {
+    const comparison = photoComparisonForField(field);
+    const card = (year, photo, current) => photo ? `<figure><img src="${U.attr(photo.photoData)}" alt="${U.attr(`${year}年 ${photo.title}`)}"><figcaption><b>${U.escapeHTML(current ? "今年" : "前年")}</b><span>${U.escapeHTML(U.fd(photo.date))} / ${U.escapeHTML(photo.title)}</span></figcaption></figure>` : `<div class="field-photo-compare-empty"><b>${U.escapeHTML(current ? "今年" : "前年")}</b><span>${U.escapeHTML(current ? "写真未登録" : "前年写真なし")}</span></div>`;
+    return `
+      <section class="field-photo-compare" aria-label="今年と前年の写真比較">
+        <div class="field-photo-compare-head"><div><span>写真比較</span><b>${U.escapeHTML(comparison.label)}</b></div><small>${U.escapeHTML(comparison.currentYear)}年 / ${U.escapeHTML(comparison.previousYear)}年</small></div>
+        <div class="field-photo-compare-grid">${card(comparison.currentYear, comparison.current, true)}${card(comparison.previousYear, comparison.previous, false)}</div>
+      </section>
+    `;
   }
 
   function renderPhotoStrip(field) {
@@ -840,6 +879,7 @@
           <div><small>現在の生育ステージ / ${U.escapeHTML(stage.certainty)}</small><b>${U.escapeHTML(stage.label)}</b><p>${U.escapeHTML(stage.management.label)} / ${U.escapeHTML(fieldNextRecord(field))}</p></div>
         </section>
         <div class="field-hub-summary"><span><b>生育</b>${U.escapeHTML(growth ? `${U.fd(growth.date)} / 葉色 ${growth.leafColor || "-"}` : "未入力")}</span><span><b>水管理</b>${U.escapeHTML(waterText)}</span></div>
+        ${renderPhotoComparison(field)}
         ${renderWaterPeriodOverview(field, dry, irrigation)}
         ${dry.actualEndDate && !irrigation ? `<section class="field-water-transition"><b>中干し完了</b><span>${U.escapeHTML(U.fd(dry.actualEndDate))}。水管理の記録は次の入力から開けます</span></section>` : ""}
         ${nextRecord

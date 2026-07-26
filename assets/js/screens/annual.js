@@ -795,6 +795,42 @@
     ].filter((row) => row.photoData || row.photo).sort((a, b) => String(b.date).localeCompare(String(a.date)));
   }
 
+  function calendarDistance(dateA, dateB) {
+    const a = String(dateA || "").slice(5);
+    const b = String(dateB || "").slice(5);
+    if (!a || !b) return Number.MAX_SAFE_INTEGER;
+    return Math.abs(new Date(`2000-${a}T00:00:00`).getTime() - new Date(`2000-${b}T00:00:00`).getTime());
+  }
+
+  function plantingDateForPhotoComparison(fieldId, year) {
+    if (state.plantingDateForField) return state.plantingDateForField(fieldId, year);
+    return firstDate(fieldYearRows(fieldId, year), (row) => row.kind === "fieldWork" && /田植/.test(String(row.title || "")));
+  }
+
+  function photoComparisonForAnnual(field) {
+    const currentYear = reviewYearValue();
+    const previousYear = String(Number(currentYear) - 1);
+    const current = photosForField(field.fieldId, currentYear).find((photo) => photo.photoData) || null;
+    const previousPhotos = photosForField(field.fieldId, previousYear).filter((photo) => photo.photoData);
+    if (!current) return { currentYear, previousYear, current: null, previous: null, label: "今年の写真がありません" };
+    if (!previousPhotos.length) return { currentYear, previousYear, current, previous: null, label: "前年の写真がありません" };
+    const currentPlanting = plantingDateForPhotoComparison(field.fieldId, currentYear);
+    const previousPlanting = plantingDateForPhotoComparison(field.fieldId, previousYear);
+    if (currentPlanting && previousPlanting) {
+      const currentDap = U.daysBetween(currentPlanting, current.date);
+      const previous = previousPhotos.slice().sort((a, b) => Math.abs(U.daysBetween(previousPlanting, a.date) - currentDap) - Math.abs(U.daysBetween(previousPlanting, b.date) - currentDap))[0];
+      return { currentYear, previousYear, current, previous, label: `田植後 ${currentDap}日 / 前年 ${U.daysBetween(previousPlanting, previous.date)}日で比較` };
+    }
+    const previous = previousPhotos.slice().sort((a, b) => calendarDistance(a.date, current.date) - calendarDistance(b.date, current.date))[0];
+    return { currentYear, previousYear, current, previous, label: "同じ暦日の近傍で比較" };
+  }
+
+  function renderAnnualPhotoComparison(field) {
+    const comparison = photoComparisonForAnnual(field);
+    const card = (year, photo, current) => photo ? `<figure><img src="${U.attr(photo.photoData)}" alt="${U.attr(`${year}年 ${photo.title}`)}"><figcaption><b>${U.escapeHTML(current ? "今年" : "前年")}</b><span>${U.escapeHTML(U.fd(photo.date))} / ${U.escapeHTML(photo.title)}</span></figcaption></figure>` : `<div class="annual-photo-compare-empty"><b>${U.escapeHTML(current ? "今年" : "前年")}</b><span>${U.escapeHTML(current ? "写真未登録" : "前年写真なし")}</span></div>`;
+    return `<section class="annual-photo-period-compare"><div class="annual-photo-period-compare-head"><div><span>写真比較</span><b>${U.escapeHTML(comparison.label)}</b></div><small>${U.escapeHTML(comparison.currentYear)}年 / ${U.escapeHTML(comparison.previousYear)}年</small></div><div class="annual-photo-period-compare-grid">${card(comparison.currentYear, comparison.current, true)}${card(comparison.previousYear, comparison.previous, false)}</div></section>`;
+  }
+
   function dryByDate(fieldId, year) {
     const map = new Map();
     const targetYear = year && year !== "all" ? String(year) : undefined;
@@ -1021,17 +1057,17 @@
 
   function renderPhotoTab(field) {
     const photos = photosForField(field.fieldId, yearValue());
-    if (!photos.length) return '<div class="empty">写真はまだありません。</div>';
     return `
-      <div class="annual-photo-compare-grid">
-        ${photos.map((photo) => `
-          <article>
-            ${photo.photoData ? `<img src="${U.attr(photo.photoData)}" alt="">` : `<div>${U.escapeHTML(photo.photo || "写真メモ")}</div>`}
-            <b>${U.escapeHTML(photo.title)}</b>
-            <span>${U.escapeHTML(U.fd(photo.date))}</span>
-          </article>
-        `).join("")}
-      </div>
+      ${renderAnnualPhotoComparison(field)}
+      ${photos.length ? `<div class="annual-photo-compare-grid">
+          ${photos.map((photo) => `
+            <article>
+              ${photo.photoData ? `<img src="${U.attr(photo.photoData)}" alt="">` : `<div>${U.escapeHTML(photo.photo || "写真メモ")}</div>`}
+              <b>${U.escapeHTML(photo.title)}</b>
+              <span>${U.escapeHTML(U.fd(photo.date))}</span>
+            </article>
+          `).join("")}
+        </div>` : '<div class="empty">写真はまだありません。</div>'}
     `;
   }
 

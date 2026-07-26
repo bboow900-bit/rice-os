@@ -11254,6 +11254,37 @@ label {
 .field-hub-summary span { min-width: 0; padding: 9px; border-radius: 10px; background: #f7faf5; color: #516555; font-size: 11px; font-weight: 750; }
 .field-hub-summary b { display: block; margin-bottom: 3px; color: #21783c; font-size: 10px; font-weight: 900; }
 
+.field-photo-compare,
+.annual-photo-period-compare { display: grid; gap: 7px; padding: 10px; border: 1px solid #d8e5d4; border-radius: 12px; background: linear-gradient(125deg, #f7fbf3, #fffefa 70%); }
+.field-photo-compare-head,
+.annual-photo-period-compare-head { display: flex; align-items: end; justify-content: space-between; gap: 8px; }
+.field-photo-compare-head span,
+.annual-photo-period-compare-head span { display: block; color: #4a7e52; font-size: 10px; font-weight: 850; }
+.field-photo-compare-head b,
+.annual-photo-period-compare-head b { display: block; margin-top: 1px; color: #29492e; font-size: 12px; font-weight: 900; }
+.field-photo-compare-head small,
+.annual-photo-period-compare-head small { color: #788476; font-size: 9px; font-weight: 800; white-space: nowrap; }
+.field-photo-compare-grid,
+.annual-photo-period-compare-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
+.field-photo-compare figure,
+.annual-photo-period-compare figure,
+.field-photo-compare-empty,
+.annual-photo-compare-empty { min-width: 0; margin: 0; overflow: hidden; border: 1px solid #dfe8db; border-radius: 9px; background: #fff; }
+.field-photo-compare img,
+.annual-photo-period-compare img { display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: cover; background: #eef3ea; }
+.field-photo-compare figcaption,
+.annual-photo-period-compare figcaption { display: grid; gap: 1px; padding: 6px 7px; }
+.field-photo-compare figcaption b,
+.annual-photo-period-compare figcaption b { color: #327a42; font-size: 10px; font-weight: 900; }
+.field-photo-compare figcaption span,
+.annual-photo-period-compare figcaption span { overflow: hidden; color: #667568; font-size: 9px; font-weight: 750; text-overflow: ellipsis; white-space: nowrap; }
+.field-photo-compare-empty,
+.annual-photo-compare-empty { display: grid; place-items: center; align-content: center; min-height: 104px; padding: 8px; color: #788477; text-align: center; }
+.field-photo-compare-empty b,
+.annual-photo-compare-empty b { color: #637464; font-size: 11px; font-weight: 900; }
+.field-photo-compare-empty span,
+.annual-photo-compare-empty span { margin-top: 3px; font-size: 9px; font-weight: 750; }
+
 .field-water-overview { display: grid; gap: 7px; padding: 10px; border: 1px solid #d7e7d2; border-radius: 13px; background: linear-gradient(120deg, #f7fbf5, #fffefa 72%); }
 .field-water-overview-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
 .field-water-overview-head span { color: #264c31; font-size: 12px; font-weight: 900; }
@@ -11311,6 +11342,8 @@ label {
   .field-hub-intro .primary { padding: 9px 10px; font-size: 11px; }
   .field-hub-filters { grid-template-columns: 1fr; }
   .field-hub-summary { gap: 6px; }
+  .field-photo-compare-head,
+  .annual-photo-period-compare-head { align-items: start; flex-direction: column; }
   .field-water-period-grid { grid-template-columns: 1fr; }
   .field-water-transition { grid-template-columns: auto minmax(0, 1fr); }
   .field-hub-history { grid-template-columns: 1fr; }
