@@ -168,6 +168,99 @@ state.saveFieldWork({
 });
 assert(state.data().fieldWorks.some((row) => row.date === "2026-07-07" && row.workName === "防除"), "天気なしで作業を保存できない");
 
+state.saveFieldWork({
+  date: "2025-05-10",
+  fieldIds: ["field_a"],
+  workName: "田植え",
+  hours: "1"
+});
+state.saveFieldWork({
+  date: "2026-05-20",
+  fieldIds: ["field_a"],
+  workName: "田植え",
+  hours: "1"
+});
+state.saveFieldWork({
+  date: "2025-06-01",
+  fieldIds: ["field_a"],
+  workName: "中干し開始",
+  hours: "1"
+});
+state.saveFieldWork({
+  date: "2026-06-05",
+  fieldIds: ["field_a"],
+  workName: "中干し開始",
+  hours: "1"
+});
+state.saveFieldWork({
+  date: "2025-07-15",
+  fieldIds: ["field_a"],
+  workName: "出穂確認",
+  hours: "1"
+});
+state.saveGrowthLog({
+  date: "2026-07-03",
+  fieldId: "field_a",
+  observedStage: "heading",
+  stageConfirmed: true
+});
+state.saveDryPeriod({
+  date: "2025-06-02",
+  fieldId: "field_a",
+  startDate: "2025-06-02",
+  actualEndDate: "2025-06-08",
+  status: "完了"
+});
+state.saveDryPeriod({
+  date: "2026-06-06",
+  fieldId: "field_a",
+  startDate: "2026-06-06",
+  status: "進行中"
+});
+// Completing the current year's drying period must create a new, current-year
+// intermittent-irrigation record without reusing a prior year's record.
+state.saveIrrigation({
+  date: "2025-06-09",
+  fieldId: "field_b",
+  method: "間断灌水",
+  startDate: "2025-06-09"
+});
+state.saveDryPeriod({
+  date: "2026-06-06",
+  fieldId: "field_b",
+  startDate: "2026-06-06",
+  actualEndDate: "2026-06-11"
+});
+const automaticCurrentYearIrrigation = state.irrigationsFor("field_b", 2026)
+  .find((row) => row.autoStartedFromDry && row.autoStartedFromDrySource);
+assert(automaticCurrentYearIrrigation, "current-year drying completion did not start intermittent irrigation");
+assert(automaticCurrentYearIrrigation.startDate === "2026-06-11", "automatic intermittent irrigation did not use the drying completion date");
+assert(!state.irrigationsFor("field_b", 2026).some((row) => String(row.date).startsWith("2025-")), "prior-year intermittent irrigation leaked into the current year");
+assert(state.irrigationsFor("field_b", 2025).some((row) => String(row.date).startsWith("2025-")), "prior-year intermittent irrigation record was unexpectedly removed");
+
+state.saveIrrigation({
+  date: "2025-06-09",
+  fieldId: "field_a",
+  method: "間断灌水",
+  startDate: "2025-06-09"
+});
+state.saveIrrigation({
+  date: "2026-06-12",
+  fieldId: "field_a",
+  method: "間断灌水",
+  startDate: "2026-06-12"
+});
+assert(state.plantingDateForField("field_a") === "2025-05-10", "yearless planting lookup changed");
+assert(state.plantingDateForField("field_a", 2026) === "2026-05-15", "year-scoped planting lookup leaked another year");
+assert(global.RiceOS.utils.daysAfterPlanting(state.field("field_a"), "2026-05-25") === 10, "DAP used a planting date from another year");
+assert(state.workDateForField("field_a", "中干し開始", "last", 2025) === "2025-06-01", "year-scoped work lookup leaked another year");
+assert(state.headingDateForField("field_a", 2025) === "2025-07-15", "heading work was not found in its year");
+assert(state.headingDateForField("field_a", 2026) === "2026-07-03", "heading lookup did not include confirmed growth evidence");
+assert(state.dryPeriodsFor("field_a", 2025).every((row) => String(row.date).startsWith("2025-")), "year-scoped drying lookup leaked another year");
+assert(state.irrigationsFor("field_a", 2026).every((row) => String(row.date).startsWith("2026-")), "year-scoped intermittent irrigation lookup leaked another year");
+assert(agro.managementStatus(state.field("field_a"), "2025-06-10").key === "dryCompleted", "prior-year drying completion was not found");
+assert(agro.managementStatus(state.field("field_a"), "2026-06-10").key === "drying", "management status leaked a different year");
+
 const beforeRoundTrip = storage.info(state.data());
 const json = JSON.stringify(state.data());
 const inspection = storage.inspectJsonText(json, state.data());

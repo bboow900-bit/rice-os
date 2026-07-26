@@ -284,7 +284,11 @@
 
   function allRows() {
     const d = state.data();
-    const fieldWorks = d.fieldWorks.map((w) => makeRow("fieldWork", w, {
+    // 湿潤灌漑と落水は、水管理の独立した履歴として扱わない。
+    // 落水は間断灌水の実終了日に統合して表示する。
+    const fieldWorks = d.fieldWorks
+      .filter((w) => !/湿潤灌漑|稲刈り前の落水|落水/.test(String(w.workName || "")))
+      .map((w) => makeRow("fieldWork", w, {
       id: w.workId,
       date: w.date,
       season: w.season,
@@ -301,7 +305,7 @@
         w.weather ? `天気 ${w.weather}` : "",
         w.memo || ""
       ]
-    }));
+      }));
     const growth = d.growthLogs.map((g) => makeRow("growth", g, {
       id: g.logId,
       date: g.date,
@@ -338,7 +342,9 @@
         item.memo || ""
       ]
     }));
-    const irrigation = (d.irrigations || []).map((item) => makeRow("irrigation", item, {
+    const irrigation = (d.irrigations || [])
+      .filter((item) => /間断/.test(String(item.method || "")))
+      .map((item) => makeRow("irrigation", item, {
       id: item.irrigationId,
       date: item.date,
       season: item.season,
@@ -350,7 +356,7 @@
         ...periodParts(item),
         item.memo || ""
       ]
-    }));
+      }));
     const schedules = (d.schedules || []).map((item) => makeRow("schedule", item, {
       id: item.scheduleId,
       date: item.date,
@@ -690,8 +696,9 @@
   }
 
   function latestPanicleLogForYear(fieldId, year) {
-    return state.growthLogsFor(fieldId)
-      .filter((row) => String(row.season || String(row.date || "").slice(0, 4)) === String(year) && U.number(row.panicleLengthMm, 0) > 0)
+    const targetYear = year && year !== "all" ? String(year) : "";
+    return state.growthLogsFor(fieldId, targetYear || undefined)
+      .filter((row) => U.number(row.panicleLengthMm, 0) > 0)
       .slice()
       .sort((a, b) => String(b.date).localeCompare(String(a.date)))[0] || null;
   }
@@ -718,11 +725,10 @@
     const dryStart = workDateForAnnualYear(field.fieldId, "中干し開始");
     const dryEnd = workDateForAnnualYear(field.fieldId, ["中干し終了", "中干し完了", "中干完了"], "last");
     const intermittentStart = workDateForAnnualYear(field.fieldId, "間断灌水開始");
-    const wetStart = workDateForAnnualYear(field.fieldId, "湿潤灌漑開始");
     const riceStage = riceStageNumberForField(field);
     const panicleLog = latestPanicleLogForYear(field.fieldId, yearValue());
     const panicle = RiceOS.agro && RiceOS.agro.latestPanicleEstimate
-      ? RiceOS.agro.latestPanicleEstimate(field)
+      ? RiceOS.agro.latestPanicleEstimate(field, yearValue())
       : null;
     const dryCompleted = dryCompletionForYear(field.fieldId, yearValue());
     return `
@@ -755,7 +761,6 @@
             ${targetLine("目標沈み込み", field.targetSinkCm ? `${field.targetSinkCm}cm` : "")}
             ${targetLine("中干し目安日数", field.drainageTargetDays ? `${field.drainageTargetDays}日` : "")}
             ${targetLine("間断灌水目安日数", field.intermittentIntervalDays ? `${field.intermittentIntervalDays}日` : "")}
-            ${targetLine("湿潤灌漑目安日数", field.wetIrrigationTargetDays ? `${field.wetIrrigationTargetDays}日` : "")}
             ${targetLine("中干し完了日", dryCompleted || "未記録")}
           </div>
           <div class="form-grid dense annual-edit-grid">
@@ -763,7 +768,6 @@
             ${fieldInput(field, "targetSinkCm", "沈み込み(cm)")}
             ${fieldInput(field, "drainageTargetDays", "中干し目安日数", "number")}
             ${fieldInput(field, "intermittentIntervalDays", "間断灌水目安日数", "number")}
-            ${fieldInput(field, "wetIrrigationTargetDays", "湿潤灌漑目安日数", "number")}
           </div>
         </section>
         <section class="annual-field-detail-card annual-target-card annual-panicle-card">
@@ -781,17 +785,19 @@
     `;
   }
 
-  function photosForField(fieldId) {
+  function photosForField(fieldId, year) {
+    const targetYear = year && year !== "all" ? String(year) : undefined;
     return [
-      ...state.growthLogsFor(fieldId).map((row) => ({ date: row.date, title: "生育", photoData: row.photoData, photo: row.photo })),
-      ...state.fieldWorksFor(fieldId).map((row) => ({ date: row.date, title: row.workName || "作業", photoData: row.photoData, photo: row.photo })),
-      ...state.dryPeriodsFor(fieldId).map((row) => ({ date: row.date, title: "中干し", photoData: row.photoData, photo: row.photo }))
+      ...state.growthLogsFor(fieldId, targetYear).map((row) => ({ date: row.date, title: "生育", photoData: row.photoData, photo: row.photo })),
+      ...state.fieldWorksFor(fieldId, targetYear).map((row) => ({ date: row.date, title: row.workName || "作業", photoData: row.photoData, photo: row.photo })),
+      ...state.dryPeriodsFor(fieldId, targetYear).map((row) => ({ date: row.date, title: "中干し", photoData: row.photoData, photo: row.photo }))
     ].filter((row) => row.photoData || row.photo).sort((a, b) => String(b.date).localeCompare(String(a.date)));
   }
 
-  function dryByDate(fieldId) {
+  function dryByDate(fieldId, year) {
     const map = new Map();
-    state.dryPeriodsFor(fieldId).forEach((row) => {
+    const targetYear = year && year !== "all" ? String(year) : undefined;
+    state.dryPeriodsFor(fieldId, targetYear).forEach((row) => {
       if (!map.has(row.date)) map.set(row.date, []);
       map.get(row.date).push(row);
     });
@@ -799,11 +805,14 @@
   }
 
   function renderGrowthTab(field) {
-    const dryMap = dryByDate(field.fieldId);
-    const growthRows = state.growthLogsFor(field.fieldId);
+    const selectedYear = yearValue();
+    const targetYear = selectedYear === "all" ? undefined : String(selectedYear);
+    const dryRows = state.dryPeriodsFor(field.fieldId, targetYear);
+    const dryMap = dryByDate(field.fieldId, targetYear);
+    const growthRows = state.growthLogsFor(field.fieldId, targetYear);
     const dates = unique([
       ...growthRows.map((row) => row.date),
-      ...state.dryPeriodsFor(field.fieldId).map((row) => row.date)
+      ...dryRows.map((row) => row.date)
     ]).sort((a, b) => String(b).localeCompare(String(a)));
     if (!dates.length) return '<div class="empty">生育記録はまだありません。</div>';
     return `
@@ -888,17 +897,13 @@
   function waterPeriodLabel(method) {
     const text = String(method || "");
     if (/中干し/.test(text)) return "中干し";
-    if (/湿潤/.test(text)) return "湿潤灌漑";
     if (/間断/.test(text)) return "間断灌水";
-    if (/落水/.test(text)) return "稲刈り前の落水";
-    return text || "水管理";
+    return "";
   }
 
   function waterPeriodTone(label) {
     if (/中干し/.test(label)) return "dry";
-    if (/湿潤/.test(label)) return "wet";
     if (/間断/.test(label)) return "intermittent";
-    if (/落水/.test(label)) return "drainage";
     return "water";
   }
 
@@ -928,6 +933,7 @@
 
     (d.irrigations || []).filter((item) => item.fieldId === field.fieldId && isSelectedYear(item)).forEach((item) => {
       const label = waterPeriodLabel(item.method);
+      if (!label) return;
       directLabels.add(label);
       periods.push({
         id: item.irrigationId,
@@ -946,18 +952,15 @@
     const works = (d.fieldWorks || []).filter((item) => (item.fieldIds || []).includes(field.fieldId) && isSelectedYear(item));
     const firstWorkDate = (test) => works.filter((item) => test(String(item.workName || ""))).map((item) => item.date).filter(Boolean).sort()[0] || "";
     const lastWorkDate = (test) => works.filter((item) => test(String(item.workName || ""))).map((item) => item.date).filter(Boolean).sort().at(-1) || "";
-    const harvestDate = firstWorkDate((name) => /稲刈り|収穫/.test(name));
     const manualDefinitions = [
       { label: "中干し", start: (name) => /中干し.*開始|中干し開始/.test(name), end: (name) => /中干し.*終了|中干し.*完了|中干完了/.test(name) },
-      { label: "間断灌水", start: (name) => /間断灌水.*開始|間断灌水開始/.test(name), end: (name) => /間断灌水.*終了|間断灌水.*完了/.test(name) },
-      { label: "湿潤灌漑", start: (name) => /湿潤灌漑.*開始|湿潤灌漑開始/.test(name), end: (name) => /湿潤灌漑.*終了|湿潤灌漑.*完了/.test(name) },
-      { label: "稲刈り前の落水", start: (name) => /稲刈り前.*落水|落水開始|^落水$/.test(name), end: () => Boolean(harvestDate) }
+      { label: "間断灌水", start: (name) => /間断灌水.*開始|間断灌水開始/.test(name), end: (name) => /間断灌水.*終了|間断灌水.*完了/.test(name) }
     ];
 
     manualDefinitions.forEach((definition) => {
       if (directLabels.has(definition.label)) return;
       const startDate = firstWorkDate(definition.start);
-      const actualEndDate = definition.label === "稲刈り前の落水" ? harvestDate : lastWorkDate(definition.end);
+      const actualEndDate = lastWorkDate(definition.end);
       if (!startDate && !actualEndDate) return;
       periods.push({
         id: `work-${definition.label}-${startDate || actualEndDate}`,
@@ -989,7 +992,7 @@
     const actualDays = completed ? waterPeriodDays(period.startDate, period.actualEndDate) : "";
     const progressDays = actualDays !== "" ? actualDays : elapsedDays;
     const progress = plannedDays ? Math.max(0, Math.min(100, Math.round((Number(progressDays || 0) / Number(plannedDays)) * 100))) : 0;
-    const subtitle = completed ? (period.label === "稲刈り前の落水" ? "収穫で完了" : "完了") : (period.startDate ? "継続中" : "開始日を記録してください");
+    const subtitle = completed ? "完了" : (period.startDate ? "継続中" : "開始日を記録してください");
     const heading = `${period.label}${period.sequence > 1 ? ` ${period.sequence}回目` : ""}`;
     return `
       <article class="annual-water-period annual-water-period-${U.attr(period.tone)}">
@@ -1011,12 +1014,12 @@
 
   function renderWaterTab(field) {
     const periods = waterPeriodsForField(field);
-    if (!periods.length) return '<div class="empty">中干し・間断灌水・湿潤灌漑・稲刈り前の落水を記録すると、期間をここで振り返れます。</div>';
+    if (!periods.length) return '<div class="empty">中干し・間断灌水を記録すると、期間をここで振り返れます。</div>';
     return `<section class="annual-water-periods"><div class="annual-water-periods-heading"><div><span>水管理の振り返り</span><h3>いつから、いつまで行ったか</h3></div><small>${periods.length}件</small></div>${periods.map(renderWaterPeriod).join("")}</section>`;
   }
 
   function renderPhotoTab(field) {
-    const photos = photosForField(field.fieldId);
+    const photos = photosForField(field.fieldId, yearValue());
     if (!photos.length) return '<div class="empty">写真はまだありません。</div>';
     return `
       <div class="annual-photo-compare-grid">
@@ -1089,7 +1092,7 @@
     const growth = rows.filter((row) => row.kind === "growth");
     const dry = rows.filter((row) => row.kind === "dry");
     const water = rows.filter((row) => row.kind === "irrigation");
-    const waterWorks = works.filter((row) => /中干し|間断灌水|湿潤灌漑|入水|落水/.test(String(row.title || "")));
+    const waterWorks = works.filter((row) => /中干し|間断灌水/.test(String(row.title || "")));
     const planting = firstDate(works, (row) => /田植/.test(String(row.title || "")));
     const heading = firstDate(growth, (row) => Boolean(row.raw && (row.raw.headingObserved || row.raw.observedStage === "heading" && row.raw.stageConfirmed))) || firstDate(works, (row) => /出穂/.test(String(row.title || "")));
     const harvest = firstDate(works, (row) => /収穫|稲刈/.test(String(row.title || "")));
@@ -1097,8 +1100,6 @@
     const panicle = growth.map((row) => row.raw).filter((row) => U.number(row && row.panicleLengthMm, 0) > 0).sort((a, b) => String(a.date).localeCompare(String(b.date)))[0] || null;
     const dryPeriod = periodSnapshot(dry);
     const intermittent = waterPeriodSnapshot(water, /間断/);
-    const wet = waterPeriodSnapshot(water, /湿潤/);
-    const drainage = waterPeriodSnapshot(water, /落水/);
     const resultRows = (state.data().varietyResults || []).filter((row) => String(row.season) === String(year) && row.varietyId === field.varietyId);
     const result = resultRows.find((row) => row.fieldId === field.fieldId) || resultRows.find((row) => !row.fieldId) || null;
     const resultScope = result && result.fieldId ? "" : (result ? "（品種集計）" : "");
@@ -1109,8 +1110,6 @@
       dry: dryPeriod.text || (waterWorks.some((row) => /中干し/.test(String(row.title || ""))) ? "作業実績あり（期間未記録）" : ""),
       dryDays: dryPeriod.days,
       intermittent: intermittent.text,
-      wet: wet.text,
-      drainage: drainage.text,
       heading,
       panicle: panicle ? `${U.fd(panicle.date)} / ${panicle.panicleLengthMm}mm` : "",
       workHours: totalHoursForField(works, field.fieldId),
@@ -1139,8 +1138,6 @@
       ["苗箱数", snapshotText(current.trays, "箱"), snapshotText(previous.trays, "箱")],
       ["中干し", snapshotText(current.dry), snapshotText(previous.dry)],
       ["間断灌水", snapshotText(current.intermittent), snapshotText(previous.intermittent)],
-      ["湿潤灌漑", snapshotText(current.wet), snapshotText(previous.wet)],
-      ["落水", snapshotText(current.drainage), snapshotText(previous.drainage)],
       ["幼穂確認", snapshotText(current.panicle), snapshotText(previous.panicle)],
       ["出穂日", snapshotText(current.heading), snapshotText(previous.heading)],
       ["作業時間（圃場配賦）", current.workHours ? U.formatHours(current.workHours) : "未記録", previous.workHours ? U.formatHours(previous.workHours) : "未記録"],

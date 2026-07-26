@@ -94,11 +94,17 @@
 
   function waterAlertsForField(field, today) {
     const date = today || U.today();
+    const year = U.dateYear ? U.dateYear(date) : String(date).slice(0, 4);
     const alerts = [];
     const d = state().data();
+    const isCurrentYear = (item) => {
+      const recordDate = item && (item.date || item.startDate || item.actualEndDate || item.endDate);
+      return Boolean(recordDate) && (U.isInYear ? U.isInYear(recordDate, year) : String(recordDate).slice(0, 4) === String(year));
+    };
 
-    const latestDry = latestByStart((d.dryPeriods || []).filter((item) => item.fieldId === field.fieldId && item.startDate));
-    const drySource = latestDry || { startDate: field.drainageStartDate, targetDays: field.drainageTargetDays };
+    const latestDry = latestByStart((d.dryPeriods || []).filter((item) => item.fieldId === field.fieldId && item.startDate && isCurrentYear(item)));
+    const fieldDryStart = isCurrentYear({ date: field.drainageStartDate }) ? field.drainageStartDate : "";
+    const drySource = latestDry || { startDate: fieldDryStart, targetDays: field.drainageTargetDays };
     if (!isCompletedPeriod(latestDry)) {
       const alert = periodEndAlert(field, {
         type: "drainage",
@@ -110,7 +116,10 @@
       if (alert) alerts.push(alert);
     }
 
-    const irrigationRecords = (d.irrigations || []).filter((item) => item.fieldId === field.fieldId && item.startDate);
+    const irrigationRecords = (d.irrigations || []).filter((item) => item.fieldId === field.fieldId
+      && item.startDate
+      && isCurrentYear(item)
+      && item.method !== "湿潤灌漑");
     const latestIrrigation = latestByStart(irrigationRecords);
     const activeIrrigations = irrigationRecords
       .filter((item) => !isCompletedPeriod(item))
@@ -118,7 +127,7 @@
     activeIrrigations.forEach((item) => {
       const title = item.method || "間断灌水";
       const alert = periodEndAlert(field, {
-        type: item.method === "湿潤灌漑" ? "wet-irrigation" : "intermittent",
+        type: "intermittent",
         title,
         startDate: item.startDate,
         endDate: item.endDate,
@@ -128,10 +137,11 @@
     });
 
     const intervalDays = U.number(field.intermittentIntervalDays, 0);
-    if (!activeIrrigations.length && !isCompletedPeriod(latestIrrigation) && field.intermittentStartDate && intervalDays > 0) {
-      const elapsed = U.daysBetween(field.intermittentStartDate, date);
+    const intermittentStart = isCurrentYear({ date: field.intermittentStartDate }) ? field.intermittentStartDate : "";
+    if (!activeIrrigations.length && !isCompletedPeriod(latestIrrigation) && intermittentStart && intervalDays > 0) {
+      const elapsed = U.daysBetween(intermittentStart, date);
       if (elapsed !== "") {
-        let nextDate = field.intermittentStartDate;
+        let nextDate = intermittentStart;
         let remaining = 0;
         let message = "";
         let priority = "watch";

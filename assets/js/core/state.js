@@ -173,6 +173,19 @@
     return workTextMatches(workName, ["中干し終了", "中干し完了", "中干完了", "荳ｭ蟷ｲ縺礼ｵゆｺ・"]);
   }
 
+  function isHeadingWorkName(workName) {
+    return workTextMatches(workName, "出穂");
+  }
+
+  function isInYear(record, year) {
+    const date = record && (record.date || record.startDate || record.actualEndDate || record.endDate);
+    return U.isInYear(date, year);
+  }
+
+  function cacheYearForDate(date) {
+    return U.dateYear(date || "");
+  }
+
   function dryActualDaysForField(field, actualEndDate) {
     const startDate = field && field.drainageStartDate || "";
     const actual = actualEndDate || "";
@@ -202,6 +215,9 @@
     field.drainageActualEndDate = ends[ends.length - 1] || "";
     field.drainageActualDays = field.drainageStartDate && field.drainageActualEndDate
       ? dryActualDaysForField(field, field.drainageActualEndDate) : "";
+    // These summary fields are only a backward-compatible cache. Their year
+    // lets current-season screens avoid treating an older record as current.
+    field.drainageSummaryYear = cacheYearForDate(field.drainageActualEndDate || field.drainageStartDate);
   }
 
   function startIntermittentAfterDrying(d, fieldId, completedDate, sourceKey) {
@@ -216,7 +232,10 @@
       previousAuto.endDate = targetDays ? U.dateAddDays(completedDate, Number(targetDays)) : "";
       previousAuto.targetDays = String(targetDays || "");
       previousAuto.updatedAt = U.now();
-      if (field) field.intermittentStartDate = completedDate;
+      if (field) {
+        field.intermittentStartDate = completedDate;
+        field.intermittentSummaryYear = cacheYearForDate(completedDate);
+      }
       return;
     }
     const alreadyPlanned = (d.irrigations || []).some((item) => item.fieldId === fieldId
@@ -255,32 +274,54 @@
       updatedAt: U.now()
     };
     d.irrigations.push(irrigation);
-    if (field) field.intermittentStartDate = completedDate;
+    if (field) {
+      field.intermittentStartDate = completedDate;
+      field.intermittentSummaryYear = cacheYearForDate(completedDate);
+    }
   }
 
-  function fieldWorksByNameFor(fieldId, names) {
+  function fieldWorksByNameFor(fieldId, names, year) {
     return data().fieldWorks
-      .filter((work) => (work.fieldIds || []).includes(fieldId) && matchesWorkName(work, names))
+      .filter((work) => (work.fieldIds || []).includes(fieldId) && matchesWorkName(work, names) && isInYear(work, year))
       .sort((a, b) => String(a.date).localeCompare(String(b.date)));
   }
 
-  function firstFieldWorkDate(fieldId, names) {
-    const work = fieldWorksByNameFor(fieldId, names)[0];
+  function firstFieldWorkDate(fieldId, names, year) {
+    const work = fieldWorksByNameFor(fieldId, names, year)[0];
     return work && work.date || "";
   }
 
-  function lastFieldWorkDate(fieldId, names) {
-    const rows = fieldWorksByNameFor(fieldId, names);
+  function lastFieldWorkDate(fieldId, names, year) {
+    const rows = fieldWorksByNameFor(fieldId, names, year);
     const work = rows[rows.length - 1];
     return work && work.date || "";
   }
 
-  function plantingDateForField(fieldId) {
-    return firstFieldWorkDate(fieldId, "田植え");
+  function plantingDateForField(fieldId, year) {
+    return firstFieldWorkDate(fieldId, "田植え", year);
   }
 
-  function workDateForField(fieldId, names, mode) {
-    return mode === "last" ? lastFieldWorkDate(fieldId, names) : firstFieldWorkDate(fieldId, names);
+  function workDateForField(fieldId, names, mode, year) {
+    const yearOnly = year === undefined && /^\d{4}$/.test(String(mode || ""));
+    const resolvedMode = yearOnly ? "first" : mode;
+    const resolvedYear = yearOnly ? mode : year;
+    return resolvedMode === "last"
+      ? lastFieldWorkDate(fieldId, names, resolvedYear)
+      : firstFieldWorkDate(fieldId, names, resolvedYear);
+  }
+
+  function headingDateForField(fieldId, year, asOfDate) {
+    const onOrBefore = (row) => !asOfDate || String(row.date || "") <= asOfDate;
+    const dates = [
+      ...growthLogsFor(fieldId, year)
+        .filter((log) => onOrBefore(log) && (log.headingObserved || (log.stageConfirmed && log.observedStage === "heading")))
+        .map((log) => log.date),
+      ...fieldWorksByNameFor(fieldId, "出穂", year)
+        .filter(onOrBefore)
+        .filter((work) => isHeadingWorkName(work.workName))
+        .map((work) => work.date)
+    ];
+    return dates.filter(Boolean).sort()[0] || "";
   }
 
   function scheduleText(value) {
@@ -418,7 +459,10 @@
       if (isDryStartWorkName(normalized.workName)) {
         normalized.fieldIds.forEach((fieldId) => {
           const fieldIndex = d.fields.findIndex((f) => f.fieldId === fieldId);
-          if (fieldIndex >= 0 && !d.fields[fieldIndex].drainageStartDate) d.fields[fieldIndex].drainageStartDate = normalized.date;
+          if (fieldIndex >= 0 && !d.fields[fieldIndex].drainageStartDate) {
+            d.fields[fieldIndex].drainageStartDate = normalized.date;
+            d.fields[fieldIndex].drainageSummaryYear = cacheYearForDate(normalized.date);
+          }
         });
       }
       const fieldTargetsChanged = previous && (previous.fieldIds || []).slice().sort().join("|") !== normalized.fieldIds.slice().sort().join("|");
@@ -432,6 +476,7 @@
           if (fieldIndex >= 0) {
             d.fields[fieldIndex].drainageActualEndDate = normalized.date;
             d.fields[fieldIndex].drainageActualDays = dryActualDaysForField(d.fields[fieldIndex], normalized.date);
+            d.fields[fieldIndex].drainageSummaryYear = cacheYearForDate(normalized.date);
           }
           startIntermittentAfterDrying(d, fieldId, normalized.date, `work:${normalized.workId}`);
         });
@@ -452,7 +497,10 @@
       if (normalized.workName === "中干し開始") {
         normalized.fieldIds.forEach((fieldId) => {
           const fieldIndex = d.fields.findIndex((f) => f.fieldId === fieldId);
-          if (fieldIndex >= 0 && !d.fields[fieldIndex].drainageStartDate) d.fields[fieldIndex].drainageStartDate = normalized.date;
+          if (fieldIndex >= 0 && !d.fields[fieldIndex].drainageStartDate) {
+            d.fields[fieldIndex].drainageStartDate = normalized.date;
+            d.fields[fieldIndex].drainageSummaryYear = cacheYearForDate(normalized.date);
+          }
         });
       }
       if (normalized.workName === "中干し終了") {
@@ -461,6 +509,7 @@
           if (fieldIndex >= 0) {
             d.fields[fieldIndex].drainageActualEndDate = normalized.date;
             d.fields[fieldIndex].drainageActualDays = dryActualDaysForField(d.fields[fieldIndex], normalized.date);
+            d.fields[fieldIndex].drainageSummaryYear = cacheYearForDate(normalized.date);
           }
         });
       }
@@ -806,12 +855,16 @@
       if (previous && previous.actualEndDate && previous.actualEndDate !== normalized.actualEndDate) clearAutoIntermittentForDrying(d, drySource);
       const fieldIndex = d.fields.findIndex((f) => f.fieldId === normalized.fieldId);
       if (fieldIndex >= 0) {
-        if (normalized.startDate) d.fields[fieldIndex].drainageStartDate = normalized.startDate;
+        if (normalized.startDate) {
+          d.fields[fieldIndex].drainageStartDate = normalized.startDate;
+          d.fields[fieldIndex].drainageSummaryYear = cacheYearForDate(normalized.startDate);
+        }
         if (normalized.targetDays) d.fields[fieldIndex].drainageTargetDays = normalized.targetDays;
         if (normalized.endDate) d.fields[fieldIndex].drainagePlannedEndDate = normalized.endDate;
         if (normalized.actualEndDate) {
           d.fields[fieldIndex].drainageActualEndDate = normalized.actualEndDate;
           d.fields[fieldIndex].drainageActualDays = dryActualDaysForField(d.fields[fieldIndex], normalized.actualEndDate);
+          d.fields[fieldIndex].drainageSummaryYear = cacheYearForDate(normalized.actualEndDate);
           startIntermittentAfterDrying(d, normalized.fieldId, normalized.actualEndDate, drySource);
         }
       }
@@ -870,7 +923,10 @@
       else d.irrigations.push(normalized);
       const fieldIndex = d.fields.findIndex((f) => f.fieldId === normalized.fieldId);
       if (fieldIndex >= 0) {
-        if (normalized.startDate) d.fields[fieldIndex].intermittentStartDate = normalized.startDate;
+        if (normalized.startDate) {
+          d.fields[fieldIndex].intermittentStartDate = normalized.startDate;
+          d.fields[fieldIndex].intermittentSummaryYear = cacheYearForDate(normalized.startDate);
+        }
         if (normalized.targetDays) d.fields[fieldIndex].intermittentIntervalDays = normalized.targetDays;
       }
     }, "水管理を保存しました");
@@ -912,20 +968,20 @@
     return cache;
   }
 
-  function fieldWorksFor(fieldId) {
-    return data().fieldWorks.filter((w) => (w.fieldIds || []).includes(fieldId));
+  function fieldWorksFor(fieldId, year) {
+    return data().fieldWorks.filter((w) => (w.fieldIds || []).includes(fieldId) && isInYear(w, year));
   }
 
-  function growthLogsFor(fieldId) {
-    return data().growthLogs.filter((g) => g.fieldId === fieldId);
+  function growthLogsFor(fieldId, year) {
+    return data().growthLogs.filter((g) => g.fieldId === fieldId && isInYear(g, year));
   }
 
-  function dryPeriodsFor(fieldId) {
-    return (data().dryPeriods || []).filter((d) => d.fieldId === fieldId);
+  function dryPeriodsFor(fieldId, year) {
+    return (data().dryPeriods || []).filter((d) => d.fieldId === fieldId && isInYear(d, year));
   }
 
-  function irrigationsFor(fieldId) {
-    return (data().irrigations || []).filter((i) => i.fieldId === fieldId);
+  function irrigationsFor(fieldId, year) {
+    return (data().irrigations || []).filter((i) => i.fieldId === fieldId && isInYear(i, year));
   }
 
   function lastFieldWork(fieldId) {
@@ -954,6 +1010,7 @@
     deleteField,
     plantingDateForField,
     workDateForField,
+    headingDateForField,
     fieldWorksByNameFor,
     saveFieldWork,
     deleteFieldWork,

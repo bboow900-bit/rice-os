@@ -46,6 +46,16 @@
     return d ? `${d.getFullYear()}年${d.getMonth() + 1}月` : "日付未設定";
   }
 
+  function dateYear(dateText) {
+    const d = localDate(dateText);
+    return d ? String(d.getFullYear()) : "";
+  }
+
+  function isInYear(dateText, year) {
+    if (year === undefined || year === null || String(year).trim() === "") return true;
+    return dateYear(dateText) === String(year);
+  }
+
   function id(prefix, dateText) {
     const d = (dateText || today()).replaceAll("-", "");
     const stamp = Date.now().toString(36);
@@ -84,7 +94,7 @@
 
   function daysAfterPlanting(field, dateText) {
     const workDate = field && RiceOS.state && RiceOS.state.plantingDateForField
-      ? RiceOS.state.plantingDateForField(field.fieldId)
+      ? RiceOS.state.plantingDateForField(field.fieldId, dateYear(dateText))
       : "";
     const plantingDate = workDate || "";
     if (!field || !plantingDate || !dateText) return "";
@@ -227,6 +237,8 @@
     fd,
     weekday,
     season,
+    dateYear,
+    isInYear,
     monthKey,
     id,
     clone,

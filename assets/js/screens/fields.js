@@ -52,6 +52,22 @@
     return (rows || []).slice().sort((a, b) => String(b.date || b.startDate).localeCompare(String(a.date || a.startDate)))[0] || null;
   }
 
+  function currentSeasonYear() {
+    return U.dateYear(U.today());
+  }
+
+  function currentYearCache(field, cacheYearKey, dateKeys) {
+    const year = currentSeasonYear();
+    const explicitYear = String(field && field[cacheYearKey] || "");
+    const dates = dateKeys.map((key) => String(field && field[key] || "")).filter(Boolean);
+    // Old backups have no cache-year field. A date in this year is still safe.
+    return explicitYear === year || (!explicitYear && dates.some((date) => U.dateYear(date) === year));
+  }
+
+  function isIntermittentIrrigation(row) {
+    return /間断/.test(String(row && row.method || ""));
+  }
+
   function compactArray(value, emptyText) {
     const rows = Array.isArray(value) ? value : [];
     if (!rows.length) return emptyText || "-";
@@ -104,15 +120,17 @@
   }
 
   function drySummary(field) {
-    const latest = state.dryPeriodsFor ? latestByDate(state.dryPeriodsFor(field.fieldId).filter((row) => row.startDate || row.endDate || row.actualEndDate)) : null;
-    const workStartDate = state.workDateForField ? state.workDateForField(field.fieldId, "中干し開始", "last") : "";
-    const workEndDate = state.workDateForField ? state.workDateForField(field.fieldId, ["中干し終了", "中干し完了", "中干完了"], "last") : "";
-    const startDate = latest && latest.startDate || field.drainageStartDate || workStartDate || "";
+    const year = currentSeasonYear();
+    const latest = state.dryPeriodsFor ? latestByDate(state.dryPeriodsFor(field.fieldId, year).filter((row) => row.startDate || row.endDate || row.actualEndDate)) : null;
+    const workStartDate = state.workDateForField ? state.workDateForField(field.fieldId, "中干し開始", "last", year) : "";
+    const workEndDate = state.workDateForField ? state.workDateForField(field.fieldId, ["中干し終了", "中干し完了", "中干完了"], "last", year) : "";
+    const useCachedSummary = currentYearCache(field, "drainageSummaryYear", ["drainageStartDate", "drainageActualEndDate", "drainagePlannedEndDate"]);
+    const startDate = latest && latest.startDate || (useCachedSummary && field.drainageStartDate) || workStartDate || "";
     const targetDays = latest && latest.targetDays || field.drainageTargetDays || "";
-    const plannedEndDate = latest && latest.endDate || field.drainagePlannedEndDate || (startDate && targetDays ? U.dateAddDays(startDate, U.number(targetDays, 0)) : "");
-    const actualEndDate = latest && latest.actualEndDate || field.drainageActualEndDate || workEndDate || "";
+    const plannedEndDate = latest && latest.endDate || (useCachedSummary && field.drainagePlannedEndDate) || (startDate && targetDays ? U.dateAddDays(startDate, U.number(targetDays, 0)) : "");
+    const actualEndDate = latest && latest.actualEndDate || (useCachedSummary && field.drainageActualEndDate) || workEndDate || "";
     const plannedDays = startDate && plannedEndDate ? U.daysBetween(startDate, plannedEndDate) : (targetDays || "");
-    const actualDays = field.drainageActualDays || (startDate && actualEndDate ? U.daysBetween(startDate, actualEndDate) : "");
+    const actualDays = (useCachedSummary && field.drainageActualDays) || (startDate && actualEndDate ? U.daysBetween(startDate, actualEndDate) : "");
     const diff = plannedDays !== "" && actualDays !== "" ? U.number(actualDays, 0) - U.number(plannedDays, 0) : "";
     const diffText = diff === "" ? "-" : diff === 0 ? "予定どおり" : diff > 0 ? `+${diff}日` : `${diff}日`;
     return {
@@ -166,7 +184,7 @@
     { key: "transplanter", group: "マスター", label: "田植え機", sub: "株間・本数", icon: "transplanter.png", screen: "recipes", tone: "amber" },
     { key: "materials", group: "マスター", label: "資材管理", sub: "在庫・使用", icon: "materials.png", screen: "materials", tone: "amber" },
     { key: "dry", group: "記録・確認", label: "中干し", sub: "目標・記録", icon: "dry-period.png", screen: "dry-period", tone: "amber" },
-    { key: "irrigation", group: "記録・確認", label: "間断/湿潤", sub: "水管理", icon: "irrigation.png", screen: "irrigation", tone: "water" },
+    { key: "irrigation", group: "記録・確認", label: "間断灌水", sub: "水管理", icon: "irrigation.png", screen: "irrigation", tone: "water" },
     { key: "photos", group: "記録・確認", label: "写真", sub: "比較素材", icon: "photos.png", screen: "photos", tone: "" },
     { key: "harvest", group: "記録・確認", label: "収穫履歴", sub: "収量・販売", icon: "harvest.png", screen: "results", tone: "amber" }
   ];
@@ -200,8 +218,7 @@
   }
 
   function latestGrowthForField(fieldId) {
-    if (state.lastGrowthLog) return state.lastGrowthLog(fieldId);
-    return (state.growthLogsFor ? state.growthLogsFor(fieldId) : [])
+    return (state.growthLogsFor ? state.growthLogsFor(fieldId, currentSeasonYear()) : [])
       .slice()
       .sort((a, b) => String(b.date).localeCompare(String(a.date)))[0] || null;
   }
@@ -209,7 +226,7 @@
   function riceStageNumberForField(field) {
     if (RiceOS.agro && RiceOS.agro.seasonStageForField) return RiceOS.agro.seasonStageForField(field).image;
     const latest = latestGrowthForField(field.fieldId);
-    const planting = state.plantingDateForField ? state.plantingDateForField(field.fieldId) : "";
+    const planting = state.plantingDateForField ? state.plantingDateForField(field.fieldId, currentSeasonYear()) : "";
     const baseDate = latest && latest.date || U.today();
     const dap = planting ? U.daysBetween(planting, baseDate) : "";
     const tillers = latest ? U.number(latest.tillerCount, 0) : 0;
@@ -408,10 +425,11 @@
   }
 
   function photosForField(fieldId) {
+    const year = currentSeasonYear();
     const photos = [
-      ...state.growthLogsFor(fieldId).map((row) => ({ date: row.date, photoData: row.photoData, photo: row.photo, title: "生育" })),
-      ...state.fieldWorksFor(fieldId).map((row) => ({ date: row.date, photoData: row.photoData, photo: row.photo, title: row.workName || "作業" })),
-      ...state.dryPeriodsFor(fieldId).map((row) => ({ date: row.date, photoData: row.photoData, photo: row.photo, title: "中干し" }))
+      ...state.growthLogsFor(fieldId, year).map((row) => ({ date: row.date, photoData: row.photoData, photo: row.photo, title: "生育" })),
+      ...state.fieldWorksFor(fieldId, year).map((row) => ({ date: row.date, photoData: row.photoData, photo: row.photo, title: row.workName || "作業" })),
+      ...state.dryPeriodsFor(fieldId, year).map((row) => ({ date: row.date, photoData: row.photoData, photo: row.photo, title: "中干し" }))
     ].filter((row) => row.photoData || row.photo);
     return photos.sort((a, b) => String(b.date).localeCompare(String(a.date))).slice(0, 4);
   }
@@ -609,7 +627,6 @@
               ${input(field, "targetSinkCm", "目標沈み込み(cm)")}
               ${input(field, "drainageTargetDays", "中干し予定日数", "number")}
               ${input(field, "intermittentIntervalDays", "間断灌水予定日数", "number")}
-              ${input(field, "wetIrrigationTargetDays", "湿潤灌漑予定日数", "number")}
             </div>
             <div class="hint-text">中干し予定日数は目標値です。開始日・完了予定日・実際の完了日・実績日数は中干し記録または作業記録から自動反映します。</div>
           </details>
@@ -642,7 +659,7 @@
         management: shared.management || { label: "中干し未実施", tone: "waiting" }
       };
     }
-    const planting = state.plantingDateForField ? state.plantingDateForField(field.fieldId) : "";
+    const planting = state.plantingDateForField ? state.plantingDateForField(field.fieldId, currentSeasonYear()) : "";
     const growth = latestGrowthForField(field.fieldId);
     if (!planting && !growth) return { number: 0, label: "記録待ち" };
     const stage = riceStageNumberForField(field);
@@ -655,8 +672,8 @@
   }
 
   function latestIrrigationForField(fieldId) {
-    return state.irrigationsFor(fieldId)
-      .filter((row) => row.startDate)
+    return state.irrigationsFor(fieldId, currentSeasonYear())
+      .filter((row) => row.startDate && isIntermittentIrrigation(row))
       .slice()
       .sort((a, b) => String(b.startDate || b.date).localeCompare(String(a.startDate || a.date)))[0] || null;
   }
@@ -673,11 +690,12 @@
   }
 
   function fieldNextRecord(field) {
-    const planting = state.plantingDateForField ? state.plantingDateForField(field.fieldId) : "";
+    const year = currentSeasonYear();
+    const planting = state.plantingDateForField ? state.plantingDateForField(field.fieldId, year) : "";
     const growth = latestGrowthForField(field.fieldId);
     const dry = drySummary(field);
     if (!planting) return "田植え作業";
-    if (dry.actualEndDate && !state.irrigationsFor(field.fieldId).some((row) => /間断/.test(String(row.method || "")) && row.startDate)) return "間断灌水の開始";
+    if (dry.actualEndDate && !state.irrigationsFor(field.fieldId, year).some((row) => isIntermittentIrrigation(row) && row.startDate)) return "間断灌水の開始";
     if (!growth) return "生育記録";
     return "次の生育・水管理記録";
   }
@@ -748,7 +766,7 @@
         <details class="form-section" open><summary>基本情報</summary><div class="form-grid dense inline-grid">${input(field, "name", "圃場名")}${input(field, "district", "地区")}<label>品種<select data-field-id="${U.attr(field.fieldId)}" data-field-field="varietyId">${varietyOptions(field.varietyId)}</select></label>${input(field, "areaA", "面積(a)", "number")}<label>状態<select data-field-id="${U.attr(field.fieldId)}" data-field-field="status">${statusOptions(field.status)}</select></label>${input(field, "sortOrder", "表示順", "number")}</div></details>
         <details class="form-section"><summary>栽培条件・圃場カルテ</summary><div class="form-grid dense inline-grid"><label>土質<select data-field-id="${U.attr(field.fieldId)}" data-field-field="soilType">${optionTags(SOIL_TYPES, field.soilType)}</select></label><label>水持ち<select data-field-id="${U.attr(field.fieldId)}" data-field-field="waterHolding">${optionTags(WATER_LEVELS, field.waterHolding)}</select></label>${arrayInput(field, "fieldFeatures", "圃場特徴", FEATURES)}${input(field, "targetCrackCm", "目標ひび割れ幅(cm)")}${input(field, "targetSinkCm", "目標沈み込み(cm)")}</div></details>
         <details class="form-section"><summary>苗箱・田植機の設定</summary><div class="form-grid dense inline-grid">${input(field, "seedlingBoxes", "実使用苗箱数", "number")}<label>栽培レシピ（品種）<select data-field-id="${U.attr(field.fieldId)}" data-field-field="varietyId">${varietyOptions(field.varietyId)}</select></label></div><p class="hint-text">株間・坪あたり株数・基肥などの共通設定は、選択した栽培レシピを参照します。</p></details>
-        <details class="form-section"><summary>グループ・メモ</summary><div class="form-grid dense inline-grid">${input(field, "fieldGroupId", "圃場グループ")}${input(field, "drainageTargetDays", "中干し目安日数", "number")}${input(field, "intermittentIntervalDays", "間断灌水目安日数", "number")}${input(field, "wetIrrigationTargetDays", "湿潤灌漑目安日数", "number")}</div><label>固定メモ<textarea data-field-id="${U.attr(field.fieldId)}" data-field-field="fixedMemo">${U.escapeHTML(field.fixedMemo || "")}</textarea></label></details>
+        <details class="form-section"><summary>グループ・メモ</summary><div class="form-grid dense inline-grid">${input(field, "fieldGroupId", "圃場グループ")}${input(field, "drainageTargetDays", "中干し目安日数", "number")}${input(field, "intermittentIntervalDays", "間断灌水目安日数", "number")}</div><label>固定メモ<textarea data-field-id="${U.attr(field.fieldId)}" data-field-field="fixedMemo">${U.escapeHTML(field.fixedMemo || "")}</textarea></label></details>
         <div class="record-actions single-action"><button class="secondary danger" type="button" data-field-action="delete" data-field-id="${U.attr(field.fieldId)}">圃場を削除</button></div>
       </section>
     `;

@@ -79,10 +79,11 @@
     };
   }
 
-  function latestPanicleEstimate(fieldOrId) {
+  function latestPanicleEstimate(fieldOrId, year) {
     const field = fieldOf(fieldOrId);
     if (!field) return null;
-    const logs = state().growthLogsFor(field.fieldId)
+    const targetYear = year && year !== "all" ? String(year) : "";
+    const logs = state().growthLogsFor(field.fieldId, targetYear || undefined)
       .slice()
       .sort((a, b) => String(b.date).localeCompare(String(a.date)));
     for (const log of logs) {
@@ -144,7 +145,7 @@
   function progress(fieldOrId, dateText) {
     const field = fieldOf(fieldOrId);
     const date = dateText || U.today();
-    const plantingDate = field && state().plantingDateForField ? state().plantingDateForField(field.fieldId) : "";
+    const plantingDate = field && state().plantingDateForField ? state().plantingDateForField(field.fieldId, U.dateYear(date)) : "";
     if (!field || !plantingDate) {
       return {
         field,
@@ -205,10 +206,9 @@
   };
 
   function rowsForYear(fieldId, year) {
-    const prefix = `${year}-`;
     return {
-      works: state().fieldWorksFor(fieldId).filter((row) => String(row.date || "").startsWith(prefix)),
-      growth: state().growthLogsFor(fieldId).filter((row) => String(row.date || "").startsWith(prefix))
+      works: state().fieldWorksFor(fieldId, year),
+      growth: state().growthLogsFor(fieldId, year)
     };
   }
 
@@ -217,18 +217,11 @@
   }
 
   function plantingDateInYear(fieldId, year) {
-    return firstDate(rowsForYear(fieldId, year).works
-      .filter((row) => /田植/.test(String(row.workName || "")))
-      .map((row) => row.date));
+    return state().plantingDateForField(fieldId, year);
   }
 
   function headingDateInYear(fieldId, year, asOfDate) {
-    const rows = rowsForYear(fieldId, year);
-    const onOrBefore = (row) => !asOfDate || String(row.date || "") <= asOfDate;
-    return firstDate([
-      ...rows.growth.filter((row) => Boolean(row.headingObserved) && onOrBefore(row)).map((row) => row.date),
-      ...rows.works.filter((row) => /出穂/.test(String(row.workName || "")) && onOrBefore(row)).map((row) => row.date)
-    ]);
+    return state().headingDateForField(fieldId, year, asOfDate);
   }
 
   function panicleStageKey(lengthMm) {
@@ -287,10 +280,13 @@
   }
 
   function managementStatus(field, date) {
-    const dry = (state().dryPeriodsFor(field.fieldId) || [])
-      .filter((row) => String(row.date || row.startDate || "") <= date)
+    const targetDate = date || U.today();
+    const year = U.dateYear(targetDate);
+    const dry = (state().dryPeriodsFor(field.fieldId, year) || [])
+      .filter((row) => String(row.date || row.startDate || "") <= targetDate)
       .slice().sort((a, b) => String(a.date || a.startDate || "").localeCompare(String(b.date || b.startDate || ""))).pop() || null;
-    const dryEnd = dry && dry.actualEndDate || field.drainageActualEndDate || "";
+    const fieldDryEnd = U.isInYear(field.drainageActualEndDate, year) ? field.drainageActualEndDate : "";
+    const dryEnd = dry && dry.actualEndDate || fieldDryEnd || "";
     if (dryEnd) return { key: "dryCompleted", label: "中干し完了", tone: "ok", date: dryEnd };
     if (dry && (dry.startDate || dry.status === "実施中")) return { key: "drying", label: "中干し中", tone: "warn", date: dry.startDate || dry.date || "" };
     return { key: "dryWaiting", label: "中干し未実施", tone: "waiting", date: "" };

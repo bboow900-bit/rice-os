@@ -24,32 +24,43 @@
     return state.field(U.$("irrigationField").value) || state.field(firstFieldId());
   }
 
-  function observedHeadingDate(fieldId) {
-    return state.growthLogsFor(fieldId)
-      .slice()
-      .sort((a, b) => String(a.date).localeCompare(String(b.date)))
-      .find((log) => log.headingObserved)?.date || "";
+  function cropYear(dateText) {
+    return String(dateText || U.today()).slice(0, 4);
   }
 
-  function latestWaterRecord(fieldId) {
-    return (state.data().irrigations || [])
-      .filter((item) => item.fieldId === fieldId)
+  function recordYear(item) {
+    const date = item && (item.date || item.startDate || item.actualEndDate || item.endDate || item.plannedStartDate);
+    return date ? String(date).slice(0, 4) : "";
+  }
+
+  function isIntermittentRecord(item) {
+    return (item && item.method || "間断灌水") === "間断灌水";
+  }
+
+  function latestWaterRecord(fieldId, year) {
+    return (state.irrigationsFor ? state.irrigationsFor(fieldId, year) : [])
       .slice()
       .sort((a, b) => String(b.date).localeCompare(String(a.date)))[0] || null;
   }
 
   function waterStage(field, date) {
-    const planting = field && state.plantingDateForField(field.fieldId);
-    if (!field || !planting) return { key: "waiting", label: "田植え日を待機", detail: "田植え作業を登録すると、水管理の目安を表示します。" };
-    const heading = observedHeadingDate(field.fieldId);
-    const dap = U.daysAfterPlanting(field, date);
-    if (!field.drainageStartDate) return { key: "tillering", label: "活着・分げつ期", detail: `田植後${dap}日。中干し前の水管理と分げつを現地確認。` };
-    if (!field.drainageActualEndDate) return { key: "drying", label: "中干し中", detail: "ひび割れ幅・足の沈み込み・天気を見て完了時期を確認。" };
-    if (!heading) return { key: "intermittent", label: "中干し後・間断灌水", detail: "走り水から間断灌水へ。土質・水持ちを見ながら現地確認。" };
-    const dah = U.daysBetween(heading, date);
-    if (dah <= 3) return { key: "heading", label: "出穂前後", detail: "出穂前後は水を切らさないか、圃場の状態を確認。" };
-    if (dah <= 30) return { key: "filling", label: "登熟期・間断灌水", detail: `出穂後${dah}日。乾かし過ぎを避け、天気と田面を確認。` };
-    return { key: "drainage", label: "落水時期の確認", detail: `出穂後${dah}日。収穫予定・田面・天気を見て落水時期を確認。` };
+    const year = cropYear(date);
+    const planting = field && state.plantingDateForField(field.fieldId, year);
+    if (!field || !planting) return { key: "waiting", label: "水管理", detail: "今年度の田植日が未登録です。" };
+    const dryPeriod = (state.dryPeriodsFor ? state.dryPeriodsFor(field.fieldId, year) : [])
+      .filter((item) => item.startDate || item.endDate || item.actualEndDate)
+      .slice()
+      .sort((a, b) => String(b.date || b.actualEndDate || b.startDate).localeCompare(String(a.date || a.actualEndDate || a.startDate)))[0] || null;
+    const dryStart = dryPeriod && dryPeriod.startDate || (state.workDateForField ? state.workDateForField(field.fieldId, ["中干し開始"], "first", year) : "");
+    const dryEnd = dryPeriod && dryPeriod.endDate || "";
+    const dryActualEnd = dryPeriod && dryPeriod.actualEndDate || (state.workDateForField ? state.workDateForField(field.fieldId, ["中干し終了"], "first", year) : "");
+    if (!dryStart) return { key: "waiting", label: "中干し", detail: "今年度の中干し期間は未登録です。" };
+    if (!dryActualEnd) return { key: "drying", label: "中干し", detail: dryEnd ? `実施中: ${U.fd(dryStart)} - ${U.fd(dryEnd)}` : `実施中: 開始 ${U.fd(dryStart)} / 終了未登録` };
+    const irrigation = latestWaterRecord(field.fieldId, year);
+    if (!irrigation || !irrigation.startDate) return { key: "intermittent", label: "間断灌水", detail: `未記録: 中干し完了 ${U.fd(dryActualEnd)}` };
+    const irrigationEnd = irrigation.actualEndDate || irrigation.endDate || "";
+    const irrigationState = irrigation.actualEndDate ? "完了" : (irrigation.periodStatus || irrigation.status || "実施中");
+    return { key: "intermittent", label: "間断灌水", detail: irrigationEnd ? `${irrigationState}: ${U.fd(irrigation.startDate)} - ${U.fd(irrigationEnd)}` : `${irrigationState}: 開始 ${U.fd(irrigation.startDate)} / 終了未登録` };
   }
 
   function renderWaterStageNavigator() {
@@ -57,19 +68,11 @@
     if (!el) return;
     const field = currentField();
     const stage = waterStage(field, U.$("irrigationDate").value || U.today());
-    const recent = field ? latestWaterRecord(field.fieldId) : null;
-    const facts = [
-      field && field.soilType ? `土質 ${field.soilType}` : "土質 未設定",
-      field && field.waterHolding ? `水持ち ${field.waterHolding}` : "水持ち 未設定",
-      recent ? `直近 ${recent.method || "水管理"} ${U.fd(recent.date)}` : "水管理記録 なし"
-    ];
     el.innerHTML = `
       <section class="water-stage-card ${U.attr(stage.key)}">
         <div class="water-stage-top"><span>水管理の現在地</span><b>${U.escapeHTML(stage.label)}</b></div>
         <p>${U.escapeHTML(field && field.name || "圃場を選択")}</p>
         <strong>${U.escapeHTML(stage.detail)}</strong>
-        <div class="water-stage-facts">${facts.map((fact) => `<span>${U.escapeHTML(fact)}</span>`).join("")}</div>
-        <small>目安です。実際の水管理は田面・天気・生育を見て判断してください。</small>
       </section>
     `;
   }
@@ -104,7 +107,7 @@
 
   function resetForm() {
     const field = state.field(firstFieldId());
-    U.$("irrigationHeading").textContent = "間断灌水/湿潤灌漑";
+    U.$("irrigationHeading").textContent = "間断灌水";
     U.$("editIrrigationId").value = "";
     U.$("irrigationDate").value = U.today();
     U.$("irrigationMethod").value = "間断灌水";
@@ -131,14 +134,15 @@
 
   function renderOptions() {
     const fieldValue = U.$("irrigationField").value || firstFieldId();
-    U.setOptions(U.$("irrigationMethod"), S.IRRIGATION_TYPES, U.$("irrigationMethod").value || "間断灌水");
+    // Keep legacy water records intact, but make new records and this UI interval-irrigation only.
+    U.setOptions(U.$("irrigationMethod"), ["間断灌水"], "間断灌水");
     U.setOptions(U.$("irrigationField"), state.activeFields().map((field) => ({ value: field.fieldId, label: field.name })), fieldValue);
     U.setOptions(U.$("irrigationPeriodStatus"), S.WATER_PERIOD_STATUS, U.$("irrigationPeriodStatus").value || "実施中");
-    U.setOptions(U.$("irrigationStatus"), S.IRRIGATION_STATUS, U.$("irrigationStatus").value || "入水中");
+    U.setOptions(U.$("irrigationStatus"), ["入水中"], "入水中");
   }
 
   function fillEdit(item) {
-    U.$("irrigationHeading").textContent = "間断灌水/湿潤灌漑を編集";
+    U.$("irrigationHeading").textContent = "間断灌水を編集";
     U.$("editIrrigationId").value = item.irrigationId;
     U.$("irrigationMethod").value = item.method || "間断灌水";
     U.$("irrigationField").value = item.fieldId;
@@ -162,7 +166,13 @@
   }
 
   function renderList() {
-    const rows = (state.data().irrigations || []).slice().sort((a, b) => String(b.date).localeCompare(String(a.date))).slice(0, 60);
+    const displayedYear = cropYear(U.$("irrigationDate").value || U.today());
+    const rows = (state.data().irrigations || [])
+      .filter((item) => recordYear(item) === displayedYear)
+      .filter(isIntermittentRecord)
+      .slice()
+      .sort((a, b) => String(b.date).localeCompare(String(a.date)))
+      .slice(0, 60);
     U.$("irrigationList").innerHTML = rows.length ? rows.map((item) => {
       const field = state.field(item.fieldId);
       const elapsed = item.startDate ? U.daysBetween(item.startDate, item.date) : "";
@@ -176,7 +186,6 @@
               <b>${U.escapeHTML(U.fd(item.date))} ${U.escapeHTML(method)}</b><br>
               <span class="pill info">${U.escapeHTML(field && field.name || "圃場")}</span>
               <span class="pill ok">${U.escapeHTML(item.periodStatus || (item.actualEndDate ? "完了" : "実施中"))}</span>
-              <span class="pill info">${U.escapeHTML(item.status || "-")}</span>
               ${elapsed !== "" ? `<span class="pill purple">${U.escapeHTML(String(elapsed))}日目</span>` : ""}
               ${remaining !== "" ? `<span class="pill warn">終了目安まで${U.escapeHTML(String(remaining))}日</span>` : ""}
               ${stats.actual !== "" ? `<span class="pill purple">予定${U.escapeHTML(String(stats.planned))}日 / 実績${U.escapeHTML(String(stats.actual))}日 / ${U.escapeHTML(diffLabel(stats.diff))}</span>` : ""}
@@ -200,7 +209,7 @@
           </div>
         </article>
       `;
-    }).join("") : '<div class="empty">水管理の記録はまだありません。</div>';
+    }).join("") : `<div class="empty">${U.escapeHTML(displayedYear)}年の間断灌水記録はまだありません。</div>`;
   }
 
   function render() {
@@ -237,7 +246,7 @@
 
   function editIrrigation(irrigationId) {
     const item = (state.data().irrigations || []).find((row) => row.irrigationId === irrigationId);
-    if (item) fillEdit(item);
+    if (item && isIntermittentRecord(item)) fillEdit(item);
   }
 
   function bind() {
@@ -302,7 +311,10 @@
       }
       renderWaterStageNavigator();
     });
-    U.$("irrigationDate").addEventListener("change", renderWaterStageNavigator);
+    U.$("irrigationDate").addEventListener("change", () => {
+      renderWaterStageNavigator();
+      renderList();
+    });
     document.querySelector('[data-action="reset-irrigation"]').addEventListener("click", resetForm);
   }
 

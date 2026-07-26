@@ -3,7 +3,7 @@
 
   const RiceOS = window.RiceOS = window.RiceOS || {};
   const NOTIFIED_KEY = "rice_os_notified_alerts";
-  const APP_VERSION = "20260726_ver122";
+  const APP_VERSION = "20260726_ver123";
 
   let deferredPrompt = null;
 
