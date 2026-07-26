@@ -764,15 +764,20 @@
     return field.status || "記録待ち";
   }
 
-  function fieldNextRecord(field) {
+  function fieldNextRecordInfo(field) {
     const year = currentSeasonYear();
     const planting = state.plantingDateForField ? state.plantingDateForField(field.fieldId, year) : "";
     const growth = latestGrowthForField(field.fieldId);
     const dry = drySummary(field);
-    if (!planting) return "田植え作業";
-    if (dry.actualEndDate && !state.irrigationsFor(field.fieldId, year).some((row) => isIntermittentIrrigation(row) && row.startDate)) return "間断灌水の開始";
-    if (!growth) return "生育記録";
-    return "次の生育・水管理記録";
+    if (!planting) return { label: "田植え作業を記録", action: "add-work" };
+    if (dry.actualEndDate && !state.irrigationsFor(field.fieldId, year).some((row) => isIntermittentIrrigation(row) && row.startDate)) return { label: "間断灌水を記録", action: "add-irrigation" };
+    if (!growth) return { label: "生育を記録", action: "add-growth" };
+    return null;
+  }
+
+  function fieldNextRecord(field) {
+    const next = fieldNextRecordInfo(field);
+    return next ? next.label : "生育・水管理を記録";
   }
 
   function renderFieldListCard(field) {
@@ -814,6 +819,7 @@
     const growth = latestGrowthForField(field.fieldId);
     const dry = drySummary(field);
     const irrigation = latestIrrigationForField(field.fieldId);
+    const nextRecord = fieldNextRecordInfo(field);
     const waterText = irrigation
       ? `${irrigation.method || "水管理"} ${irrigation.actualEndDate ? `完了 ${U.fd(irrigation.actualEndDate)}` : `実施中 ${U.fd(irrigation.startDate)}`}`
       : dry.actualEndDate
@@ -828,8 +834,11 @@
         </section>
         <div class="field-hub-summary"><span><b>生育</b>${U.escapeHTML(growth ? `${U.fd(growth.date)} / 葉色 ${growth.leafColor || "-"}` : "未入力")}</span><span><b>水管理</b>${U.escapeHTML(waterText)}</span></div>
         ${renderWaterPeriodOverview(field, dry, irrigation)}
-        ${dry.actualEndDate && !irrigation ? `<section class="field-water-transition"><b>中干し完了</b><span>${U.escapeHTML(U.fd(dry.actualEndDate))}。田面を確認して次の水管理を記録してください</span><button type="button" data-field-action="add-irrigation" data-field-id="${U.attr(field.fieldId)}">間断灌水を開始・記録</button></section>` : ""}
-        <section class="field-hub-actions"><button type="button" data-field-action="add-work" data-field-id="${U.attr(field.fieldId)}">作業を記録</button><button type="button" data-field-action="add-growth" data-field-id="${U.attr(field.fieldId)}">生育を記録</button><button type="button" data-field-action="add-irrigation" data-field-id="${U.attr(field.fieldId)}">水管理</button><button type="button" data-field-action="photos" data-field-id="${U.attr(field.fieldId)}">写真</button></section>
+        ${dry.actualEndDate && !irrigation ? `<section class="field-water-transition"><b>中干し完了</b><span>${U.escapeHTML(U.fd(dry.actualEndDate))}。水管理の記録は次の入力から開けます</span></section>` : ""}
+        ${nextRecord
+          ? `<section class="field-next-action"><button type="button" data-field-action="${U.attr(nextRecord.action)}" data-field-id="${U.attr(field.fieldId)}"><span>記録が不足しています</span><b>${U.escapeHTML(nextRecord.label)}</b><i aria-hidden="true">›</i></button></section>`
+          : '<section class="field-next-guide"><b>記録を追加</b><span>現場の様子に合わせて、下から種類を選べます</span></section>'}
+        <section class="field-hub-actions"><button type="button" data-field-action="add-work" data-field-id="${U.attr(field.fieldId)}">作業</button><button type="button" data-field-action="add-growth" data-field-id="${U.attr(field.fieldId)}">生育</button><button type="button" data-field-action="add-irrigation" data-field-id="${U.attr(field.fieldId)}">水管理</button><button type="button" data-field-action="photos" data-field-id="${U.attr(field.fieldId)}">写真</button></section>
         <section class="field-hub-history"><div><span>今年のひとこと</span><b>${U.escapeHTML(field.yearMemo || field.nextSeasonMemo || field.fixedMemo || "まだありません")}</b></div><button type="button" class="secondary" data-field-action="history" data-field-id="${U.attr(field.fieldId)}">前年比較・振り返り</button></section>
       </section>
     `;
