@@ -244,13 +244,20 @@
     setSelectedFieldIds(selected);
   }
 
+  function templateFillSummary(template) {
+    const parts = [template.machine || "機械なし"];
+    if (template.material) parts.push(template.material === "recipe" ? "資材:レシピ" : "資材あり");
+    parts.push(formatDuration(template.hours) || "時間未設定");
+    return parts.join("・");
+  }
+
   function renderTemplates() {
     const root = U.$("fwTemplatePicks");
     if (!root) return;
     root.innerHTML = WORK_TEMPLATES.map((template) => `
       <button type="button" data-fw-template="${U.attr(template.key)}">
         <span>${U.escapeHTML(template.label)}</span>
-        <small>${U.escapeHTML(formatDuration(template.hours) || "時間未設定")}</small>
+        <small>${U.escapeHTML(templateFillSummary(template))}</small>
       </button>
     `).join("");
   }

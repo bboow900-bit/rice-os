@@ -3743,10 +3743,14 @@ h3 {
 }
 
 #fwTemplatePicks button small {
+  display: block;
+  overflow: hidden;
   color: #637063;
   font-size: 9px;
   font-weight: 780;
   line-height: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .work-time-tools {

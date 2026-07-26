@@ -27,7 +27,18 @@
 
   function render() {
     const info = storage.info(state.data());
-    U.$("dataStatus").innerHTML = [
+    const exportDate = info.lastJsonExportAt ? String(info.lastJsonExportAt).slice(0, 10) : "";
+    const exportDays = exportDate ? U.daysBetween(exportDate, U.today()) : "";
+    const exportStatus = exportDate
+      ? `最終JSON出力: ${U.fd(exportDate)} / ${exportDays}日前`
+      : "JSON出力: 未実施";
+    U.$("dataStatus").innerHTML = `
+      <div class="data-storage-status" style="grid-column: 1 / -1">
+        <b>バックアップ状況</b>
+        <span>${U.escapeHTML(exportStatus)}</span>
+        <button id="dataBackupExport" class="primary" type="button">JSON保存</button>
+      </div>
+    ` + [
       ["アプリバージョン", APP_VERSION_LABEL],
       ["保存キー", info.storeKey],
       ["使用量", sizeLabel(info.bytes)],
@@ -46,6 +57,16 @@
         <div class="value" style="font-size:16px">${U.escapeHTML(value)}</div>
       </div>
     `).join("");
+    const backupExportButton = U.$("dataBackupExport");
+    if (backupExportButton) {
+      backupExportButton.onclick = () => {
+        const exportButton = document.querySelector('[data-action="export-json"]');
+        if (exportButton) {
+          exportButton.click();
+          render();
+        }
+      };
+    }
     U.$("dataSnapshot").value = JSON.stringify(state.data(), null, 2);
     renderStorageStatus();
   }

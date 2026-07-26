@@ -1254,6 +1254,25 @@
     `;
   }
 
+  function renderEndSeasonReflection(field, snapshot) {
+    const latestNote = seasonNotesForReview(field.fieldId)[0] || null;
+    const carryover = String(field.nextSeasonMemo || "").trim();
+    const noteStatus = latestNote
+      ? `今年の気づき ${latestNote.date ? U.fd(latestNote.date) : "記録あり"}`
+      : carryover ? "来年に引き継ぐメモあり" : "今年の気づき・来年メモは未記録";
+    if (!snapshot.harvest) {
+      return `<div class="annual-compare-check"><b>収穫後にここで振り返る</b><span>収穫日が記録されると、この年の実績と引き継ぎメモをまとめて確認できます。</span></div>`;
+    }
+    const facts = [
+      `収穫 ${snapshot.harvest}`,
+      snapshot.yield ? `収量 ${snapshot.yield}` : "収量 未記録",
+      snapshot.quality ? `品質 ${snapshot.quality}` : "品質 未記録",
+      snapshot.workHours ? `作業時間 ${U.formatHours(snapshot.workHours)}` : "作業時間 未記録",
+      noteStatus
+    ];
+    return `<div class="annual-compare-check complete"><b>収穫後の振り返り</b><span>${U.escapeHTML(facts.join(" / "))}</span><button type="button" class="secondary" data-annual-reflection-focus>気づき・来年メモへ</button></div>`;
+  }
+
   function renderYearCompare(field) {
     const currentYear = yearValue() === "all" ? String(new Date().getFullYear()) : String(yearValue());
     const previousYear = String(Number(currentYear) - 1);
@@ -1280,6 +1299,7 @@
         <div class="annual-compare-head"><div><span>来年につなぐ比較</span><h3>${U.escapeHTML(currentYear)}年と${U.escapeHTML(previousYear)}年</h3></div><small>${U.escapeHTML(field.name)} / ${U.escapeHTML(varietyName(field))}</small></div>
         <div class="annual-compare-table"><div class="annual-compare-row annual-compare-label"><b>比較項目</b><b>${U.escapeHTML(currentYear)}年</b><b>${U.escapeHTML(previousYear)}年</b></div>${rows.map((row) => `<div class="annual-compare-row"><span>${U.escapeHTML(row[0])}</span><b class="${row[1] === "未記録" ? "missing" : ""}">${U.escapeHTML(row[1])}</b><b class="${row[2] === "未記録" ? "missing" : ""}">${U.escapeHTML(row[2])}</b></div>`).join("")}</div>
         ${renderYearFlow(field)}
+        ${renderEndSeasonReflection(field, current)}
         ${missing.length ? `<div class="annual-compare-check"><b>翌年比較のため、今年はここを残す</b><span>${U.escapeHTML(missing.join(" / "))}</span></div>` : '<div class="annual-compare-check complete"><b>比較に必要な基本記録がそろっています</b><span>来年の判断材料として使えます</span></div>'}
         ${renderSeasonNotes(field)}
         <label class="annual-carryover-note"><span>来年に引き継ぐメモ</span><textarea data-annual-field-edit="nextSeasonMemo" placeholder="例: この圃場は中干しを早めに始める。穂肥量は葉色を見て控えめに。">${U.escapeHTML(field.nextSeasonMemo || "")}</textarea><small>圃場マスターに保存され、年度をまたいで確認できます。</small></label>
@@ -1442,6 +1462,14 @@
       const fab = event.target.closest("[data-annual-fab]");
       if (fab) {
         openAdd(fab.dataset.annualFab);
+        return;
+      }
+      if (event.target.closest("[data-annual-reflection-focus]")) {
+        const target = U.$("annualTimeline").querySelector(".annual-season-notes") || U.$("annualTimeline").querySelector(".annual-carryover-note");
+        if (!target) return;
+        target.scrollIntoView({ behavior: "smooth", block: "center" });
+        const input = target.querySelector("textarea, input");
+        if (input) setTimeout(() => input.focus(), 280);
         return;
       }
       const noteAdd = event.target.closest("[data-season-note-add]");
