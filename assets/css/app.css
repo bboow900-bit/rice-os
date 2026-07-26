@@ -1650,6 +1650,28 @@
 .annual-season-note-list button { padding: 3px 5px; border: 0; border-radius: 5px; background: #eef5eb; color: #397241; font: inherit; font-size: 9px; font-weight: 850; }
 .annual-season-note-list button.danger { background: #fff0ee; color: #b75048; }
 .annual-season-note-empty { margin: 8px 0 0; padding: 8px; border-radius: 8px; background: #f7f8f4; color: #748074; font-size: 11px; line-height: 1.4; }
+.annual-year-flow { margin: 10px 11px; padding: 10px; border: 1px solid #dce8d7; border-radius: 10px; background: linear-gradient(120deg, #f8fbf5, #fffdf6); }
+.annual-year-flow-head { display: flex; align-items: end; justify-content: space-between; gap: 8px; }
+.annual-year-flow-head span { display: block; color: #748175; font-size: 9px; font-weight: 800; }
+.annual-year-flow-head h3 { margin: 2px 0 0; color: #2c6837; font-size: 14px; font-weight: 900; }
+.annual-year-flow-head small { color: #7b867a; font-size: 9px; font-weight: 800; white-space: nowrap; }
+.annual-year-flow ol { display: grid; gap: 0; margin: 9px 0 0; padding: 0; list-style: none; }
+.annual-year-flow li { position: relative; display: grid; grid-template-columns: 48px minmax(0, 1fr); gap: 8px; min-width: 0; padding: 0 0 8px; }
+.annual-year-flow li:last-child { padding-bottom: 0; }
+.annual-year-flow li::before { content: ""; position: absolute; left: 53px; top: 15px; bottom: -2px; width: 1px; background: #d8e3d5; }
+.annual-year-flow li:last-child::before { display: none; }
+.annual-year-flow time { position: relative; z-index: 1; padding-top: 1px; color: #6c7c6d; font-size: 10px; font-weight: 900; }
+.annual-year-flow time::after { content: ""; position: absolute; right: -11px; top: 5px; width: 7px; height: 7px; border: 2px solid #fff; border-radius: 50%; background: #4e9c59; box-shadow: 0 0 0 1px #b9d8bb; }
+.annual-year-flow li > div { min-width: 0; padding: 6px 8px; border: 1px solid #e1eade; border-radius: 8px; background: rgba(255,255,255,.8); }
+.annual-year-flow li b, .annual-year-flow li span { display: block; }
+.annual-year-flow li b { color: #2e4733; font-size: 11px; font-weight: 900; }
+.annual-year-flow li span { overflow: hidden; margin-top: 2px; color: #68766a; font-size: 10px; font-weight: 750; line-height: 1.3; text-overflow: ellipsis; white-space: nowrap; }
+.annual-year-flow li.dry time::after { background: #d28a29; box-shadow: 0 0 0 1px #efd3a2; }
+.annual-year-flow li.water time::after { background: #348fbe; box-shadow: 0 0 0 1px #bdddED; }
+.annual-year-flow li.panicle time::after { background: #739c45; box-shadow: 0 0 0 1px #cee0b8; }
+.annual-year-flow li.heading time::after { background: #a98730; box-shadow: 0 0 0 1px #e5d39c; }
+.annual-year-flow li.harvest time::after { background: #b47732; box-shadow: 0 0 0 1px #e4c493; }
+.annual-year-flow-empty { margin: 8px 0 0; padding: 8px; border-radius: 8px; background: #f6f8f3; color: #748074; font-size: 11px; line-height: 1.4; }
 /* Mobile primary route: Home, calendar, record, fields, review. */
 @media (max-width: 900px) {
   .side-nav .nav-item { display: none !important; }

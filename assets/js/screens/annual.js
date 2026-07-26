@@ -1199,6 +1199,61 @@
     `;
   }
 
+  function timelinePeriod(label, startDate, endDate, tone) {
+    if (!startDate && !endDate) return null;
+    const start = startDate || endDate;
+    const detail = startDate && endDate
+      ? `${U.fd(startDate)} - ${U.fd(endDate)}${U.daysBetween(startDate, endDate) !== "" ? ` / ${U.daysBetween(startDate, endDate)}日間` : ""}`
+      : startDate ? `開始 ${U.fd(startDate)} / 完了日未記録` : `完了 ${U.fd(endDate)}`;
+    return { date: start, label, detail, tone, kind: "period" };
+  }
+
+  function fieldYearTimeline(field, year) {
+    // Use the year-scoped state APIs here. Older imports can have a stale season field.
+    const works = state.fieldWorksFor(field.fieldId, year);
+    const growth = state.growthLogsFor(field.fieldId, year);
+    const dryRows = state.dryPeriodsFor(field.fieldId, year);
+    const irrigationRows = state.irrigationsFor(field.fieldId, year);
+    const entries = [];
+    const firstWorkDate = (pattern) => works.filter((row) => pattern.test(String(row.workName || ""))).map((row) => row.date).filter(Boolean).sort()[0] || "";
+    const planting = state.plantingDateForField(field.fieldId, year);
+    if (planting) entries.push({ date: planting, label: "田植え", detail: U.fd(planting), tone: "planting", kind: "point" });
+
+    const dryPeriod = periodSnapshot(dryRows);
+    const dryStart = dryPeriod.startDate || firstWorkDate(/中干し開始/);
+    const dryEnd = dryPeriod.endDate || firstWorkDate(/中干し終了|中干し完了|中干完了/);
+    const dryEntry = timelinePeriod("中干し", dryStart, dryEnd, "dry");
+    if (dryEntry) entries.push(dryEntry);
+
+    const intermittentPeriod = periodSnapshot(irrigationRows.filter((row) => /間断/.test(String(row.method || ""))));
+    const intermittentStart = intermittentPeriod.startDate || firstWorkDate(/間断灌水開始/);
+    const intermittentEnd = intermittentPeriod.endDate || firstWorkDate(/間断灌水終了|間断灌水完了/);
+    const intermittentEntry = timelinePeriod("間断灌水", intermittentStart, intermittentEnd, "water");
+    if (intermittentEntry) entries.push(intermittentEntry);
+
+    const panicle = growth.filter((row) => U.number(row.panicleLengthMm, 0) > 0)
+      .slice().sort((a, b) => String(b.date).localeCompare(String(a.date)))[0] || null;
+    if (panicle) entries.push({ date: panicle.date, label: "幼穂確認", detail: `${U.fd(panicle.date)} / 幼穂長 ${panicle.panicleLengthMm}mm`, tone: "panicle", kind: "point" });
+
+    const heading = state.headingDateForField(field.fieldId, year) || firstWorkDate(/出穂/);
+    if (heading) entries.push({ date: heading, label: "出穂", detail: U.fd(heading), tone: "heading", kind: "point" });
+
+    const harvest = state.workDateForField(field.fieldId, ["収穫", "稲刈り"], "first", year);
+    if (harvest) entries.push({ date: harvest, label: "収穫", detail: U.fd(harvest), tone: "harvest", kind: "point" });
+    return entries.sort((a, b) => String(a.date).localeCompare(String(b.date)) || String(a.label).localeCompare(String(b.label)));
+  }
+
+  function renderYearFlow(field) {
+    const year = reviewYearValue();
+    const entries = fieldYearTimeline(field, year);
+    return `
+      <section class="annual-year-flow" aria-label="${U.escapeHTML(year)}年の一年の流れ">
+        <div class="annual-year-flow-head"><div><span>${U.escapeHTML(year)}年の記録</span><h3>一年の流れ</h3></div><small>実績のみ</small></div>
+        ${entries.length ? `<ol>${entries.map((entry) => `<li class="${U.attr(entry.tone)} ${U.attr(entry.kind)}"><time>${U.escapeHTML(U.fd(entry.date))}</time><div><b>${U.escapeHTML(entry.label)}</b><span>${U.escapeHTML(entry.detail)}</span></div></li>`).join("")}</ol>` : '<p class="annual-year-flow-empty">田植え・水管理・幼穂・出穂・収穫の実績を残すと、ここに一年の流れが並びます。</p>'}
+      </section>
+    `;
+  }
+
   function renderYearCompare(field) {
     const currentYear = yearValue() === "all" ? String(new Date().getFullYear()) : String(yearValue());
     const previousYear = String(Number(currentYear) - 1);
@@ -1224,6 +1279,7 @@
       <section class="annual-compare-card">
         <div class="annual-compare-head"><div><span>来年につなぐ比較</span><h3>${U.escapeHTML(currentYear)}年と${U.escapeHTML(previousYear)}年</h3></div><small>${U.escapeHTML(field.name)} / ${U.escapeHTML(varietyName(field))}</small></div>
         <div class="annual-compare-table"><div class="annual-compare-row annual-compare-label"><b>比較項目</b><b>${U.escapeHTML(currentYear)}年</b><b>${U.escapeHTML(previousYear)}年</b></div>${rows.map((row) => `<div class="annual-compare-row"><span>${U.escapeHTML(row[0])}</span><b class="${row[1] === "未記録" ? "missing" : ""}">${U.escapeHTML(row[1])}</b><b class="${row[2] === "未記録" ? "missing" : ""}">${U.escapeHTML(row[2])}</b></div>`).join("")}</div>
+        ${renderYearFlow(field)}
         ${missing.length ? `<div class="annual-compare-check"><b>翌年比較のため、今年はここを残す</b><span>${U.escapeHTML(missing.join(" / "))}</span></div>` : '<div class="annual-compare-check complete"><b>比較に必要な基本記録がそろっています</b><span>来年の判断材料として使えます</span></div>'}
         ${renderSeasonNotes(field)}
         <label class="annual-carryover-note"><span>来年に引き継ぐメモ</span><textarea data-annual-field-edit="nextSeasonMemo" placeholder="例: この圃場は中干しを早めに始める。穂肥量は葉色を見て控えめに。">${U.escapeHTML(field.nextSeasonMemo || "")}</textarea><small>圃場マスターに保存され、年度をまたいで確認できます。</small></label>
