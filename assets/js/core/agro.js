@@ -204,13 +204,6 @@
     harvest: "maturity"
   };
 
-  function median(values) {
-    const clean = values.map(Number).filter(Number.isFinite).sort((a, b) => a - b);
-    if (!clean.length) return "";
-    const mid = Math.floor(clean.length / 2);
-    return clean.length % 2 ? clean[mid] : Math.round((clean[mid - 1] + clean[mid]) / 2);
-  }
-
   function rowsForYear(fieldId, year) {
     const prefix = `${year}-`;
     return {
@@ -251,21 +244,10 @@
     const ownPlanting = plantingDateInYear(field.fieldId, previousYear);
     const ownHeading = headingDateInYear(field.fieldId, previousYear);
     let headingDays = ownPlanting && ownHeading ? U.daysBetween(ownPlanting, ownHeading) : "";
-    let basis = ownHeading ? "前年の同一圃場" : "";
-
-    if (headingDays === "") {
-      const varietyDays = state().fields()
-        .filter((item) => item.varietyId === field.varietyId)
-        .map((item) => {
-          const plant = plantingDateInYear(item.fieldId, previousYear);
-          const heading = headingDateInYear(item.fieldId, previousYear);
-          return plant && heading ? U.daysBetween(plant, heading) : "";
-        });
-      headingDays = median(varietyDays);
-      basis = headingDays === "" ? "" : "前年の同品種";
-    }
-    if (headingDays === "") return null;
-    return { date: addDays(plantingDate, headingDays), daysAfterPlanting: headingDays, basis };
+    // Historical data can contain old trial entries. Only use a same-field
+    // planting-to-heading interval when it is within a realistic rice season.
+    if (headingDays === "" || headingDays < 70 || headingDays > 130) return null;
+    return { date: addDays(plantingDate, headingDays), daysAfterPlanting: headingDays, basis: "前年の同一圃場" };
   }
 
   function estimatedStageKey(daysFromHeading) {
@@ -279,6 +261,23 @@
     if (daysFromHeading <= 10) return "fullHeading";
     if (daysFromHeading <= 35) return "ripening";
     if (daysFromHeading <= 45) return "yellowRipening";
+    return "maturity";
+  }
+
+  function fallbackStageFromDap(dap) {
+    const days = Number(dap);
+    if (!Number.isFinite(days) || days < 0) return "";
+    if (days <= 7) return "establishment";
+    if (days <= 30) return "earlyTillering";
+    if (days <= 50) return "peakTillering";
+    if (days <= 65) return "maximumTillering";
+    if (days <= 78) return "panicleInitiation";
+    if (days <= 85) return "meiosis";
+    if (days <= 92) return "booting";
+    if (days <= 100) return "heading";
+    if (days <= 108) return "fullHeading";
+    if (days <= 135) return "ripening";
+    if (days <= 145) return "yellowRipening";
     return "maturity";
   }
 
@@ -312,8 +311,10 @@
     const plantingRows = works.filter((row) => /田植/.test(String(row.workName || "")));
     const planting = plantingRows.map((row) => row.date).filter(Boolean).sort()[0]
       || (String(field.plantingDate || "").startsWith(`${year}-`) ? field.plantingDate : "");
-    const headingDate = headingDateInYear(field.fieldId, year, date);
+    const recordedHeadingDate = headingDateInYear(field.fieldId, year, date);
     const dap = planting ? U.daysBetween(planting, date) : "";
+    const headingDays = planting && recordedHeadingDate ? U.daysBetween(planting, recordedHeadingDate) : "";
+    const headingDate = headingDays !== "" && headingDays >= 70 && headingDays <= 130 ? recordedHeadingDate : "";
     const evidence = [];
     plantingRows.forEach((row) => evidence.push({ date: row.date, key: "establishment", source: "work", recordId: row.workId || "" }));
     growth.forEach((row) => {
@@ -336,14 +337,17 @@
       || String(a.date).localeCompare(String(b.date))
       || ({ measured: 1, work: 2, confirmed: 3 }[a.source] - { measured: 1, work: 2, confirmed: 3 }[b.source]));
     const latestEvidence = explicitCorrection || evidence[evidence.length - 1] || null;
-    const headingReference = headingDate
-      ? { date: headingDate, basis: "今年の出穂日" }
-      : estimatedHeading(field, planting, year);
+    const historicalHeading = !headingDate ? estimatedHeading(field, planting, year) : null;
+    const headingReference = headingDate ? { date: headingDate, basis: "今年の出穂日" } : null;
     const prediction = headingReference ? {
       key: estimatedStageKey(U.daysBetween(headingReference.date, date)),
       date: headingReference.date,
       basis: headingReference.basis
-    } : null;
+    } : (dap === "" ? null : {
+      key: fallbackStageFromDap(dap),
+      date: "",
+      basis: "田植後日数の目安"
+    });
     const actual = latestEvidence ? stageFromKey(latestEvidence.key) : stageFromKey("");
     const predicted = prediction ? stageFromKey(prediction.key) : stageFromKey("");
     // Planting establishes the season, but should not freeze a field at 活着期.
@@ -376,7 +380,7 @@
       evidenceRecordId: latestEvidence && latestEvidence.recordId || "",
       certainty: usePrediction ? "推定" : (current ? "確定" : "記録待ち"),
       basis: usePrediction && prediction ? `${prediction.basis}・田植日` : (latestEvidence ? "現地記録" : ""),
-      predictedHeadingDate: headingReference && headingReference.date || "",
+      predictedHeadingDate: headingReference && headingReference.date || historicalHeading && historicalHeading.date || "",
       management: managementStatus(field, date),
       suggested
     };
