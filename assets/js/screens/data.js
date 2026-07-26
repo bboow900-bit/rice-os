@@ -30,7 +30,7 @@
     const exportDate = info.lastJsonExportAt ? String(info.lastJsonExportAt).slice(0, 10) : "";
     const exportDays = exportDate ? U.daysBetween(exportDate, U.today()) : "";
     const exportStatus = exportDate
-      ? `最終JSON出力: ${U.fd(exportDate)} / ${exportDays}日前`
+      ? `最終JSON出力を開始: ${U.fd(exportDate)} / ${exportDays}日前`
       : "JSON出力: 未実施";
     U.$("dataStatus").innerHTML = `
       <div class="data-storage-status" style="grid-column: 1 / -1">
@@ -163,8 +163,8 @@
 
   function bind() {
     document.querySelector('[data-action="export-json"]').addEventListener("click", () => {
-      state.markJsonExported();
       storage.exportJson(state.data());
+      state.markJsonExported();
     });
     document.querySelector('[data-action="export-csv"]').addEventListener("click", () => {
       storage.exportCsv(state.data());

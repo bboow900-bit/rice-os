@@ -416,7 +416,7 @@
         fertilizerRateKg10a: record.fertilizerRateKg10a || "",
         fertilizerTotalKg: record.fertilizerTotalKg || "",
         fertilizerBagCount: record.fertilizerBagCount || "",
-        sourceScheduleId: record.sourceScheduleId || "",
+        sourceScheduleId: record.sourceScheduleId || previous && previous.sourceScheduleId || "",
         growthSnapshots: record.growthSnapshots || {},
         weather: record.weather || "",
         weatherAuto: record.weatherAuto || null,
@@ -429,9 +429,21 @@
       const index = d.fieldWorks.findIndex((w) => w.workId === normalized.workId);
       if (index >= 0) d.fieldWorks[index] = { ...d.fieldWorks[index], ...normalized };
       else d.fieldWorks.push(normalized);
+      // An edited work may no longer satisfy the schedule it previously
+      // completed. Re-open it first, then let the current record re-match.
+      if (previous) {
+        (d.schedules || []).forEach((schedule) => {
+          if (schedule.completedByWorkId !== normalized.workId) return;
+          schedule.status = "予定";
+          schedule.completedAt = "";
+          schedule.completedByWorkId = "";
+          schedule.completionReason = "";
+          schedule.updatedAt = U.now();
+        });
+      }
       if (normalized.sourceScheduleId) {
         const scheduleIndex = (d.schedules || []).findIndex((schedule) => schedule.scheduleId === normalized.sourceScheduleId);
-        if (scheduleIndex >= 0) {
+        if (scheduleIndex >= 0 && scheduleMatchesWork(d.schedules[scheduleIndex], normalized)) {
           d.schedules[scheduleIndex] = {
             ...d.schedules[scheduleIndex],
             status: "実施済み",
@@ -440,6 +452,9 @@
             completionReason: `${normalized.workName || "作業"}の作業記録により完了`,
             updatedAt: U.now()
           };
+        } else {
+          normalized.sourceScheduleId = "";
+          if (index >= 0) d.fieldWorks[index] = { ...d.fieldWorks[index], sourceScheduleId: "" };
         }
       }
       completeMatchingSchedules(d, normalized);

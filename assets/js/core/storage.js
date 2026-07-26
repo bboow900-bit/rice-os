@@ -231,6 +231,16 @@
       added[key] = additions.length;
       skipped[key] = (incoming[key] || []).length - additions.length;
     });
+    // Fields are de-duplicated by ID, but their annual reflections are nested.
+    // Merge notes separately so a backup cannot silently lose a year's insight.
+    const incomingFields = new Map((incoming.fields || []).map((field) => [field.fieldId, field]));
+    merged.fields = (merged.fields || []).map((field) => {
+      const source = incomingFields.get(field.fieldId);
+      if (!source) return field;
+      const existingIds = new Set((field.seasonNotes || []).map((note) => String(note.noteId || "")));
+      const seasonNotes = [...(field.seasonNotes || []), ...(source.seasonNotes || []).filter((note) => !existingIds.has(String(note.noteId || "")))];
+      return { ...field, seasonNotes };
+    });
     merged.meta = {
       ...(current.meta || {}),
       lastImportAt: U.now(),

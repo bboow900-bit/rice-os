@@ -85,6 +85,23 @@
         record: x
       });
     });
+    // When an appointment is completed on a different day, leave a concise
+    // trace on the actual work day as well as the planned day.
+    (d.schedules || []).filter((x) => {
+      if (!x.completedByWorkId || x.date === date) return false;
+      const work = (d.fieldWorks || []).find((item) => item.workId === x.completedByWorkId);
+      return work && work.date === date;
+    }).forEach((x) => {
+      const work = (d.fieldWorks || []).find((item) => item.workId === x.completedByWorkId);
+      entries.push({
+        kind: "schedule-completed",
+        tone: "schedule-done",
+        title: `実施: ${x.title || x.scheduleType || "予定"}`,
+        subtitle: fieldNames(x.fieldIds),
+        memo: `予定 ${U.fd(x.date)} / 実施 ${U.fd(work.date)}`,
+        record: x
+      });
+    });
     d.fieldWorks.filter((x) => x.date === date).forEach((x) => {
       entries.push({
         kind: "work",

@@ -287,6 +287,13 @@
       .slice().sort((a, b) => String(a.date || a.startDate || "").localeCompare(String(b.date || b.startDate || ""))).pop() || null;
     const fieldDryEnd = U.isInYear(field.drainageActualEndDate, year) ? field.drainageActualEndDate : "";
     const dryEnd = dry && dry.actualEndDate || fieldDryEnd || "";
+    const irrigation = (state().irrigationsFor(field.fieldId, year) || [])
+      .filter((row) => /間断灌水/.test(String(row.method || "")) && String(row.startDate || row.date || "") <= targetDate)
+      .slice().sort((a, b) => String(a.startDate || a.date || "").localeCompare(String(b.startDate || b.date || ""))).pop() || null;
+    if (irrigation) {
+      const ended = irrigation.actualEndDate && irrigation.actualEndDate <= targetDate;
+      return { key: ended ? "intermittentCompleted" : "intermittent", label: ended ? "間断灌水完了" : "間断灌水中", tone: ended ? "ok" : "water", date: irrigation.actualEndDate || irrigation.startDate || irrigation.date || "" };
+    }
     if (dryEnd) return { key: "dryCompleted", label: "中干し完了", tone: "ok", date: dryEnd };
     if (dry && (dry.startDate || dry.status === "実施中")) return { key: "drying", label: "中干し中", tone: "warn", date: dry.startDate || dry.date || "" };
     return { key: "dryWaiting", label: "中干し未実施", tone: "waiting", date: "" };
@@ -363,16 +370,16 @@
     // A field observation is certain on its recorded day. On later days, the
     // calendar may progress from that observation until another field check
     // confirms or corrects the stage.
-    const usePrediction = Boolean(prediction) && (!displayedEvidence || displayedEvidence.kind !== "panicle") && !evidenceIsToday
+    const usePrediction = Boolean(prediction) && !evidenceIsToday
       && (!actual.index || predicted.index >= actual.index);
     const resolved = usePrediction ? predicted : actual;
     const index = resolved.index;
-    let next = "田植え作業を残すと、今年の比較が始まります";
-    if (index >= STAGE_INDEX.establishment && index < STAGE_INDEX.panicleInitiation) next = "分げつの様子を記録しましょう";
-    if (index >= STAGE_INDEX.panicleInitiation && index < STAGE_INDEX.heading) next = "幼穂長または出穂を確認できたら残しましょう";
-    if (index >= STAGE_INDEX.heading && index < STAGE_INDEX.ripening) next = "穂揃いと登熟の様子を現地で確認して残しましょう";
-    if (index >= STAGE_INDEX.ripening && index < STAGE_INDEX.maturity) next = "成熟と収穫日を残しましょう";
-    if (index === STAGE_INDEX.maturity) next = "収穫日と来年への引き継ぎを残しましょう";
+    let next = "次に残せる記録: 田植え日";
+    if (index >= STAGE_INDEX.establishment && index < STAGE_INDEX.panicleInitiation) next = "次に残せる記録: 分げつの様子";
+    if (index >= STAGE_INDEX.panicleInitiation && index < STAGE_INDEX.heading) next = "次に残せる記録: 幼穂長または出穂";
+    if (index >= STAGE_INDEX.heading && index < STAGE_INDEX.ripening) next = "次に残せる記録: 穂揃い・登熟の様子";
+    if (index >= STAGE_INDEX.ripening && index < STAGE_INDEX.maturity) next = "次に残せる記録: 成熟・収穫日";
+    if (index === STAGE_INDEX.maturity) next = "次に残せる記録: 収穫日・来年への引き継ぎ";
     const current = resolved.current;
     const suggested = headingDate && STAGE_INDEX[current && current.key] >= STAGE_INDEX.heading && U.daysBetween(headingDate, date) >= 7
       ? { type: "ripening", label: "登熟の確認目安", basis: `出穂確認から${U.daysBetween(headingDate, date)}日` }

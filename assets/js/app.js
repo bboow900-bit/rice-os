@@ -21,7 +21,8 @@
     "irrigation",
     "recipes",
     "photos",
-    "results"
+    "results",
+    "other-work"
   ]);
 
   function initialScreen() {

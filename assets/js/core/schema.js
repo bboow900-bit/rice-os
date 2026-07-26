@@ -4,8 +4,8 @@
   const RiceOS = window.RiceOS = window.RiceOS || {};
   const U = RiceOS.utils;
 
-  const SCHEMA_VERSION = 13;
-  const APP_VERSION = "20260723_ver118";
+  const SCHEMA_VERSION = 14;
+  const APP_VERSION = "20260726_ver131";
   const STORE_KEY = "rice_os_v8_stable";
   const BACKUP_KEY = "rice_os_v8_stable_backup";
   const LEGACY_STORES = [
@@ -334,6 +334,7 @@
       date,
       season: U.number(w.season, U.season(date)),
       fieldIds: ensureArray(w.fieldIds).length ? ensureArray(w.fieldIds).map(String) : (w.fieldId ? [String(w.fieldId)] : []),
+      orphanedFieldIds: ensureArray(w.orphanedFieldIds).map(String),
       batchId: String(w.batchId || ""),
       batchFieldIds: ensureArray(w.batchFieldIds || w.fieldIds).map(String),
       timeAccounting: String(w.timeAccounting || (ensureArray(w.fieldIds).length > 1 ? "shared" : "single")),
@@ -374,6 +375,7 @@
       date,
       season: U.number(g.season, U.season(date)),
       fieldId: String(g.fieldId || ""),
+      orphanedFieldId: String(g.orphanedFieldId || ""),
       leafCount: String(g.leafCount || ""),
       tillerCount: String(g.tillerCount || ""),
       plantHeightCm: String(g.plantHeightCm || g.plantHeight || ""),
@@ -467,6 +469,7 @@
       date,
       season: U.number(s.season, U.season(date)),
       fieldIds: ensureArray(s.fieldIds).map(String),
+      orphanedFieldIds: ensureArray(s.orphanedFieldIds).map(String),
       scheduleType: String(s.scheduleType || s.kind || "作業予定"),
       title: String(s.title || s.workName || s.scheduleType || "予定"),
       status: String(s.status || "予定"),
@@ -484,13 +487,14 @@
 
   function normalizeDryPeriod(input) {
     const d = input || {};
-    const date = String(d.date || d.observedDate || d.startDate || U.today());
+    const date = String(d.startDate || d.date || d.observedDate || U.today());
     return {
       dryPeriodId: String(d.dryPeriodId || d.id || U.id("dry", date)),
       type: "dryPeriod",
       date,
       season: U.number(d.season, U.season(date)),
       fieldId: String(d.fieldId || ""),
+      orphanedFieldId: String(d.orphanedFieldId || ""),
       status: String(d.status || (d.actualEndDate ? "完了" : "実施中")),
       startDate: String(d.startDate || d.drainageStartDate || ""),
       endDate: String(d.endDate || d.expectedEndDate || ""),
@@ -519,13 +523,14 @@
 
   function normalizeIrrigation(input) {
     const i = input || {};
-    const date = String(i.date || i.startDate || U.today());
+    const date = String(i.startDate || i.date || U.today());
     return {
       irrigationId: String(i.irrigationId || i.id || U.id("irrigation", date)),
       type: "irrigation",
       date,
       season: U.number(i.season, U.season(date)),
       fieldId: String(i.fieldId || ""),
+      orphanedFieldId: String(i.orphanedFieldId || ""),
       method: String(i.method || i.irrigationType || "間断灌水"),
       periodStatus: String(i.periodStatus || (i.actualEndDate ? "完了" : "実施中")),
       startDate: String(i.startDate || ""),
@@ -641,11 +646,13 @@
       if (!varieties.some((v) => v.varietyId === f.varietyId)) f.varietyId = fallbackVarietyId || "";
     });
 
+    const orphan = (fieldId) => fieldId && !fieldIds.has(fieldId) ? fieldId : "";
     const fieldWorks = dedupeBy([
       ...ensureArray(source.fieldWorks).map(normalizeFieldWork),
       ...convertedWorks
     ], "workId").map((w) => ({
       ...w,
+      orphanedFieldIds: Array.from(new Set([...(w.orphanedFieldIds || []), ...ensureArray(w.fieldIds).filter((id) => !fieldIds.has(id))])),
       fieldIds: ensureArray(w.fieldIds).filter((id) => fieldIds.has(id)),
       batchFieldIds: ensureArray(w.batchFieldIds || w.fieldIds).filter((id) => fieldIds.has(id))
     }));
@@ -655,7 +662,8 @@
       ...convertedGrowth
     ], "logId").map((g) => ({
       ...g,
-      fieldId: fieldIds.has(g.fieldId) ? g.fieldId : (fields[0] && fields[0].fieldId) || ""
+      orphanedFieldId: g.orphanedFieldId || orphan(g.fieldId),
+      fieldId: fieldIds.has(g.fieldId) ? g.fieldId : ""
     }));
 
     const otherWorks = dedupeBy(ensureArray(source.otherWorks || source.generalWorks).map(normalizeOtherWork), "otherWorkId");
@@ -663,15 +671,18 @@
     const varietyResults = dedupeBy(ensureArray(source.varietyResults).map(normalizeResult), "resultId");
     const schedules = dedupeBy(ensureArray(source.schedules).map(normalizeSchedule), "scheduleId").map((s) => ({
       ...s,
+      orphanedFieldIds: Array.from(new Set([...(s.orphanedFieldIds || []), ...ensureArray(s.fieldIds).filter((id) => !fieldIds.has(id))])),
       fieldIds: ensureArray(s.fieldIds).filter((id) => fieldIds.has(id))
     }));
     const dryPeriods = dedupeBy(ensureArray(source.dryPeriods).map(normalizeDryPeriod), "dryPeriodId").map((d) => ({
       ...d,
-      fieldId: fieldIds.has(d.fieldId) ? d.fieldId : (fields[0] && fields[0].fieldId) || ""
+      orphanedFieldId: d.orphanedFieldId || orphan(d.fieldId),
+      fieldId: fieldIds.has(d.fieldId) ? d.fieldId : ""
     }));
     const irrigations = dedupeBy(ensureArray(source.irrigations).map(normalizeIrrigation), "irrigationId").map((i) => ({
       ...i,
-      fieldId: fieldIds.has(i.fieldId) ? i.fieldId : (fields[0] && fields[0].fieldId) || ""
+      orphanedFieldId: i.orphanedFieldId || orphan(i.fieldId),
+      fieldId: fieldIds.has(i.fieldId) ? i.fieldId : ""
     }));
     const shipments = dedupeBy(ensureArray(source.shipments).map(normalizeShipment), "shipmentId");
     const confirmationCandidates = dedupeBy(ensureArray(source.confirmationCandidates).map(normalizeConfirmationCandidate), "candidateId")

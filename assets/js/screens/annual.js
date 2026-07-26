@@ -1467,8 +1467,13 @@
       if (event.target.closest("[data-annual-reflection-focus]")) {
         const target = U.$("annualTimeline").querySelector(".annual-season-notes") || U.$("annualTimeline").querySelector(".annual-carryover-note");
         if (!target) return;
-        target.scrollIntoView({ behavior: "smooth", block: "center" });
-        const input = target.querySelector("textarea, input");
+        if (selectedFieldId && !target.querySelector("textarea, input")) {
+          seasonNoteDraft = { fieldId: selectedFieldId, year: reviewYearValue(), date: defaultSeasonNoteDate(reviewYearValue()), memo: "" };
+          render();
+        }
+        const refreshedTarget = U.$("annualTimeline").querySelector(".annual-season-notes") || U.$("annualTimeline").querySelector(".annual-carryover-note");
+        refreshedTarget.scrollIntoView({ behavior: "smooth", block: "center" });
+        const input = refreshedTarget.querySelector("textarea, input");
         if (input) setTimeout(() => input.focus(), 280);
         return;
       }

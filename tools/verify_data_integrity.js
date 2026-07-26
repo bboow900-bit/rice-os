@@ -175,9 +175,9 @@ const panicleObserved = agro.seasonStageForField("field_a", "2026-06-25");
 assert(panicleObserved.current && panicleObserved.current.key === "panicleInitiation", "幼穂長から幼穂形成期を導出できない");
 assert(panicleObserved.certainty === "確定", "幼穂長の記録日が確定ステージとして扱われていない");
 const panicleStage = agro.seasonStageForField("field_a", "2026-08-05");
-assert(panicleStage.current && panicleStage.current.key === "panicleInitiation", "過去日の幼穂長が日数推定で上書きされた");
-assert(panicleStage.certainty === "確定", "過去日の幼穂長が確定ステージとして維持されていない");
-assert(panicleStage.current.key !== "heading", "幼穂長だけで出穂実績が確定した");
+assert(panicleStage.current && panicleStage.index >= panicleObserved.index, "幼穂長後の推定ステージが後退した");
+assert(panicleStage.certainty === "推定", "幼穂長後の日数推定が表示されていない");
+assert(panicleStage.current.key !== "heading" || panicleStage.certainty === "推定", "幼穂長だけで出穂実績が確定した");
 const prediction = state.data().confirmationCandidates.find((row) => row.candidateType === "heading" && row.fieldId === "field_a");
 assert(prediction && prediction.status === "active", "出穂確認目安の履歴が保存されていない");
 
@@ -297,7 +297,7 @@ assert(state.headingDateForField("field_a", 2025) === "2025-07-15", "heading wor
 assert(state.headingDateForField("field_a", 2026) === "2026-07-03", "heading lookup did not include confirmed growth evidence");
 assert(state.dryPeriodsFor("field_a", 2025).every((row) => String(row.date).startsWith("2025-")), "year-scoped drying lookup leaked another year");
 assert(state.irrigationsFor("field_a", 2026).every((row) => String(row.date).startsWith("2026-")), "year-scoped intermittent irrigation lookup leaked another year");
-assert(agro.managementStatus(state.field("field_a"), "2025-06-10").key === "dryCompleted", "prior-year drying completion was not found");
+assert(agro.managementStatus(state.field("field_a"), "2025-06-10").key === "intermittent", "中干し完了後の間断灌水が管理状況へ反映されない");
 assert(agro.managementStatus(state.field("field_a"), "2026-06-10").key === "drying", "management status leaked a different year");
 
 const beforeRoundTrip = storage.info(state.data());
@@ -315,6 +315,27 @@ assert(
   brokenInspection.warnings.some((warning) => warning.includes("参照先のない圃場ID")),
   "インポート前検査で元JSONの参照切れを検出できない"
 );
+const quarantined = S.normalize(brokenPayload);
+const quarantinedGrowth = quarantined.growthLogs.find((row) => row.logId === "growth_broken_reference");
+assert(quarantinedGrowth && quarantinedGrowth.fieldId === "" && quarantinedGrowth.orphanedFieldId === "field_missing", "参照切れの生育記録が隔離されず別圃場へ移った");
+const crossYearWater = S.normalize({
+  varieties: oldData.varieties,
+  fields: oldData.fields,
+  dryPeriods: [{ dryPeriodId: "dry_cross_year", fieldId: "field_a", date: "2026-01-03", startDate: "2025-12-28" }],
+  irrigations: [{ irrigationId: "irrigation_cross_year", fieldId: "field_a", date: "2026-01-03", startDate: "2025-12-29", method: "間断灌水" }]
+});
+assert(crossYearWater.dryPeriods[0].date === "2025-12-28" && crossYearWater.dryPeriods[0].season === 2025, "中干しの年度が開始日に基づかない");
+assert(crossYearWater.irrigations[0].date === "2025-12-29" && crossYearWater.irrigations[0].season === 2025, "間断灌水の年度が開始日に基づかない");
+const mergedNotes = storage.mergeData(
+  S.normalize({ varieties: oldData.varieties, fields: [{ fieldId: "field_a", name: "A", varietyId: "variety_test", seasonNotes: [{ noteId: "note_current", date: "2026-09-01", text: "current" }] }] }),
+  S.normalize({ varieties: oldData.varieties, fields: [{ fieldId: "field_a", name: "A", varietyId: "variety_test", seasonNotes: [{ noteId: "note_imported", date: "2026-09-02", text: "imported" }] }] })
+).data;
+assert(mergedNotes.fields.find((field) => field.fieldId === "field_a").seasonNotes.some((note) => note.noteId === "note_imported"), "同一圃場のJSON統合でseasonNotesが失われた");
+state.saveSchedule({ scheduleId: "schedule_edit_check", date: "2026-07-20", fieldIds: ["field_b"], scheduleType: "追肥", title: "追肥予定" });
+state.saveFieldWork({ workId: "work_schedule_edit", date: "2026-07-20", fieldIds: ["field_b"], workName: "追肥", sourceScheduleId: "schedule_edit_check" });
+assert(state.data().schedules.find((row) => row.scheduleId === "schedule_edit_check").status === "実施済み", "予定に紐づく作業で完了にならない");
+state.saveFieldWork({ workId: "work_schedule_edit", date: "2026-07-20", fieldIds: ["field_b"], workName: "草刈り" });
+assert(state.data().schedules.find((row) => row.scheduleId === "schedule_edit_check").status === "予定", "作業編集後も予定が誤って実施済みのまま");
 const invalidCollectionInspection = storage.inspectJsonText(JSON.stringify({ ...brokenPayload, fields: {} }), state.data());
 assert(!invalidCollectionInspection.ok, "配列ではないコレクションを正常扱いした");
 assert(invalidCollectionInspection.errors.some((error) => error.includes("fields は配列ではありません")), "配列形式エラーを説明できない");

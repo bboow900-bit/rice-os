@@ -39,6 +39,7 @@
 
   function latestWaterRecord(fieldId, year) {
     return (state.irrigationsFor ? state.irrigationsFor(fieldId, year) : [])
+      .filter(isIntermittentRecord)
       .slice()
       .sort((a, b) => String(b.date).localeCompare(String(a.date)))[0] || null;
   }

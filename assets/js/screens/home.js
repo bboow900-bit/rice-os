@@ -832,12 +832,7 @@
       .slice()
       .sort((a, b) => String(a.date).localeCompare(String(b.date)))[0]?.date || "";
     if (workDate) return workDate;
-    const log = state.growthLogsFor(field.fieldId)
-      .filter((row) => String(row.date || "").startsWith(`${year}-`))
-      .slice()
-      .sort((a, b) => String(a.date).localeCompare(String(b.date)))
-      .find((row) => String(row.memo || "").includes("出穂"));
-    return log && log.date || "";
+    return "";
   }
 
   function headingDateInfo(field, cached, planting, headingTarget, dateText) {
@@ -994,7 +989,7 @@
 
   function latestIrrigation(fieldId, year) {
     return (state.irrigationsFor ? state.irrigationsFor(fieldId, year) : [])
-      .filter((row) => row.method !== "湿潤灌漑")
+      .filter((row) => /間断灌水/.test(String(row.method || "")))
       .slice()
       .sort((a, b) => String(b.date || b.startDate).localeCompare(String(a.date || a.startDate)))[0] || null;
   }
@@ -1073,7 +1068,7 @@
     const ripeningElapsed = headingDate ? U.daysBetween(headingDate, U.today()) : "";
     const ripeningTarget = ripeningTempTarget(field);
     const waterStage = waterStageForField(field, U.today());
-    const afterDrying = Boolean(dryStart);
+    const afterDrying = Boolean(dryActualEnd);
     return [
       {
         tone: "green",
