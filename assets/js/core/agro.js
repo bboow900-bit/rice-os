@@ -316,23 +316,34 @@
     growth.forEach((row) => {
       const observed = LEGACY_STAGE[String(row.observedStage || "")] || String(row.observedStage || "");
       if (row.stageConfirmed && STAGE_INDEX[observed]) {
-        evidence.push({ date: row.date, key: observed, source: "confirmed", recordId: row.logId || "", correctionReason: row.correctionReason || "" });
+        evidence.push({ date: row.date, key: observed, source: "confirmed", kind: "confirmed", recordId: row.logId || "", correctionReason: row.correctionReason || "" });
         return;
       }
-      if (row.headingObserved) evidence.push({ date: row.date, key: "heading", source: "measured", recordId: row.logId || "" });
-      else if (Number(row.panicleLengthMm || 0) > 0) evidence.push({ date: row.date, key: panicleStageKey(row.panicleLengthMm), source: "measured", recordId: row.logId || "" });
-      else if (row.tillerCount !== undefined && String(row.tillerCount) !== "") evidence.push({ date: row.date, key: "peakTillering", source: "measured", recordId: row.logId || "" });
+      if (row.headingObserved) evidence.push({ date: row.date, key: "heading", source: "measured", kind: "heading", recordId: row.logId || "" });
+      else if (Number(row.panicleLengthMm || 0) > 0) evidence.push({ date: row.date, key: panicleStageKey(row.panicleLengthMm), source: "measured", kind: "panicle", recordId: row.logId || "" });
+      else if (row.tillerCount !== undefined && String(row.tillerCount) !== "") evidence.push({ date: row.date, key: "peakTillering", source: "measured", kind: "tiller", recordId: row.logId || "" });
     });
     works.filter((row) => /出穂/.test(String(row.workName || "")))
-      .forEach((row) => evidence.push({ date: row.date, key: "heading", source: "work", recordId: row.workId || "" }));
+      .forEach((row) => evidence.push({ date: row.date, key: "heading", source: "work", kind: "heading", recordId: row.workId || "" }));
     works.filter((row) => /稲刈り|収穫/.test(String(row.workName || "")))
-      .forEach((row) => evidence.push({ date: row.date, key: "maturity", source: "work", recordId: row.workId || "" }));
+      .forEach((row) => evidence.push({ date: row.date, key: "maturity", source: "work", kind: "harvest", recordId: row.workId || "" }));
     const explicitCorrection = evidence.filter((item) => item.source === "confirmed" && item.correctionReason)
       .sort((a, b) => String(a.date).localeCompare(String(b.date))).pop() || null;
     evidence.sort((a, b) => String(a.date).localeCompare(String(b.date))
       || (STAGE_INDEX[a.key] || 0) - (STAGE_INDEX[b.key] || 0)
       || ({ measured: 1, work: 2, confirmed: 3 }[a.source] - { measured: 1, work: 2, confirmed: 3 }[b.source]));
     const latestEvidence = explicitCorrection || evidence[evidence.length - 1] || null;
+    const latestPanicleEvidence = evidence.filter((item) => item.kind === "panicle").pop() || null;
+    const panicleHasLaterConfirmation = latestPanicleEvidence && evidence.some((item) =>
+      item !== latestPanicleEvidence
+      && String(item.date || "") >= String(latestPanicleEvidence.date || "")
+      && ["confirmed", "heading", "harvest"].includes(item.kind)
+    );
+    // A panicle-length measurement remains the confirmed field stage until a
+    // later explicit confirmation, heading observation, or harvest supersedes it.
+    const displayedEvidence = latestPanicleEvidence && !panicleHasLaterConfirmation && !explicitCorrection
+      ? latestPanicleEvidence
+      : latestEvidence;
     const historicalHeading = !headingDate ? estimatedHeading(field, planting, year) : null;
     const headingReference = headingDate ? { date: headingDate, basis: "今年の出穂日" }
       : (historicalHeading ? { date: historicalHeading.date, basis: historicalHeading.basis } : null);
@@ -345,14 +356,14 @@
       date: "",
       basis: "田植後日数の目安"
     });
-    const actual = latestEvidence ? stageFromKey(latestEvidence.key) : stageFromKey("");
+    const actual = displayedEvidence ? stageFromKey(displayedEvidence.key) : stageFromKey("");
     const predicted = prediction ? stageFromKey(prediction.key) : stageFromKey("");
-    const evidenceIsToday = latestEvidence && latestEvidence.date === date
-      && latestEvidence.source !== "work";
+    const evidenceIsToday = displayedEvidence && displayedEvidence.date === date
+      && displayedEvidence.source !== "work";
     // A field observation is certain on its recorded day. On later days, the
     // calendar may progress from that observation until another field check
     // confirms or corrects the stage.
-    const usePrediction = Boolean(prediction) && !evidenceIsToday
+    const usePrediction = Boolean(prediction) && (!displayedEvidence || displayedEvidence.kind !== "panicle") && !evidenceIsToday
       && (!actual.index || predicted.index >= actual.index);
     const resolved = usePrediction ? predicted : actual;
     const index = resolved.index;
@@ -372,10 +383,10 @@
       next,
       dap,
       image: current ? current.image : 1,
-      evidenceSource: latestEvidence && latestEvidence.source || "",
-      evidenceRecordId: latestEvidence && latestEvidence.recordId || "",
+      evidenceSource: displayedEvidence && displayedEvidence.source || "",
+      evidenceRecordId: displayedEvidence && displayedEvidence.recordId || "",
       certainty: usePrediction ? "推定" : (current ? "確定" : "記録待ち"),
-      basis: usePrediction && prediction ? `${prediction.basis}・田植日` : (latestEvidence ? "現地記録" : ""),
+      basis: usePrediction && prediction ? `${prediction.basis}・田植日` : (displayedEvidence ? "現地記録" : ""),
       predictedHeadingDate: headingReference && headingReference.date || historicalHeading && historicalHeading.date || "",
       management: managementStatus(field, date),
       suggested

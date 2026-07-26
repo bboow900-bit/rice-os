@@ -678,6 +678,81 @@
       .sort((a, b) => String(b.startDate || b.date).localeCompare(String(a.startDate || a.date)))[0] || null;
   }
 
+  function periodDayLabel(value) {
+    return value === "" || value == null ? "-" : `${value}日`;
+  }
+
+  function periodStatus(startDate, actualEndDate, savedStatus) {
+    if (actualEndDate) return "完了";
+    if (startDate) return "実施中";
+    return "未記録";
+  }
+
+  function renderWaterPeriodCard(options) {
+    const startDate = options.startDate || "";
+    const plannedEndDate = options.plannedEndDate || "";
+    const actualEndDate = options.actualEndDate || "";
+    const targetDays = options.targetDays === "" || options.targetDays == null ? "" : options.targetDays;
+    const plannedDays = startDate && plannedEndDate ? U.daysBetween(startDate, plannedEndDate) : targetDays;
+    const actualDays = startDate && actualEndDate ? U.daysBetween(startDate, actualEndDate) : "";
+    const elapsedDays = startDate && !actualEndDate ? Math.max(0, U.daysBetween(startDate, U.today())) : "";
+    const status = periodStatus(startDate, actualEndDate, options.savedStatus);
+    const endLabel = actualEndDate ? "実完了" : "終了予定";
+    const endValue = actualEndDate || plannedEndDate || "";
+    const durationLabel = actualEndDate ? "実績日数" : "経過日数";
+    const durationValue = actualEndDate ? actualDays : elapsedDays;
+    return `
+      <article class="field-water-period ${U.attr(options.tone)} status-${U.attr(status)}">
+        <div class="field-water-period-head">
+          <span class="field-water-period-icon"><img src="assets/images/menu-icons/${U.attr(options.icon)}" alt=""></span>
+          <div><small>${U.escapeHTML(options.kicker)}</small><b>${U.escapeHTML(options.label)}</b></div>
+          <strong>${U.escapeHTML(status)}</strong>
+        </div>
+        <div class="field-water-period-dates">
+          <span><small>開始</small><b>${U.escapeHTML(startDate ? U.fd(startDate) : "未記録")}</b></span>
+          <span><small>${U.escapeHTML(endLabel)}</small><b>${U.escapeHTML(endValue ? U.fd(endValue) : "未記録")}</b></span>
+        </div>
+        <div class="field-water-period-days">
+          <span>予定 <b>${U.escapeHTML(periodDayLabel(plannedDays))}</b></span>
+          <span>${U.escapeHTML(durationLabel)} <b>${U.escapeHTML(periodDayLabel(durationValue))}</b></span>
+        </div>
+      </article>
+    `;
+  }
+
+  function renderWaterPeriodOverview(field, dry, irrigation) {
+    const intermittentStart = irrigation && irrigation.startDate || "";
+    return `
+      <section class="field-water-overview" aria-label="${U.escapeHTML(currentSeasonYear())}年の水管理期間">
+        <div class="field-water-overview-head"><span>${U.escapeHTML(currentSeasonYear())}年の水管理</span><small>記録した期間だけを表示</small></div>
+        <div class="field-water-period-grid">
+          ${renderWaterPeriodCard({
+            label: "中干し",
+            kicker: "田面を乾かす期間",
+            icon: "dry-period.png",
+            tone: "dry",
+            startDate: dry.startDate,
+            plannedEndDate: dry.plannedEndDate,
+            actualEndDate: dry.actualEndDate,
+            targetDays: dry.targetDays,
+            savedStatus: dry.status
+          })}
+          ${renderWaterPeriodCard({
+            label: "間断灌水",
+            kicker: "中干し完了後の水管理",
+            icon: "irrigation.png",
+            tone: "intermittent",
+            startDate: intermittentStart,
+            plannedEndDate: irrigation && irrigation.endDate || "",
+            actualEndDate: irrigation && irrigation.actualEndDate || "",
+            targetDays: irrigation && irrigation.targetDays || field.intermittentIntervalDays || "",
+            savedStatus: irrigation && (irrigation.periodStatus || irrigation.status) || ""
+          })}
+        </div>
+      </section>
+    `;
+  }
+
   function fieldStatusText(field) {
     const growth = latestGrowthForField(field.fieldId);
     const dry = drySummary(field);
@@ -752,7 +827,8 @@
           <div><small>現在の生育ステージ / ${U.escapeHTML(stage.certainty)}</small><b>${U.escapeHTML(stage.label)}</b><p>${U.escapeHTML(stage.management.label)} / ${U.escapeHTML(fieldNextRecord(field))}</p></div>
         </section>
         <div class="field-hub-summary"><span><b>生育</b>${U.escapeHTML(growth ? `${U.fd(growth.date)} / 葉色 ${growth.leafColor || "-"}` : "未入力")}</span><span><b>水管理</b>${U.escapeHTML(waterText)}</span></div>
-        ${dry.actualEndDate && !irrigation ? `<section class="field-water-transition"><b>中干し完了</b><span>${U.escapeHTML(U.fd(dry.actualEndDate))}。田面を確認して次の水管理を記録してください</span><button type="button" data-field-action="add-irrigation" data-field-id="${U.attr(field.fieldId)}">間断灌水を開始・記録</button><small>自動では開始しません</small></section>` : ""}
+        ${renderWaterPeriodOverview(field, dry, irrigation)}
+        ${dry.actualEndDate && !irrigation ? `<section class="field-water-transition"><b>中干し完了</b><span>${U.escapeHTML(U.fd(dry.actualEndDate))}。田面を確認して次の水管理を記録してください</span><button type="button" data-field-action="add-irrigation" data-field-id="${U.attr(field.fieldId)}">間断灌水を開始・記録</button></section>` : ""}
         <section class="field-hub-actions"><button type="button" data-field-action="add-work" data-field-id="${U.attr(field.fieldId)}">作業を記録</button><button type="button" data-field-action="add-growth" data-field-id="${U.attr(field.fieldId)}">生育を記録</button><button type="button" data-field-action="add-irrigation" data-field-id="${U.attr(field.fieldId)}">水管理</button><button type="button" data-field-action="photos" data-field-id="${U.attr(field.fieldId)}">写真</button></section>
         <section class="field-hub-history"><div><span>今年のひとこと</span><b>${U.escapeHTML(field.yearMemo || field.nextSeasonMemo || field.fixedMemo || "まだありません")}</b></div><button type="button" class="secondary" data-field-action="history" data-field-id="${U.attr(field.fieldId)}">前年比較・振り返り</button></section>
       </section>
