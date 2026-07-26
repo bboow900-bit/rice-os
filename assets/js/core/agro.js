@@ -178,16 +178,126 @@
     return `${dap} / 積算気温 ${item.tempText}`;
   }
 
+  // Detailed stage definitions live here so UI screens only render the result.
+  // Water management is deliberately kept out of this list.
   const SEASON_STAGES = [
-    { key: "planting", label: "田植え", image: 2 },
-    { key: "tillering", label: "分げつ", image: 3 },
-    { key: "panicle", label: "幼穂", image: 5 },
-    { key: "heading", label: "出穂", image: 6 },
-    { key: "ripening", label: "登熟", image: 7 },
-    { key: "harvest", label: "収穫", image: 8 }
+    { key: "establishment", label: "活着期", image: 2, legacyKey: "planting" },
+    { key: "earlyTillering", label: "分げつ初期", image: 3, legacyKey: "tillering" },
+    { key: "peakTillering", label: "分げつ盛期", image: 3, legacyKey: "tillering" },
+    { key: "maximumTillering", label: "最高分げつ期", image: 4, legacyKey: "tillering" },
+    { key: "panicleInitiation", label: "幼穂形成期", image: 5, legacyKey: "panicle" },
+    { key: "meiosis", label: "減数分裂期", image: 5, legacyKey: "panicle" },
+    { key: "booting", label: "穂ばらみ期", image: 5, legacyKey: "panicle" },
+    { key: "heading", label: "出穂期", image: 6, legacyKey: "heading" },
+    { key: "fullHeading", label: "穂揃期", image: 6, legacyKey: "heading" },
+    { key: "ripening", label: "登熟期", image: 7, legacyKey: "ripening" },
+    { key: "yellowRipening", label: "黄熟期", image: 7, legacyKey: "ripening" },
+    { key: "maturity", label: "成熟期", image: 8, legacyKey: "harvest" }
   ];
+  const STAGE_INDEX = Object.fromEntries(SEASON_STAGES.map((item, index) => [item.key, index + 1]));
+  const LEGACY_STAGE = {
+    planting: "establishment",
+    tillering: "peakTillering",
+    panicle: "panicleInitiation",
+    heading: "heading",
+    ripening: "ripening",
+    harvest: "maturity"
+  };
 
-  // Every screen uses this same record-based stage to keep field progress aligned.
+  function median(values) {
+    const clean = values.map(Number).filter(Number.isFinite).sort((a, b) => a - b);
+    if (!clean.length) return "";
+    const mid = Math.floor(clean.length / 2);
+    return clean.length % 2 ? clean[mid] : Math.round((clean[mid - 1] + clean[mid]) / 2);
+  }
+
+  function rowsForYear(fieldId, year) {
+    const prefix = `${year}-`;
+    return {
+      works: state().fieldWorksFor(fieldId).filter((row) => String(row.date || "").startsWith(prefix)),
+      growth: state().growthLogsFor(fieldId).filter((row) => String(row.date || "").startsWith(prefix))
+    };
+  }
+
+  function firstDate(rows) {
+    return rows.filter(Boolean).sort()[0] || "";
+  }
+
+  function plantingDateInYear(fieldId, year) {
+    return firstDate(rowsForYear(fieldId, year).works
+      .filter((row) => /田植/.test(String(row.workName || "")))
+      .map((row) => row.date));
+  }
+
+  function headingDateInYear(fieldId, year, asOfDate) {
+    const rows = rowsForYear(fieldId, year);
+    const onOrBefore = (row) => !asOfDate || String(row.date || "") <= asOfDate;
+    return firstDate([
+      ...rows.growth.filter((row) => Boolean(row.headingObserved) && onOrBefore(row)).map((row) => row.date),
+      ...rows.works.filter((row) => /出穂/.test(String(row.workName || "")) && onOrBefore(row)).map((row) => row.date)
+    ]);
+  }
+
+  function panicleStageKey(lengthMm) {
+    const length = Number(lengthMm || 0);
+    if (length <= 2) return "panicleInitiation";
+    if (length <= 10) return "meiosis";
+    return "booting";
+  }
+
+  function estimatedHeading(field, plantingDate, year) {
+    if (!plantingDate) return null;
+    const previousYear = Number(year) - 1;
+    const ownPlanting = plantingDateInYear(field.fieldId, previousYear);
+    const ownHeading = headingDateInYear(field.fieldId, previousYear);
+    let headingDays = ownPlanting && ownHeading ? U.daysBetween(ownPlanting, ownHeading) : "";
+    let basis = ownHeading ? "前年の同一圃場" : "";
+
+    if (headingDays === "") {
+      const varietyDays = state().fields()
+        .filter((item) => item.varietyId === field.varietyId)
+        .map((item) => {
+          const plant = plantingDateInYear(item.fieldId, previousYear);
+          const heading = headingDateInYear(item.fieldId, previousYear);
+          return plant && heading ? U.daysBetween(plant, heading) : "";
+        });
+      headingDays = median(varietyDays);
+      basis = headingDays === "" ? "" : "前年の同品種";
+    }
+    if (headingDays === "") return null;
+    return { date: addDays(plantingDate, headingDays), daysAfterPlanting: headingDays, basis };
+  }
+
+  function estimatedStageKey(daysFromHeading) {
+    if (daysFromHeading <= -45) return "earlyTillering";
+    if (daysFromHeading <= -31) return "peakTillering";
+    if (daysFromHeading <= -23) return "maximumTillering";
+    if (daysFromHeading <= -19) return "panicleInitiation";
+    if (daysFromHeading <= -16) return "meiosis";
+    if (daysFromHeading <= -8) return "booting";
+    if (daysFromHeading <= 5) return "heading";
+    if (daysFromHeading <= 10) return "fullHeading";
+    if (daysFromHeading <= 35) return "ripening";
+    if (daysFromHeading <= 45) return "yellowRipening";
+    return "maturity";
+  }
+
+  function stageFromKey(key) {
+    const index = STAGE_INDEX[key] || 0;
+    return { index, current: index ? SEASON_STAGES[index - 1] : null };
+  }
+
+  function managementStatus(field, date) {
+    const dry = (state().dryPeriodsFor(field.fieldId) || [])
+      .filter((row) => String(row.date || row.startDate || "") <= date)
+      .slice().sort((a, b) => String(a.date || a.startDate || "").localeCompare(String(b.date || b.startDate || ""))).pop() || null;
+    const dryEnd = dry && dry.actualEndDate || field.drainageActualEndDate || "";
+    if (dryEnd) return { key: "dryCompleted", label: "中干し完了", tone: "ok", date: dryEnd };
+    if (dry && (dry.startDate || dry.status === "実施中")) return { key: "drying", label: "中干し中", tone: "warn", date: dry.startDate || dry.date || "" };
+    return { key: "dryWaiting", label: "中干し未実施", tone: "waiting", date: "" };
+  }
+
+  // Every screen uses this service so confirmed facts and calendar estimates stay aligned.
   function seasonStageForField(fieldOrId, dateText) {
     const field = fieldOf(fieldOrId);
     const date = dateText || U.today();
@@ -200,46 +310,60 @@
     const growth = state().growthLogsFor(field.fieldId)
       .filter((row) => String(row.date || "").startsWith(`${year}-`) && beforeOrOn(row));
     const plantingRows = works.filter((row) => /田植/.test(String(row.workName || "")));
-    const planting = plantingRows.map((row) => row.date).filter(Boolean).sort()[0] || "";
-    const headingDates = growth.filter((row) => Boolean(row.headingObserved)).map((row) => row.date)
-      .concat(works.filter((row) => /出穂/.test(String(row.workName || ""))).map((row) => row.date))
-      .filter(Boolean).sort();
-    const headingDate = headingDates[0] || "";
+    const planting = plantingRows.map((row) => row.date).filter(Boolean).sort()[0]
+      || (String(field.plantingDate || "").startsWith(`${year}-`) ? field.plantingDate : "");
+    const headingDate = headingDateInYear(field.fieldId, year, date);
     const dap = planting ? U.daysBetween(planting, date) : "";
-    const stageIndex = { planting: 1, tillering: 2, panicle: 3, heading: 4, ripening: 5, harvest: 6 };
     const evidence = [];
-    plantingRows.forEach((row) => evidence.push({ date: row.date, index: 1, source: "work", recordId: row.workId || "" }));
+    plantingRows.forEach((row) => evidence.push({ date: row.date, key: "establishment", source: "work", recordId: row.workId || "" }));
     growth.forEach((row) => {
-      const observed = String(row.observedStage || "");
-      const confirmedIndex = row.stageConfirmed ? stageIndex[observed] : 0;
-      if (confirmedIndex) {
-        evidence.push({ date: row.date, index: confirmedIndex, source: "confirmed", recordId: row.logId || "", correctionReason: row.correctionReason || "" });
+      const observed = LEGACY_STAGE[String(row.observedStage || "")] || String(row.observedStage || "");
+      if (row.stageConfirmed && STAGE_INDEX[observed]) {
+        evidence.push({ date: row.date, key: observed, source: "confirmed", recordId: row.logId || "", correctionReason: row.correctionReason || "" });
         return;
       }
-      if (row.headingObserved) evidence.push({ date: row.date, index: 4, source: "measured", recordId: row.logId || "" });
-      else if (Number(row.panicleLengthMm || 0) > 0) evidence.push({ date: row.date, index: 3, source: "measured", recordId: row.logId || "" });
-      else if (row.tillerCount !== undefined && String(row.tillerCount) !== "") evidence.push({ date: row.date, index: 2, source: "measured", recordId: row.logId || "" });
+      if (row.headingObserved) evidence.push({ date: row.date, key: "heading", source: "measured", recordId: row.logId || "" });
+      else if (Number(row.panicleLengthMm || 0) > 0) evidence.push({ date: row.date, key: panicleStageKey(row.panicleLengthMm), source: "measured", recordId: row.logId || "" });
+      else if (row.tillerCount !== undefined && String(row.tillerCount) !== "") evidence.push({ date: row.date, key: "peakTillering", source: "measured", recordId: row.logId || "" });
     });
     works.filter((row) => /出穂/.test(String(row.workName || "")))
-      .forEach((row) => evidence.push({ date: row.date, index: 4, source: "work", recordId: row.workId || "" }));
+      .forEach((row) => evidence.push({ date: row.date, key: "heading", source: "work", recordId: row.workId || "" }));
     works.filter((row) => /稲刈り|収穫/.test(String(row.workName || "")))
-      .forEach((row) => evidence.push({ date: row.date, index: 6, source: "work", recordId: row.workId || "" }));
+      .forEach((row) => evidence.push({ date: row.date, key: "maturity", source: "work", recordId: row.workId || "" }));
     const explicitCorrection = evidence.filter((item) => item.source === "confirmed" && item.correctionReason)
       .sort((a, b) => String(a.date).localeCompare(String(b.date))).pop() || null;
-    evidence.sort((a, b) => a.index - b.index
+    evidence.sort((a, b) => (STAGE_INDEX[a.key] || 0) - (STAGE_INDEX[b.key] || 0)
       || String(a.date).localeCompare(String(b.date))
       || ({ measured: 1, work: 2, confirmed: 3 }[a.source] - { measured: 1, work: 2, confirmed: 3 }[b.source]));
     const latestEvidence = explicitCorrection || evidence[evidence.length - 1] || null;
-    let index = latestEvidence ? latestEvidence.index : 0;
+    const headingReference = headingDate
+      ? { date: headingDate, basis: "今年の出穂日" }
+      : estimatedHeading(field, planting, year);
+    const prediction = headingReference ? {
+      key: estimatedStageKey(U.daysBetween(headingReference.date, date)),
+      date: headingReference.date,
+      basis: headingReference.basis
+    } : null;
+    const actual = latestEvidence ? stageFromKey(latestEvidence.key) : stageFromKey("");
+    const predicted = prediction ? stageFromKey(prediction.key) : stageFromKey("");
+    // Planting establishes the season, but should not freeze a field at 活着期.
+    // Any observed growth measurement, confirmed stage, heading work, or harvest work
+    // is treated as the current factual stage instead of a calendar estimate.
+    const hasDirectStageEvidence = evidence.some((item) => item.source === "measured"
+      || item.source === "confirmed"
+      || (item.source === "work" && item.key !== "establishment"));
+    const usePrediction = !hasDirectStageEvidence && Boolean(prediction)
+      && (!actual.index || predicted.index >= actual.index);
+    const resolved = usePrediction ? predicted : actual;
+    const index = resolved.index;
     let next = "田植え作業を残すと、今年の比較が始まります";
-    if (index === 1) next = "活着・分げつの様子を記録しましょう";
-    if (index === 2) next = "幼穂長を確認できたら残しましょう";
-    if (index === 3) next = "出穂を確認したら記録しましょう";
-    if (index === 4) next = "登熟の様子を現地で確認して残しましょう";
-    if (index === 5) next = "収穫日と今年の振り返りを残しましょう";
-    if (index === 6) next = "来年への引き継ぎを残しましょう";
-    const current = index ? SEASON_STAGES[index - 1] : null;
-    const suggested = headingDate && index === 4 && U.daysBetween(headingDate, date) >= 7
+    if (index >= STAGE_INDEX.establishment && index < STAGE_INDEX.panicleInitiation) next = "分げつの様子を記録しましょう";
+    if (index >= STAGE_INDEX.panicleInitiation && index < STAGE_INDEX.heading) next = "幼穂長または出穂を確認できたら残しましょう";
+    if (index >= STAGE_INDEX.heading && index < STAGE_INDEX.ripening) next = "穂揃いと登熟の様子を現地で確認して残しましょう";
+    if (index >= STAGE_INDEX.ripening && index < STAGE_INDEX.maturity) next = "成熟と収穫日を残しましょう";
+    if (index === STAGE_INDEX.maturity) next = "収穫日と来年への引き継ぎを残しましょう";
+    const current = resolved.current;
+    const suggested = headingDate && STAGE_INDEX[current && current.key] >= STAGE_INDEX.heading && U.daysBetween(headingDate, date) >= 7
       ? { type: "ripening", label: "登熟の確認目安", basis: `出穂確認から${U.daysBetween(headingDate, date)}日` }
       : null;
     return {
@@ -250,6 +374,10 @@
       image: current ? current.image : 1,
       evidenceSource: latestEvidence && latestEvidence.source || "",
       evidenceRecordId: latestEvidence && latestEvidence.recordId || "",
+      certainty: usePrediction ? "推定" : (current ? "確定" : "記録待ち"),
+      basis: usePrediction && prediction ? `${prediction.basis}・田植日` : (latestEvidence ? "現地記録" : ""),
+      predictedHeadingDate: headingReference && headingReference.date || "",
+      management: managementStatus(field, date),
       suggested
     };
   }
@@ -259,6 +387,8 @@
     compactLine,
     panicleEstimate,
     latestPanicleEstimate,
-    seasonStageForField
+    seasonStageForField,
+    managementStatus,
+    SEASON_STAGES
   };
 })();

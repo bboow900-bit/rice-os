@@ -522,6 +522,8 @@
       interruptionDays: String(i.interruptionDays || ""),
       referenceRecordIds: ensureArray(i.referenceRecordIds).map(String),
       status: String(i.status || "入水中"),
+      autoStartedFromDry: Boolean(i.autoStartedFromDry),
+      autoStartedFromDrySource: String(i.autoStartedFromDrySource || ""),
       photo: String(i.photo || ""),
       photoData: String(i.photoData || ""),
       memo: String(i.memo || ""),

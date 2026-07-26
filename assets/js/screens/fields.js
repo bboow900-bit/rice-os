@@ -635,14 +635,19 @@
   function fieldStage(field) {
     if (RiceOS.agro && RiceOS.agro.seasonStageForField) {
       const shared = RiceOS.agro.seasonStageForField(field);
-      return { number: shared.index ? shared.image : 0, label: shared.current ? shared.current.label : "記録待ち" };
+      return {
+        number: shared.index ? shared.image : 0,
+        label: shared.current ? shared.current.label : "記録待ち",
+        certainty: shared.certainty || "記録待ち",
+        management: shared.management || { label: "中干し未実施", tone: "waiting" }
+      };
     }
     const planting = state.plantingDateForField ? state.plantingDateForField(field.fieldId) : "";
     const growth = latestGrowthForField(field.fieldId);
     if (!planting && !growth) return { number: 0, label: "記録待ち" };
     const stage = riceStageNumberForField(field);
     const labels = ["記録待ち", "田植え", "活着", "分げつ", "中干し", "幼穂", "出穂", "登熟", "収穫"];
-    return { number: stage, label: labels[stage] || "生育中" };
+    return { number: stage, label: labels[stage] || "生育中", certainty: "確定", management: { label: "中干し未実施", tone: "waiting" } };
   }
 
   function latestPhotoForField(field) {
@@ -726,7 +731,7 @@
         <div class="field-hub-detail-head"><button type="button" class="field-hub-back" data-field-view="list" aria-label="圃場一覧へ戻る">‹</button><div><span>圃場詳細</span><h3>${U.escapeHTML(field.name)}</h3><small>${U.escapeHTML(variety && variety.name || "品種未設定")} / ${U.escapeHTML(String(field.areaA || 0))}a</small></div><button type="button" class="secondary" data-field-view="settings">編集</button></div>
         <section class="field-hub-now stage-${U.attr(String(stage.number).padStart(2, "0"))}">
           ${photo && photo.photoData ? `<img src="${U.attr(photo.photoData)}" alt="">` : `<span>${groupRiceImage(stage.number)}</span>`}
-          <div><small>いまのステージ</small><b>${U.escapeHTML(stage.label)}</b><p>${U.escapeHTML(fieldNextRecord(field))}を残すと、この圃場の一年がつながります。</p></div>
+          <div><small>現在の生育ステージ / ${U.escapeHTML(stage.certainty)}</small><b>${U.escapeHTML(stage.label)}</b><p>${U.escapeHTML(stage.management.label)} / ${U.escapeHTML(fieldNextRecord(field))}</p></div>
         </section>
         <div class="field-hub-summary"><span><b>生育</b>${U.escapeHTML(growth ? `${U.fd(growth.date)} / 葉色 ${growth.leafColor || "-"}` : "未入力")}</span><span><b>水管理</b>${U.escapeHTML(waterText)}</span></div>
         ${dry.actualEndDate && !irrigation ? `<section class="field-water-transition"><b>中干し完了</b><span>${U.escapeHTML(U.fd(dry.actualEndDate))}。田面を確認して次の水管理を記録してください</span><button type="button" data-field-action="add-irrigation" data-field-id="${U.attr(field.fieldId)}">間断灌水を開始・記録</button><small>自動では開始しません</small></section>` : ""}

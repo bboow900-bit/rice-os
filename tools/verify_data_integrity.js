@@ -133,7 +133,8 @@ state.saveGrowthLog({
   stageConfirmed: false
 });
 const panicleStage = agro.seasonStageForField("field_a", "2026-06-26");
-assert(panicleStage.current && panicleStage.current.key === "panicle", "幼穂長から幼穂ステージを導出できない");
+assert(panicleStage.current && panicleStage.current.key === "panicleInitiation", "幼穂長から幼穂形成期を導出できない");
+assert(panicleStage.certainty === "確定", "幼穂長の実測が確定ステージとして扱われていない");
 assert(panicleStage.current.key !== "heading", "幼穂長だけで出穂実績が確定した");
 const prediction = state.data().confirmationCandidates.find((row) => row.candidateType === "heading" && row.fieldId === "field_a");
 assert(prediction && prediction.status === "active", "出穂確認目安の履歴が保存されていない");

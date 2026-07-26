@@ -164,6 +164,84 @@
     return days === "" ? "" : String(days);
   }
 
+  function clearAutoIntermittentForDrying(d, sourceKey) {
+    if (!sourceKey) return;
+    d.irrigations = (d.irrigations || []).filter((item) => item.autoStartedFromDrySource !== sourceKey);
+  }
+
+  function refreshDryingSummary(d, fieldId) {
+    const field = d.fields.find((item) => item.fieldId === fieldId);
+    if (!field) return;
+    const periodRows = (d.dryPeriods || []).filter((item) => item.fieldId === fieldId);
+    const workRows = (d.fieldWorks || []).filter((item) => (item.fieldIds || []).includes(fieldId));
+    const starts = [
+      ...periodRows.map((item) => item.startDate).filter(Boolean),
+      ...workRows.filter((item) => isDryStartWorkName(item.workName)).map((item) => item.date).filter(Boolean)
+    ].sort();
+    const ends = [
+      ...periodRows.map((item) => item.actualEndDate).filter(Boolean),
+      ...workRows.filter((item) => isDryEndWorkName(item.workName)).map((item) => item.date).filter(Boolean)
+    ].sort();
+    field.drainageStartDate = starts[0] || "";
+    field.drainageActualEndDate = ends[ends.length - 1] || "";
+    field.drainageActualDays = field.drainageStartDate && field.drainageActualEndDate
+      ? dryActualDaysForField(field, field.drainageActualEndDate) : "";
+  }
+
+  function startIntermittentAfterDrying(d, fieldId, completedDate, sourceKey) {
+    if (!fieldId || !completedDate) return;
+    const field = d.fields.find((item) => item.fieldId === fieldId);
+    const targetDays = field && field.intermittentIntervalDays || "";
+    const previousAuto = (d.irrigations || []).find((item) => item.fieldId === fieldId
+      && item.autoStartedFromDrySource === sourceKey);
+    if (previousAuto) {
+      previousAuto.date = completedDate;
+      previousAuto.startDate = completedDate;
+      previousAuto.endDate = targetDays ? U.dateAddDays(completedDate, Number(targetDays)) : "";
+      previousAuto.targetDays = String(targetDays || "");
+      previousAuto.updatedAt = U.now();
+      if (field) field.intermittentStartDate = completedDate;
+      return;
+    }
+    const alreadyPlanned = (d.irrigations || []).some((item) => item.fieldId === fieldId
+      && /間断/.test(String(item.method || ""))
+      && !item.actualEndDate
+      && String(item.date || item.startDate || "").startsWith(String(completedDate).slice(0, 4)));
+    if (alreadyPlanned) return;
+    const irrigation = {
+      irrigationId: U.id("irrigation", completedDate),
+      type: "irrigation",
+      date: completedDate,
+      season: U.season(completedDate),
+      fieldId,
+      method: "間断灌水",
+      periodStatus: "実施中",
+      startDate: completedDate,
+      endDate: targetDays ? U.dateAddDays(completedDate, Number(targetDays)) : "",
+      actualEndDate: "",
+      targetDays: String(targetDays || ""),
+      plannedStartDate: "",
+      startReason: "中干し完了後（自動開始）",
+      startTillerCount: "",
+      startLeafColor: "",
+      startSurface: "",
+      endSurface: "",
+      observationSummary: "",
+      interruptionDays: "",
+      referenceRecordIds: [],
+      status: "入水中",
+      photo: "",
+      photoData: "",
+      memo: "中干し完了に連動して開始。現地状況に合わせて編集できます。",
+      autoStartedFromDry: true,
+      autoStartedFromDrySource: sourceKey || "",
+      createdAt: U.now(),
+      updatedAt: U.now()
+    };
+    d.irrigations.push(irrigation);
+    if (field) field.intermittentStartDate = completedDate;
+  }
+
   function fieldWorksByNameFor(fieldId, names) {
     return data().fieldWorks
       .filter((work) => (work.fieldIds || []).includes(fieldId) && matchesWorkName(work, names))
@@ -327,6 +405,11 @@
           if (fieldIndex >= 0 && !d.fields[fieldIndex].drainageStartDate) d.fields[fieldIndex].drainageStartDate = normalized.date;
         });
       }
+      const fieldTargetsChanged = previous && (previous.fieldIds || []).slice().sort().join("|") !== normalized.fieldIds.slice().sort().join("|");
+      if (previous && isDryEndWorkName(previous.workName) && (!isDryEndWorkName(normalized.workName) || previous.date !== normalized.date || fieldTargetsChanged)) {
+        clearAutoIntermittentForDrying(d, `work:${normalized.workId}`);
+        (previous.fieldIds || []).forEach((fieldId) => refreshDryingSummary(d, fieldId));
+      }
       if (isDryEndWorkName(normalized.workName)) {
         normalized.fieldIds.forEach((fieldId) => {
           const fieldIndex = d.fields.findIndex((f) => f.fieldId === fieldId);
@@ -334,6 +417,7 @@
             d.fields[fieldIndex].drainageActualEndDate = normalized.date;
             d.fields[fieldIndex].drainageActualDays = dryActualDaysForField(d.fields[fieldIndex], normalized.date);
           }
+          startIntermittentAfterDrying(d, fieldId, normalized.date, `work:${normalized.workId}`);
         });
       }
       if (normalized.workName === "田植え") {
@@ -369,7 +453,14 @@
 
   function deleteFieldWork(workId) {
     mutate((d) => {
+      const removed = d.fieldWorks.find((work) => work.workId === workId);
       d.fieldWorks = d.fieldWorks.filter((w) => w.workId !== workId);
+      if (removed && isDryEndWorkName(removed.workName)) {
+        (removed.fieldIds || []).forEach((fieldId) => {
+          clearAutoIntermittentForDrying(d, `work:${workId}`);
+          refreshDryingSummary(d, fieldId);
+        });
+      }
       (d.schedules || []).forEach((schedule) => {
         if (schedule.completedByWorkId !== workId) return;
         schedule.status = "予定";
@@ -695,6 +786,8 @@
       const index = d.dryPeriods.findIndex((item) => item.dryPeriodId === normalized.dryPeriodId);
       if (index >= 0) d.dryPeriods[index] = { ...d.dryPeriods[index], ...normalized };
       else d.dryPeriods.push(normalized);
+      const drySource = `period:${normalized.dryPeriodId}`;
+      if (previous && previous.actualEndDate && previous.actualEndDate !== normalized.actualEndDate) clearAutoIntermittentForDrying(d, drySource);
       const fieldIndex = d.fields.findIndex((f) => f.fieldId === normalized.fieldId);
       if (fieldIndex >= 0) {
         if (normalized.startDate) d.fields[fieldIndex].drainageStartDate = normalized.startDate;
@@ -703,14 +796,21 @@
         if (normalized.actualEndDate) {
           d.fields[fieldIndex].drainageActualEndDate = normalized.actualEndDate;
           d.fields[fieldIndex].drainageActualDays = dryActualDaysForField(d.fields[fieldIndex], normalized.actualEndDate);
+          startIntermittentAfterDrying(d, normalized.fieldId, normalized.actualEndDate, drySource);
         }
       }
+      if (previous && previous.actualEndDate && !normalized.actualEndDate) refreshDryingSummary(d, normalized.fieldId);
     }, `${fieldNameForFeedback(record.fieldId)}の中干し記録を残しました。圃場カードの水管理も更新しました。`);
   }
 
   function deleteDryPeriod(dryPeriodId) {
     mutate((d) => {
+      const removed = (d.dryPeriods || []).find((item) => item.dryPeriodId === dryPeriodId);
       d.dryPeriods = (d.dryPeriods || []).filter((item) => item.dryPeriodId !== dryPeriodId);
+      if (removed) {
+        clearAutoIntermittentForDrying(d, `period:${dryPeriodId}`);
+        refreshDryingSummary(d, removed.fieldId);
+      }
     }, "中干し記録を削除しました");
   }
 
@@ -741,6 +841,8 @@
         interruptionDays: record.interruptionDays || "",
         referenceRecordIds: record.referenceRecordIds || [],
         status: record.status || "入水中",
+        autoStartedFromDry: record.autoStartedFromDry === undefined ? Boolean(previous && previous.autoStartedFromDry) : Boolean(record.autoStartedFromDry),
+        autoStartedFromDrySource: record.autoStartedFromDrySource === undefined ? String(previous && previous.autoStartedFromDrySource || "") : String(record.autoStartedFromDrySource || ""),
         photo: record.photo || "",
         photoData: record.photoData || "",
         memo: record.memo || "",

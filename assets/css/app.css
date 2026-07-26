@@ -1518,15 +1518,28 @@
 .home-season-focus.stage-heading { border-color: #c6e5ef; background: #f0fbff; }
 .home-season-focus.stage-heading b, .home-season-focus.stage-heading > span { color: #247f9d; }
 .home-season-focus.stage-heading > span { background: #d9eff7; }
+.home-season-focus.stage-fullHeading { border-color: #c6e5ef; background: #f0fbff; }
+.home-season-focus.stage-fullHeading b, .home-season-focus.stage-fullHeading > span { color: #247f9d; }
+.home-season-focus.stage-fullHeading > span { background: #d9eff7; }
 .home-season-focus.stage-ripening { border-color: #ead9a9; background: #fffbed; }
 .home-season-focus.stage-ripening b, .home-season-focus.stage-ripening > span { color: #9b7121; }
 .home-season-focus.stage-ripening > span { background: #f6e9be; }
+.home-season-focus.stage-yellowRipening { border-color: #ead9a9; background: #fffbed; }
+.home-season-focus.stage-yellowRipening b, .home-season-focus.stage-yellowRipening > span { color: #9b7121; }
+.home-season-focus.stage-yellowRipening > span { background: #f6e9be; }
+.home-season-focus.stage-maturity { border-color: #ead2ad; background: #fff7e8; }
+.home-season-focus.stage-maturity b, .home-season-focus.stage-maturity > span { color: #986128; }
+.home-season-focus.stage-maturity > span { background: #f5e2bd; }
 .home-season-focus.stage-harvest { border-color: #ead2ad; background: #fff7e8; }
 .home-season-focus.stage-harvest b, .home-season-focus.stage-harvest > span { color: #986128; }
 .home-season-focus.stage-harvest > span { background: #f5e2bd; }
 .home-season-focus.stage-waiting { border-color: #dce4d8; background: #f7f9f5; }
 .home-season-focus.stage-waiting b, .home-season-focus.stage-waiting > span { color: #7d887e; }
 .home-season-focus.stage-waiting > span { background: #e8ede6; }
+.home-stage-management { display: flex; align-items: center; gap: 7px; margin-top: 6px; padding: 6px 8px; border-radius: 8px; background: #f7f9f5; color: #637166; font-size: 11px; font-weight: 800; }
+.home-stage-management b { color: #6a7a6c; font-size: 10px; }
+.home-stage-management.ok { background: #eef8ed; color: #287a3a; }
+.home-stage-management.warn { background: #fff7e4; color: #a36b20; }
 .home-season-track { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 2px; margin-top: 5px; }
 .home-season-track span { position: relative; min-width: 0; padding-top: 8px; color: #a2aaa0; font-size: 8px; text-align: center; }
 .home-season-track span::before { position: absolute; top: 2px; right: 50%; left: -50%; height: 2px; background: #dfe7dc; content: ""; }

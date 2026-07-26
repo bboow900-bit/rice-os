@@ -426,9 +426,11 @@
   }
 
   function renderSeasonTrack(stage) {
+    const legacyKey = stage.current && stage.current.legacyKey || stage.current && stage.current.key || "";
+    const currentIndex = SEASON_STAGES.findIndex((item) => item.key === legacyKey) + 1;
     return `
       <div class="home-season-track" aria-label="季節ステージ">
-        ${SEASON_STAGES.map((item, index) => `<span class="${index + 1 < stage.index ? "done" : ""} ${index + 1 === stage.index ? "current" : ""}"><i></i><b>${U.escapeHTML(item.label)}</b></span>`).join("")}
+        ${SEASON_STAGES.map((item, index) => `<span class="${index + 1 < currentIndex ? "done" : ""} ${index + 1 === currentIndex ? "current" : ""}"><i></i><b>${U.escapeHTML(item.label)}</b></span>`).join("")}
       </div>
     `;
   }
@@ -456,17 +458,13 @@
         ${note ? `<p class="home-field-story"><b>今年のひとこと</b><span>${U.escapeHTML(note)}</span></p>` : ""}
         <div class="home-season-focus stage-${U.attr(stageKey)}">
           <img src="${U.attr(stageImage)}" alt="">
-          <div><small>確認済みの生育</small><b>${U.escapeHTML(stage.current ? stage.current.label : "記録待ち")}</b></div>
-          <span>${U.escapeHTML(stage.current ? "実績" : "次の一歩")}</span>
+          <div><small>現在の生育ステージ</small><b>${U.escapeHTML(stage.current ? stage.current.label : "記録待ち")}</b></div>
+          <span>${U.escapeHTML(stage.certainty || "記録待ち")}</span>
         </div>
-        ${stage.suggested ? `<div class="home-stage-suggestion"><b>確認目安</b><span>${U.escapeHTML(stage.suggested.label)}</span><small>${U.escapeHTML(stage.suggested.basis)} / 現地確認が必要です</small></div>` : ""}
+        <div class="home-stage-management ${U.attr(stage.management && stage.management.tone || "waiting")}"><b>管理状況</b><span>${U.escapeHTML(stage.management && stage.management.label || "中干し未実施")}</span></div>
         <div class="home-season-title"><span>${U.escapeHTML(stage.current ? `次に残す：${stage.next}` : stage.next)}</span></div>
         ${renderSeasonTrack(stage)}
         <div class="home-decision-status"><span>${U.escapeHTML(need.label)}</span><small>${U.escapeHTML(need.detail)}</small></div>
-        <div class="home-decision-facts">
-          <span><b>水管理</b>${U.escapeHTML(water.label)}</span>
-          <span><b>生育</b>${U.escapeHTML(growth ? `葉色 ${growth.leafColor || "-"} / 分げつ ${growth.tillerCount || "-"}` : "未入力")}</span>
-        </div>
         ${memory ? `<div class="home-field-memory"><img src="${U.attr(memory.photoData || stageImage)}" alt=""><span><b>${U.escapeHTML(memory.label)}</b><small>${U.escapeHTML(U.fd(memory.date))} / ${U.escapeHTML(memory.title || "記録")}${memory.text ? ` / ${U.escapeHTML(memory.text)}` : ""}</small></span></div>` : `<p class="home-field-memory-empty">${U.escapeHTML(previousYearHint(field, date))}</p>`}
       </article>
     `;
