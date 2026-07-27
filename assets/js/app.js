@@ -136,7 +136,8 @@
   }
 
   function bindGlobalActions() {
-    document.querySelector('[data-action="add-variety"]').addEventListener("click", () => {
+    const addVarietyButton = document.querySelector('[data-action="add-variety"]');
+    if (addVarietyButton) addVarietyButton.addEventListener("click", () => {
       const name = prompt("追加する品種名");
       if (name === null) return;
       const varietyId = RiceOS.state.addVariety(name);
@@ -144,7 +145,8 @@
       show("recipes");
     });
 
-    document.querySelector('[data-action="add-field"]').addEventListener("click", () => {
+    const addFieldButton = document.querySelector('[data-action="add-field"]');
+    if (addFieldButton) addFieldButton.addEventListener("click", () => {
       const name = prompt("追加する圃場名");
       if (name === null) return;
       const fieldId = RiceOS.state.addField(name);
@@ -184,8 +186,16 @@
       });
     }
 
-    U.$$("[data-jump-screen]").forEach((button) => {
-      button.addEventListener("click", () => show(button.dataset.jumpScreen));
+    document.addEventListener("click", (event) => {
+      const jump = event.target.closest("[data-jump-screen]");
+      if (!jump) return;
+      const target = jump.dataset.jumpScreen;
+      if (!target || !initialScreens.has(target)) {
+        console.warn("Unknown rice-os screen target:", target);
+        return;
+      }
+      event.preventDefault();
+      show(target);
     });
 
     U.$$(".quick-button[data-work-shortcut]").forEach((button) => {
