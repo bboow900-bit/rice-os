@@ -2438,22 +2438,24 @@
 .home-linked-lane.water .home-linked-road::before { background: #c7e3ed; }
 .home-linked-road > em { position: absolute; top: 14px; left: 0; height: 4px; border-radius: 999px; background: #61ad67; }
 .home-linked-lane.water .home-linked-road > em { background: #59acc9; }
-.home-linked-road > strong { position: absolute; top: 4px; z-index: 3; color: #277d3b; font-size: 8px; font-weight: 900; transform: translateX(-50%); }
-.home-linked-road > strong::after { position: absolute; top: 10px; left: 50%; width: 2px; height: 17px; border-radius: 2px; background: #2d933f; content: ""; transform: translateX(-50%); }
-.home-linked-lane.water .home-linked-road > strong { color: #1f7d9b; }
-.home-linked-lane.water .home-linked-road > strong::after { background: #258cab; }
-.home-linked-marker { position: absolute; top: 11px; left: calc(var(--at) * 1%); z-index: 2; width: 1px; height: 8px; }
+.home-linked-road > strong { position: absolute; top: 5px; z-index: 3; width: 2px; height: 19px; border-radius: 2px; background: #2d933f; transform: translateX(-50%); }
+.home-linked-road > strong::after { position: absolute; top: -3px; left: 50%; width: 6px; height: 6px; border-radius: 1px; background: inherit; content: ""; transform: translateX(-50%) rotate(45deg); }
+.home-linked-lane.water .home-linked-road > strong { background: #258cab; }
+.home-linked-marker { position: absolute; top: calc(11px + var(--lift, 0px)); left: calc(var(--at) * 1%); z-index: 4; width: 1px; height: 8px; }
 .home-linked-marker i { position: absolute; top: 0; left: 50%; width: 8px; height: 8px; border: 2px solid #fff; border-radius: 50%; background: #4fa85d; box-shadow: 0 0 0 1px #4fa85d; transform: translate(-50%, -2px); }
+.home-linked-marker i[data-count]::after { position: absolute; inset: 0; color: #fff; content: attr(data-count); font-size: 7px; font-style: normal; font-weight: 900; line-height: 8px; text-align: center; }
 .home-linked-lane.water .home-linked-marker i { background: #4fa8c5; box-shadow: 0 0 0 1px #4fa8c5; }
 .home-linked-marker.estimated i { background: #fffefa; box-shadow: 0 0 0 1px #97ab95; }
-.home-linked-marker b, .home-linked-marker small { position: absolute; left: 50%; display: block; color: #58705b; font-size: 8px; font-weight: 850; line-height: 1.05; text-align: center; transform: translateX(-50%); white-space: nowrap; }
-.home-linked-marker b { top: 11px; }
-.home-linked-marker small { top: 20px; color: #8a9689; font-size: 7px; font-weight: 700; }
-.home-linked-marker[style^="--at:0"] b, .home-linked-marker[style^="--at:0"] small { left: 0; transform: none; text-align: left; }
-.home-linked-marker[style^="--at:100"] b, .home-linked-marker[style^="--at:100"] small { left: auto; right: 0; transform: none; text-align: right; }
-.home-linked-history { display: grid; gap: 3px; margin-top: 7px; padding-top: 6px; border-top: 1px dashed #dbe5d8; }
-.home-linked-history span { overflow: hidden; color: #687867; font-size: 9px; font-weight: 750; line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; }
-.home-linked-history span:last-child { color: #5e8490; }
+.home-linked-marker.baseline i { background: #f8f3df; box-shadow: 0 0 0 1px #b99d5d; }
+.home-linked-chips { display: flex; flex-wrap: wrap; gap: 4px; margin: 5px 0 7px; }
+.home-linked-chips:last-child { margin-bottom: 0; }
+.home-linked-chips > span { display: inline-flex; align-items: center; gap: 3px; min-width: 0; padding: 3px 5px; border: 1px solid #d6e7d2; border-radius: 999px; background: #fffefa; color: #4c764f; font-size: 9px; line-height: 1.15; }
+.home-linked-chips > span b { font-size: inherit; font-weight: 900; white-space: nowrap; }
+.home-linked-chips > span small { color: #718271; font-size: inherit; font-weight: 750; white-space: nowrap; }
+.home-linked-lane.water + .home-linked-chips > span { border-color: #cfe5ed; color: #3d7e94; }
+.home-linked-chips > span.estimated { border-style: dashed; color: #7a856f; }
+.home-linked-chips > span.baseline { border-color: #e5d6aa; background: #fffdf4; color: #806a32; }
+.home-linked-chips.empty { display: block; color: #7c897b; font-size: 9px; font-weight: 700; line-height: 1.35; }
 
 /* Mobile primary navigation: calendar is a first-class daily screen. */
 @media (max-width: 900px) {

@@ -457,35 +457,87 @@
     return { ...samePeriod, date: samePeriod.date, label: `去年の今日ごろ・${samePeriod.kind}` };
   }
 
-  function stageManagement(field, dateText) {
-    if (RiceOS.agro && RiceOS.agro.managementStatus) return RiceOS.agro.managementStatus(field, dateText);
-    return { key: "dryWaiting", label: "中干し未実施" };
-  }
-
   function clampPercent(value) {
     return Math.max(0, Math.min(100, Math.round(value)));
   }
 
   function fieldWorkDate(fieldId, year, pattern) {
     return state.fieldWorksFor(fieldId, year)
-      .filter((row) => pattern.test(String(row.workName || "")))
+      .filter((row) => pattern.test(String(row.workName || "")) && !/予定/.test(String(row.workName || "")))
       .map((row) => row.date || "")
       .filter(Boolean)
       .sort()[0] || "";
   }
 
+  function latestFieldWorkDate(fieldId, year, pattern) {
+    return state.fieldWorksFor(fieldId, year)
+      .filter((row) => pattern.test(String(row.workName || "")) && !/予定/.test(String(row.workName || "")))
+      .map((row) => row.date || "")
+      .filter(Boolean)
+      .sort().pop() || "";
+  }
+
   function earliestGrowthDate(fieldId, year) {
     return state.growthLogsFor(fieldId, year)
-      .filter((row) => String(row.date || "").startsWith(`${year}-`) && (row.tillerCount !== undefined || row.leafColorScore !== undefined))
+      .filter((row) => String(row.date || "").startsWith(`${year}-`) && (U.number(row.tillerCount, 0) > 0 || /分げつ/.test(String(row.observedStage || ""))))
       .map((row) => row.date || "")
       .filter(Boolean)
       .sort()[0] || "";
+  }
+
+  function managementPeriods(fieldId, year, pattern) {
+    return (state.irrigationsFor ? state.irrigationsFor(fieldId, year) : [])
+      .filter((row) => pattern.test(String(row.method || "")))
+      .slice()
+      .sort((a, b) => String(a.startDate || a.date || "").localeCompare(String(b.startDate || b.date || "")));
+  }
+
+  function isPlannedPeriod(row) {
+    return /予定|未開始/.test(String(row && (row.periodStatus || row.status) || ""));
+  }
+
+  function actualPeriodStart(row) {
+    return row && !isPlannedPeriod(row) ? String(row.startDate || row.date || "") : "";
+  }
+
+  function dashboardWaterStatus(dateText, dryStart, dryActualEnd, irrigations, deeps, drainDate) {
+    const candidates = [];
+    const add = (date, label) => {
+      if (date && date <= dateText) candidates.push({ date, label, evidence: "実績" });
+    };
+    if (dryStart && (!dryActualEnd || dryActualEnd > dateText)) add(dryStart, "中干し中");
+    if (dryActualEnd) add(dryActualEnd, "中干し完了");
+    (irrigations || []).forEach((row) => {
+      const start = actualPeriodStart(row);
+      if (start && (!row.actualEndDate || row.actualEndDate > dateText)) add(start, "間断灌水中");
+      if (!isPlannedPeriod(row) && row.actualEndDate) add(String(row.actualEndDate), "間断灌水完了");
+    });
+    (deeps || []).forEach((row) => {
+      const start = actualPeriodStart(row);
+      if (start && (!row.actualEndDate || row.actualEndDate > dateText)) add(start, "深水管理中");
+      if (!isPlannedPeriod(row) && row.actualEndDate) add(String(row.actualEndDate), "深水管理完了");
+    });
+    if (drainDate) add(drainDate, "落水済み");
+    if (candidates.length) return candidates.sort((a, b) => String(b.date).localeCompare(String(a.date)))[0];
+    return { label: "中干し前", evidence: "記録待ち" };
+  }
+
+  function waterManagementForField(field, dateText) {
+    const year = cropYear(dateText);
+    const dry = latestDryPeriod(field.fieldId, year);
+    const dryIsPlanned = isPlannedPeriod(dry);
+    const dryStart = actualPeriodStart(dry) || fieldWorkDate(field.fieldId, year, /中干し開始/);
+    const dryActualEnd = dry && !dryIsPlanned && dry.actualEndDate || fieldWorkDate(field.fieldId, year, /中干し終了/);
+    const irrigations = managementPeriods(field.fieldId, year, /間断灌水/);
+    const deeps = managementPeriods(field.fieldId, year, /深水管理/);
+    const drainDate = latestFieldWorkDate(field.fieldId, year, /稲刈り前.*落水|^落水$/);
+    return dashboardWaterStatus(dateText, dryStart, dryActualEnd, irrigations, deeps, drainDate);
   }
 
   function flowPercent(dateText, startDate, endDate) {
     if (!dateText || !startDate || !endDate) return 0;
     const total = Math.max(1, U.daysBetween(startDate, endDate));
-    return clampPercent((U.daysBetween(startDate, dateText) / total) * 100);
+    return Math.max(4, Math.min(96, clampPercent((U.daysBetween(startDate, dateText) / total) * 100)));
   }
 
   function flowDate(dateText) {
@@ -493,11 +545,38 @@
   }
 
   function renderFlowMarkers(markers, startDate, endDate) {
-    return markers.filter((item) => item.date).map((item) => `
-      <span class="home-linked-marker ${item.estimated ? "estimated" : ""}" style="--at:${U.attr(String(flowPercent(item.date, startDate, endDate)))}%">
-        <i></i><b>${U.escapeHTML(item.label)}</b><small>${U.escapeHTML(flowDate(item.date))}</small>
-      </span>
-    `).join("");
+    const grouped = new Map();
+    markers.filter((item) => item.date).forEach((item) => {
+      const key = String(item.date);
+      const current = grouped.get(key) || { date: item.date, labels: [], estimated: true, baseline: true };
+      current.labels.push(item.label);
+      current.estimated = current.estimated && Boolean(item.estimated);
+      current.baseline = current.baseline && Boolean(item.baseline);
+      grouped.set(key, current);
+    });
+    const clusters = [];
+    Array.from(grouped.values()).sort((a, b) => String(a.date).localeCompare(String(b.date))).forEach((item) => {
+      const at = flowPercent(item.date, startDate, endDate);
+      const previous = clusters[clusters.length - 1];
+      if (previous && at - previous.at < 7) {
+        previous.labels.push(...item.labels);
+        previous.estimated = previous.estimated && item.estimated;
+        previous.baseline = previous.baseline && item.baseline;
+        previous.dates.push(item.date);
+        return;
+      }
+      clusters.push({ ...item, at, dates: [item.date] });
+    });
+    return clusters.map((item) => {
+      const count = item.labels.length;
+      const dateLabel = item.dates.length > 1 ? `${flowDate(item.dates[0])}ほか` : flowDate(item.date);
+      return `<span class="home-linked-marker ${item.estimated ? "estimated" : ""} ${item.baseline ? "baseline" : ""}" title="${U.attr(`${item.labels.join("・")} ${dateLabel}${item.estimated ? "ごろ" : ""}`)}" style="--at:${U.attr(String(item.at))}%"><i${count > 1 ? ` data-count="${U.attr(String(count))}"` : ""}></i></span>`;
+    }).join("");
+  }
+
+  function renderFlowChips(items) {
+    const rows = items.filter((item) => item.date);
+    return rows.length ? `<div class="home-linked-chips">${rows.map((item) => `<span class="${item.estimated ? "estimated" : ""} ${item.baseline ? "baseline" : ""}"><b>${U.escapeHTML(item.label)}</b><small>${U.escapeHTML(flowDate(item.date))}${item.estimated ? "ごろ" : ""}</small></span>`).join("")}</div>` : '<span class="home-linked-chips empty">実績を追加すると、ここに日付を表示します。</span>';
   }
 
   function renderLinkedLane(kind, title, current, period, markers, startDate, endDate, todayPercent) {
@@ -506,7 +585,7 @@
         <div class="home-linked-lane-head"><span>${U.escapeHTML(title)}</span><b>${U.escapeHTML(current)}</b><small>${U.escapeHTML(period)}</small></div>
         <div class="home-linked-road">
           <em style="width:${U.attr(String(todayPercent))}%"></em>
-          <strong style="left:${U.attr(String(todayPercent))}%">今日</strong>
+          <strong title="今日" aria-label="今日の位置" style="left:${U.attr(String(todayPercent))}%"></strong>
           ${renderFlowMarkers(markers, startDate, endDate)}
         </div>
       </section>
@@ -526,52 +605,55 @@
     const flowEnd = harvest || (heading ? addDays(heading, 48) : addDays(planting, 145));
     const todayPercent = flowPercent(dateText, planting, flowEnd);
     const growthDate = earliestGrowthDate(field.fieldId, year);
-    const currentStageKey = stage.current && stage.current.key || "";
-    const growthStart = currentStageKey === "panicleInitiation" || currentStageKey === "meiosis" || currentStageKey === "booting"
-      ? (panicle && panicle.date || addDays(planting, 60))
-      : (currentStageKey === "heading" || currentStageKey === "fullHeading" ? (heading || addDays(planting, 85))
-        : (currentStageKey === "ripening" || currentStageKey === "yellowRipening" ? (heading ? addDays(heading, 7) : addDays(planting, 92))
-          : (currentStageKey === "maturity" ? (harvest || addDays(planting, 145)) : (growthDate || planting))));
-    const growthPeriod = `${flowDate(growthStart)} - ${harvest && currentStageKey === "maturity" ? flowDate(harvest) : "現在"}${stage.certainty === "推定" ? "（推定）" : ""}`;
     const dry = latestDryPeriod(field.fieldId, year);
-    const dryStart = dry && dry.startDate || fieldWorkDate(field.fieldId, year, /中干し開始/);
-    const dryEnd = dry && (dry.actualEndDate || dry.endDate) || fieldWorkDate(field.fieldId, year, /中干し終了/);
-    const irrigation = latestIrrigation(field.fieldId, year);
-    const irrigationStart = irrigation && irrigation.startDate || fieldWorkDate(field.fieldId, year, /間断灌水開始/);
-    const irrigationEnd = irrigation && (irrigation.actualEndDate || irrigation.endDate) || fieldWorkDate(field.fieldId, year, /間断灌水終了|落水/);
-    const deep = (state.irrigationsFor ? state.irrigationsFor(field.fieldId, year) : []).filter((row) => /深水管理/.test(String(row.method || ""))).slice().sort((a, b) => String(a.startDate || a.date || "").localeCompare(String(b.startDate || b.date || "")))[0] || null;
-    const deepStart = deep && (deep.startDate || deep.date) || "";
-    const management = stageManagement(field, dateText);
-    const waterStarts = {
-      drying: dryStart,
-      dryCompleted: dryEnd,
-      intermittent: irrigationStart,
-      intermittentCompleted: irrigationEnd,
-      deepWater: deepStart,
-      dryWaiting: planting
-    };
-    const waterStart = waterStarts[management.key] || planting;
-    const waterPeriod = `${flowDate(waterStart)} - ${management.key === "intermittentCompleted" ? flowDate(irrigationEnd) : "現在"}`;
+    const dryIsPlanned = isPlannedPeriod(dry);
+    const dryStart = actualPeriodStart(dry) || fieldWorkDate(field.fieldId, year, /中干し開始/);
+    const dryActualEnd = dry && !dryIsPlanned && dry.actualEndDate || fieldWorkDate(field.fieldId, year, /中干し終了/);
+    const dryPlannedStart = dryIsPlanned && String(dry.startDate || dry.date || "");
+    const dryPlannedEnd = dry && dry.endDate || "";
+    const irrigations = managementPeriods(field.fieldId, year, /間断灌水/);
+    const deeps = managementPeriods(field.fieldId, year, /深水管理/);
+    const drainDate = latestFieldWorkDate(field.fieldId, year, /稲刈り前.*落水|^落水$/);
+    const management = dashboardWaterStatus(dateText, dryStart, dryActualEnd, irrigations, deeps, drainDate);
     const growthMarkers = [
-      { label: "田植", date: planting },
+      { label: "田植（基準）", date: planting, baseline: true },
       { label: "分げつ", date: growthDate },
       { label: "幼穂", date: panicle && panicle.date || "" },
       { label: "出穂", date: heading, estimated: Boolean(heading && !headingActual) },
       { label: "収穫", date: harvest }
     ];
     const waterMarkers = [
-      { label: "田植", date: planting },
-      { label: "中干", date: dryStart },
-      { label: "間断", date: irrigationStart },
-      { label: "深水", date: deepStart },
-      { label: "落水", date: irrigationEnd }
+      { label: "田植（基準）", date: planting, baseline: true },
+      { label: "中干開始", date: dryStart },
+      { label: "中干完了", date: dryActualEnd },
+      { label: "中干予定", date: dryStart || dryActualEnd ? "" : (dryPlannedStart || dryPlannedEnd), estimated: Boolean(!dryStart && !dryActualEnd && (dryPlannedStart || dryPlannedEnd)) },
+      ...irrigations.flatMap((row) => {
+        const start = actualPeriodStart(row);
+        if (!start) return [{ label: "間断予定", date: row.startDate || row.date || row.endDate || "", estimated: true }];
+        return [
+          { label: "間断開始", date: start },
+          { label: "間断完了", date: row.actualEndDate || "" },
+          { label: "間断終了予定", date: row.actualEndDate ? "" : row.endDate || "", estimated: Boolean(!row.actualEndDate && row.endDate) }
+        ];
+      }),
+      ...deeps.flatMap((row) => {
+        const start = actualPeriodStart(row);
+        if (!start) return [{ label: "深水予定", date: row.startDate || row.date || row.endDate || "", estimated: true }];
+        return [
+          { label: "深水開始", date: start },
+          { label: "深水完了", date: row.actualEndDate || "" },
+          { label: "深水終了予定", date: row.actualEndDate ? "" : row.endDate || "", estimated: Boolean(!row.actualEndDate && row.endDate) }
+        ];
+      }),
+      { label: "落水", date: drainDate }
     ];
     return `
       <section class="home-linked-flow" aria-label="生育と水管理の今期工程">
-        <div class="home-linked-flow-head"><span>今期の工程</span><small>◎ 今日の位置 / 点は実績、白点は推定</small></div>
-        ${renderLinkedLane("growth", "生育", stage.current ? stage.current.label : "記録待ち", growthPeriod, growthMarkers, planting, flowEnd, todayPercent)}
-        ${renderLinkedLane("water", "水管理", management.label || "記録待ち", waterPeriod, waterMarkers, planting, flowEnd, todayPercent)}
-        <div class="home-linked-history"><span>生育: ${U.escapeHTML(growthMarkers.filter((item) => item.date).map((item) => `${item.label} ${flowDate(item.date)}${item.estimated ? "ごろ" : ""}`).join(" → ") || "記録待ち")}</span><span>水管理: ${U.escapeHTML(waterMarkers.filter((item) => item.date).map((item) => `${item.label} ${flowDate(item.date)}`).join(" → ") || "記録待ち")}</span></div>
+        <div class="home-linked-flow-head"><span>今期の工程</span><small>縦線は今日 / 点は実績、白点は推定</small></div>
+        ${renderLinkedLane("growth", "生育", stage.current ? stage.current.label : "記録待ち", stage.certainty || "記録待ち", growthMarkers, planting, flowEnd, todayPercent)}
+        ${renderFlowChips(growthMarkers)}
+        ${renderLinkedLane("water", "水管理", management.label || "記録待ち", management.evidence || "記録待ち", waterMarkers, planting, flowEnd, todayPercent)}
+        ${renderFlowChips(waterMarkers)}
       </section>
     `;
   }
@@ -582,6 +664,7 @@
     const dap = planting ? U.daysBetween(planting, date) : "";
     const need = dashboardNeed(field, date);
     const stage = seasonStageForField(field, date);
+    const waterManagement = waterManagementForField(field, date);
     const stageImage = stage.current ? `assets/images/rice-stages/rice-stage-${String(stage.current.image).padStart(2, "0")}.png` : "assets/images/rice-stages/rice-stage-01.png";
     const stageKey = stage.current ? stage.current.key : "waiting";
     return `
@@ -597,7 +680,7 @@
           <span>${U.escapeHTML(stage.certainty || "記録待ち")}</span>
         </div>
         ${renderLinkedSeasonFlow(field, date, stage)}
-        <div class="home-decision-status"><span>${U.escapeHTML(need.label)}</span><small>${U.escapeHTML(stage.management && stage.management.label || need.detail)}</small></div>
+        <div class="home-decision-status"><span>${U.escapeHTML(need.label)}</span><small>${U.escapeHTML(waterManagement.label || need.detail)}</small></div>
       </article>
     `;
   }
