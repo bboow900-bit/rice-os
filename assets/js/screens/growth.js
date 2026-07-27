@@ -7,7 +7,8 @@
   const state = RiceOS.state;
   let bulkFieldIds = [];
   let inputMode = localStorage.getItem("riceGrowthInputMode") || "simple";
-  let timelineOpen = localStorage.getItem("riceGrowthTimelineOpen") === "1";
+  // 履歴は入力の邪魔にならないよう、画面を開くたび閉じた状態から始める。
+  let timelineOpen = false;
 
   function setBulkFields(ids) {
     bulkFieldIds = (ids || []).filter(Boolean);
@@ -45,6 +46,23 @@
       .sort((a, b) => String(b.date).localeCompare(String(a.date)))[0] || null;
   }
 
+  function targetFieldsForStageRecord(kind) {
+    const selectedField = state.field(U.$("gField").value);
+    const mode = U.$("gPanicleTargetMode");
+    const groupSelect = U.$("gPanicleGroup");
+    if (!selectedField) return { name: "", fields: [], skipped: [] };
+    if (!mode || mode.value !== "group") return { name: selectedField.name, fields: [selectedField], skipped: [] };
+    const group = fieldGroups().find((item) => item.name === groupSelect.value);
+    if (!group) return { name: "", fields: [], skipped: [] };
+    const date = U.$("gDate").value || U.today();
+    const skip = kind === "heading"
+      ? (field) => Boolean(observedHeadingDate(field.fieldId, date))
+      : (field) => Boolean(latestPanicleLog(field.fieldId, date));
+    const fields = group.fields.filter((field) => !skip(field));
+    const skipped = group.fields.filter(skip);
+    return { name: `${group.name}グループ`, fields, skipped };
+  }
+
   function plantingDateForYear(fieldId, year) {
     return state.fieldWorksFor(fieldId)
       .filter((work) => String(work.date || "").startsWith(`${year}-`) && /田植/.test(String(work.workName || "")))
@@ -68,12 +86,14 @@
 
   function renderPanicleEntryState() {
     const field = state.field(U.$("gField").value);
+    const targets = targetFieldsForStageRecord("panicle");
     const latest = field && latestPanicleLog(field.fieldId, U.$("gDate").value);
     const editing = U.$("editGrowthId").value;
     const section = U.$("growthPanicleSection");
     const input = U.$("gPanicleLengthMm");
     const bulk = document.querySelector('[data-action="growth-bulk-panicle"]');
-    const locked = Boolean(latest && !editing);
+    const isGroup = U.$("gPanicleTargetMode") && U.$("gPanicleTargetMode").value === "group";
+    const locked = Boolean(!editing && (isGroup ? !targets.fields.length : latest));
     if (section) {
       section.classList.toggle("panicle-recorded", locked);
       if (locked) section.open = false;
@@ -105,7 +125,11 @@
     const varieties = new Set(selected.fields.map((field) => field.varietyId).filter(Boolean));
     const plantingDates = new Set(selected.fields.map((field) => plantingDateForYear(field.fieldId, cropYear(U.$("gDate").value))).filter(Boolean));
     const caution = varieties.size > 1 || plantingDates.size > 1 ? " 品種または田植日が異なる圃場があります。" : "";
-    notice.textContent = `${selected.name}グループの${selected.fields.length}圃場へ同じ幼穂長を記録します。${caution}`;
+    const panicleTargets = targetFieldsForStageRecord("panicle");
+    const headingTargets = targetFieldsForStageRecord("heading");
+    const recorded = panicleTargets.skipped.length ? ` 幼穂入力済み ${panicleTargets.skipped.length}圃場は除外します。` : "";
+    const headed = headingTargets.skipped.length ? ` 出穂確認済み ${headingTargets.skipped.length}圃場は除外します。` : "";
+    notice.textContent = `${selected.name}グループの${selected.fields.length}圃場が対象です。幼穂長・出穂は未記録の圃場に同じ日付で保存します。${recorded}${headed}${caution}`;
   }
 
   function setInputMode(mode) {
@@ -182,8 +206,10 @@
     `;
   }
 
-  function observedHeadingDate(fieldId) {
+  function observedHeadingDate(fieldId, dateText) {
+    const year = cropYear(dateText);
     return state.growthLogsFor(fieldId)
+      .filter((log) => String(log.date || "").startsWith(`${year}-`))
       .slice()
       .sort((a, b) => String(a.date).localeCompare(String(b.date)))
       .find((log) => log.headingObserved)?.date || "";
@@ -205,7 +231,7 @@
       `;
       return;
     }
-    const headingDate = observedHeadingDate(field.fieldId);
+    const headingDate = observedHeadingDate(field.fieldId, date);
     const latest = latestPanicleLog(field.fieldId, date);
     const previous = previousPanicleReference(field.fieldId, date);
     const existingLength = latest && latest.panicleLengthMm;
@@ -475,6 +501,7 @@
   }
 
   function render() {
+    timelineOpen = false;
     renderOptions();
     setInputMode(inputMode);
     renderTimeline();
@@ -523,23 +550,29 @@
       alert("圃場を選んでください。");
       return;
     }
-    const field = state.field(U.$("gField").value);
-    const saved = state.saveGrowthLog({
-      date: U.$("gDate").value || U.today(),
-      fieldId: U.$("gField").value,
-      leafColorScore: U.$("gLeaf").value || "3",
-      leafColor: S.leafColorLabel(U.$("gLeaf").value || "3"),
-      weed: "-",
-      gas: "-",
-      water: "-",
-      headingObserved: true,
-      observedStage: "heading",
-      stageConfirmed: true,
-      recordedBy: U.$("gRecordedBy") ? U.$("gRecordedBy").value : "",
-      memo: U.$("gMemo").value || "出穂確認"
-    });
+    const targets = targetFieldsForStageRecord("heading");
+    if (!targets.fields.length) {
+      alert("出穂を登録できる未確認の圃場がありません。");
+      return;
+    }
+    if (targets.fields.length > 1 && !confirm(`${targets.name}の${targets.fields.length}圃場へ、${U.fd(U.$("gDate").value || U.today())}を出穂日として登録します。`)) return;
+    const records = targets.fields.map((field) => ({
+        date: U.$("gDate").value || U.today(),
+        fieldId: field.fieldId,
+        leafColorScore: U.$("gLeaf").value || "3",
+        leafColor: S.leafColorLabel(U.$("gLeaf").value || "3"),
+        weed: "-",
+        gas: "-",
+        water: "-",
+        headingObserved: true,
+        observedStage: "heading",
+        stageConfirmed: true,
+        recordedBy: U.$("gRecordedBy") ? U.$("gRecordedBy").value : "",
+        memo: U.$("gMemo").value || "出穂確認"
+      }));
+    const saved = state.saveGrowthLogsBatch(records, `${targets.name || "圃場"}の出穂を登録しました`);
     if (saved === null) return;
-    U.toast(`${field && field.name || "圃場"} の出穂を登録しました`);
+    U.toast(`${targets.name || "圃場"}に出穂を${targets.fields.length}件登録しました`);
     resetForm();
   }
 
@@ -634,19 +667,26 @@
         photoData: U.$("gPhotoPreview").dataset.photoData || "",
         memo: U.$("gMemo").value
       };
-      const groupName = U.$("gPanicleTargetMode") && U.$("gPanicleTargetMode").value === "group" ? U.$("gPanicleGroup").value : "";
-      const groupFields = groupName ? (fieldGroups().find((group) => group.name === groupName) || { fields: [] }).fields.map((field) => field.fieldId) : [];
-      const targets = !common.logId && groupFields.length && common.panicleLengthMm
-        ? groupFields
+      const panicleTargets = targetFieldsForStageRecord("panicle");
+      const headingTargets = targetFieldsForStageRecord("heading");
+      const groupedStageTargets = headingObserved ? headingTargets : panicleTargets;
+      const targets = !common.logId && (common.panicleLengthMm || headingObserved) && groupedStageTargets.fields.length
+        ? groupedStageTargets.fields.map((field) => field.fieldId)
         : (!common.logId && bulkFieldIds.length > 1 ? bulkFieldIds : [U.$("gField").value]);
-      for (const fieldId of targets) {
-        const saved = state.saveGrowthLog({
-          ...common,
-          logId: targets.length > 1 ? "" : common.logId,
-          fieldId
-        });
-        if (saved === null) return;
-      }
+      const stageLabel = headingObserved ? "出穂" : `幼穂長 ${common.panicleLengthMm}mm`;
+      if (targets.length > 1 && (common.panicleLengthMm || headingObserved) && !confirm(`${groupedStageTargets.name || "選択した圃場"}の${targets.length}圃場へ、${stageLabel}を同じ日付で登録します。`)) return;
+      const records = targets.map((fieldId) => ({
+        ...common,
+        logId: targets.length > 1 ? "" : common.logId,
+        fieldId,
+        // 一括観察では写真を複製せず、各圃場の記録容量を守る。
+        photo: targets.length > 1 ? "" : common.photo,
+        photoData: targets.length > 1 ? "" : common.photoData
+      }));
+      const saved = targets.length > 1
+        ? state.saveGrowthLogsBatch(records, `${groupedStageTargets.name || "複数圃場"}へ${stageLabel}を登録しました`)
+        : state.saveGrowthLog(records[0]);
+      if (saved === null) return;
       resetForm();
     });
 
@@ -666,11 +706,16 @@
     document.querySelector('[data-action="reset-growth"]').addEventListener("click", resetForm);
     if (U.$("growthFilterField")) U.$("growthFilterField").addEventListener("change", renderTimeline);
     if (U.$("growthRange")) U.$("growthRange").addEventListener("change", renderTimeline);
-    if (U.$("gPanicleTargetMode")) U.$("gPanicleTargetMode").addEventListener("change", renderPanicleTargets);
-    if (U.$("gPanicleGroup")) U.$("gPanicleGroup").addEventListener("change", renderPanicleTargets);
+    if (U.$("gPanicleTargetMode")) U.$("gPanicleTargetMode").addEventListener("change", () => {
+      renderPanicleTargets();
+      renderPanicleEntryState();
+    });
+    if (U.$("gPanicleGroup")) U.$("gPanicleGroup").addEventListener("change", () => {
+      renderPanicleTargets();
+      renderPanicleEntryState();
+    });
     if (U.$("growthTimelineSection")) U.$("growthTimelineSection").addEventListener("toggle", () => {
       timelineOpen = U.$("growthTimelineSection").open;
-      localStorage.setItem("riceGrowthTimelineOpen", timelineOpen ? "1" : "0");
     });
     document.querySelector('[data-action="growth-quick-input"]').addEventListener("click", () => {
       U.$("growthBasicSection").open = true;

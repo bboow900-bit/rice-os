@@ -1518,7 +1518,7 @@
 .home-decision-hero h2 { margin-top: 4px; color: #1d2c20; font-size: 22px; }
 .home-decision-hero small { display: block; margin-top: 7px; color: #637066; }
 .home-decision-hero .primary { flex: 0 0 auto; min-height: 44px; }
-.home-decision-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 12px 0; }
+.home-decision-summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 12px 0; }
 .home-decision-summary button { min-height: 66px; padding: 8px 5px; border: 1px solid #dfe5d6; border-radius: 13px; background: #fffefa; color: #26322a; }
 .home-decision-summary button b { display: block; color: #24833a; font-size: 21px; line-height: 1.05; }
 .home-decision-summary button span { display: block; margin-top: 4px; font-size: 11px; font-weight: 700; }

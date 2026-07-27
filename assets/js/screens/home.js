@@ -533,6 +533,7 @@
         <button type="button" data-home-dashboard-list="candidate"><b>${U.escapeHTML(String(candidates.length))}</b><span>確認候補</span></button>
         <button type="button" data-home-dashboard-list="overdue"><b>${U.escapeHTML(String(overdue.length))}</b><span>期限超過</span></button>
         <button type="button" data-home-dashboard-list="today"><b>${U.escapeHTML(String(todayEntries.length))}</b><span>今日の記録</span></button>
+        <button type="button" data-home-overview="progress"><b>${U.escapeHTML(String(state.activeFields().filter((field) => plantingDateForYear(field.fieldId, cropYear(U.today()))).length))}</b><span>年間進捗</span></button>
       </section>
       <section class="home-decision-section">
         <div class="home-decision-section-head"><div><h3>圃場ごとの判断</h3><small>気になる圃場から記録へ進めます</small></div><button type="button" data-home-open-calendar>カレンダー</button></div>
@@ -547,7 +548,10 @@
       return `
         <header class="farm-calendar-header home-dashboard-header">
           <div><h1>ホーム</h1><p>今年の記録を、来年の判断につなげます</p></div>
-          <div class="farm-calendar-actions"><button type="button" class="farm-year-button" data-home-open-calendar>カレンダー</button></div>
+          <div class="farm-calendar-actions">
+            <button type="button" class="farm-year-button" data-home-overview="progress">年間進捗</button>
+            <button type="button" class="farm-year-button" data-home-open-calendar>カレンダー</button>
+          </div>
         </header>
       `;
     }

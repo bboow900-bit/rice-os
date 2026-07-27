@@ -101,6 +101,14 @@ assert(state.fieldWorksFor("field_a").some((row) => row.workId === "work_plantin
 state.updateField("field_a", { name: "新名A" });
 assert(state.fieldWorksFor("field_a").some((row) => row.workId === "work_planting"), "圃場名変更で過去作業が消えた");
 
+const beforeGrowthBatch = state.data().growthLogs.length;
+assert(state.saveGrowthLogsBatch([
+  { logId: "growth_group_a", date: "2026-06-05", fieldId: "field_a", panicleLengthMm: "1", observedStage: "panicle", stageConfirmed: true },
+  { logId: "growth_group_b", date: "2026-06-05", fieldId: "field_b", panicleLengthMm: "1", observedStage: "panicle", stageConfirmed: true }
+], "group growth") !== null, "グループ生育記録を一括保存できない");
+assert(state.data().growthLogs.length === beforeGrowthBatch + 2, "グループ生育記録の件数が一致しない");
+assert(["field_a", "field_b"].every((fieldId) => state.data().growthLogs.some((row) => row.logId === `growth_group_${fieldId.slice(-1)}` && row.fieldId === fieldId)), "グループ生育記録が圃場別に保存されていない");
+
 state.updateField("field_a", { nextSeasonMemo: "keep this carryover" });
 const carryoverBeforeSeasonNotes = state.field("field_a").nextSeasonMemo;
 const currentSeasonNoteId = state.saveSeasonNote({

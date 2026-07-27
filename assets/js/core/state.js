@@ -552,8 +552,19 @@
     }, "圃場作業を削除しました");
   }
 
-  function saveGrowthLog(record) {
+  function saveGrowthLogsBatch(records, message) {
+    const rows = Array.isArray(records) ? records.filter(Boolean) : [];
+    if (!rows.length) return null;
     return mutate((d) => {
+      rows.forEach((record) => saveGrowthLogToDraft(d, record));
+    }, message || `生育ログを${rows.length}件保存しました`);
+  }
+
+  function saveGrowthLog(record) {
+    return saveGrowthLogsBatch([record], growthSaveFeedback(record));
+  }
+
+  function saveGrowthLogToDraft(d, record) {
       const date = record.date || U.today();
       const logId = record.logId || U.id("growth", date);
       const previous = d.growthLogs.find((g) => g.logId === logId) || null;
@@ -632,7 +643,6 @@
           candidate.updatedAt = U.now();
         });
       }
-    }, growthSaveFeedback(record));
   }
 
   function deleteGrowthLog(logId) {
@@ -1082,6 +1092,7 @@
     saveFieldWork,
     deleteFieldWork,
     saveGrowthLog,
+    saveGrowthLogsBatch,
     deleteGrowthLog,
     saveOtherWork,
     deleteOtherWork,
