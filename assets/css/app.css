@@ -6543,6 +6543,56 @@ label {
 .water-stage-facts span { padding: 4px 7px; border-radius: 999px; background: #fff; color: #557052; font-size: 10px; font-weight: 800; box-shadow: inset 0 0 0 1px #e2eadc; }
 .water-stage-card small { color: #7a7b6d; font-size: 10px; line-height: 1.45; }
 
+/* 水管理: 生育の節目と実績期間を一画面で確認する。 */
+.water-management-target, .water-flow-card, .water-current-card, .water-action-section, .water-edit-section, .water-history { margin-bottom: 12px; }
+.water-management-target { padding: 12px; border: 1px solid #dce7d7; border-radius: 14px; background: #fffefa; }
+.water-target-notice { margin-top: 8px; color: #58705b; font-size: 11px; font-weight: 750; line-height: 1.4; }
+.water-flow-card { padding: 13px; border: 1px solid #d2e4cb; border-radius: 15px; background: linear-gradient(145deg, #f0f8e9, #fffdf5); box-shadow: 0 5px 14px rgba(45, 89, 46, .07); }
+.water-flow-head, .water-history-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.water-flow-head div { display: grid; gap: 2px; }
+.water-flow-head span, .water-history-head small { color: #668065; font-size: 10px; font-weight: 850; }
+.water-flow-head b { color: #183c22; font-size: 15px; }
+.water-flow-head strong { padding: 5px 8px; border-radius: 999px; background: #fff9e1; color: #92721e; font-size: 10px; }
+.water-crop-road, .water-flow-road { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); margin-top: 13px; }
+.water-crop-road span { overflow: hidden; color: #59735a; font-size: 8px; font-weight: 800; text-align: center; text-overflow: ellipsis; white-space: nowrap; }
+.water-flow-road { grid-template-columns: repeat(5, minmax(0, 1fr)); margin-top: 6px; overflow: hidden; border-radius: 8px; }
+.water-flow-road span { position: relative; display: grid; min-height: 36px; place-items: center; background: #dce8ef; color: #4d6d7e; font-size: 9px; font-weight: 900; text-align: center; }
+.water-flow-road span + span { border-left: 1px solid rgba(255,255,255,.72); }
+.water-flow-road .dry { background: #f4dc9a; color: #744b12; }
+.water-flow-road .intermittent { background: #99d9ef; color: #145270; }
+.water-flow-road .deep { background: #4eaed4; color: #fff; }
+.water-flow-road .drain { background: #e4d5bd; color: #695540; }
+.water-flow-road .current { box-shadow: inset 0 -4px 0 #238e3f; transform: translateY(-1px); }
+.water-flow-road .current i { position: absolute; top: -8px; width: 10px; height: 10px; border: 2px solid #fff; border-radius: 50%; background: #289543; box-shadow: 0 1px 4px rgba(23,79,34,.3); }
+.water-flow-facts { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 9px; }
+.water-flow-facts span { padding: 3px 6px; border-radius: 999px; background: #fff; color: #526d57; font-size: 9px; font-weight: 800; box-shadow: inset 0 0 0 1px #dce7d8; }
+.water-current-card { display: grid; grid-template-columns: auto 1fr; gap: 4px 10px; padding: 11px 13px; border-left: 5px solid #3c9ec9; border-radius: 10px; background: #f1fbff; }
+.water-current-card span { color: #48768c; font-size: 10px; font-weight: 850; }
+.water-current-card b { color: #174458; font-size: 15px; }
+.water-current-card small { grid-column: 1 / -1; color: #61787d; font-size: 10px; }
+.water-action-section { padding: 2px 0; }
+.water-action-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.water-action { display: grid; min-height: 66px; gap: 4px; padding: 10px; border: 1px solid #cfe3d2; border-radius: 12px; background: #fffefa; color: #214528; text-align: left; }
+.water-action b { font-size: 14px; }
+.water-action small { color: #65806a; font-size: 9px; font-weight: 700; }
+.water-action.deep { border-color: #9bd0e5; background: #ebf9ff; color: #18536a; }
+.water-action.dry { border-color: #ebcf83; background: #fff8e5; color: #76500d; }
+.water-action.drain { border-color: #d7c2a5; background: #fbf6ed; color: #654f35; }
+.water-action:disabled { opacity: .45; }
+.water-edit-section { background: #fffefa; }
+.water-history-head { margin: 4px 2px 8px; }
+.water-history-head h3 { margin: 0; color: #263c2a; font-size: 16px; }
+.water-history-head > span { padding: 4px 7px; border-radius: 999px; background: #edf6e9; color: #277740; font-size: 10px; font-weight: 850; }
+.water-history-list { display: grid; gap: 7px; }
+.water-history-card { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 11px; border: 1px solid #dbe8dc; border-left: 5px solid #55ae69; border-radius: 11px; background: #fffefa; }
+.water-history-card.deep { border-left-color: #3a9fc7; background: #f3fbff; }
+.water-history-card.dry { border-left-color: #dfab42; background: #fffaf0; }
+.water-history-card > div { display: grid; min-width: 0; gap: 2px; }
+.water-history-card span { color: #578060; font-size: 10px; font-weight: 850; }
+.water-history-card b { color: #233d29; font-size: 14px; }
+.water-history-card small { color: #68766a; font-size: 10px; }
+.water-history-card button { flex: 0 0 auto; min-height: 34px; padding: 0 9px; border: 1px solid #d5e2d6; border-radius: 8px; background: #fff; color: #2c7540; font-size: 11px; font-weight: 850; }
+
 .growth-compare-panel {
   display: grid;
   gap: 8px;

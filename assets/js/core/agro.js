@@ -287,6 +287,12 @@
       .slice().sort((a, b) => String(a.date || a.startDate || "").localeCompare(String(b.date || b.startDate || ""))).pop() || null;
     const fieldDryEnd = U.isInYear(field.drainageActualEndDate, year) ? field.drainageActualEndDate : "";
     const dryEnd = dry && dry.actualEndDate || fieldDryEnd || "";
+    const deepWater = (state().irrigationsFor(field.fieldId, year) || [])
+      .filter((row) => /深水管理/.test(String(row.method || "")) && String(row.startDate || row.date || "") <= targetDate)
+      .slice().sort((a, b) => String(a.startDate || a.date || "").localeCompare(String(b.startDate || b.date || ""))).pop() || null;
+    if (deepWater && !(deepWater.actualEndDate && deepWater.actualEndDate <= targetDate)) {
+      return { key: "deepWater", label: "深水管理中", tone: "water", date: deepWater.startDate || deepWater.date || "" };
+    }
     const irrigation = (state().irrigationsFor(field.fieldId, year) || [])
       .filter((row) => /間断灌水/.test(String(row.method || "")) && String(row.startDate || row.date || "") <= targetDate)
       .slice().sort((a, b) => String(a.startDate || a.date || "").localeCompare(String(b.startDate || b.date || ""))).pop() || null;

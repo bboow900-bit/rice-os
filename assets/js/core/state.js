@@ -838,8 +838,19 @@
     }, "予定を削除しました");
   }
 
-  function saveDryPeriod(record) {
+  function saveDryPeriodsBatch(records, message) {
+    const rows = Array.isArray(records) ? records.filter(Boolean) : [];
+    if (!rows.length) return null;
     return mutate((d) => {
+      rows.forEach((record) => saveDryPeriodToDraft(d, record));
+    }, message || `中干し記録を${rows.length}件保存しました`);
+  }
+
+  function saveDryPeriod(record) {
+    return saveDryPeriodsBatch([record], `${fieldNameForFeedback(record.fieldId)}の中干し記録を残しました。圃場カードの水管理も更新しました。`);
+  }
+
+  function saveDryPeriodToDraft(d, record) {
       const date = record.date || U.today();
       const dryPeriodId = record.dryPeriodId || U.id("dry", date);
       const previous = d.dryPeriods.find((item) => item.dryPeriodId === dryPeriodId) || null;
@@ -894,7 +905,6 @@
         }
       }
       if (previous && previous.actualEndDate && !normalized.actualEndDate) refreshDryingSummary(d, normalized.fieldId);
-    }, `${fieldNameForFeedback(record.fieldId)}の中干し記録を残しました。圃場カードの水管理も更新しました。`);
   }
 
   function deleteDryPeriod(dryPeriodId) {
@@ -908,8 +918,19 @@
     }, "中干し記録を削除しました");
   }
 
-  function saveIrrigation(record) {
+  function saveIrrigationsBatch(records, message) {
+    const rows = Array.isArray(records) ? records.filter(Boolean) : [];
+    if (!rows.length) return null;
     return mutate((d) => {
+      rows.forEach((record) => saveIrrigationToDraft(d, record));
+    }, message || `水管理を${rows.length}件保存しました`);
+  }
+
+  function saveIrrigation(record) {
+    return saveIrrigationsBatch([record], "水管理を保存しました");
+  }
+
+  function saveIrrigationToDraft(d, record) {
       const date = record.date || U.today();
       const irrigationId = record.irrigationId || U.id("irrigation", date);
       const previous = d.irrigations.find((item) => item.irrigationId === irrigationId) || null;
@@ -937,6 +958,8 @@
         status: record.status || "入水中",
         autoStartedFromDry: record.autoStartedFromDry === undefined ? Boolean(previous && previous.autoStartedFromDry) : Boolean(record.autoStartedFromDry),
         autoStartedFromDrySource: record.autoStartedFromDrySource === undefined ? String(previous && previous.autoStartedFromDrySource || "") : String(record.autoStartedFromDrySource || ""),
+        targetDepthCm: record.targetDepthCm || previous && previous.targetDepthCm || "",
+        observedDepthCm: record.observedDepthCm || previous && previous.observedDepthCm || "",
         photo: record.photo || "",
         photoData: record.photoData || "",
         memo: record.memo || "",
@@ -947,14 +970,13 @@
       if (index >= 0) d.irrigations[index] = { ...d.irrigations[index], ...normalized };
       else d.irrigations.push(normalized);
       const fieldIndex = d.fields.findIndex((f) => f.fieldId === normalized.fieldId);
-      if (fieldIndex >= 0) {
+      if (fieldIndex >= 0 && /間断/.test(String(normalized.method || ""))) {
         if (normalized.startDate) {
           d.fields[fieldIndex].intermittentStartDate = normalized.startDate;
           d.fields[fieldIndex].intermittentSummaryYear = cacheYearForDate(normalized.startDate);
         }
         if (normalized.targetDays) d.fields[fieldIndex].intermittentIntervalDays = normalized.targetDays;
       }
-    }, "水管理を保存しました");
   }
 
   function deleteIrrigation(irrigationId) {
@@ -1103,8 +1125,10 @@
     saveFertilizerCompletion,
     deleteSchedule,
     saveDryPeriod,
+    saveDryPeriodsBatch,
     deleteDryPeriod,
     saveIrrigation,
+    saveIrrigationsBatch,
     deleteIrrigation,
     updateWeatherLocation,
     markJsonExported,

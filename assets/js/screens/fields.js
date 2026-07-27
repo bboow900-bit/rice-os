@@ -68,6 +68,10 @@
     return /間断/.test(String(row && row.method || ""));
   }
 
+  function isDeepWaterIrrigation(row) {
+    return /深水/.test(String(row && row.method || ""));
+  }
+
   function compactArray(value, emptyText) {
     const rows = Array.isArray(value) ? value : [];
     if (!rows.length) return emptyText || "-";
@@ -183,8 +187,7 @@
     { key: "recipe", group: "マスター", label: "栽培レシピ", sub: "品種単位", icon: "recipe.png", screen: "recipes", tone: "green" },
     { key: "transplanter", group: "マスター", label: "田植え機", sub: "株間・本数", icon: "transplanter.png", screen: "recipes", tone: "amber" },
     { key: "materials", group: "マスター", label: "資材管理", sub: "在庫・使用", icon: "materials.png", screen: "materials", tone: "amber" },
-    { key: "dry", group: "記録・確認", label: "中干し", sub: "目標・記録", icon: "dry-period.png", screen: "dry-period", tone: "amber" },
-    { key: "irrigation", group: "記録・確認", label: "間断灌水", sub: "水管理", icon: "irrigation.png", screen: "irrigation", tone: "water" },
+    { key: "irrigation", group: "記録・確認", label: "水管理", sub: "中干し・深水・間断", icon: "irrigation.png", screen: "irrigation", tone: "water" },
     { key: "photos", group: "記録・確認", label: "写真", sub: "比較素材", icon: "photos.png", screen: "photos", tone: "" },
     { key: "harvest", group: "記録・確認", label: "収穫履歴", sub: "収量・販売", icon: "harvest.png", screen: "results", tone: "amber" }
   ];
@@ -717,6 +720,13 @@
       .sort((a, b) => String(b.startDate || b.date).localeCompare(String(a.startDate || a.date)))[0] || null;
   }
 
+  function latestDeepWaterForField(fieldId) {
+    return state.irrigationsFor(fieldId, currentSeasonYear())
+      .filter((row) => row.startDate && isDeepWaterIrrigation(row))
+      .slice()
+      .sort((a, b) => String(b.startDate || b.date).localeCompare(String(a.startDate || a.date)))[0] || null;
+  }
+
   function latestSeasonNoteForField(fieldId) {
     if (!state.seasonNotesForField) return null;
     return (state.seasonNotesForField(fieldId, currentSeasonYear()) || []).slice()
@@ -765,7 +775,7 @@
     `;
   }
 
-  function renderWaterPeriodOverview(field, dry, irrigation) {
+  function renderWaterPeriodOverview(field, dry, irrigation, deepWater) {
     const intermittentStart = irrigation && irrigation.startDate || "";
     return `
       <section class="field-water-overview" aria-label="${U.escapeHTML(currentSeasonYear())}年の水管理期間">
@@ -793,6 +803,17 @@
             targetDays: irrigation && irrigation.targetDays || field.intermittentIntervalDays || "",
             savedStatus: irrigation && (irrigation.periodStatus || irrigation.status) || ""
           })}
+          ${renderWaterPeriodCard({
+            label: "深水管理",
+            kicker: "穂ばらみ・出穂期などの実施記録",
+            icon: "irrigation.png",
+            tone: "deep",
+            startDate: deepWater && deepWater.startDate || "",
+            plannedEndDate: deepWater && deepWater.endDate || "",
+            actualEndDate: deepWater && deepWater.actualEndDate || "",
+            targetDays: "",
+            savedStatus: deepWater && (deepWater.periodStatus || deepWater.status) || ""
+          })}
         </div>
       </section>
     `;
@@ -802,6 +823,8 @@
     const growth = latestGrowthForField(field.fieldId);
     const dry = drySummary(field);
     const irrigation = latestIrrigationForField(field.fieldId);
+    const deepWater = latestDeepWaterForField(field.fieldId);
+    if (deepWater && !deepWater.actualEndDate) return "深水管理 実施中";
     if (irrigation && !irrigation.actualEndDate) return `${irrigation.method || "水管理"} 実施中`;
     if (dry.actualEndDate) return "中干し完了・次の水管理は未開始";
     if (dry.startDate && !dry.actualEndDate) return `中干し ${dry.status}`;
@@ -864,9 +887,12 @@
     const growth = latestGrowthForField(field.fieldId);
     const dry = drySummary(field);
     const irrigation = latestIrrigationForField(field.fieldId);
+    const deepWater = latestDeepWaterForField(field.fieldId);
     const latestSeasonNote = latestSeasonNoteForField(field.fieldId);
     const nextRecord = fieldNextRecordInfo(field);
-    const waterText = irrigation
+    const waterText = deepWater && !deepWater.actualEndDate
+      ? `深水管理 実施中 ${U.fd(deepWater.startDate)}`
+      : irrigation
       ? `${irrigation.method || "水管理"} ${irrigation.actualEndDate ? `完了 ${U.fd(irrigation.actualEndDate)}` : `実施中 ${U.fd(irrigation.startDate)}`}`
       : dry.actualEndDate
         ? `中干し完了 ${U.fd(dry.actualEndDate)} / 次の水管理は未開始`
@@ -880,7 +906,7 @@
         </section>
         <div class="field-hub-summary"><span><b>生育</b>${U.escapeHTML(growth ? `${U.fd(growth.date)} / 葉色 ${growth.leafColor || "-"}` : "未入力")}</span><span><b>水管理</b>${U.escapeHTML(waterText)}</span></div>
         ${renderPhotoComparison(field)}
-        ${renderWaterPeriodOverview(field, dry, irrigation)}
+        ${renderWaterPeriodOverview(field, dry, irrigation, deepWater)}
         ${dry.actualEndDate && !irrigation ? `<section class="field-water-transition"><b>中干し完了</b><span>${U.escapeHTML(U.fd(dry.actualEndDate))}。水管理の記録は次の入力から開けます</span></section>` : ""}
         ${nextRecord
           ? `<section class="field-next-action"><button type="button" data-field-action="${U.attr(nextRecord.action)}" data-field-id="${U.attr(field.fieldId)}"><span>記録が不足しています</span><b>${U.escapeHTML(nextRecord.label)}</b><i aria-hidden="true">›</i></button></section>`

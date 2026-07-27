@@ -344,7 +344,7 @@
       ]
     }));
     const irrigation = (d.irrigations || [])
-      .filter((item) => /間断/.test(String(item.method || "")))
+      .filter((item) => /間断|深水|湿潤/.test(String(item.method || "")))
       .map((item) => makeRow("irrigation", item, {
       id: item.irrigationId,
       date: item.date,
@@ -935,12 +935,16 @@
     const text = String(method || "");
     if (/中干し/.test(text)) return "中干し";
     if (/間断/.test(text)) return "間断灌水";
+    if (/深水/.test(text)) return "深水管理";
+    if (/湿潤/.test(text)) return "湿潤灌漑（旧記録）";
     return "";
   }
 
   function waterPeriodTone(label) {
     if (/中干し/.test(label)) return "dry";
     if (/間断/.test(label)) return "intermittent";
+    if (/深水/.test(label)) return "deep";
+    if (/湿潤/.test(label)) return "legacy";
     return "water";
   }
 
@@ -991,7 +995,8 @@
     const lastWorkDate = (test) => works.filter((item) => test(String(item.workName || ""))).map((item) => item.date).filter(Boolean).sort().at(-1) || "";
     const manualDefinitions = [
       { label: "中干し", start: (name) => /中干し.*開始|中干し開始/.test(name), end: (name) => /中干し.*終了|中干し.*完了|中干完了/.test(name) },
-      { label: "間断灌水", start: (name) => /間断灌水.*開始|間断灌水開始/.test(name), end: (name) => /間断灌水.*終了|間断灌水.*完了/.test(name) }
+      { label: "間断灌水", start: (name) => /間断灌水.*開始|間断灌水開始/.test(name), end: (name) => /間断灌水.*終了|間断灌水.*完了/.test(name) },
+      { label: "深水管理", start: (name) => /深水.*開始|深水管理/.test(name), end: (name) => /深水.*終了|深水管理.*完了/.test(name) }
     ];
 
     manualDefinitions.forEach((definition) => {
@@ -1051,7 +1056,7 @@
 
   function renderWaterTab(field) {
     const periods = waterPeriodsForField(field);
-    if (!periods.length) return '<div class="empty">中干し・間断灌水を記録すると、期間をここで振り返れます。</div>';
+    if (!periods.length) return '<div class="empty">中干し・間断灌水・深水管理を記録すると、期間をここで振り返れます。</div>';
     return `<section class="annual-water-periods"><div class="annual-water-periods-heading"><div><span>水管理の振り返り</span><h3>いつから、いつまで行ったか</h3></div><small>${periods.length}件</small></div>${periods.map(renderWaterPeriod).join("")}</section>`;
   }
 
@@ -1137,6 +1142,7 @@
     const panicle = growth.map((row) => row.raw).filter((row) => U.number(row && row.panicleLengthMm, 0) > 0).sort((a, b) => String(a.date).localeCompare(String(b.date)))[0] || null;
     const dryPeriod = periodSnapshot(dry);
     const intermittent = waterPeriodSnapshot(water, /間断/);
+    const deepWater = waterPeriodSnapshot(water, /深水/);
     const resultRows = (state.data().varietyResults || []).filter((row) => String(row.season) === String(year) && row.varietyId === field.varietyId);
     const result = resultRows.find((row) => row.fieldId === field.fieldId) || resultRows.find((row) => !row.fieldId) || null;
     const resultScope = result && result.fieldId ? "" : (result ? "（品種集計）" : "");
@@ -1147,6 +1153,7 @@
       dry: dryPeriod.text || (waterWorks.some((row) => /中干し/.test(String(row.title || ""))) ? "作業実績あり（期間未記録）" : ""),
       dryDays: dryPeriod.days,
       intermittent: intermittent.text,
+      deepWater: deepWater.text,
       heading,
       panicle: panicle ? `${U.fd(panicle.date)} / ${panicle.panicleLengthMm}mm` : "",
       workHours: totalHoursForField(works, field.fieldId),
@@ -1231,6 +1238,12 @@
     const intermittentEntry = timelinePeriod("間断灌水", intermittentStart, intermittentEnd, "water");
     if (intermittentEntry) entries.push(intermittentEntry);
 
+    const deepPeriod = periodSnapshot(irrigationRows.filter((row) => /深水/.test(String(row.method || ""))));
+    const deepStart = deepPeriod.startDate || firstWorkDate(/深水.*開始|深水管理/);
+    const deepEnd = deepPeriod.endDate || firstWorkDate(/深水.*終了|深水管理.*完了/);
+    const deepEntry = timelinePeriod("深水管理", deepStart, deepEnd, "water");
+    if (deepEntry) entries.push(deepEntry);
+
     const panicle = growth.filter((row) => U.number(row.panicleLengthMm, 0) > 0)
       .slice().sort((a, b) => String(b.date).localeCompare(String(a.date)))[0] || null;
     if (panicle) entries.push({ date: panicle.date, label: "幼穂確認", detail: `${U.fd(panicle.date)} / 幼穂長 ${panicle.panicleLengthMm}mm`, tone: "panicle", kind: "point" });
@@ -1283,6 +1296,7 @@
       ["苗箱数", snapshotText(current.trays, "箱"), snapshotText(previous.trays, "箱")],
       ["中干し", snapshotText(current.dry), snapshotText(previous.dry)],
       ["間断灌水", snapshotText(current.intermittent), snapshotText(previous.intermittent)],
+      ["深水管理", snapshotText(current.deepWater), snapshotText(previous.deepWater)],
       ["幼穂確認", snapshotText(current.panicle), snapshotText(previous.panicle)],
       ["出穂日", snapshotText(current.heading), snapshotText(previous.heading)],
       ["作業時間（圃場配賦）", current.workHours ? U.formatHours(current.workHours) : "未記録", previous.workHours ? U.formatHours(previous.workHours) : "未記録"],

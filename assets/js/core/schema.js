@@ -1,11 +1,11 @@
-(function () {
+﻿(function () {
   "use strict";
 
   const RiceOS = window.RiceOS = window.RiceOS || {};
   const U = RiceOS.utils;
 
   const SCHEMA_VERSION = 14;
-  const APP_VERSION = "20260727_ver132";
+  const APP_VERSION = "20260727_ver133";
   const STORE_KEY = "rice_os_v8_stable";
   const BACKUP_KEY = "rice_os_v8_stable_backup";
   const LEGACY_STORES = [
@@ -226,7 +226,7 @@
   const DRY_GAS_LEVELS = ["-", "多い", "少しあり", "ほとんど無し", "無し"];
   const IRRIGATION_STATUS = ["入水中", "落水中"];
   const WATER_PERIOD_STATUS = ["予定中", "実施中", "完了"];
-  const IRRIGATION_TYPES = ["間断灌水", "湿潤灌漑"];
+  const IRRIGATION_TYPES = ["間断灌水", "深水管理", "湿潤灌漑"];
 
   function canonicalId(prefix, value, fallbackName) {
     const raw = String(value || fallbackName || "").trim();
@@ -549,6 +549,8 @@
       status: String(i.status || "入水中"),
       autoStartedFromDry: Boolean(i.autoStartedFromDry),
       autoStartedFromDrySource: String(i.autoStartedFromDrySource || ""),
+      targetDepthCm: String(i.targetDepthCm || ""),
+      observedDepthCm: String(i.observedDepthCm || ""),
       photo: String(i.photo || ""),
       photoData: String(i.photoData || ""),
       memo: String(i.memo || ""),

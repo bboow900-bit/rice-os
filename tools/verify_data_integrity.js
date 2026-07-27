@@ -285,6 +285,20 @@ assert(automaticCurrentYearIrrigation.startDate === "2026-06-11", "automatic int
 assert(!state.irrigationsFor("field_b", 2026).some((row) => String(row.date).startsWith("2025-")), "prior-year intermittent irrigation leaked into the current year");
 assert(state.irrigationsFor("field_b", 2025).some((row) => String(row.date).startsWith("2025-")), "prior-year intermittent irrigation record was unexpectedly removed");
 
+const intermittentStartBeforeDeep = state.field("field_b").intermittentStartDate;
+assert(state.saveIrrigationsBatch([{
+  irrigationId: "deep_water_field_b",
+  date: "2026-07-01",
+  fieldId: "field_b",
+  method: "深水管理",
+  startDate: "2026-07-01",
+  targetDepthCm: "10",
+  observedDepthCm: "8"
+}], "deep water") !== null, "深水管理を一括保存できない");
+const deepWater = state.irrigationsFor("field_b", 2026).find((row) => row.irrigationId === "deep_water_field_b");
+assert(deepWater && deepWater.method === "深水管理" && deepWater.targetDepthCm === "10", "深水管理の追加項目が保存されていない");
+assert(state.field("field_b").intermittentStartDate === intermittentStartBeforeDeep, "深水管理が間断灌水の開始日キャッシュを上書きした");
+
 state.saveIrrigation({
   date: "2025-06-09",
   fieldId: "field_a",
