@@ -8,6 +8,7 @@
   let viewMode = "dashboard";
   let anchorDate = U.today();
   let filterFieldId = "all";
+  let homeGroupFilter = "all";
   const heatCache = new Map();
   const heatProjectionCache = new Map();
   const waterForecastCache = new Map();
@@ -82,6 +83,21 @@
       '<option value="all">すべての圃場</option>',
       ...state.activeFields().map((field) => `<option value="${U.attr(field.fieldId)}" ${filterFieldId === field.fieldId ? "selected" : ""}>${U.escapeHTML(field.name)}</option>`)
     ].join("");
+  }
+
+  function homeGroupName(field) {
+    return String(field && (field.fieldGroupId || field.district) || "").trim() || "未設定";
+  }
+
+  function homeGroups() {
+    const groups = new Map();
+    state.activeFields().forEach((field) => {
+      const name = homeGroupName(field);
+      groups.set(name, (groups.get(name) || 0) + 1);
+    });
+    return Array.from(groups.entries())
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => a.name.localeCompare(b.name));
   }
 
   function entryFieldIds(entry) {
@@ -451,6 +467,38 @@
     `;
   }
 
+  function stageManagement(field, dateText) {
+    if (RiceOS.agro && RiceOS.agro.managementStatus) return RiceOS.agro.managementStatus(field, dateText);
+    return { key: "dryWaiting", label: "中干し未実施" };
+  }
+
+  function waterStageForDashboard(field, dateText) {
+    const planting = plantingDateForYear(field.fieldId, cropYear(dateText));
+    if (!planting) return { index: 0, label: "田植日未登録", detail: "水管理の開始待ち" };
+    const management = stageManagement(field, dateText);
+    const key = management && management.key || "dryWaiting";
+    if (key === "drying") return { index: 2, label: "中干し", detail: management.label || "中干し中" };
+    if (key === "dryCompleted") return { index: 3, label: "間断灌水へ", detail: management.label || "中干し完了" };
+    if (key === "intermittent") return { index: 3, label: "間断灌水", detail: management.label || "間断灌水中" };
+    if (key === "deepWater") return { index: 4, label: "深水管理", detail: management.label || "深水管理中" };
+    if (key === "intermittentCompleted") return { index: 5, label: "落水・収穫前", detail: management.label || "間断灌水完了" };
+    return { index: 1, label: "活着・浅水", detail: management.label || "中干し前" };
+  }
+
+  function renderWaterTrack(field, dateText) {
+    const water = waterStageForDashboard(field, dateText);
+    const steps = ["活着・浅水", "中干し", "間断灌水", "深水", "落水"];
+    return `
+      <div class="home-water-track-wrap">
+        <div class="home-track-heading"><span>水管理の現在地</span><b>${U.escapeHTML(water.label)}</b></div>
+        <div class="home-water-track" aria-label="水管理工程">
+          ${steps.map((label, index) => `<span class="${index + 1 < water.index ? "done" : ""} ${index + 1 === water.index ? "current" : ""}"><i></i><b>${U.escapeHTML(label)}</b></span>`).join("")}
+        </div>
+        <small>${U.escapeHTML(water.detail)}</small>
+      </div>
+    `;
+  }
+
   function renderDecisionFieldCard(field) {
     const date = U.today();
     const planting = plantingDateForYear(field.fieldId, cropYear(date));
@@ -471,6 +519,11 @@
           <div><small>現在の生育ステージ</small><b>${U.escapeHTML(stage.current ? stage.current.label : "記録待ち")}</b></div>
           <span>${U.escapeHTML(stage.certainty || "記録待ち")}</span>
         </div>
+        <div class="home-growth-track-wrap">
+          <div class="home-track-heading"><span>生育ステージの現在地</span><b>${U.escapeHTML(stage.current ? stage.current.label : "記録待ち")}</b></div>
+          ${renderSeasonTrack(stage)}
+        </div>
+        ${renderWaterTrack(field, date)}
         <div class="home-decision-status"><span>${U.escapeHTML(need.label)}</span><small>${U.escapeHTML(stage.management && stage.management.label || need.detail)}</small></div>
       </article>
     `;
@@ -510,8 +563,10 @@
     const todayEntries = entriesForDate(U.today()).filter((entry) => entry.kind !== "candidate");
     const candidates = candidatesForDate(U.today());
     const overdue = overdueSchedules();
-    const ranked = prioritizedDecisionFields(U.today(), candidates, overdue);
-    const rows = ranked.slice(0, 3).map((item) => item.field);
+    const rows = state.activeFields()
+      .filter((field) => homeGroupFilter === "all" || homeGroupName(field) === homeGroupFilter)
+      .sort((a, b) => homeGroupName(a).localeCompare(homeGroupName(b)) || String(a.name).localeCompare(String(b.name)));
+    const groupOptions = [`<option value="all">すべてのグループ（${state.activeFields().length}圃場）</option>`, ...homeGroups().map((group) => `<option value="${U.attr(group.name)}" ${group.name === homeGroupFilter ? "selected" : ""}>${U.escapeHTML(group.name)}グループ（${group.count}圃場）</option>`)].join("");
     return `
       <section class="home-decision-hero">
         <div><p>今日・今週の判断</p><h2>田んぼの今を、先に見る</h2><small>${U.escapeHTML(U.fd(U.today()))} / ${U.escapeHTML(todayEntries.length ? `今日の記録 ${todayEntries.length}件` : "今日の記録はありません")}</small></div>
@@ -524,8 +579,8 @@
         <div><b>${U.escapeHTML(String(state.activeFields().filter((field) => plantingDateForYear(field.fieldId, cropYear(U.today()))).length))}</b><span>田植え済み</span></div>
       </section>
       <section class="home-decision-section">
-        <div class="home-decision-section-head"><div><h3>圃場の現在地</h3><small>各圃場の今の状態を確認します</small></div></div>
-        <div class="home-decision-list">${rows.length ? rows.map(renderDecisionFieldCard).join("") : '<div class="farm-empty">圃場を登録すると、ここに判断カードを表示します。</div>'}</div>
+        <div class="home-decision-section-head"><div><h3>圃場の現在地</h3><small>生育と水管理の進み具合を全圃場で確認します</small></div><select data-home-group-filter aria-label="圃場グループを絞り込む">${groupOptions}</select></div>
+        <div class="home-decision-list">${rows.length ? rows.map(renderDecisionFieldCard).join("") : '<div class="farm-empty">このグループには圃場がありません。</div>'}</div>
       </section>
     `;
   }
@@ -1420,6 +1475,12 @@
       }
     });
     root.addEventListener("change", (event) => {
+      const group = event.target.closest("[data-home-group-filter]");
+      if (group) {
+        homeGroupFilter = group.value || "all";
+        render();
+        return;
+      }
       const select = event.target.closest("[data-home-field-filter]");
       if (!select) return;
       filterFieldId = select.value || "all";
