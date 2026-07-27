@@ -86,7 +86,9 @@
   }
 
   function homeGroupName(field) {
-    return String(field && (field.fieldGroupId || field.district) || "").trim() || "未設定";
+    const configured = String(field && (field.fieldGroupId || field.district) || "").trim();
+    if (configured) return configured;
+    return String(field && field.name || "").trim().split(/[\s　]+/)[0] || "未設定";
   }
 
   function homeGroups() {
@@ -592,6 +594,41 @@
     `;
   }
 
+  function annualStageIndex(stage) {
+    const key = String(stage && stage.current && stage.current.key || "");
+    if (["establishment", "planting"].includes(key)) return 0;
+    if (["earlyTillering", "peakTillering", "maximumTillering", "tillering"].includes(key)) return 1;
+    if (["panicleInitiation", "panicle"].includes(key)) return 2;
+    if (["meiosis", "booting"].includes(key)) return 3;
+    if (["heading", "fullHeading"].includes(key)) return 4;
+    if (["ripening", "yellowRipening"].includes(key)) return 5;
+    if (["maturity", "harvest"].includes(key)) return 6;
+    return -1;
+  }
+
+  function renderAnnualStageRuler(stage) {
+    const stages = [
+      { label: "田植え", image: 2 },
+      { label: "分げつ", image: 3 },
+      { label: "幼穂", image: 5 },
+      { label: "穂ばらみ", image: 5 },
+      { label: "出穂", image: 6 },
+      { label: "登熟", image: 7 },
+      { label: "成熟期", image: 8 }
+    ];
+    const current = annualStageIndex(stage);
+    return `
+      <div class="home-stage-ruler" aria-label="一年の生育段階">
+        ${stages.map((item, index) => `
+          <div class="${index < current ? "done" : ""} ${index === current ? "current" : ""}">
+            <span><img src="assets/images/rice-stages/rice-stage-${String(item.image).padStart(2, "0")}.png" alt=""></span>
+            <b>${U.escapeHTML(item.label)}</b>
+          </div>
+        `).join("")}
+      </div>
+    `;
+  }
+
   function renderLinkedSeasonFlow(field, dateText, stage) {
     const year = cropYear(dateText);
     const planting = plantingDateForYear(field.fieldId, year);
@@ -649,7 +686,8 @@
     ];
     return `
       <section class="home-linked-flow" aria-label="生育と水管理の今期工程">
-        <div class="home-linked-flow-head"><span>今期の工程</span><small>縦線は今日 / 点は実績、白点は推定</small></div>
+        <div class="home-linked-flow-head"><span>今期の成長マップ</span><small>縦線は今日 / 点は実績、白点は推定</small></div>
+        ${renderAnnualStageRuler(stage)}
         ${renderLinkedLane("growth", "生育", stage.current ? stage.current.label : "記録待ち", stage.certainty || "記録待ち", growthMarkers, planting, flowEnd, todayPercent)}
         ${renderFlowChips(growthMarkers)}
         ${renderLinkedLane("water", "水管理", management.label || "記録待ち", management.evidence || "記録待ち", waterMarkers, planting, flowEnd, todayPercent)}

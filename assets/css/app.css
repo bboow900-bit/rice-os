@@ -2423,6 +2423,21 @@
 .home-linked-flow-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 7px; }
 .home-linked-flow-head span { color: #336f3e; font-size: 11px; font-weight: 900; }
 .home-linked-flow-head small { color: #778378; font-size: 9px; font-weight: 700; text-align: right; }
+.home-stage-ruler { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); align-items: end; gap: 0; min-height: 58px; margin: 0 0 9px; padding: 5px 2px 0; border-radius: 9px; background: linear-gradient(180deg, #f8fbed 0%, #f3f8ec 100%); }
+.home-stage-ruler > div { position: relative; display: grid; justify-items: center; align-content: end; min-width: 0; min-height: 52px; color: #aab6a5; text-align: center; }
+.home-stage-ruler > div::before { position: absolute; right: -50%; bottom: 17px; left: 50%; height: 3px; border-radius: 999px; background: #dfe9dd; content: ""; }
+.home-stage-ruler > div:last-child::before { display: none; }
+.home-stage-ruler > div.done::before, .home-stage-ruler > div.current::before { background: #70b66d; }
+.home-stage-ruler > div span { position: relative; z-index: 1; display: grid; width: 26px; height: 26px; place-items: center; border: 1px solid #d9e4d5; border-radius: 50%; background: #fffefa; }
+.home-stage-ruler > div img { width: 23px; height: 23px; object-fit: contain; opacity: .48; }
+.home-stage-ruler > div b { display: grid; align-items: start; min-width: 0; min-height: 22px; margin-top: 4px; color: inherit; font-size: 9px; font-weight: 800; line-height: 1.15; overflow-wrap: anywhere; }
+.home-stage-ruler > div.done { color: #5a9560; }
+.home-stage-ruler > div.done span { border-color: #a8d2a4; background: #eff8e9; }
+.home-stage-ruler > div.done img { opacity: .8; }
+.home-stage-ruler > div.current { color: #23763a; }
+.home-stage-ruler > div.current span { width: 32px; height: 32px; margin-top: -6px; border: 2px solid #3a9d4b; background: #e5f5dd; box-shadow: 0 0 0 3px rgba(94, 174, 91, .13); }
+.home-stage-ruler > div.current img { width: 28px; height: 28px; opacity: 1; }
+.home-stage-ruler > div.current b { font-weight: 950; }
 .home-linked-lane { padding: 7px 7px 6px; border-radius: 8px; background: #f2faef; }
 .home-linked-lane + .home-linked-lane { margin-top: 6px; }
 .home-linked-lane.water { background: #eff9fc; }
