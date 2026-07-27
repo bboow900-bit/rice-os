@@ -11377,6 +11377,73 @@ label {
   gap: 12px;
 }
 
+/* The field tab owns fixed field information; records remain in record screens. */
+.field-hub-master-card,
+.field-hub-settings-link {
+  margin-top: 0;
+  border: 1px solid #d9e7d4;
+  border-radius: 14px;
+  background: #fbfdf8;
+  box-shadow: 0 4px 12px rgba(47, 84, 50, .06);
+}
+.field-hub-master-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px 14px 8px;
+  color: #285c36;
+}
+.field-hub-master-card-head span {
+  color: #7a887c;
+  font-size: 11px;
+}
+.field-hub-master-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  padding: 0 12px 12px;
+}
+.field-hub-master-grid > span {
+  min-width: 0;
+  padding: 9px 10px;
+  border-radius: 10px;
+  background: #f1f8ec;
+}
+.field-hub-master-grid small,
+.field-hub-master-grid b {
+  display: block;
+}
+.field-hub-master-grid small {
+  color: #758276;
+  font-size: 10px;
+}
+.field-hub-master-grid b {
+  margin-top: 3px;
+  overflow-wrap: anywhere;
+  color: #26362a;
+  font-size: 13px;
+}
+.field-hub-settings-link {
+  display: grid;
+  gap: 4px;
+  padding: 13px 14px;
+}
+.field-hub-settings-link b {
+  color: #285c36;
+  font-size: 13px;
+}
+.field-hub-settings-link span {
+  color: #68766b;
+  font-size: 11px;
+  line-height: 1.55;
+}
+@media (max-width: 380px) {
+  .field-hub-master-grid { gap: 6px; padding-inline: 9px; }
+  .field-hub-master-grid > span { padding: 8px; }
+  .field-hub-master-grid b { font-size: 12px; }
+}
+
 #screen-fields.field-hub-subscreen > .screen-head { display: none !important; }
 
 .field-hub-intro,

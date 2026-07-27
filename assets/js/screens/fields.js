@@ -871,10 +871,10 @@
       .slice()
       .sort((a, b) => U.number(a.sortOrder, 0) - U.number(b.sortOrder, 0) || String(a.name).localeCompare(String(b.name)));
     return `
-      <section class="field-hub-list">
-        <div class="field-hub-intro"><div><span>圃場一覧</span><h3>田んぼを選ぶ</h3><small>記録を見る・残す入口をひとつにまとめました。</small></div><button class="primary" type="button" data-action="add-field">＋ 圃場追加</button></div>
+        <section class="field-hub-list">
+        <div class="field-hub-intro"><div><span>圃場一覧</span><h3>田んぼを管理する</h3><small>圃場名・品種・面積・グループなど固定情報を整えます。</small></div><button class="primary" type="button" data-action="add-field">＋ 圃場追加</button></div>
         <div class="field-hub-filters"><input type="search" data-field-search placeholder="圃場名・品種・地区で検索" value="${U.attr(fieldSearch)}"><select data-field-group-filter>${groupOptions}</select></div>
-        <div class="field-hub-groups">${groups.map((group) => `<div><button type="button" data-field-group-open="${U.attr(group.name)}"><span>${U.escapeHTML(group.name)}</span><small>${group.fields.length}圃場 / ${Math.round(group.area * 10) / 10}a</small></button><button type="button" data-field-group-bulk="${U.attr(group.name)}">一括記録</button></div>`).join("")}</div>
+        <div class="field-hub-groups">${groups.map((group) => `<div><button type="button" data-field-group-open="${U.attr(group.name)}"><span>${U.escapeHTML(group.name)}</span><small>${group.fields.length}圃場 / ${Math.round(group.area * 10) / 10}a</small></button><button type="button" data-field-group-bulk="${U.attr(group.name)}">一括作業入力</button></div>`).join("")}</div>
         <div class="field-hub-cards">${visible.length ? visible.map(renderFieldListCard).join("") : '<div class="empty">条件に合う圃場はありません。</div>'}</div>
       </section>
     `;
@@ -884,23 +884,24 @@
     const variety = state.variety(field.varietyId);
     const stage = fieldStage(field);
     const photo = latestPhotoForField(field);
-    const growth = latestGrowthForField(field.fieldId);
-    const latestSeasonNote = latestSeasonNoteForField(field.fieldId);
-    const nextRecord = fieldNextRecordInfo(field);
     return `
       <section class="field-hub-detail">
-        <div class="field-hub-detail-head"><button type="button" class="field-hub-back" data-field-view="list" aria-label="圃場一覧へ戻る">‹</button><div><span>圃場詳細</span><h3>${U.escapeHTML(field.name)}</h3><small>${U.escapeHTML(variety && variety.name || "品種未設定")} / ${U.escapeHTML(String(field.areaA || 0))}a</small></div><button type="button" class="secondary" data-field-view="settings">編集</button></div>
+        <div class="field-hub-detail-head"><button type="button" class="field-hub-back" data-field-view="list" aria-label="圃場一覧へ戻る">‹</button><div><span>圃場情報</span><h3>${U.escapeHTML(field.name)}</h3><small>${U.escapeHTML(variety && variety.name || "品種未設定")} / ${U.escapeHTML(String(field.areaA || 0))}a</small></div><button type="button" class="secondary" data-field-view="settings">編集</button></div>
         <section class="field-hub-now stage-${U.attr(String(stage.number).padStart(2, "0"))}">
           ${photo && photo.photoData ? `<img src="${U.attr(photo.photoData)}" alt="">` : `<span>${groupRiceImage(stage.number)}</span>`}
-          <div><small>現在の生育ステージ / ${U.escapeHTML(stage.certainty)}</small><b>${U.escapeHTML(stage.label)}</b><p>${U.escapeHTML(stage.management.label)} / ${U.escapeHTML(fieldNextRecord(field))}</p></div>
+          <div><small>現在の状態 / ${U.escapeHTML(stage.certainty)}</small><b>${U.escapeHTML(fieldStatusText(field))}</b><p>${U.escapeHTML(stage.label)}</p></div>
         </section>
-        <div class="field-hub-summary single"><span><b>最新の生育</b>${U.escapeHTML(growth ? `${U.fd(growth.date)} / 葉色 ${growth.leafColor || "-"}` : "未入力")}</span></div>
-        ${renderPhotoComparison(field)}
-        ${nextRecord
-          ? `<section class="field-next-action"><button type="button" data-field-action="${U.attr(nextRecord.action)}" data-field-id="${U.attr(field.fieldId)}"><span>記録が不足しています</span><b>${U.escapeHTML(nextRecord.label)}</b><i aria-hidden="true">›</i></button></section>`
-          : '<section class="field-next-guide"><b>記録を追加</b><span>現場の様子に合わせて、下から種類を選べます</span></section>'}
-        <section class="field-hub-actions"><button type="button" data-field-action="add-work" data-field-id="${U.attr(field.fieldId)}">作業</button><button type="button" data-field-action="add-growth" data-field-id="${U.attr(field.fieldId)}">生育</button><button type="button" data-field-action="add-irrigation" data-field-id="${U.attr(field.fieldId)}">水管理</button><button type="button" data-field-action="photos" data-field-id="${U.attr(field.fieldId)}">写真</button></section>
-        <section class="field-hub-history"><div><span>今年の気づき${latestSeasonNote && latestSeasonNote.date ? ` / ${U.escapeHTML(U.fd(latestSeasonNote.date))}` : ""}</span><b>${U.escapeHTML(latestSeasonNote && (latestSeasonNote.text || latestSeasonNote.memo || latestSeasonNote.note) || "年間履歴で気づきを残せます")}</b></div><button type="button" class="secondary" data-field-action="history" data-field-id="${U.attr(field.fieldId)}">前年比較・振り返り</button></section>
+        <section class="field-hub-master-card">
+          <div class="field-hub-master-card-head"><b>固定情報</b><span>圃場設定で編集</span></div>
+          <div class="field-hub-master-grid">
+            <span><small>地区</small><b>${U.escapeHTML(field.district || "未設定")}</b></span>
+            <span><small>グループ</small><b>${U.escapeHTML(groupName(field) || "未設定")}</b></span>
+            <span><small>土質</small><b>${U.escapeHTML(field.soilType || "未設定")}</b></span>
+            <span><small>水持ち</small><b>${U.escapeHTML(field.waterHolding || "未設定")}</b></span>
+            <span><small>固定メモ</small><b>${U.escapeHTML(field.fixedMemo || "未設定")}</b></span>
+          </div>
+        </section>
+        <section class="field-hub-settings-link"><b>記録は専用画面で管理します</b><span>作業・生育・水管理・写真は「記録入力」や「カレンダー」から登録します。</span></section>
       </section>
     `;
   }
@@ -912,7 +913,7 @@
         <details class="form-section" open><summary>基本情報</summary><div class="form-grid dense inline-grid">${input(field, "name", "圃場名")}${input(field, "district", "地区")}<label>品種<select data-field-id="${U.attr(field.fieldId)}" data-field-field="varietyId">${varietyOptions(field.varietyId)}</select></label>${input(field, "areaA", "面積(a)", "number")}<label>状態<select data-field-id="${U.attr(field.fieldId)}" data-field-field="status">${statusOptions(field.status)}</select></label>${input(field, "sortOrder", "表示順", "number")}</div></details>
         <details class="form-section"><summary>栽培条件・圃場カルテ</summary><div class="form-grid dense inline-grid"><label>土質<select data-field-id="${U.attr(field.fieldId)}" data-field-field="soilType">${optionTags(SOIL_TYPES, field.soilType)}</select></label><label>水持ち<select data-field-id="${U.attr(field.fieldId)}" data-field-field="waterHolding">${optionTags(WATER_LEVELS, field.waterHolding)}</select></label>${arrayInput(field, "fieldFeatures", "圃場特徴", FEATURES)}${input(field, "targetCrackCm", "目標ひび割れ幅(cm)")}${input(field, "targetSinkCm", "目標沈み込み(cm)")}</div></details>
         <details class="form-section"><summary>苗箱・田植機の設定</summary><div class="form-grid dense inline-grid">${input(field, "seedlingBoxes", "実使用苗箱数", "number")}<label>栽培レシピ（品種）<select data-field-id="${U.attr(field.fieldId)}" data-field-field="varietyId">${varietyOptions(field.varietyId)}</select></label></div><p class="hint-text">株間・坪あたり株数・基肥などの共通設定は、選択した栽培レシピを参照します。</p></details>
-        <details class="form-section"><summary>グループ・メモ</summary><div class="form-grid dense inline-grid">${input(field, "fieldGroupId", "圃場グループ")}${input(field, "drainageTargetDays", "中干し目安日数", "number")}${input(field, "intermittentIntervalDays", "間断灌水目安日数", "number")}</div><label>固定メモ<textarea data-field-id="${U.attr(field.fieldId)}" data-field-field="fixedMemo">${U.escapeHTML(field.fixedMemo || "")}</textarea></label></details>
+        <details class="form-section"><summary>グループ・水管理目標・メモ</summary><div class="form-grid dense inline-grid">${input(field, "fieldGroupId", "圃場グループ")}${input(field, "drainageTargetDays", "中干し目安日数", "number")}${input(field, "intermittentIntervalDays", "間断灌水目安日数", "number")}</div><label>固定メモ<textarea data-field-id="${U.attr(field.fieldId)}" data-field-field="fixedMemo">${U.escapeHTML(field.fixedMemo || "")}</textarea></label></details>
         <div class="record-actions single-action"><button class="secondary danger" type="button" data-field-action="delete" data-field-id="${U.attr(field.fieldId)}">圃場を削除</button></div>
       </section>
     `;
