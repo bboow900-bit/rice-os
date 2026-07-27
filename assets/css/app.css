@@ -2416,6 +2416,45 @@
   body .app-shell .side-nav .nav-label { overflow: hidden !important; font-size: 9px !important; letter-spacing: 0 !important; text-overflow: clip !important; white-space: nowrap !important; }
 }
 
+/* One shared season axis keeps crop growth and water management readable together. */
+.home-linked-flow { margin-top: 9px; padding: 8px; border: 1px solid #dae5d6; border-radius: 10px; background: linear-gradient(135deg, #fcfdf9, #f9fcf9); }
+.home-linked-flow.waiting { display: grid; gap: 3px; color: #718071; font-size: 10px; line-height: 1.4; }
+.home-linked-flow.waiting b { color: #44714d; font-size: 11px; }
+.home-linked-flow-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 7px; }
+.home-linked-flow-head span { color: #336f3e; font-size: 11px; font-weight: 900; }
+.home-linked-flow-head small { color: #778378; font-size: 9px; font-weight: 700; text-align: right; }
+.home-linked-lane { padding: 7px 7px 6px; border-radius: 8px; background: #f2faef; }
+.home-linked-lane + .home-linked-lane { margin-top: 6px; }
+.home-linked-lane.water { background: #eff9fc; }
+.home-linked-lane-head { display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; align-items: baseline; gap: 6px; }
+.home-linked-lane-head > span { color: #53825a; font-size: 10px; font-weight: 900; }
+.home-linked-lane-head b { overflow: hidden; color: #236f34; font-size: 12px; font-weight: 900; text-overflow: ellipsis; white-space: nowrap; }
+.home-linked-lane-head small { color: #667866; font-size: 9px; font-weight: 800; white-space: nowrap; }
+.home-linked-lane.water .home-linked-lane-head > span { color: #43849a; }
+.home-linked-lane.water .home-linked-lane-head b { color: #1f7996; }
+.home-linked-road { position: relative; height: 33px; margin: 7px 3px 0; border-radius: 999px; background: #dfeadf; }
+.home-linked-road::before { position: absolute; inset: 14px 0 auto; height: 4px; border-radius: 999px; background: #cbdcca; content: ""; }
+.home-linked-lane.water .home-linked-road { background: #e0f0f5; }
+.home-linked-lane.water .home-linked-road::before { background: #c7e3ed; }
+.home-linked-road > em { position: absolute; top: 14px; left: 0; height: 4px; border-radius: 999px; background: #61ad67; }
+.home-linked-lane.water .home-linked-road > em { background: #59acc9; }
+.home-linked-road > strong { position: absolute; top: 4px; z-index: 3; color: #277d3b; font-size: 8px; font-weight: 900; transform: translateX(-50%); }
+.home-linked-road > strong::after { position: absolute; top: 10px; left: 50%; width: 2px; height: 17px; border-radius: 2px; background: #2d933f; content: ""; transform: translateX(-50%); }
+.home-linked-lane.water .home-linked-road > strong { color: #1f7d9b; }
+.home-linked-lane.water .home-linked-road > strong::after { background: #258cab; }
+.home-linked-marker { position: absolute; top: 11px; left: calc(var(--at) * 1%); z-index: 2; width: 1px; height: 8px; }
+.home-linked-marker i { position: absolute; top: 0; left: 50%; width: 8px; height: 8px; border: 2px solid #fff; border-radius: 50%; background: #4fa85d; box-shadow: 0 0 0 1px #4fa85d; transform: translate(-50%, -2px); }
+.home-linked-lane.water .home-linked-marker i { background: #4fa8c5; box-shadow: 0 0 0 1px #4fa8c5; }
+.home-linked-marker.estimated i { background: #fffefa; box-shadow: 0 0 0 1px #97ab95; }
+.home-linked-marker b, .home-linked-marker small { position: absolute; left: 50%; display: block; color: #58705b; font-size: 8px; font-weight: 850; line-height: 1.05; text-align: center; transform: translateX(-50%); white-space: nowrap; }
+.home-linked-marker b { top: 11px; }
+.home-linked-marker small { top: 20px; color: #8a9689; font-size: 7px; font-weight: 700; }
+.home-linked-marker[style^="--at:0"] b, .home-linked-marker[style^="--at:0"] small { left: 0; transform: none; text-align: left; }
+.home-linked-marker[style^="--at:100"] b, .home-linked-marker[style^="--at:100"] small { left: auto; right: 0; transform: none; text-align: right; }
+.home-linked-history { display: grid; gap: 3px; margin-top: 7px; padding-top: 6px; border-top: 1px dashed #dbe5d8; }
+.home-linked-history span { overflow: hidden; color: #687867; font-size: 9px; font-weight: 750; line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; }
+.home-linked-history span:last-child { color: #5e8490; }
+
 /* Mobile primary navigation: calendar is a first-class daily screen. */
 @media (max-width: 900px) {
   body .app-shell .side-nav {
