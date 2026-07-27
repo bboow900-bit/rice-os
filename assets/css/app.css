@@ -13389,3 +13389,79 @@ label {
     display: none !important;
   }
 }
+.system-settings-trigger {
+  width: 44px;
+  min-width: 44px;
+  padding: 0;
+  font-size: 22px;
+  line-height: 1;
+}
+.common-master-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.common-master-card {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  min-height: 142px;
+  padding: 12px 8px 10px;
+  border: 1px solid #dfe5dd;
+  border-radius: 14px;
+  background: #fffefa;
+  box-shadow: 0 5px 12px rgba(54, 79, 58, .07);
+  color: #233329;
+  font: inherit;
+  text-align: center;
+}
+.common-master-card.green { border-color: #c9e3c3; background: #f4fbf0; }
+.common-master-card.amber { border-color: #ead8a9; background: #fffaf0; }
+.common-master-card.water { border-color: #c7e1ea; background: #f1fbfd; }
+.common-master-card img {
+  width: 62px;
+  height: 62px;
+  object-fit: contain;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, .72);
+}
+.common-master-card b { font-size: 14px; font-weight: 900; }
+.common-master-card small { color: #718075; font-size: 10px; line-height: 1.2; }
+.common-master-card em {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  padding: 3px 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .82);
+  color: #5e7261;
+  font-size: 9px;
+  font-style: normal;
+  font-weight: 800;
+}
+.system-settings-panel {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid #d5e1d1;
+  border-radius: 16px;
+  background: #f8fbf6;
+  box-shadow: 0 8px 18px rgba(44, 72, 48, .08);
+}
+.system-settings-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.system-settings-head span { color: #6b7d6c; font-size: 11px; font-weight: 800; }
+.system-settings-head h3 { margin: 2px 0 0; color: #1d3b25; font-size: 19px; }
+.system-settings-note { margin: 0; color: #647366; font-size: 11px; line-height: 1.55; }
+.system-settings-panel .data-actions { margin: 0; }
+@media (max-width: 380px) {
+  .common-master-grid { gap: 8px; }
+  .common-master-card { min-height: 132px; padding-inline: 6px; }
+  .common-master-card img { width: 56px; height: 56px; }
+  .common-master-card b { font-size: 13px; }
+}

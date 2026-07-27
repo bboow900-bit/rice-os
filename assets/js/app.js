@@ -115,7 +115,8 @@
       calendar: "カレンダー",
       "field-work": "記録入力",
       fields: "圃場",
-      annual: "振り返り"
+      annual: "振り返り",
+      data: "管理"
     };
     Object.keys(primaryLabels).forEach((screenId) => {
       const label = document.querySelector(`[data-screen="${screenId}"] .nav-label`);

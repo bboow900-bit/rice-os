@@ -10,12 +10,12 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="稲作カルテ">
-  <link rel="manifest" href="manifest.webmanifest?v=20260728_ver155">
+  <link rel="manifest" href="manifest.webmanifest?v=20260728_ver156">
   <link rel="icon" href="assets/icons/icon-192.png">
   <link rel="apple-touch-icon" href="assets/icons/icon-192.png">
   <title>稲作カルテ</title>
-  <link rel="stylesheet" href="assets/css/app.css?v=20260728_ver155">
-  <link rel="stylesheet" href="assets/css/field-management.css?v=20260728_ver155">
+  <link rel="stylesheet" href="assets/css/app.css?v=20260728_ver156">
+  <link rel="stylesheet" href="assets/css/field-management.css?v=20260728_ver156">
   <style>
     @media (max-width: 900px) {
       body .app-shell .side-nav .nav-item { display: none !important; }
@@ -573,26 +573,34 @@
         <div id="noticeList" class="notice-list"></div>
       </section>
 
-      <section class="screen" id="screen-data" data-title="設定">
+      <section class="screen" id="screen-data" data-title="共通マスター">
         <div class="screen-head">
           <div>
-            <p class="eyebrow">設定・保存と復元</p>
-            <h2>設定</h2>
+            <p class="eyebrow">管理ハブ</p>
+            <h2>共通マスター</h2>
           </div>
+          <button class="secondary icon-button system-settings-trigger" type="button" data-action="open-system-settings" aria-label="システム設定を開く" title="システム設定">⚙</button>
         </div>
         <div class="mobile-screen-menu settings-menu">
           <div class="section-title compact">
-            <h3>共通マスター</h3>
-            <span class="muted">品種・資材・写真・結果をまとめて確認</span>
+            <h3>農作業の管理入口</h3>
+            <span class="muted">固定情報と記録の本籍地をここに集約</span>
           </div>
-          <div class="menu-grid">
-            <button data-jump-screen="materials">▣<span>資材台帳</span></button>
-            <button data-jump-screen="recipes">※<span>栽培レシピ</span></button>
-            <button data-jump-screen="photos">▧<span>写真</span></button>
-            <button data-jump-screen="results">¥<span>品種結果</span></button>
+          <div class="common-master-grid">
+            <button class="common-master-card green" data-jump-screen="fields"><img src="assets/images/menu-icons/field-master.png" alt=""><b>圃場マスター</b><small>土質・面積・グループ</small><em data-master-count="fields">-</em></button>
+            <button class="common-master-card green" data-jump-screen="recipes"><img src="assets/images/menu-icons/recipe.png" alt=""><b>栽培レシピ</b><small>品種単位の設定</small><em data-master-count="varieties">-</em></button>
+            <button class="common-master-card amber" data-jump-screen="recipes"><img src="assets/images/menu-icons/transplanter.png" alt=""><b>田植え機</b><small>株間・苗箱の設定</small><em data-master-count="transplanter">-</em></button>
+            <button class="common-master-card amber" data-jump-screen="dry-period"><img src="assets/images/menu-icons/dry-period.png" alt=""><b>中干し</b><small>目標・実施期間</small><em data-master-count="dryPeriods">-</em></button>
+            <button class="common-master-card water" data-jump-screen="irrigation"><img src="assets/images/menu-icons/irrigation.png" alt=""><b>間断 / 湿潤</b><small>水管理の記録</small><em data-master-count="irrigations">-</em></button>
+            <button class="common-master-card amber" data-jump-screen="materials"><img src="assets/images/menu-icons/materials.png" alt=""><b>資材管理</b><small>在庫・使用量</small><em data-master-count="materials">-</em></button>
+            <button class="common-master-card" data-jump-screen="photos"><img src="assets/images/menu-icons/photos.png" alt=""><b>写真</b><small>比較素材</small><em data-master-count="photos">-</em></button>
+            <button class="common-master-card amber" data-jump-screen="results"><img src="assets/images/menu-icons/harvest.png" alt=""><b>収穫履歴</b><small>収量・販売</small><em data-master-count="results">-</em></button>
           </div>
         </div>
-        <div class="data-actions">
+        <section id="systemSettingsPanel" class="system-settings-panel hidden" aria-hidden="true">
+          <div class="system-settings-head"><div><span>システム設定</span><h3>データとアプリ</h3></div><button class="secondary icon-button" type="button" data-action="close-system-settings" aria-label="システム設定を閉じる">×</button></div>
+          <p class="system-settings-note">普段の管理は共通マスターから行い、保存・復元・更新などの操作だけをここにまとめています。</p>
+          <div class="data-actions">
           <button class="primary" data-action="export-json">JSON保存</button>
           <button class="secondary" data-action="export-csv">CSV出力</button>
           <label class="file-button">JSONを選択<input id="importFile" type="file" accept=".json,application/json"></label>
@@ -608,15 +616,16 @@
           <button class="secondary" data-action="request-persistent-storage">永続保存を確認</button>
           <button class="secondary" data-action="enable-notifications">通知を許可</button>
           <button class="secondary" data-action="force-update">最新版に更新</button>
-        </div>
-        <div id="dataImportReport" class="data-import-report hidden"></div>
-        <div id="dataStorageStatus" class="data-storage-status"></div>
-        <div class="data-status" id="dataStatus"></div>
-        <details class="data-snapshot-details">
-          <summary>保存内容を確認（JSON）</summary>
-          <small>現在のブラウザ内データを読み取り専用で表示します。</small>
-          <textarea id="dataSnapshot" readonly></textarea>
-        </details>
+          </div>
+          <div id="dataImportReport" class="data-import-report hidden"></div>
+          <div id="dataStorageStatus" class="data-storage-status"></div>
+          <div class="data-status" id="dataStatus"></div>
+          <details class="data-snapshot-details">
+            <summary>保存内容を確認（JSON）</summary>
+            <small>現在のブラウザ内データを読み取り専用で表示します。</small>
+            <textarea id="dataSnapshot" readonly></textarea>
+          </details>
+        </section>
       </section>
     </main>
   </div>
@@ -697,33 +706,33 @@
 
   <div id="toast" class="toast hidden" role="status"></div>
 
-  <script src="assets/js/core/utils.js?v=20260728_ver155"></script>
-  <script src="assets/js/core/schema.js?v=20260728_ver155"></script>
-  <script src="assets/js/core/storage.js?v=20260728_ver155"></script>
-  <script src="assets/js/core/state.js?v=20260728_ver155"></script>
-  <script src="assets/js/core/agro.js?v=20260728_ver155"></script>
-  <script src="assets/js/core/record-actions.js?v=20260728_ver155"></script>
-  <script src="assets/js/core/calendar.js?v=20260728_ver155"></script>
-  <script src="assets/js/core/alerts.js?v=20260728_ver155"></script>
-  <script src="assets/js/core/weather.js?v=20260728_ver155"></script>
-  <script src="assets/js/core/pwa.js?v=20260728_ver155"></script>
-  <script src="assets/js/screens/home.js?v=20260728_ver155"></script>
-  <script src="assets/js/screens/calendar.js?v=20260728_ver155"></script>
-  <script src="assets/js/screens/bottom-sheet.js?v=20260728_ver155"></script>
-  <script src="assets/js/screens/recipes.js?v=20260728_ver155"></script>
-  <script src="assets/js/screens/fields.js?v=20260728_ver155"></script>
-  <script src="assets/js/screens/field-work.js?v=20260728_ver155"></script>
-  <script src="assets/js/screens/fertilizer.js?v=20260728_ver155"></script>
-  <script src="assets/js/screens/growth.js?v=20260728_ver155"></script>
-  <script src="assets/js/screens/dry-period.js?v=20260728_ver155"></script>
-  <script src="assets/js/screens/irrigation.js?v=20260728_ver155"></script>
-  <script src="assets/js/screens/photos.js?v=20260728_ver155"></script>
-  <script src="assets/js/screens/other-work.js?v=20260728_ver155"></script>
-  <script src="assets/js/screens/annual.js?v=20260728_ver155"></script>
-  <script src="assets/js/screens/materials.js?v=20260728_ver155"></script>
-  <script src="assets/js/screens/results.js?v=20260728_ver155"></script>
-  <script src="assets/js/screens/notices.js?v=20260728_ver155"></script>
-  <script src="assets/js/screens/data.js?v=20260728_ver155"></script>
-  <script src="assets/js/app.js?v=20260728_ver155"></script>
+  <script src="assets/js/core/utils.js?v=20260728_ver156"></script>
+  <script src="assets/js/core/schema.js?v=20260728_ver156"></script>
+  <script src="assets/js/core/storage.js?v=20260728_ver156"></script>
+  <script src="assets/js/core/state.js?v=20260728_ver156"></script>
+  <script src="assets/js/core/agro.js?v=20260728_ver156"></script>
+  <script src="assets/js/core/record-actions.js?v=20260728_ver156"></script>
+  <script src="assets/js/core/calendar.js?v=20260728_ver156"></script>
+  <script src="assets/js/core/alerts.js?v=20260728_ver156"></script>
+  <script src="assets/js/core/weather.js?v=20260728_ver156"></script>
+  <script src="assets/js/core/pwa.js?v=20260728_ver156"></script>
+  <script src="assets/js/screens/home.js?v=20260728_ver156"></script>
+  <script src="assets/js/screens/calendar.js?v=20260728_ver156"></script>
+  <script src="assets/js/screens/bottom-sheet.js?v=20260728_ver156"></script>
+  <script src="assets/js/screens/recipes.js?v=20260728_ver156"></script>
+  <script src="assets/js/screens/fields.js?v=20260728_ver156"></script>
+  <script src="assets/js/screens/field-work.js?v=20260728_ver156"></script>
+  <script src="assets/js/screens/fertilizer.js?v=20260728_ver156"></script>
+  <script src="assets/js/screens/growth.js?v=20260728_ver156"></script>
+  <script src="assets/js/screens/dry-period.js?v=20260728_ver156"></script>
+  <script src="assets/js/screens/irrigation.js?v=20260728_ver156"></script>
+  <script src="assets/js/screens/photos.js?v=20260728_ver156"></script>
+  <script src="assets/js/screens/other-work.js?v=20260728_ver156"></script>
+  <script src="assets/js/screens/annual.js?v=20260728_ver156"></script>
+  <script src="assets/js/screens/materials.js?v=20260728_ver156"></script>
+  <script src="assets/js/screens/results.js?v=20260728_ver156"></script>
+  <script src="assets/js/screens/notices.js?v=20260728_ver156"></script>
+  <script src="assets/js/screens/data.js?v=20260728_ver156"></script>
+  <script src="assets/js/app.js?v=20260728_ver156"></script>
 </body>
 </html>

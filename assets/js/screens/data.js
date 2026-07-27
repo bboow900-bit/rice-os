@@ -25,8 +25,28 @@
     return `${Math.round(bytes / 1024 / 102.4) / 10}MB`;
   }
 
+  function renderMasterCounts() {
+    const data = state.data();
+    const values = {
+      fields: state.activeFields ? state.activeFields().length : (data.fields || []).length,
+      varieties: (data.varieties || []).length,
+      transplanter: (data.varieties || []).filter((item) => item.rowSpacing || item.plantSpacing || item.seedlingScrapeAmount).length,
+      dryPeriods: (data.dryPeriods || []).length,
+      irrigations: (data.irrigations || []).length,
+      materials: (data.materials || []).length,
+      photos: (data.photos || []).length,
+      results: (data.varietyResults || []).length
+    };
+    Object.entries(values).forEach(([key, value]) => {
+      U.$$(`[data-master-count="${key}"]`).forEach((el) => {
+        el.textContent = `${value}件`;
+      });
+    });
+  }
+
   function render() {
     const info = storage.info(state.data());
+    renderMasterCounts();
     const exportDate = info.lastJsonExportAt ? String(info.lastJsonExportAt).slice(0, 10) : "";
     const exportDays = exportDate ? U.daysBetween(exportDate, U.today()) : "";
     const exportStatus = exportDate
@@ -162,6 +182,22 @@
   }
 
   function bind() {
+    const systemSettingsPanel = U.$("systemSettingsPanel");
+    U.$$('[data-action="open-system-settings"]').forEach((button) => {
+      button.addEventListener("click", () => {
+        if (!systemSettingsPanel) return;
+        systemSettingsPanel.classList.remove("hidden");
+        systemSettingsPanel.setAttribute("aria-hidden", "false");
+        systemSettingsPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+    });
+    U.$$('[data-action="close-system-settings"]').forEach((button) => {
+      button.addEventListener("click", () => {
+        if (!systemSettingsPanel) return;
+        systemSettingsPanel.classList.add("hidden");
+        systemSettingsPanel.setAttribute("aria-hidden", "true");
+      });
+    });
     document.querySelector('[data-action="export-json"]').addEventListener("click", () => {
       storage.exportJson(state.data());
       state.markJsonExported();
