@@ -885,18 +885,8 @@
     const stage = fieldStage(field);
     const photo = latestPhotoForField(field);
     const growth = latestGrowthForField(field.fieldId);
-    const dry = drySummary(field);
-    const irrigation = latestIrrigationForField(field.fieldId);
-    const deepWater = latestDeepWaterForField(field.fieldId);
     const latestSeasonNote = latestSeasonNoteForField(field.fieldId);
     const nextRecord = fieldNextRecordInfo(field);
-    const waterText = deepWater && !deepWater.actualEndDate
-      ? `深水管理 実施中 ${U.fd(deepWater.startDate)}`
-      : irrigation
-      ? `${irrigation.method || "水管理"} ${irrigation.actualEndDate ? `完了 ${U.fd(irrigation.actualEndDate)}` : `実施中 ${U.fd(irrigation.startDate)}`}`
-      : dry.actualEndDate
-        ? `中干し完了 ${U.fd(dry.actualEndDate)} / 次の水管理は未開始`
-        : dry.startDate ? `中干し ${dry.status}` : "水管理未記録";
     return `
       <section class="field-hub-detail">
         <div class="field-hub-detail-head"><button type="button" class="field-hub-back" data-field-view="list" aria-label="圃場一覧へ戻る">‹</button><div><span>圃場詳細</span><h3>${U.escapeHTML(field.name)}</h3><small>${U.escapeHTML(variety && variety.name || "品種未設定")} / ${U.escapeHTML(String(field.areaA || 0))}a</small></div><button type="button" class="secondary" data-field-view="settings">編集</button></div>
@@ -904,10 +894,8 @@
           ${photo && photo.photoData ? `<img src="${U.attr(photo.photoData)}" alt="">` : `<span>${groupRiceImage(stage.number)}</span>`}
           <div><small>現在の生育ステージ / ${U.escapeHTML(stage.certainty)}</small><b>${U.escapeHTML(stage.label)}</b><p>${U.escapeHTML(stage.management.label)} / ${U.escapeHTML(fieldNextRecord(field))}</p></div>
         </section>
-        <div class="field-hub-summary"><span><b>生育</b>${U.escapeHTML(growth ? `${U.fd(growth.date)} / 葉色 ${growth.leafColor || "-"}` : "未入力")}</span><span><b>水管理</b>${U.escapeHTML(waterText)}</span></div>
+        <div class="field-hub-summary single"><span><b>最新の生育</b>${U.escapeHTML(growth ? `${U.fd(growth.date)} / 葉色 ${growth.leafColor || "-"}` : "未入力")}</span></div>
         ${renderPhotoComparison(field)}
-        ${renderWaterPeriodOverview(field, dry, irrigation, deepWater)}
-        ${dry.actualEndDate && !irrigation ? `<section class="field-water-transition"><b>中干し完了</b><span>${U.escapeHTML(U.fd(dry.actualEndDate))}。水管理の記録は次の入力から開けます</span></section>` : ""}
         ${nextRecord
           ? `<section class="field-next-action"><button type="button" data-field-action="${U.attr(nextRecord.action)}" data-field-id="${U.attr(field.fieldId)}"><span>記録が不足しています</span><b>${U.escapeHTML(nextRecord.label)}</b><i aria-hidden="true">›</i></button></section>`
           : '<section class="field-next-guide"><b>記録を追加</b><span>現場の様子に合わせて、下から種類を選べます</span></section>'}

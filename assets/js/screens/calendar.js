@@ -91,16 +91,13 @@
   function renderSelected() {
     U.$("selectedDateTitle").textContent = `${U.fd(selectedDate)} の記録`;
     const entries = RiceOS.calendar.entriesForDate(selectedDate);
-    const field = RiceOS.state.activeFields()[0] || RiceOS.state.fields()[0] || null;
-    const progress = field && RiceOS.agro ? RiceOS.agro.progress(field, selectedDate) : null;
-    if (U.$("selectedDateProgress")) {
-      U.$("selectedDateProgress").innerHTML = progress ? `
-        <span>${U.escapeHTML(field.name)}</span>
-        <b>${U.escapeHTML(progress.dap === "" ? "田植日未設定" : `田植後 ${progress.dap}日`)}</b>
-        <b>積算気温 ${U.escapeHTML(progress.tempText)}</b>
-      ` : "";
+    const kinds = [...new Set(entries.map((entry) => entryStatusLabel(entry)).filter(Boolean))];
+    const meta = U.$("selectedDateMeta");
+    if (meta) {
+      meta.textContent = entries.length
+        ? `${entries.length}件の記録${kinds.length ? ` / ${kinds.join("・")}` : ""}`
+        : "記録を追加できます";
     }
-    U.$("selectedDateEntries").innerHTML = entries.length ? entries.map(entryHtml).join("") : '<div class="empty">この日の記録はまだありません。</div>';
   }
 
   function render() {
@@ -120,39 +117,10 @@
       render();
       if (RiceOS.bottomSheet) RiceOS.bottomSheet.open(selectedDate);
     });
-    U.$("selectedDateEntries").addEventListener("click", (event) => {
-      const fieldButton = event.target.closest("[data-calendar-open-field]");
-      if (fieldButton && RiceOS.app && RiceOS.screens.fields && RiceOS.screens.fields.openField) {
-        RiceOS.app.show("fields");
-        RiceOS.screens.fields.openField(fieldButton.dataset.calendarOpenField, "detail");
-        return;
-      }
-      const groupButton = event.target.closest("[data-calendar-open-group]");
-      if (groupButton && RiceOS.app && RiceOS.screens.fields && RiceOS.screens.fields.openGroup) {
-        RiceOS.app.show("fields");
-        RiceOS.screens.fields.openGroup(groupButton.dataset.calendarOpenGroup || "");
-        return;
-      }
-      const button = event.target.closest("[data-calendar-action]");
-      if (!button || !RiceOS.recordActions) return;
-      const entry = findEntry(button.dataset.kind, button.dataset.id);
-      if (!entry) return;
-      if (button.dataset.calendarAction === "complete" && entry.kind === "schedule") {
-        if (String(entry.record.title || entry.record.scheduleType || "").includes("追肥") && RiceOS.screens.fertilizer) {
-          RiceOS.screens.fertilizer.open(entry.record, render);
-          return;
-        }
-        RiceOS.app.show("field-work");
-        RiceOS.screens.fieldWork.prefillSchedule(entry.record);
-        return;
-      }
-      if (button.dataset.calendarAction === "edit") {
-        RiceOS.recordActions.edit(entry.kind, entry.record);
-        render();
-      }
-      if (button.dataset.calendarAction === "delete") {
-        if (RiceOS.recordActions.remove(entry.kind, entry.record)) render();
-      }
+    const openSelected = U.$("selectedDateSummary");
+    if (openSelected) openSelected.addEventListener("click", (event) => {
+      if (!event.target.closest("[data-calendar-open-selected]")) return;
+      if (RiceOS.bottomSheet) RiceOS.bottomSheet.open(selectedDate);
     });
     document.querySelectorAll("[data-calendar-move]").forEach((button) => {
       button.addEventListener("click", () => {
