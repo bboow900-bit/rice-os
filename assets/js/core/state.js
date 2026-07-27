@@ -482,7 +482,6 @@
       }
       const fieldTargetsChanged = previous && (previous.fieldIds || []).slice().sort().join("|") !== normalized.fieldIds.slice().sort().join("|");
       if (previous && isDryEndWorkName(previous.workName) && (!isDryEndWorkName(normalized.workName) || previous.date !== normalized.date || fieldTargetsChanged)) {
-        clearAutoIntermittentForDrying(d, `work:${normalized.workId}`);
         (previous.fieldIds || []).forEach((fieldId) => refreshDryingSummary(d, fieldId));
       }
       if (isDryEndWorkName(normalized.workName)) {
@@ -493,7 +492,6 @@
             d.fields[fieldIndex].drainageActualDays = dryActualDaysForField(d.fields[fieldIndex], normalized.date);
             d.fields[fieldIndex].drainageSummaryYear = cacheYearForDate(normalized.date);
           }
-          startIntermittentAfterDrying(d, fieldId, normalized.date, `work:${normalized.workId}`);
         });
       }
       if (normalized.workName === "田植え") {
@@ -537,7 +535,6 @@
       d.fieldWorks = d.fieldWorks.filter((w) => w.workId !== workId);
       if (removed && isDryEndWorkName(removed.workName)) {
         (removed.fieldIds || []).forEach((fieldId) => {
-          clearAutoIntermittentForDrying(d, `work:${workId}`);
           refreshDryingSummary(d, fieldId);
         });
       }
@@ -887,8 +884,6 @@
       const index = d.dryPeriods.findIndex((item) => item.dryPeriodId === normalized.dryPeriodId);
       if (index >= 0) d.dryPeriods[index] = { ...d.dryPeriods[index], ...normalized };
       else d.dryPeriods.push(normalized);
-      const drySource = `period:${normalized.dryPeriodId}`;
-      if (previous && previous.actualEndDate && previous.actualEndDate !== normalized.actualEndDate) clearAutoIntermittentForDrying(d, drySource);
       const fieldIndex = d.fields.findIndex((f) => f.fieldId === normalized.fieldId);
       if (fieldIndex >= 0) {
         if (normalized.startDate) {
@@ -901,7 +896,8 @@
           d.fields[fieldIndex].drainageActualEndDate = normalized.actualEndDate;
           d.fields[fieldIndex].drainageActualDays = dryActualDaysForField(d.fields[fieldIndex], normalized.actualEndDate);
           d.fields[fieldIndex].drainageSummaryYear = cacheYearForDate(normalized.actualEndDate);
-          startIntermittentAfterDrying(d, normalized.fieldId, normalized.actualEndDate, drySource);
+          // 中干し完了は事実として残すだけにする。間断灌水など次の管理は、
+          // 現場で開始を記録した時だけ別の期間として保存される。
         }
       }
       if (previous && previous.actualEndDate && !normalized.actualEndDate) refreshDryingSummary(d, normalized.fieldId);
@@ -912,7 +908,6 @@
       const removed = (d.dryPeriods || []).find((item) => item.dryPeriodId === dryPeriodId);
       d.dryPeriods = (d.dryPeriods || []).filter((item) => item.dryPeriodId !== dryPeriodId);
       if (removed) {
-        clearAutoIntermittentForDrying(d, `period:${dryPeriodId}`);
         refreshDryingSummary(d, removed.fieldId);
       }
     }, "中干し記録を削除しました");

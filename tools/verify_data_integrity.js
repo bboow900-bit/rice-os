@@ -264,8 +264,8 @@ state.saveDryPeriod({
   startDate: "2026-06-06",
   status: "進行中"
 });
-// Completing the current year's drying period must create a new, current-year
-// intermittent-irrigation record without reusing a prior year's record.
+// Completing drying must not invent a new water-management period. Each
+// management type is recorded explicitly so the saved facts stay auditable.
 state.saveIrrigation({
   date: "2025-06-09",
   fieldId: "field_b",
@@ -278,12 +278,45 @@ state.saveDryPeriod({
   startDate: "2026-06-06",
   actualEndDate: "2026-06-11"
 });
-const automaticCurrentYearIrrigation = state.irrigationsFor("field_b", 2026)
-  .find((row) => row.autoStartedFromDry && row.autoStartedFromDrySource);
-assert(automaticCurrentYearIrrigation, "current-year drying completion did not start intermittent irrigation");
-assert(automaticCurrentYearIrrigation.startDate === "2026-06-11", "automatic intermittent irrigation did not use the drying completion date");
+assert(!state.irrigationsFor("field_b", 2026)
+  .some((row) => row.autoStartedFromDry && row.autoStartedFromDrySource), "drying completion unexpectedly started intermittent irrigation");
 assert(!state.irrigationsFor("field_b", 2026).some((row) => String(row.date).startsWith("2025-")), "prior-year intermittent irrigation leaked into the current year");
 assert(state.irrigationsFor("field_b", 2025).some((row) => String(row.date).startsWith("2025-")), "prior-year intermittent irrigation record was unexpectedly removed");
+
+state.saveIrrigationsBatch([{
+  irrigationId: "intermittent_field_b_2026_01",
+  date: "2026-06-12",
+  fieldId: "field_b",
+  method: "間断灌水",
+  startDate: "2026-06-12"
+}, {
+  irrigationId: "drain_field_b_2026_01",
+  date: "2026-09-10",
+  fieldId: "field_b",
+  method: "稲刈り前の落水",
+  startDate: "2026-09-10"
+}], "independent water periods");
+assert(state.irrigationsFor("field_b", 2026).some((row) => row.method === "間断灌水" && row.irrigationId === "intermittent_field_b_2026_01"), "manual intermittent irrigation was not retained");
+assert(state.irrigationsFor("field_b", 2026).some((row) => row.method === "稲刈り前の落水" && row.irrigationId === "drain_field_b_2026_01"), "pre-harvest drainage was not retained as an independent period");
+
+state.saveIrrigation({
+  irrigationId: "legacy_auto_intermit_field_a",
+  date: "2026-06-15",
+  fieldId: "field_a",
+  method: "間断灌水",
+  startDate: "2026-06-15",
+  autoStartedFromDry: true,
+  autoStartedFromDrySource: "work:legacy_dry_end"
+});
+state.saveFieldWork({
+  workId: "dry_end_manual_work",
+  date: "2026-06-16",
+  fieldIds: ["field_a"],
+  workName: "中干し終了"
+});
+assert(!state.irrigationsFor("field_a", 2026).some((row) => row.autoStartedFromDrySource === "work:dry_end_manual_work"), "drying-end work unexpectedly created intermittent irrigation");
+state.deleteFieldWork("dry_end_manual_work");
+assert(state.irrigationsFor("field_a", 2026).some((row) => row.irrigationId === "legacy_auto_intermit_field_a"), "deleting a drying-end work removed a legacy automatic irrigation record");
 
 const intermittentStartBeforeDeep = state.field("field_b").intermittentStartDate;
 assert(state.saveIrrigationsBatch([{

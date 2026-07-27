@@ -285,8 +285,7 @@
 
   function allRows() {
     const d = state.data();
-    // 湿潤灌漑と落水は、水管理の独立した履歴として扱わない。
-    // 落水は間断灌水の実終了日に統合して表示する。
+    // 専用の水管理期間として残る記録は、作業一覧との重複を避ける。
     const fieldWorks = d.fieldWorks
       .filter((w) => !/湿潤灌漑|稲刈り前の落水|落水/.test(String(w.workName || "")))
       .map((w) => makeRow("fieldWork", w, {
@@ -344,7 +343,7 @@
       ]
     }));
     const irrigation = (d.irrigations || [])
-      .filter((item) => /間断|深水|湿潤/.test(String(item.method || "")))
+      .filter((item) => /間断|深水|湿潤|稲刈り前の落水|^落水$/.test(String(item.method || "")))
       .map((item) => makeRow("irrigation", item, {
       id: item.irrigationId,
       date: item.date,
@@ -936,6 +935,7 @@
     if (/中干し/.test(text)) return "中干し";
     if (/間断/.test(text)) return "間断灌水";
     if (/深水/.test(text)) return "深水管理";
+    if (/稲刈り前.*落水|^落水$/.test(text)) return "稲刈り前の落水";
     if (/湿潤/.test(text)) return "湿潤灌漑（旧記録）";
     return "";
   }
@@ -944,6 +944,7 @@
     if (/中干し/.test(label)) return "dry";
     if (/間断/.test(label)) return "intermittent";
     if (/深水/.test(label)) return "deep";
+    if (/落水/.test(label)) return "drain";
     if (/湿潤/.test(label)) return "legacy";
     return "water";
   }
@@ -996,7 +997,8 @@
     const manualDefinitions = [
       { label: "中干し", start: (name) => /中干し.*開始|中干し開始/.test(name), end: (name) => /中干し.*終了|中干し.*完了|中干完了/.test(name) },
       { label: "間断灌水", start: (name) => /間断灌水.*開始|間断灌水開始/.test(name), end: (name) => /間断灌水.*終了|間断灌水.*完了/.test(name) },
-      { label: "深水管理", start: (name) => /深水.*開始|深水管理/.test(name), end: (name) => /深水.*終了|深水管理.*完了/.test(name) }
+      { label: "深水管理", start: (name) => /深水.*開始|深水管理/.test(name), end: (name) => /深水.*終了|深水管理.*完了/.test(name) },
+      { label: "稲刈り前の落水", start: (name) => /稲刈り前.*落水|^落水$/.test(name), end: (name) => /落水.*終了|落水.*完了/.test(name) }
     ];
 
     manualDefinitions.forEach((definition) => {
@@ -1019,11 +1021,12 @@
     });
 
     return periods
-      .sort((a, b) => String(b.startDate || b.actualEndDate).localeCompare(String(a.startDate || a.actualEndDate)))
-      .map((period, index, list) => ({
+      .map((period) => ({
         ...period,
-        sequence: list.filter((other, otherIndex) => otherIndex <= index && other.label === period.label).length
-      }));
+        sequence: periods.filter((other) => other.label === period.label
+          && String(other.startDate || other.actualEndDate || "") <= String(period.startDate || period.actualEndDate || "")).length
+      }))
+      .sort((a, b) => String(b.startDate || b.actualEndDate).localeCompare(String(a.startDate || a.actualEndDate)));
   }
 
   function renderWaterPeriod(period) {
@@ -1056,7 +1059,7 @@
 
   function renderWaterTab(field) {
     const periods = waterPeriodsForField(field);
-    if (!periods.length) return '<div class="empty">中干し・間断灌水・深水管理を記録すると、期間をここで振り返れます。</div>';
+    if (!periods.length) return '<div class="empty">中干し・間断灌水・深水管理・稲刈り前の落水を記録すると、期間をここで振り返れます。</div>';
     return `<section class="annual-water-periods"><div class="annual-water-periods-heading"><div><span>水管理の振り返り</span><h3>いつから、いつまで行ったか</h3></div><small>${periods.length}件</small></div>${periods.map(renderWaterPeriod).join("")}</section>`;
   }
 

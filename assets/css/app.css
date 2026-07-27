@@ -6723,7 +6723,7 @@ label {
 .water-flow-head span, .water-history-head small { color: #668065; font-size: 10px; font-weight: 850; }
 .water-flow-head b { color: #183c22; font-size: 15px; }
 .water-flow-head strong { padding: 5px 8px; border-radius: 999px; background: #fff9e1; color: #92721e; font-size: 10px; }
-.water-crop-road, .water-flow-road { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); margin-top: 13px; }
+.water-crop-road, .water-flow-road { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); margin-top: 13px; }
 .water-crop-road span { overflow: hidden; color: #59735a; font-size: 8px; font-weight: 800; text-align: center; text-overflow: ellipsis; white-space: nowrap; }
 .water-flow-road { grid-template-columns: repeat(5, minmax(0, 1fr)); margin-top: 6px; overflow: hidden; border-radius: 8px; }
 .water-flow-road span { position: relative; display: grid; min-height: 36px; place-items: center; background: #dce8ef; color: #4d6d7e; font-size: 9px; font-weight: 900; text-align: center; }
@@ -6741,14 +6741,31 @@ label {
 .water-current-card b { color: #174458; font-size: 15px; }
 .water-current-card small { grid-column: 1 / -1; color: #61787d; font-size: 10px; }
 .water-action-section { padding: 2px 0; }
-.water-action-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-.water-action { display: grid; min-height: 66px; gap: 4px; padding: 10px; border: 1px solid #cfe3d2; border-radius: 12px; background: #fffefa; color: #214528; text-align: left; }
-.water-action b { font-size: 14px; }
-.water-action small { color: #65806a; font-size: 9px; font-weight: 700; }
-.water-action.deep { border-color: #9bd0e5; background: #ebf9ff; color: #18536a; }
-.water-action.dry { border-color: #ebcf83; background: #fff8e5; color: #76500d; }
-.water-action.drain { border-color: #d7c2a5; background: #fbf6ed; color: #654f35; }
-.water-action:disabled { opacity: .45; }
+.water-action-grid { display: grid; grid-template-columns: 1fr; gap: 9px; }
+.water-period-card { display: grid; gap: 8px; padding: 11px; border: 1px solid #cfe3d2; border-left: 5px solid #48a45e; border-radius: 13px; background: linear-gradient(135deg, #f7fff4, #fffefa); box-shadow: 0 5px 12px rgba(43, 91, 46, .06); }
+.water-period-card.intermittent { border-left-color: #4eadd0; background: linear-gradient(135deg, #f0fbff, #fffefa); }
+.water-period-card.deep { border-left-color: #2f91bc; background: linear-gradient(135deg, #eaf8ff, #fffefa); }
+.water-period-card.dry { border-left-color: #d4a33e; background: linear-gradient(135deg, #fff8e5, #fffefa); }
+.water-period-card.drain { border-left-color: #998166; background: linear-gradient(135deg, #fbf4e8, #fffefa); }
+.water-period-card-head { display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; align-items: center; gap: 8px; }
+.water-period-icon { display: grid; width: 32px; height: 32px; place-items: center; border-radius: 10px; background: #fff; box-shadow: inset 0 0 0 1px rgba(71, 131, 79, .13); color: #28783d; font-size: 19px; font-weight: 900; }
+.water-period-card.intermittent .water-period-icon, .water-period-card.deep .water-period-icon { color: #277e9d; }
+.water-period-card.dry .water-period-icon { color: #a56b18; }
+.water-period-card.drain .water-period-icon { color: #765e44; }
+.water-period-card-head > div { display: grid; min-width: 0; gap: 1px; }
+.water-period-card-head b { color: #24402b; font-size: 15px; line-height: 1.2; }
+.water-period-card-head small { overflow: hidden; color: #66806a; font-size: 10px; font-weight: 760; text-overflow: ellipsis; white-space: nowrap; }
+.water-period-status { padding: 4px 7px; border-radius: 999px; background: #eef2ed; color: #667168; font-size: 10px; }
+.water-period-status.active { background: #dff4e4; color: #21763a; }
+.water-period-status.done { background: #eaf3f6; color: #377187; }
+.water-period-facts { display: flex; flex-wrap: wrap; gap: 5px; }
+.water-period-facts span { padding: 3px 6px; border-radius: 999px; background: rgba(255,255,255,.84); color: #607263; font-size: 10px; font-weight: 780; box-shadow: inset 0 0 0 1px #e0eadf; }
+.water-period-stage { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 6px; margin: 0; padding-top: 6px; border-top: 1px dashed #d6e2d4; color: #66806a; font-size: 10px; }
+.water-period-stage b { overflow: hidden; color: #355a3e; text-align: right; text-overflow: ellipsis; white-space: nowrap; }
+.water-period-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
+.water-period-actions button { min-height: 44px; padding: 7px; border-radius: 10px; font-size: 12px; font-weight: 900; }
+.water-period-actions button:disabled { opacity: .38; }
+.water-period-history-note { color: #788477; font-size: 10px; text-align: right; }
 .water-edit-section { background: #fffefa; }
 .water-history-head { margin: 4px 2px 8px; }
 .water-history-head h3 { margin: 0; color: #263c2a; font-size: 16px; }
@@ -6761,6 +6778,7 @@ label {
 .water-history-card span { color: #578060; font-size: 10px; font-weight: 850; }
 .water-history-card b { color: #233d29; font-size: 14px; }
 .water-history-card small { color: #68766a; font-size: 10px; }
+.water-history-card em { color: #6b7a6d; font-size: 9px; font-style: normal; line-height: 1.35; }
 .water-history-card button { flex: 0 0 auto; min-height: 34px; padding: 0 9px; border: 1px solid #d5e2d6; border-radius: 8px; background: #fff; color: #2c7540; font-size: 11px; font-weight: 850; }
 
 /* 水管理工程: 生育の段階と水管理を同じ横軸で見せる。 */

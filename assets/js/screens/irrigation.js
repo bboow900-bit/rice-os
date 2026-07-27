@@ -16,6 +16,13 @@
     { key: "ripening", label: "登熟・収穫前", water: "intermittent", waterLabel: "間断・落水" }
   ];
 
+  const WATER_TYPES = [
+    { key: "dry", label: "中干し", source: "dry", tone: "dry", icon: "☀", target: (field) => field.drainageTargetDays || "" },
+    { key: "intermittent", label: "間断灌水", source: "irrigation", method: "間断灌水", tone: "intermittent", icon: "〰", target: (field) => field.intermittentIntervalDays || "" },
+    { key: "deep", label: "深水管理", source: "irrigation", method: "深水管理", tone: "deep", icon: "≋", target: () => "" },
+    { key: "drain", label: "稲刈り前の落水", source: "irrigation", method: "稲刈り前の落水", tone: "drain", icon: "⌇", target: () => "" }
+  ];
+
   function cropYear(date) {
     return String(date || U.today()).slice(0, 4);
   }
@@ -63,7 +70,7 @@
   function irrigationRows(fieldId, date) {
     const year = cropYear(date);
     return state.irrigationsFor(fieldId, year)
-      .filter((item) => /間断灌水|深水管理/.test(String(item.method || "")))
+      .filter((item) => /間断灌水|深水管理|稲刈り前の落水|落水/.test(String(item.method || "")))
       .filter((item) => String(item.startDate || item.date || "") <= String(date))
       .slice()
       .sort((a, b) => String(a.startDate || a.date).localeCompare(String(b.startDate || b.date)));
@@ -76,18 +83,34 @@
   }
 
   function activeRow(rows, method, date) {
-    return rows.filter((item) => item.method === method && item.startDate && (!item.actualEndDate || String(item.actualEndDate) > String(date))).at(-1) || null;
+    return rows.filter((item) => !/予定|未開始/.test(String(item.periodStatus || item.status || ""))
+      && (!method || item.method === method) && item.startDate && (!item.actualEndDate || String(item.actualEndDate) > String(date))).at(-1) || null;
+  }
+
+  function typeForKey(key) {
+    return WATER_TYPES.find((item) => item.key === key) || null;
+  }
+
+  function typeRows(field, type, date) {
+    if (type.source === "dry") return dryRows(field.fieldId, date);
+    return irrigationRows(field.fieldId, date).filter((item) => item.method === type.method || (type.key === "drain" && item.method === "落水"));
+  }
+
+  function activePeriod(field, type, date) {
+    const rows = typeRows(field, type, date);
+    if (type.source === "dry") return rows.filter((item) => !/予定|未開始/.test(String(item.periodStatus || item.status || ""))
+      && item.startDate && (!item.actualEndDate || String(item.actualEndDate) > String(date))).at(-1) || null;
+    return activeRow(rows, type.method, date) || (type.key === "drain" ? activeRow(rows, "落水", date) : null);
   }
 
   function waterState(field, date) {
-    const dry = dryRows(field.fieldId, date).filter((item) => item.startDate).at(-1) || null;
-    const irrigation = irrigationRows(field.fieldId, date);
-    const deep = activeRow(irrigation, "深水管理", date);
-    const intermittent = activeRow(irrigation, "間断灌水", date);
-    if (deep) return { key: "deep", label: "深水管理中", item: deep };
-    if (intermittent) return { key: "intermittent", label: "間断灌水中", item: intermittent };
-    if (dry && (!dry.actualEndDate || String(dry.actualEndDate) > String(date))) return { key: "dry", label: "中干し中", item: dry };
-    if (dry && dry.actualEndDate && String(dry.actualEndDate) <= String(date)) return { key: "afterDry", label: "中干し完了", item: dry };
+    const active = WATER_TYPES.map((type) => ({ type, item: activePeriod(field, type, date) }))
+      .filter((row) => row.item)
+      .sort((a, b) => String(a.item.startDate || a.item.date).localeCompare(String(b.item.startDate || b.item.date)));
+    if (active.length) {
+      const latest = active.at(-1);
+      return { key: latest.type.key, label: `${latest.type.label}中`, item: latest.item };
+    }
     return { key: "waiting", label: "水管理を記録", item: null };
   }
 
@@ -187,42 +210,72 @@
     `;
   }
 
-  function button(action, label, tone, enabled) {
-    const note = enabled ? `${U.fd(U.$("waterDate").value || U.today())}で記録` : "対象となる期間がありません";
-    return `<button type="button" class="water-action ${U.attr(tone)}" data-water-action="${U.attr(action)}" ${enabled ? "" : "disabled"}><b>${U.escapeHTML(label)}</b><small>${U.escapeHTML(note)}</small></button>`;
+  function typeActiveFields(type, date) {
+    return targetFields().filter((field) => activePeriod(field, type, date));
   }
 
-  function eligibleFields(action) {
+  function typePeriodSummary(type, date) {
+    const fields = targetFields();
+    const active = typeActiveFields(type, date);
+    const rows = fields.flatMap((field) => typeRows(field, type, date).map((item) => ({ field, item })));
+    const latest = rows.slice().sort((a, b) => String(b.item.startDate || b.item.date).localeCompare(String(a.item.startDate || a.item.date)))[0] || null;
+    return { fields, active, rows, latest };
+  }
+
+  function stageText(field, date) {
+    if (!field || !date) return "生育記録待ち";
+    const stage = currentStage(field, date);
+    return `${stage.label} (${stage.certainty})`;
+  }
+
+  function periodDays(item, date) {
+    if (!item || !item.startDate) return "";
+    const end = item.actualEndDate || date;
+    const days = U.daysBetween(item.startDate, end);
+    return days === "" ? "" : `${days}日`;
+  }
+
+  function renderTypeCard(type) {
     const date = U.$("waterDate").value || U.today();
-    return targetFields().filter((field) => {
-      const stateRow = waterState(field, date);
-      if (action === "dry-start") return stateRow.key === "waiting";
-      if (action === "dry-end") return stateRow.key === "dry";
-      if (action === "intermittent-start") return ["waiting", "afterDry"].includes(stateRow.key);
-      if (action === "deep-start") return stateRow.key === "intermittent";
-      if (action === "deep-end") return stateRow.key === "deep";
-      if (action === "drain") return stateRow.key === "intermittent";
-      return false;
-    });
+    const summary = typePeriodSummary(type, date);
+    const activeCount = summary.active.length;
+    const isGroup = summary.fields.length > 1;
+    const latest = summary.latest;
+    const latestItem = latest && latest.item;
+    const startLabel = latestItem ? U.fd(latestItem.startDate || latestItem.date) : "まだ記録なし";
+    const finished = latestItem && latestItem.actualEndDate;
+    const status = activeCount ? "実施中" : (finished ? "完了" : "未開始");
+    const targetDays = latestItem && latestItem.targetDays || (summary.fields.length === 1 ? type.target(summary.fields[0]) : "");
+    const activeItem = summary.active[0] && activePeriod(summary.active[0], type, date);
+    const stageField = activeItem && summary.active[0] ? summary.active[0] : latest && latest.field;
+    const stage = activeItem && stageField ? stageText(stageField, activeItem.startDate) : (latest ? stageText(latest.field, latestItem.startDate || latestItem.date) : "");
+    const startEnabled = summary.fields.length > activeCount;
+    const endEnabled = activeCount > 0;
+    const countNote = isGroup ? `${activeCount}/${summary.fields.length}圃場が実施中` : "";
+    return `
+      <article class="water-period-card ${U.attr(type.tone)}">
+        <div class="water-period-card-head"><span class="water-period-icon" aria-hidden="true">${U.escapeHTML(type.icon)}</span><div><b>${U.escapeHTML(type.label)}</b><small>${U.escapeHTML(countNote || (activeCount ? `開始 ${startLabel}` : (finished ? `完了 ${U.fd(latestItem.actualEndDate)}` : "期間を記録")))}</small></div><strong class="water-period-status ${activeCount ? "active" : (finished ? "done" : "waiting")}">${U.escapeHTML(status)}</strong></div>
+        <div class="water-period-facts">
+          <span>最新 ${U.escapeHTML(startLabel)}</span>
+          ${activeItem ? `<span>経過 ${U.escapeHTML(periodDays(activeItem, date))}</span>` : (finished ? `<span>実績 ${U.escapeHTML(periodDays(latestItem, latestItem.actualEndDate))}</span>` : "")}
+          ${targetDays ? `<span>目安 ${U.escapeHTML(String(targetDays))}日</span>` : ""}
+        </div>
+        ${stage ? `<p class="water-period-stage"><span>${isGroup ? `代表: ${stageField.name}` : "生育との重なり"}</span><b>${U.escapeHTML(stage)}</b></p>` : ""}
+        <div class="water-period-actions">
+          <button type="button" class="secondary" data-water-action="${U.attr(`${type.key}-start`)}" ${startEnabled ? "" : "disabled"}>${finished ? "もう一度開始" : "開始を記録"}</button>
+          <button type="button" class="primary" data-water-action="${U.attr(`${type.key}-end`)}" ${endEnabled ? "" : "disabled"}>終了を記録</button>
+        </div>
+        ${summary.rows.length > 1 ? `<small class="water-period-history-note">過去を含めて ${isGroup ? `合計${summary.rows.length}件` : `${summary.rows.length}回`}</small>` : ""}
+      </article>`;
   }
 
   function renderActions() {
-    const states = targetFields().map((field) => waterState(field, U.$("waterDate").value || U.today()));
-    const key = states.length && states.every((state) => state.key === states[0].key) ? states[0].key : "mixed";
-    const actions = key === "dry"
-      ? [["dry-end", "中干しを終了", "dry"]]
-      : key === "deep"
-        ? [["deep-end", "深水管理を終了", "deep"]]
-        : key === "intermittent"
-          ? [["deep-start", "深水管理を開始", "deep"], ["drain", "落水を記録", "drain"]]
-          : key === "afterDry"
-            ? [["intermittent-start", "間断灌水を開始", "intermittent"]]
-            : [["dry-start", "中干しを開始", "dry"], ["intermittent-start", "間断灌水を開始", "intermittent"]];
-    U.$("waterActionGrid").innerHTML = actions.map(([action, label, tone]) => button(action, label, tone, eligibleFields(action).length > 0)).join("");
+    U.$("waterActionGrid").innerHTML = WATER_TYPES.map(renderTypeCard).join("");
   }
 
   function irrigationRecord(field, method, startDate, endDate, memo) {
-    const targetDays = method === "間断灌水" ? String(field.intermittentIntervalDays || "") : "";
+    const type = WATER_TYPES.find((item) => item.method === method);
+    const targetDays = type ? String(type.target(field) || "") : "";
     return {
       method,
       date: startDate,
@@ -232,54 +285,33 @@
       actualEndDate: "",
       targetDays,
       periodStatus: "実施中",
-      status: method === "深水管理" ? "入水中" : "入水中",
+      status: method === "稲刈り前の落水" ? "落水中" : "入水中",
       memo: memo || ""
     };
   }
 
-  function confirmAction(action, fields) {
-    const labels = { "dry-start": "中干しを開始", "dry-end": "中干しを終了", "intermittent-start": "間断灌水を開始", "deep-start": "深水管理を開始", "deep-end": "深水管理を終了", drain: "落水を記録" };
-    return confirm(`${targetLabel()}の${fields.length}圃場へ、${U.fd(U.$("waterDate").value || U.today())}に${labels[action]}を記録します。`);
-  }
-
   function recordAction(action) {
     const date = U.$("waterDate").value || U.today();
-    const fields = eligibleFields(action);
-    if (!fields.length || !confirmAction(action, fields)) return;
-    if (action === "dry-start") {
-      const records = fields.map((field) => ({ fieldId: field.fieldId, date, startDate: date, targetDays: String(field.drainageTargetDays || ""), status: "実施中", memo: "" }));
-      state.saveDryPeriodsBatch(records, `${targetLabel()}の中干しを開始しました`);
-    } else if (action === "dry-end") {
+    const [key, mode] = String(action || "").split("-");
+    const type = typeForKey(key);
+    if (!type || !mode) return;
+    const fields = targetFields().filter((field) => mode === "start" ? !activePeriod(field, type, date) : Boolean(activePeriod(field, type, date)));
+    if (!fields.length) return;
+    const verb = mode === "start" ? "開始" : "終了";
+    if (!confirm(`${targetLabel()}の${fields.length}圃場へ、${U.fd(date)}に${type.label}の${verb}を記録します。`)) return;
+    if (mode === "start") {
+      if (type.source === "dry") {
+        state.saveDryPeriodsBatch(fields.map((field) => ({ fieldId: field.fieldId, date, startDate: date, targetDays: String(type.target(field) || ""), status: "実施中", memo: "" })), `${targetLabel()}の中干しを開始しました`);
+      } else {
+        state.saveIrrigationsBatch(fields.map((field) => irrigationRecord(field, type.method, date, "", "")), `${targetLabel()}の${type.label}を開始しました`);
+      }
+    } else {
       const records = fields.map((field) => {
-        const active = waterState(field, date).item;
-        return { ...active, date: active.date || active.startDate, actualEndDate: date, status: "完了" };
+        const active = activePeriod(field, type, date);
+        return { ...active, date: active.date || active.startDate, actualEndDate: date, status: "完了", periodStatus: "完了" };
       });
-      state.saveDryPeriodsBatch(records, `${targetLabel()}の中干しを終了しました。間断灌水を開始しました`);
-    } else if (action === "intermittent-start") {
-      const records = fields.map((field) => irrigationRecord(field, "間断灌水", date, "", ""));
-      state.saveIrrigationsBatch(records, `${targetLabel()}の間断灌水を開始しました`);
-    } else if (action === "deep-start") {
-      const records = [];
-      fields.forEach((field) => {
-        const active = waterState(field, date).item;
-        records.push({ ...active, date: active.date || active.startDate, actualEndDate: date, periodStatus: "完了", status: "落水中" });
-        records.push(irrigationRecord(field, "深水管理", date, "", "穂ばらみ・出穂期の深水管理"));
-      });
-      state.saveIrrigationsBatch(records, `${targetLabel()}の深水管理を開始しました`);
-    } else if (action === "deep-end") {
-      const records = [];
-      fields.forEach((field) => {
-        const active = waterState(field, date).item;
-        records.push({ ...active, date: active.date || active.startDate, actualEndDate: date, periodStatus: "完了", status: "落水中" });
-        records.push(irrigationRecord(field, "間断灌水", date, "", "深水管理終了後の間断灌水"));
-      });
-      state.saveIrrigationsBatch(records, `${targetLabel()}の深水管理を終了し、間断灌水へ戻しました`);
-    } else if (action === "drain") {
-      const records = fields.map((field) => {
-        const active = waterState(field, date).item;
-        return { ...active, date: active.date || active.startDate, actualEndDate: date, periodStatus: "完了", status: "落水中", memo: active.memo || "稲刈り前の落水" };
-      });
-      state.saveIrrigationsBatch(records, `${targetLabel()}の落水を記録しました`);
+      const saved = type.source === "dry" ? state.saveDryPeriodsBatch(records, `${targetLabel()}の中干しを終了しました`) : state.saveIrrigationsBatch(records, `${targetLabel()}の${type.label}を終了しました`);
+      if (saved === null) return;
     }
     resetEdit();
     render();
@@ -290,12 +322,12 @@
     const year = cropYear(U.$("waterDate").value || U.today());
     const dry = state.data().dryPeriods.filter((item) => ids.has(item.fieldId) && String(item.season) === year)
       .map((item) => ({ ...item, source: "dry", label: "中干し", tone: "dry" }));
-    const irrigation = state.data().irrigations.filter((item) => ids.has(item.fieldId) && String(item.season) === year && /間断灌水|深水管理|湿潤灌漑/.test(item.method || ""))
+    const irrigation = state.data().irrigations.filter((item) => ids.has(item.fieldId) && String(item.season) === year && /間断灌水|深水管理|稲刈り前の落水|落水|湿潤灌漑/.test(item.method || ""))
       .map((item) => ({
         ...item,
         source: "irrigation",
         label: item.method === "湿潤灌漑" ? "湿潤灌漑（旧記録）" : item.method,
-        tone: item.method === "深水管理" ? "deep" : (item.method === "湿潤灌漑" ? "legacy" : "intermittent")
+        tone: item.method === "深水管理" ? "deep" : (item.method === "稲刈り前の落水" || item.method === "落水" ? "drain" : (item.method === "湿潤灌漑" ? "legacy" : "intermittent"))
       }));
     return [...dry, ...irrigation].sort((a, b) => String(b.startDate || b.date).localeCompare(String(a.startDate || a.date)));
   }
@@ -308,7 +340,10 @@
         const field = state.field(item.fieldId);
         const end = item.actualEndDate || "";
         const days = item.startDate && end ? U.daysBetween(item.startDate, end) : "";
-        return `<article class="water-history-card ${U.attr(item.tone)}"><div><span>${U.escapeHTML(item.label)}</span><b>${U.escapeHTML(field?.name || "圃場")}</b><small>${U.escapeHTML(U.fd(item.startDate || item.date))} - ${U.escapeHTML(end ? U.fd(end) : "実施中")}${days !== "" ? ` / ${days}日` : ""}</small></div><button type="button" data-water-edit="${U.attr(item.source)}" data-id="${U.attr(item.source === "dry" ? item.dryPeriodId : item.irrigationId)}">編集</button></article>`;
+        const start = item.startDate || item.date || "";
+        const startStage = stageText(field, start);
+        const endStage = end ? stageText(field, end) : "";
+        return `<article class="water-history-card ${U.attr(item.tone)}"><div><span>${U.escapeHTML(item.label)}</span><b>${U.escapeHTML(field?.name || "圃場")}</b><small>${U.escapeHTML(U.fd(start))} - ${U.escapeHTML(end ? U.fd(end) : "実施中")}${days !== "" ? ` / ${days}日` : ""}</small><em>${U.escapeHTML(`開始時: ${startStage}${endStage ? ` → 完了時: ${endStage}` : ""}`)}</em></div><button type="button" data-water-edit="${U.attr(item.source)}" data-id="${U.attr(item.source === "dry" ? item.dryPeriodId : item.irrigationId)}">編集</button></article>`;
       }).join("") : '<div class="empty">今年の水管理はまだありません。</div>'}</div>
     `;
   }
