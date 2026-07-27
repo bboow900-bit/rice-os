@@ -8,7 +8,6 @@
   let viewMode = "dashboard";
   let anchorDate = U.today();
   let filterFieldId = "all";
-  let homeWaterFieldId = "";
   const heatCache = new Map();
   const heatProjectionCache = new Map();
   const waterForecastCache = new Map();
@@ -452,59 +451,18 @@
     `;
   }
 
-  function renderHomeWaterFocus(field) {
-    if (!field) return "";
-    const date = U.today();
-    const stage = seasonStageForField(field, date);
-    const water = RiceOS.agro && RiceOS.agro.managementStatus
-      ? RiceOS.agro.managementStatus(field, date)
-      : { label: "水管理の記録待ち", tone: "waiting", date: "" };
-    const stageImage = stage.current
-      ? `assets/images/rice-stages/rice-stage-${String(stage.current.image).padStart(2, "0")}.png`
-      : "assets/images/rice-stages/rice-stage-01.png";
-    const managementDays = water.date ? U.daysBetween(water.date, date) : "";
-    return `
-      <section class="home-water-focus-card">
-        <div class="home-water-focus-head">
-          <div><span>水管理の現在地</span><b>選んだ圃場を確認</b></div>
-          <select data-home-water-field aria-label="水管理を表示する圃場">
-            ${state.activeFields().map((item) => `<option value="${U.attr(item.fieldId)}" ${item.fieldId === field.fieldId ? "selected" : ""}>${U.escapeHTML(item.name)}</option>`).join("")}
-          </select>
-        </div>
-        <div class="home-water-focus-main">
-          <img src="${U.attr(stageImage)}" alt="">
-          <div>
-            <small>現在の生育ステージ</small>
-            <b>${U.escapeHTML(stage.current ? stage.current.label : "記録待ち")}</b>
-            <span>${U.escapeHTML(stage.certainty || "推定")}</span>
-          </div>
-          <div class="home-water-focus-status ${U.attr(water.tone || "waiting")}">
-            <small>管理状況</small><b>${U.escapeHTML(water.label || "記録待ち")}</b>
-            ${managementDays !== "" ? `<em>開始から${U.escapeHTML(String(managementDays))}日</em>` : ""}
-          </div>
-        </div>
-        ${renderSeasonTrack(stage)}
-        <div class="home-water-focus-actions">
-          <span>${U.escapeHTML(stage.next || "次の記録を確認")}</span>
-          <button type="button" data-home-open-water="${U.attr(field.fieldId)}">水管理を開く</button>
-        </div>
-      </section>
-    `;
-  }
-
   function renderDecisionFieldCard(field) {
     const date = U.today();
     const planting = plantingDateForYear(field.fieldId, cropYear(date));
     const dap = planting ? U.daysBetween(planting, date) : "";
     const need = dashboardNeed(field, date);
     const stage = seasonStageForField(field, date);
-    const photo = latestFieldPhoto(field.fieldId, cropYear(date));
     const stageImage = stage.current ? `assets/images/rice-stages/rice-stage-${String(stage.current.image).padStart(2, "0")}.png` : "assets/images/rice-stages/rice-stage-01.png";
     const stageKey = stage.current ? stage.current.key : "waiting";
     return `
-      <article class="home-decision-card ${U.attr(need.tone)} stage-${U.attr(stageKey)}" data-home-open-field="${U.attr(field.fieldId)}">
+      <article class="home-decision-card ${U.attr(need.tone)} stage-${U.attr(stageKey)}">
         <div class="home-decision-card-head">
-          <img class="${photo && photo.photoData ? "photo" : "stage"}" src="${U.attr(photo && photo.photoData || stageImage)}" alt="">
+          <img class="stage" src="${U.attr(stageImage)}" alt="">
           <div><b>${U.escapeHTML(field.name)}</b><small>${U.escapeHTML(fieldVariety(field))} / ${U.escapeHTML(areaText(field))}</small></div>
           <strong>${U.escapeHTML(dap === "" ? "田植え未登録" : `田植後 ${dap}日`)}</strong>
         </div>
@@ -554,25 +512,20 @@
     const overdue = overdueSchedules();
     const ranked = prioritizedDecisionFields(U.today(), candidates, overdue);
     const rows = ranked.slice(0, 3).map((item) => item.field);
-    const allFields = state.activeFields();
-    const waterField = allFields.find((field) => field.fieldId === homeWaterFieldId) || ranked[0] && ranked[0].field || allFields[0] || null;
-    if (waterField) homeWaterFieldId = waterField.fieldId;
     return `
       <section class="home-decision-hero">
         <div><p>今日・今週の判断</p><h2>田んぼの今を、先に見る</h2><small>${U.escapeHTML(U.fd(U.today()))} / ${U.escapeHTML(todayEntries.length ? `今日の記録 ${todayEntries.length}件` : "今日の記録はありません")}</small></div>
         <button type="button" class="primary" data-home-quick-record>記録を追加</button>
       </section>
-      <section class="home-decision-summary">
-        <button type="button" data-home-dashboard-list="candidate"><b>${U.escapeHTML(String(candidates.length))}</b><span>確認候補</span></button>
-        <button type="button" data-home-dashboard-list="overdue"><b>${U.escapeHTML(String(overdue.length))}</b><span>期限超過</span></button>
-        <button type="button" data-home-dashboard-list="today"><b>${U.escapeHTML(String(todayEntries.length))}</b><span>今日の記録</span></button>
-        <button type="button" data-home-overview="progress"><b>${U.escapeHTML(String(state.activeFields().filter((field) => plantingDateForYear(field.fieldId, cropYear(U.today()))).length))}</b><span>振り返り</span></button>
+      <section class="home-decision-summary" aria-label="今日の状況">
+        <div><b>${U.escapeHTML(String(candidates.length))}</b><span>確認候補</span></div>
+        <div><b>${U.escapeHTML(String(overdue.length))}</b><span>期限超過</span></div>
+        <div><b>${U.escapeHTML(String(todayEntries.length))}</b><span>今日の記録</span></div>
+        <div><b>${U.escapeHTML(String(state.activeFields().filter((field) => plantingDateForYear(field.fieldId, cropYear(U.today()))).length))}</b><span>田植え済み</span></div>
       </section>
-      ${renderHomeWaterFocus(waterField)}
       <section class="home-decision-section">
-        <div class="home-decision-section-head"><div><h3>圃場ごとの判断</h3><small>気になる圃場から記録へ進めます</small></div><button type="button" data-home-open-calendar>カレンダー</button></div>
+        <div class="home-decision-section-head"><div><h3>圃場の現在地</h3><small>各圃場の今の状態を確認します</small></div></div>
         <div class="home-decision-list">${rows.length ? rows.map(renderDecisionFieldCard).join("") : '<div class="farm-empty">圃場を登録すると、ここに判断カードを表示します。</div>'}</div>
-        ${ranked.length > 3 ? `<button type="button" class="home-all-fields-button" data-home-all-fields>すべての圃場を見る (${U.escapeHTML(String(ranked.length))})</button>` : ""}
       </section>
     `;
   }
@@ -582,10 +535,6 @@
       return `
         <header class="farm-calendar-header home-dashboard-header">
           <div><h1>ホーム</h1><p>今年の記録を、来年の判断につなげます</p></div>
-          <div class="farm-calendar-actions">
-            <button type="button" class="farm-year-button" data-home-overview="progress">振り返り</button>
-            <button type="button" class="farm-year-button" data-home-open-calendar>カレンダー</button>
-          </div>
         </header>
       `;
     }
@@ -1292,7 +1241,7 @@
         ${viewMode === "month" ? renderMonthView() : ""}
         ${viewMode === "list" ? renderListView() : ""}
         ${viewMode === "progress" ? renderProgressView() : ""}
-        <button type="button" class="farm-calendar-fab" data-home-date="${U.attr(U.today())}" aria-label="記録を追加">＋</button>
+        ${viewMode === "dashboard" ? "" : `<button type="button" class="farm-calendar-fab" data-home-date="${U.attr(U.today())}" aria-label="記録を追加">＋</button>`}
       </div>
     `;
     if (viewMode === "progress") setTimeout(hydrateHeatMeters, 50);
@@ -1445,14 +1394,6 @@
         if (RiceOS.app) RiceOS.app.show("calendar");
         return;
       }
-      const waterButton = event.target.closest("[data-home-open-water]");
-      if (waterButton) {
-        if (RiceOS.app) RiceOS.app.show("irrigation");
-        if (RiceOS.screens.irrigation && RiceOS.screens.irrigation.prefillDate) {
-          RiceOS.screens.irrigation.prefillDate(U.today(), waterButton.dataset.homeOpenWater || "");
-        }
-        return;
-      }
       if (event.target.closest("[data-home-today]")) {
         anchorDate = U.today();
         render();
@@ -1473,24 +1414,12 @@
         render();
         return;
       }
-      const fieldButton = event.target.closest("[data-home-open-field]");
-      if (fieldButton && RiceOS.app) {
-        RiceOS.app.show("fields");
-        if (RiceOS.screens.fields && RiceOS.screens.fields.openField) RiceOS.screens.fields.openField(fieldButton.dataset.homeOpenField, "detail");
-        return;
-      }
       const dateButton = event.target.closest("[data-home-date]");
       if (dateButton) {
         openDate(dateButton.dataset.homeDate || U.today(), dateButton.dataset.homeField || "");
       }
     });
     root.addEventListener("change", (event) => {
-      const waterField = event.target.closest("[data-home-water-field]");
-      if (waterField) {
-        homeWaterFieldId = waterField.value || "";
-        render();
-        return;
-      }
       const select = event.target.closest("[data-home-field-filter]");
       if (!select) return;
       filterFieldId = select.value || "all";

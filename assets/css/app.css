@@ -1467,7 +1467,6 @@
   }
 }
 
-@media (max-width: 900px) {
   #screen-home.active {
     width: 100% !important;
     max-width: 100% !important;
@@ -1519,9 +1518,9 @@
 .home-decision-hero small { display: block; margin-top: 7px; color: #637066; }
 .home-decision-hero .primary { flex: 0 0 auto; min-height: 44px; }
 .home-decision-summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 12px 0; }
-.home-decision-summary button { min-height: 66px; padding: 8px 5px; border: 1px solid #dfe5d6; border-radius: 13px; background: #fffefa; color: #26322a; }
-.home-decision-summary button b { display: block; color: #24833a; font-size: 21px; line-height: 1.05; }
-.home-decision-summary button span { display: block; margin-top: 4px; font-size: 11px; font-weight: 700; }
+.home-decision-summary > * { min-height: 66px; padding: 8px 5px; border: 1px solid #dfe5d6; border-radius: 13px; background: #fffefa; color: #26322a; text-align: center; }
+.home-decision-summary > * b { display: block; color: #24833a; font-size: 21px; line-height: 1.05; }
+.home-decision-summary > * span { display: block; margin-top: 4px; font-size: 11px; font-weight: 700; }
 .home-water-focus-card { margin: 12px 0 14px; padding: 12px; border: 1px solid #cfe4e7; border-left: 5px solid #3998b8; border-radius: 15px; background: linear-gradient(135deg, #f2fbfc, #fffefa 70%); box-shadow: 0 4px 12px rgba(43, 112, 129, .07); }
 .home-water-focus-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .home-water-focus-head span, .home-water-focus-head b { display: block; }
@@ -1559,7 +1558,7 @@
 .home-stage-suggestion small { color: #887349; font-size: 10px; }
 .home-all-fields-button { width: 100%; min-height: 44px; margin-top: 10px; border: 1px solid #a8cfaa; border-radius: 8px; background: #f7fff6; color: #237e39; font: inherit; font-size: 13px; font-weight: 900; }
 .home-decision-list { display: grid; gap: 10px; }
-.home-decision-card { padding: 12px; border: 1px solid #dce5d6; border-left: 5px solid #44a35a; border-radius: 15px; background: #fffefa; box-shadow: 0 4px 12px rgba(53, 76, 52, .06); cursor: pointer; }
+.home-decision-card { padding: 12px; border: 1px solid #dce5d6; border-left: 5px solid #44a35a; border-radius: 15px; background: #fffefa; box-shadow: 0 4px 12px rgba(53, 76, 52, .06); cursor: default; }
 .home-decision-card.alert { border-left-color: #e89b28; background: #fffdf4; }
 .home-decision-card.notice { border-left-color: #559ac8; background: #fbfdff; }
 .home-decision-card.stage-panicle { border-left-color: #65a946; }
@@ -2364,6 +2363,37 @@
 
   #screen-annual.annual-detail-mode .annual-target-card > .annual-edit-grid {
     display: none !important;
+  }
+}
+
+/* Mobile primary navigation: calendar is a first-class daily screen. */
+@media (max-width: 900px) {
+  body .app-shell .side-nav {
+    grid-template-columns: repeat(6, minmax(0, 1fr)) !important;
+    padding-right: 3px !important;
+    padding-left: 3px !important;
+  }
+
+  body .app-shell .side-nav .nav-item[data-screen="home"],
+  body .app-shell .side-nav .nav-item[data-screen="fields"],
+  body .app-shell .side-nav .nav-item[data-screen="calendar"],
+  body .app-shell .side-nav .nav-item[data-screen="annual"],
+  body .app-shell .side-nav .nav-item[data-screen="notices"],
+  body .app-shell .side-nav .nav-item[data-screen="data"] {
+    display: flex !important;
+  }
+
+  body .app-shell .side-nav .nav-label {
+    font-size: 9px !important;
+    letter-spacing: 0 !important;
+    overflow: hidden !important;
+    text-overflow: clip !important;
+    white-space: nowrap !important;
+  }
+
+  body .app-shell .side-nav .nav-icon svg {
+    width: 24px !important;
+    height: 24px !important;
   }
 }
 
