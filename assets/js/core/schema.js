@@ -1,11 +1,11 @@
-﻿(function () {
+(function () {
   "use strict";
 
   const RiceOS = window.RiceOS = window.RiceOS || {};
   const U = RiceOS.utils;
 
   const SCHEMA_VERSION = 14;
-  const APP_VERSION = "20260727_ver133";
+  const APP_VERSION = "20260727_ver137";
   const STORE_KEY = "rice_os_v8_stable";
   const BACKUP_KEY = "rice_os_v8_stable_backup";
   const LEGACY_STORES = [

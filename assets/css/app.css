@@ -6593,6 +6593,37 @@ label {
 .water-history-card small { color: #68766a; font-size: 10px; }
 .water-history-card button { flex: 0 0 auto; min-height: 34px; padding: 0 9px; border: 1px solid #d5e2d6; border-radius: 8px; background: #fff; color: #2c7540; font-size: 11px; font-weight: 850; }
 
+/* 水管理工程: 生育の段階と水管理を同じ横軸で見せる。 */
+.water-flow-card { padding: 12px; border-radius: 16px; }
+.water-now-summary { display: grid; grid-template-columns: 50px minmax(0, 1fr); align-items: center; gap: 9px; margin: 10px 0 12px; padding: 8px; border: 1px solid #deead9; border-radius: 12px; background: rgba(255,255,255,.72); }
+.water-now-summary img { width: 48px; height: 48px; border: 1px solid #d4e0ce; border-radius: 10px; object-fit: cover; background: #edf6e9; }
+.water-now-summary div { display: grid; min-width: 0; gap: 1px; }
+.water-now-summary span { color: #658064; font-size: 9px; font-weight: 850; }
+.water-now-summary b { overflow: hidden; color: #1c4528; font-size: 15px; line-height: 1.2; text-overflow: ellipsis; white-space: nowrap; }
+.water-now-summary small { overflow: hidden; color: #586d5d; font-size: 10px; font-weight: 750; text-overflow: ellipsis; white-space: nowrap; }
+.water-road-caption { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 8px 2px 4px; }
+.water-road-caption span { color: #38583d; font-size: 10px; font-weight: 900; }
+.water-road-caption small { color: #7b8975; font-size: 8px; font-weight: 700; }
+.water-stage-road, .water-flow-road.image-style { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); overflow: visible; border-radius: 9px; }
+.water-stage-road { border: 1px solid #dbe8d6; background: #f6fbf3; }
+.water-stage-road span { position: relative; display: grid; min-height: 34px; align-content: center; justify-items: center; padding: 4px 1px; color: #59735a; font-size: 8px; font-weight: 850; line-height: 1.2; text-align: center; }
+.water-stage-road span + span { border-left: 1px solid #e3eee0; }
+.water-stage-road span b { overflow: hidden; max-width: 100%; text-overflow: ellipsis; white-space: nowrap; }
+.water-stage-road span.current { color: #17793a; background: #e6f6df; }
+.water-stage-road span.current i { position: absolute; top: -8px; color: #249b41; font-size: 10px; font-style: normal; line-height: 1; text-shadow: 0 1px 0 #fff; }
+.water-flow-road.image-style { margin-top: 0; border: 1px solid rgba(255,255,255,.78); }
+.water-flow-road.image-style span { min-height: 38px; padding: 3px 1px; font-size: 8px; line-height: 1.15; }
+.water-flow-road.image-style .shallow { background: #bfe5f2; color: #286378; }
+.water-flow-road.image-style .actual { z-index: 1; box-shadow: inset 0 -4px 0 #218d3c, 0 0 0 2px rgba(35,143,59,.16); transform: translateY(-2px); }
+.water-flow-road.image-style .actual i { position: absolute; top: -9px; color: #1f963d; font-size: 10px; font-style: normal; line-height: 1; text-shadow: 0 1px 0 #fff; }
+.water-flow-road.image-style .actual b { transform: translateY(2px); }
+.water-flow-facts { min-height: 24px; }
+@media (max-width: 380px) {
+  .water-flow-card { padding: 10px; }
+  .water-stage-road span, .water-flow-road.image-style span { font-size: 8px; }
+  .water-road-caption small { display: none; }
+}
+
 .growth-compare-panel {
   display: grid;
   gap: 8px;

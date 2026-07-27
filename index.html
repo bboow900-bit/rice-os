@@ -1,4 +1,4 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="ja">
 <head>
   <meta charset="utf-8">
@@ -10,20 +10,20 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="稲作カルテ">
-  <link rel="manifest" href="manifest.webmanifest?v=20260727_ver133">
+  <link rel="manifest" href="manifest.webmanifest?v=20260727_ver137">
   <link rel="icon" href="assets/icons/icon-192.png">
   <link rel="apple-touch-icon" href="assets/icons/icon-192.png">
   <title>稲作カルテ</title>
-  <link rel="stylesheet" href="assets/css/app.css?v=20260727_ver133">
-  <link rel="stylesheet" href="assets/css/field-management.css?v=20260727_ver133">
+  <link rel="stylesheet" href="assets/css/app.css?v=20260727_ver137">
+  <link rel="stylesheet" href="assets/css/field-management.css?v=20260727_ver137">
   <style>
     @media (max-width: 900px) {
       body .app-shell .side-nav .nav-item { display: none !important; }
       body .app-shell .side-nav .nav-item[data-screen="home"],
-      body .app-shell .side-nav .nav-item[data-screen="calendar"],
-      body .app-shell .side-nav .nav-item[data-screen="field-work"],
       body .app-shell .side-nav .nav-item[data-screen="fields"],
-      body .app-shell .side-nav .nav-item[data-screen="annual"] { display: grid !important; }
+      body .app-shell .side-nav .nav-item[data-screen="annual"],
+      body .app-shell .side-nav .nav-item[data-screen="notices"],
+      body .app-shell .side-nav .nav-item[data-screen="data"] { display: grid !important; }
       #screen-fields { width: min(100%, 430px) !important; max-width: 430px !important; padding-right: 12px !important; padding-left: 12px !important; }
       #screen-fields .screen-head > button.primary { min-height: 44px !important; min-width: 88px !important; }
       #screen-annual .annual-filter-row { display: grid !important; grid-template-columns: minmax(0, 1fr) 44px 94px !important; gap: 6px !important; overflow: visible !important; }
@@ -700,33 +700,33 @@
 
   <div id="toast" class="toast hidden" role="status"></div>
 
-  <script src="assets/js/core/utils.js?v=20260727_ver133"></script>
-  <script src="assets/js/core/schema.js?v=20260727_ver133"></script>
-  <script src="assets/js/core/storage.js?v=20260727_ver133"></script>
-  <script src="assets/js/core/state.js?v=20260727_ver133"></script>
-  <script src="assets/js/core/agro.js?v=20260727_ver133"></script>
-  <script src="assets/js/core/record-actions.js?v=20260727_ver133"></script>
-  <script src="assets/js/core/calendar.js?v=20260727_ver133"></script>
-  <script src="assets/js/core/alerts.js?v=20260727_ver133"></script>
-  <script src="assets/js/core/weather.js?v=20260727_ver133"></script>
-  <script src="assets/js/core/pwa.js?v=20260727_ver133"></script>
-  <script src="assets/js/screens/home.js?v=20260727_ver133"></script>
-  <script src="assets/js/screens/calendar.js?v=20260727_ver133"></script>
-  <script src="assets/js/screens/bottom-sheet.js?v=20260727_ver133"></script>
-  <script src="assets/js/screens/recipes.js?v=20260727_ver133"></script>
-  <script src="assets/js/screens/fields.js?v=20260727_ver133"></script>
-  <script src="assets/js/screens/field-work.js?v=20260727_ver133"></script>
-  <script src="assets/js/screens/fertilizer.js?v=20260727_ver133"></script>
-  <script src="assets/js/screens/growth.js?v=20260727_ver133"></script>
-  <script src="assets/js/screens/dry-period.js?v=20260727_ver133"></script>
-  <script src="assets/js/screens/irrigation.js?v=20260727_ver133"></script>
-  <script src="assets/js/screens/photos.js?v=20260727_ver133"></script>
-  <script src="assets/js/screens/other-work.js?v=20260727_ver133"></script>
-  <script src="assets/js/screens/annual.js?v=20260727_ver133"></script>
-  <script src="assets/js/screens/materials.js?v=20260727_ver133"></script>
-  <script src="assets/js/screens/results.js?v=20260727_ver133"></script>
-  <script src="assets/js/screens/notices.js?v=20260727_ver133"></script>
-  <script src="assets/js/screens/data.js?v=20260727_ver133"></script>
-  <script src="assets/js/app.js?v=20260727_ver133"></script>
+  <script src="assets/js/core/utils.js?v=20260727_ver137"></script>
+  <script src="assets/js/core/schema.js?v=20260727_ver137"></script>
+  <script src="assets/js/core/storage.js?v=20260727_ver137"></script>
+  <script src="assets/js/core/state.js?v=20260727_ver137"></script>
+  <script src="assets/js/core/agro.js?v=20260727_ver137"></script>
+  <script src="assets/js/core/record-actions.js?v=20260727_ver137"></script>
+  <script src="assets/js/core/calendar.js?v=20260727_ver137"></script>
+  <script src="assets/js/core/alerts.js?v=20260727_ver137"></script>
+  <script src="assets/js/core/weather.js?v=20260727_ver137"></script>
+  <script src="assets/js/core/pwa.js?v=20260727_ver137"></script>
+  <script src="assets/js/screens/home.js?v=20260727_ver137"></script>
+  <script src="assets/js/screens/calendar.js?v=20260727_ver137"></script>
+  <script src="assets/js/screens/bottom-sheet.js?v=20260727_ver137"></script>
+  <script src="assets/js/screens/recipes.js?v=20260727_ver137"></script>
+  <script src="assets/js/screens/fields.js?v=20260727_ver137"></script>
+  <script src="assets/js/screens/field-work.js?v=20260727_ver137"></script>
+  <script src="assets/js/screens/fertilizer.js?v=20260727_ver137"></script>
+  <script src="assets/js/screens/growth.js?v=20260727_ver137"></script>
+  <script src="assets/js/screens/dry-period.js?v=20260727_ver137"></script>
+  <script src="assets/js/screens/irrigation.js?v=20260727_ver137"></script>
+  <script src="assets/js/screens/photos.js?v=20260727_ver137"></script>
+  <script src="assets/js/screens/other-work.js?v=20260727_ver137"></script>
+  <script src="assets/js/screens/annual.js?v=20260727_ver137"></script>
+  <script src="assets/js/screens/materials.js?v=20260727_ver137"></script>
+  <script src="assets/js/screens/results.js?v=20260727_ver137"></script>
+  <script src="assets/js/screens/notices.js?v=20260727_ver137"></script>
+  <script src="assets/js/screens/data.js?v=20260727_ver137"></script>
+  <script src="assets/js/app.js?v=20260727_ver137"></script>
 </body>
 </html>

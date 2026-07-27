@@ -6,12 +6,14 @@
   const state = RiceOS.state;
   let bulkFieldIds = [];
 
-  const FLOW = [
-    { key: "dry", label: "中干し", tone: "dry" },
-    { key: "intermittentEarly", label: "間断灌水", tone: "intermittent" },
-    { key: "deep", label: "深水管理", tone: "deep" },
-    { key: "intermittentLate", label: "間断灌水", tone: "intermittent" },
-    { key: "drain", label: "落水", tone: "drain" }
+  const ROAD = [
+    { key: "establishment", label: "移植・活着", water: "deep", waterLabel: "深水" },
+    { key: "tillering", label: "有効分げつ", water: "shallow", waterLabel: "浅水" },
+    { key: "maximumTillering", label: "無効分げつ", water: "dry", waterLabel: "中干し" },
+    { key: "panicle", label: "幼穂形成", water: "intermittent", waterLabel: "間断" },
+    { key: "booting", label: "穂ばらみ", water: "deep", waterLabel: "深水" },
+    { key: "heading", label: "出穂", water: "deep", waterLabel: "深水" },
+    { key: "ripening", label: "登熟・収穫前", water: "intermittent", waterLabel: "間断・落水" }
   ];
 
   function cropYear(date) {
@@ -91,7 +93,44 @@
 
   function currentStage(field, date) {
     const result = RiceOS.agro && RiceOS.agro.seasonStageForField ? RiceOS.agro.seasonStageForField(field, date) : null;
-    return result && result.current ? result.current.label : "生育記録待ち";
+    return result && result.current ? {
+      key: result.current.key || "",
+      label: result.current.label,
+      certainty: result.certainty || "推定",
+      image: result.current.image || 1
+    } : { key: "", label: "生育記録待ち", certainty: "記録待ち", image: 1 };
+  }
+
+  function roadIndex(stageKey) {
+    if (/establishment/.test(stageKey)) return 0;
+    if (/earlyTillering|peakTillering/.test(stageKey)) return 1;
+    if (/maximumTillering/.test(stageKey)) return 2;
+    if (/panicleInitiation|meiosis/.test(stageKey)) return 3;
+    if (/booting/.test(stageKey)) return 4;
+    if (/heading|fullHeading/.test(stageKey)) return 5;
+    if (/ripening|yellowRipening|maturity/.test(stageKey)) return 6;
+    return -1;
+  }
+
+  function waterDays(stateRow, date) {
+    const item = stateRow && stateRow.item;
+    if (!item || !item.startDate) return "記録待ち";
+    if (item.actualEndDate && String(item.actualEndDate) <= String(date)) {
+      const days = U.daysBetween(item.startDate, item.actualEndDate);
+      const afterDays = U.daysBetween(item.actualEndDate, date);
+      if (days === "") return "完了";
+      return afterDays > 0 ? `実績 ${days}日 / 完了から ${afterDays}日` : `実績 ${days}日`;
+    }
+    const days = U.daysBetween(item.startDate, date);
+    return days === "" ? "開始日" : `開始から ${days}日`;
+  }
+
+  function currentWaterRoadIndex(stageIndex, waterKey) {
+    if (waterKey === "dry") return 2;
+    if (waterKey === "deep") return stageIndex >= 5 ? 5 : 4;
+    if (waterKey === "intermittent") return stageIndex >= 6 ? 6 : 3;
+    if (waterKey === "afterDry") return 3;
+    return -1;
   }
 
   function panicleHeadingFacts(field, date) {
@@ -120,14 +159,30 @@
     const date = U.$("waterDate").value || U.today();
     const states = fields.map((field) => waterState(field, date));
     const current = states.length && states.every((state) => state.key === states[0].key) ? states[0].key : "mixed";
-    const stage = fields[0] ? currentStage(fields[0], date) : "生育記録待ち";
+    const stageRows = fields.map((field) => currentStage(field, date));
+    const stageMatches = stageRows.length && stageRows.every((item) => item.key === stageRows[0].key);
+    const stage = stageMatches ? stageRows[0] : {
+      key: "",
+      label: fields.length > 1 ? "圃場ごとに生育段階が異なります" : "生育記録待ち",
+      certainty: fields.length > 1 ? "個別確認" : "記録待ち",
+      image: fields.length > 1 ? 4 : 1
+    };
+    const stageIndex = roadIndex(stage.key);
+    const activeState = current === "mixed" ? null : states[0];
+    const waterIndex = stageMatches ? currentWaterRoadIndex(stageIndex, current) : -1;
     const facts = fields[0] ? panicleHeadingFacts(fields[0], date) : [];
     U.$("waterFlowChart").innerHTML = `
       <section class="water-flow-card ${U.attr(current)}">
-        <div class="water-flow-head"><div><span>生育 × 水管理</span><b>${U.escapeHTML(targetLabel())}</b></div><strong>${U.escapeHTML(stage)}</strong></div>
-        <div class="water-crop-road"><span>田植え</span><span>分げつ</span><span>幼穂</span><span>穂ばらみ</span><span>出穂</span><span>登熟</span></div>
-        <div class="water-flow-road">${FLOW.map((step) => `<span class="${U.attr(step.key)} ${current === step.key || (step.key.startsWith("intermittent") && current === "intermittent") ? "current" : ""}"><i></i><b>${U.escapeHTML(step.label)}</b></span>`).join("")}</div>
-        <div class="water-flow-facts"><span>現在: ${U.escapeHTML(current === "mixed" ? "圃場ごとに異なります" : states[0]?.label || "未記録")}</span>${facts.map((fact) => `<span>${U.escapeHTML(fact)}</span>`).join("")}</div>
+        <div class="water-flow-head"><div><span>今年の水管理工程</span><b>${U.escapeHTML(targetLabel())}</b></div><strong>${U.escapeHTML(stage.certainty)}</strong></div>
+        <div class="water-now-summary">
+          <img src="assets/images/rice-stages/rice-paddy-tile-${String(stage.image).padStart(2, "0")}.png" alt="">
+          <div><span>いまここ</span><b>${U.escapeHTML(stage.label)}</b><small>${U.escapeHTML(current === "mixed" ? "圃場ごとに水管理の状態が異なります" : `${activeState?.label || "水管理を記録"} ・ ${waterDays(activeState, date)}`)}</small></div>
+        </div>
+        <div class="water-road-caption"><span>生育の流れ</span><small>現在地を緑の目印で表示</small></div>
+        <div class="water-stage-road">${ROAD.map((step, index) => `<span class="${index === stageIndex ? "current" : ""}"><i>${index === stageIndex ? "●" : ""}</i><b>${U.escapeHTML(step.label)}</b></span>`).join("")}</div>
+        <div class="water-road-caption"><span>水管理の目安</span><small>色帯は工程の目安、濃色は実績</small></div>
+        <div class="water-flow-road image-style">${ROAD.map((step, index) => `<span class="${U.attr(step.water)} ${index === waterIndex ? "actual" : ""}"><i>${index === waterIndex ? "●" : ""}</i><b>${U.escapeHTML(step.waterLabel)}</b></span>`).join("")}</div>
+        <div class="water-flow-facts"><span>${U.escapeHTML(current === "mixed" ? "実績は圃場ごとに確認" : waterDays(activeState, date))}</span>${facts.slice(0, 1).map((fact) => `<span>${U.escapeHTML(fact)}</span>`).join("")}</div>
       </section>
     `;
   }
@@ -295,7 +350,7 @@
     const fields = targetFields();
     const states = fields.map((field) => waterState(field, U.$("waterDate").value || U.today()));
     const stateLabel = states.length && states.every((item) => item.key === states[0].key) ? states[0].label : "圃場ごとに状態が異なります";
-    U.$("waterCurrentStatus").innerHTML = `<div class="water-current-card"><span>現在の水管理</span><b>${U.escapeHTML(stateLabel)}</b><small>現地で実施した開始・終了だけを残します</small></div>`;
+    U.$("waterCurrentStatus").innerHTML = "";
     renderActions();
     renderHistory();
   }
