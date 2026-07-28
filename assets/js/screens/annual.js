@@ -1267,54 +1267,71 @@
     `;
   }
 
-  function timelinePeriod(label, startDate, endDate, tone) {
+  function timelinePeriod(label, startDate, endDate, tone, source) {
     if (!startDate && !endDate) return null;
     const start = startDate || endDate;
+    const days = startDate && endDate ? U.daysBetween(startDate, endDate) : "";
     const detail = startDate && endDate
-      ? `${U.fd(startDate)} - ${U.fd(endDate)}${U.daysBetween(startDate, endDate) !== "" ? ` / ${U.daysBetween(startDate, endDate)}日間` : ""}`
+      ? `${U.fd(startDate)} 開始 → ${U.fd(endDate)} 完了`
       : startDate ? `開始 ${U.fd(startDate)} / 完了日未記録` : `完了 ${U.fd(endDate)}`;
-    return { date: start, label, detail, tone, kind: "period" };
+    return { date: start, label, detail, days, tone, kind: "period", category: "水管理", source: source === "legacy-work" ? "旧作業記録" : "実績" };
   }
 
   function fieldYearTimeline(field, year) {
     // Use the year-scoped state APIs here. Older imports can have a stale season field.
-    const works = state.fieldWorksFor(field.fieldId, year);
+    const works = state.fieldWorksFor(field.fieldId, year)
+      .filter((row) => !/予定|確認/.test(String(row.workName || "")));
     const growth = state.growthLogsFor(field.fieldId, year);
     const waterPeriods = state.resolvedWaterPeriodsFor
-      ? state.resolvedWaterPeriodsFor(field.fieldId, { year, includePlanned: true, forDisplay: true })
+      ? state.resolvedWaterPeriodsFor(field.fieldId, { year, includePlanned: false, forDisplay: true })
       : [];
     const entries = [];
     const firstWorkDate = (pattern) => works.filter((row) => pattern.test(String(row.workName || ""))).map((row) => row.date).filter(Boolean).sort()[0] || "";
-    const planting = state.plantingDateForField(field.fieldId, year);
-    if (planting) entries.push({ date: planting, label: "田植え", detail: U.fd(planting), tone: "planting", kind: "point" });
+    const planting = firstWorkDate(/田植/);
+    if (planting) entries.push({ date: planting, label: "田植え", detail: "田植え後 0日", tone: "planting", kind: "point", category: "農作業", source: "実績" });
 
     waterPeriods.forEach((period) => {
       const tone = period.kind === "dry" ? "dry" : "water";
-      const entry = timelinePeriod(period.label, period.startDate, period.actualEndDate, tone);
+      const entry = timelinePeriod(period.label, period.startDate, period.actualEndDate, tone, period.source);
       if (entry) entries.push(entry);
     });
 
     const growthSummary = state.growthSummaryFor ? state.growthSummaryFor(field.fieldId, year) : null;
-    const panicle = growthSummary && growthSummary.panicleLog
-      || growth.filter((row) => U.number(row.panicleLengthMm, 0) > 0)
-        .slice().sort((a, b) => String(b.date).localeCompare(String(a.date)))[0] || null;
-    if (panicle) entries.push({ date: panicle.date, label: "幼穂確認", detail: `${U.fd(panicle.date)} / 幼穂長 ${panicle.panicleLengthMm}mm`, tone: "panicle", kind: "point" });
+    const panicleLogs = growth.filter((row) => U.number(row.panicleLengthMm, 0) > 0)
+      .slice().sort((a, b) => String(a.date).localeCompare(String(b.date)));
+    const panicle = growthSummary && growthSummary.panicleLog || panicleLogs.at(-1) || null;
+    if (panicle) {
+      const observation = panicleLogs.length > 1 ? `幼穂観察 ${panicleLogs.length}回 / 最新 ${panicle.panicleLengthMm}mm` : `幼穂長 ${panicle.panicleLengthMm}mm`;
+      entries.push({ date: panicle.date, label: "幼穂確認", detail: observation, tone: "panicle", kind: "point", category: "生育", source: "実測" });
+    }
 
-    const heading = growthSummary && growthSummary.headingDate || firstWorkDate(/出穂/);
-    if (heading) entries.push({ date: heading, label: "出穂", detail: U.fd(heading), tone: "heading", kind: "point" });
+    const observedHeading = growth.filter((row) => row.headingObserved || row.observedStage === "heading" && row.stageConfirmed)
+      .slice().sort((a, b) => String(a.date).localeCompare(String(b.date)))[0] || null;
+    const heading = observedHeading && observedHeading.date || firstWorkDate(/出穂/);
+    if (heading) entries.push({ date: heading, label: "出穂", detail: observedHeading ? "生育記録から確定" : "作業記録", tone: "heading", kind: "point", category: "生育", source: observedHeading ? "実測" : "作業" });
 
-    const harvest = state.workDateForField(field.fieldId, ["収穫", "稲刈り"], "first", year);
-    if (harvest) entries.push({ date: harvest, label: "収穫", detail: U.fd(harvest), tone: "harvest", kind: "point" });
+    const harvest = firstWorkDate(/収穫|稲刈り/);
+    if (harvest) entries.push({ date: harvest, label: "収穫", detail: "収穫作業", tone: "harvest", kind: "point", category: "収穫", source: "実績" });
+
+    works.filter((row) => /代かき|除草|追肥|防除|草刈り|溝切り/.test(String(row.workName || ""))).forEach((row) => {
+      const detail = [row.machine, row.material].filter(Boolean).join(" / ") || "作業記録";
+      entries.push({ date: row.date, label: row.workName, detail, tone: "work", kind: "point", category: "農作業", source: "実績" });
+    });
     return entries.sort((a, b) => String(a.date).localeCompare(String(b.date)) || String(a.label).localeCompare(String(b.label)));
   }
 
   function renderYearFlow(field) {
     const year = reviewYearValue();
     const entries = fieldYearTimeline(field, year);
+    const planting = entries.find((entry) => entry.label === "田植え")?.date || "";
+    const harvest = entries.find((entry) => entry.label === "収穫")?.date || "";
+    const seasonLength = planting && harvest ? U.daysBetween(planting, harvest) : "";
+    const seasonText = planting ? `${U.fd(planting)}${harvest ? ` → ${U.fd(harvest)}${seasonLength !== "" ? ` / ${seasonLength}日` : ""}` : " → 収穫記録待ち"}` : "田植え記録待ち";
     return `
       <section class="annual-year-flow" aria-label="${U.escapeHTML(year)}年の一年の流れ">
         <div class="annual-year-flow-head"><div><span>${U.escapeHTML(year)}年の記録</span><h3>一年の流れ</h3></div><small>実績のみ</small></div>
-        ${entries.length ? `<ol>${entries.map((entry) => `<li class="${U.attr(entry.tone)} ${U.attr(entry.kind)}"><time>${U.escapeHTML(U.fd(entry.date))}</time><div><b>${U.escapeHTML(entry.label)}</b><span>${U.escapeHTML(entry.detail)}</span></div></li>`).join("")}</ol>` : '<p class="annual-year-flow-empty">田植え・水管理・幼穂・出穂・収穫の実績を残すと、ここに一年の流れが並びます。</p>'}
+        <p class="annual-year-flow-season">${U.escapeHTML(seasonText)}</p>
+        ${entries.length ? `<ol>${entries.map((entry) => `<li class="${U.attr(entry.tone)} ${U.attr(entry.kind)}"><time>${U.escapeHTML(U.fd(entry.date))}</time><span class="annual-year-flow-rail" aria-hidden="true"><i></i></span><div class="annual-year-flow-entry"><div class="annual-year-flow-title"><em>${U.escapeHTML(entry.category || "記録")}</em><b>${U.escapeHTML(entry.label)}</b><small>${U.escapeHTML(entry.source || "実績")}</small></div><p>${U.escapeHTML(entry.detail)}</p>${entry.days !== "" ? `<span class="annual-year-flow-days">${U.escapeHTML(String(entry.days))}日間</span>` : ""}</div></li>`).join("")}</ol>` : '<p class="annual-year-flow-empty">田植え・水管理・幼穂・出穂・収穫の実績を残すと、ここに一年の流れが並びます。</p>'}
       </section>
     `;
   }
