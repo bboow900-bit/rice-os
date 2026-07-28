@@ -5,6 +5,7 @@
   const U = RiceOS.utils;
   const state = RiceOS.state;
   let bulkFieldIds = [];
+  let focusedTypeKey = "";
 
   const ROAD = [
     { key: "establishment", label: "移植・活着", water: "deep", waterLabel: "深水" },
@@ -253,7 +254,7 @@
     const endEnabled = activeCount > 0;
     const countNote = isGroup ? `${activeCount}/${summary.fields.length}圃場が実施中` : "";
     return `
-      <article class="water-period-card ${U.attr(type.tone)}">
+      <article class="water-period-card ${U.attr(type.tone)} ${focusedTypeKey === type.key ? "focus" : ""}" data-water-type-card="${U.attr(type.key)}">
         <div class="water-period-card-head"><span class="water-period-icon" aria-hidden="true">${U.escapeHTML(type.icon)}</span><div><b>${U.escapeHTML(type.label)}</b><small>${U.escapeHTML(countNote || (activeCount ? `開始 ${startLabel}` : (finished ? `完了 ${U.fd(latestItem.actualEndDate)}` : "期間を記録")))}</small></div><strong class="water-period-status ${activeCount ? "active" : (finished ? "done" : "waiting")}">${U.escapeHTML(status)}</strong></div>
         <div class="water-period-facts">
           <span>最新 ${U.escapeHTML(startLabel)}</span>
@@ -375,6 +376,7 @@
     U.$("waterTargetMode").value = "field";
     U.$("waterField").value = field?.fieldId || "";
     bulkFieldIds = [];
+    focusedTypeKey = "";
     resetEdit();
     render();
   }
@@ -390,12 +392,16 @@
     renderHistory();
   }
 
-  function prefillDate(date, fieldId) {
+  function prefillDate(date, fieldId, typeKey) {
     bulkFieldIds = [];
     U.$("waterDate").value = date || U.today();
     U.$("waterTargetMode").value = "field";
     if (fieldId) U.$("waterField").value = fieldId;
+    focusedTypeKey = typeForKey(typeKey) ? typeKey : "";
     render();
+    if (focusedTypeKey) {
+      setTimeout(() => document.querySelector(`[data-water-type-card="${U.attr(focusedTypeKey)}"]`)?.scrollIntoView({ behavior: "smooth", block: "center" }), 30);
+    }
   }
 
   function prefillFields(date, fieldIds) {

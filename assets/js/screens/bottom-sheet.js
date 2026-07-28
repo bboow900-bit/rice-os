@@ -67,6 +67,7 @@
   function render() {
     U.$("sheetDateTitle").textContent = `${U.fd(selectedDate)} の記録`;
     if (!savingSchedule) hideScheduleForm();
+    hideWaterQuick();
     renderFieldSelect();
     const rows = RiceOS.calendar.entriesForDate(selectedDate);
     U.$("sheetEntries").innerHTML = rows.length ? rows.map(entryHtml).join("") : '<div class="empty">この日の記録はまだありません。</div>';
@@ -180,6 +181,18 @@
     editingScheduleId = "";
   }
 
+  function hideWaterQuick() {
+    const panel = U.$("sheetWaterQuick");
+    if (panel) panel.classList.add("hidden");
+  }
+
+  function showWaterQuick() {
+    hideScheduleForm();
+    const panel = U.$("sheetWaterQuick");
+    if (!panel) return;
+    panel.classList.remove("hidden");
+  }
+
   function showScheduleForm(record) {
     const form = U.$("sheetScheduleForm");
     if (!form) return;
@@ -286,7 +299,13 @@
         return;
       }
       const button = event.target.closest("[data-sheet-add]");
+      const waterTypeButton = event.target.closest("[data-sheet-water-type]");
       const presetButton = event.target.closest("[data-schedule-preset]");
+      if (waterTypeButton) {
+        const typeKey = waterTypeButton.dataset.sheetWaterType || "";
+        openScreen("irrigation", (fieldId) => RiceOS.screens.irrigation.prefillDate(selectedDate, fieldId, typeKey));
+        return;
+      }
       if (presetButton) {
         U.$("sheetScheduleTitle").value = presetButton.dataset.schedulePreset;
         renderFertilizerScheduleFields();
@@ -300,7 +319,7 @@
       } else if (action === "work") {
         openScreen("field-work", (fieldId) => RiceOS.screens.fieldWork.prefillDate(selectedDate, fieldId));
       } else if (action === "water") {
-        openScreen("irrigation", (fieldId) => RiceOS.screens.irrigation.prefillDate(selectedDate, fieldId));
+        showWaterQuick();
       } else if (action === "photo") {
         openScreen("growth", (fieldId) => {
           RiceOS.screens.growth.prefillDate(selectedDate, fieldId);

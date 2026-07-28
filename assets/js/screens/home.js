@@ -190,11 +190,14 @@
     return String(dateText || U.today()).slice(0, 4);
   }
 
-  function panicleLogForYear(fieldId, year) {
-    return state.growthLogsFor(fieldId)
-      .filter((log) => String(log.date || "").startsWith(`${year}-`) && U.number(log.panicleLengthMm, 0) > 0)
-      .slice()
-      .sort((a, b) => String(a.date).localeCompare(String(b.date)))[0] || null;
+  function panicleLogForYear(fieldId, year, asOfDate) {
+    return state.growthSummaryFor
+      ? state.growthSummaryFor(fieldId, year, { asOfDate }).panicleLog
+      : state.growthLogsFor(fieldId, year)
+        .filter((log) => !asOfDate || String(log.date || "") <= String(asOfDate))
+        .filter((log) => U.number(log.panicleLengthMm, 0) > 0)
+        .slice()
+        .sort((a, b) => String(b.date).localeCompare(String(a.date)))[0] || null;
   }
 
   function plantingDateForYear(fieldId, year) {
@@ -205,7 +208,7 @@
     const currentYear = Number(cropYear(dateText));
     if (!Number.isFinite(currentYear)) return null;
     const year = String(currentYear - 1);
-    const log = panicleLogForYear(fieldId, year);
+    const log = panicleLogForYear(fieldId, year, addYears(dateText, -1));
     if (!log) return null;
     const planting = plantingDateForYear(fieldId, year);
     return { log, planting, dap: planting ? U.daysBetween(planting, log.date) : "" };
@@ -247,11 +250,14 @@
       const rows = [];
       const planting = plantingDateForYear(field.fieldId, year);
       const dap = planting ? U.daysBetween(planting, date) : "";
-      const dryRecord = latestDryPeriod(field.fieldId, year);
-      const irrigationRecord = latestIrrigation(field.fieldId, year);
-      const dryStart = dryRecord && dryRecord.startDate || (state.workDateForField ? state.workDateForField(field.fieldId, ["中干し開始"], "first", year) : "");
-      const dryEnd = dryRecord && dryRecord.actualEndDate || (state.workDateForField ? state.workDateForField(field.fieldId, ["中干し終了"], "first", year) : "");
-      const irrigationStart = irrigationRecord && irrigationRecord.startDate || (state.workDateForField ? state.workDateForField(field.fieldId, ["間断灌水開始"], "first", year) : "");
+      const periods = resolvedWaterPeriods(field.fieldId, year, date);
+      const latest = (kind) => periods.filter((row) => row.kind === kind)
+        .slice().sort((a, b) => String(b.startDate || b.actualEndDate || "").localeCompare(String(a.startDate || a.actualEndDate || "")))[0] || null;
+      const dryRecord = latest("dry");
+      const irrigationRecord = latest("intermittent");
+      const dryStart = dryRecord && dryRecord.startDate || "";
+      const dryEnd = dryRecord && dryRecord.actualEndDate || "";
+      const irrigationStart = irrigationRecord && irrigationRecord.startDate || "";
       if (dap !== "" && dap >= 35 && dap <= 55 && !dryStart) {
         rows.push({
           kind: "candidate",
@@ -416,11 +422,11 @@
     const year = cropYear(dateText);
     const works = seasonRowsForField(field.fieldId, year);
     const growth = latestGrowthForYear(field.fieldId, year);
-    const panicleLog = panicleLogForYear(field.fieldId, year);
-    const headingLog = state.growthLogsFor(field.fieldId).find((row) => String(row.date || "").startsWith(`${year}-`) && row.headingObserved);
+    const panicleLog = panicleLogForYear(field.fieldId, year, dateText);
+    const growthSummary = state.growthSummaryFor ? state.growthSummaryFor(field.fieldId, year, dateText) : null;
     const planting = plantingDateForYear(field.fieldId, year);
     const hasWork = (pattern) => works.some((row) => pattern.test(String(row.workName || "")));
-    const heading = Boolean(headingLog) || hasWork(/出穂/);
+    const heading = Boolean(growthSummary && growthSummary.headingDate) || hasWork(/出穂/);
     const harvest = hasWork(/稲刈り|収穫/);
     const panicle = Boolean(panicleLog);
     const dap = planting ? U.daysBetween(planting, dateText) : "";
@@ -494,6 +500,28 @@
       .sort((a, b) => String(a.startDate || a.date || "").localeCompare(String(b.startDate || b.date || "")));
   }
 
+  function resolvedWaterPeriods(fieldId, year, throughDate) {
+    if (state.resolvedWaterPeriodsFor) {
+      return state.resolvedWaterPeriodsFor(fieldId, { year, throughDate, includePlanned: true, forDisplay: true });
+    }
+    return [];
+  }
+
+  function waterRows(periods, kind) {
+    return periods
+      .filter((period) => period.kind === kind)
+      .map((period) => ({
+        date: period.startDate || period.actualEndDate || period.plannedEndDate || "",
+        startDate: period.startDate || "",
+        endDate: period.plannedEndDate || "",
+        actualEndDate: period.actualEndDate || "",
+        targetDays: period.targetDays || "",
+        method: period.label || "",
+        source: period.source || "",
+        periodStatus: period.status || ""
+      }));
+  }
+
   function isPlannedPeriod(row) {
     return /予定|未開始/.test(String(row && (row.periodStatus || row.status) || ""));
   }
@@ -531,19 +559,15 @@
 
   function waterManagementForField(field, dateText) {
     const year = cropYear(dateText);
-    const dryPeriods = (state.dryPeriodsFor ? state.dryPeriodsFor(field.fieldId, year) : [])
-      .filter((row) => !isPlannedPeriod(row))
-      .slice()
-      .sort((a, b) => String(a.startDate || a.date || "").localeCompare(String(b.startDate || b.date || "")));
+    const periods = resolvedWaterPeriods(field.fieldId, year, dateText);
+    const dryPeriods = waterRows(periods, "dry");
     const dry = dryPeriods.at(-1) || null;
-    const dryIsPlanned = isPlannedPeriod(dry);
-    const dryStart = actualPeriodStart(dry) || fieldWorkDate(field.fieldId, year, /中干し開始/);
-    const dryActualEnd = dry && !dryIsPlanned && dry.actualEndDate || fieldWorkDate(field.fieldId, year, /中干し終了/);
-    const irrigations = managementPeriods(field.fieldId, year, /間断灌水/);
-    const deeps = managementPeriods(field.fieldId, year, /深水管理/);
-    const drains = managementPeriods(field.fieldId, year, /稲刈り前の落水|^落水$/);
-    const legacyDrainDate = latestFieldWorkDate(field.fieldId, year, /稲刈り前.*落水|^落水$/);
-    return dashboardWaterStatus(dateText, dryStart, dryActualEnd, irrigations, deeps, drains, legacyDrainDate);
+    const dryStart = dry && dry.startDate || "";
+    const dryActualEnd = dry && dry.actualEndDate || "";
+    const irrigations = waterRows(periods, "intermittent");
+    const deeps = waterRows(periods, "deep");
+    const drains = waterRows(periods, "drain");
+    return dashboardWaterStatus(dateText, dryStart, dryActualEnd, irrigations, deeps, drains, "");
   }
 
   function flowPercent(dateText, startDate, endDate) {
@@ -645,28 +669,24 @@
     if (!planting) return `
       <div class="home-linked-flow waiting"><b>今期の工程</b><span>田植え作業を登録すると、生育と水管理を同じ時間軸で表示します。</span></div>
     `;
-    const panicle = panicleLogForYear(field.fieldId, year);
+    const panicle = panicleLogForYear(field.fieldId, year, dateText);
     const headingActual = actualHeadingDate(field, dateText);
     const heading = headingActual || stage.predictedHeadingDate || "";
     const harvest = fieldWorkDate(field.fieldId, year, /稲刈り|収穫/);
     const flowEnd = harvest || (heading ? addDays(heading, 48) : addDays(planting, 145));
     const todayPercent = flowPercent(dateText, planting, flowEnd);
     const growthDate = earliestGrowthDate(field.fieldId, year);
-    const dryPeriods = (state.dryPeriodsFor ? state.dryPeriodsFor(field.fieldId, year) : [])
-      .filter((row) => !isPlannedPeriod(row))
-      .slice()
-      .sort((a, b) => String(a.startDate || a.date || "").localeCompare(String(b.startDate || b.date || "")));
+    const periods = resolvedWaterPeriods(field.fieldId, year, dateText);
+    const dryPeriods = waterRows(periods, "dry");
     const dry = dryPeriods.at(-1) || null;
-    const dryIsPlanned = isPlannedPeriod(dry);
-    const dryStart = actualPeriodStart(dry) || fieldWorkDate(field.fieldId, year, /中干し開始/);
-    const dryActualEnd = dry && !dryIsPlanned && dry.actualEndDate || fieldWorkDate(field.fieldId, year, /中干し終了/);
-    const dryPlannedStart = dryIsPlanned && String(dry.startDate || dry.date || "");
+    const dryStart = dry && dry.startDate || "";
+    const dryActualEnd = dry && dry.actualEndDate || "";
+    const dryPlannedStart = dry && !dry.startDate && String(dry.date || "");
     const dryPlannedEnd = dry && dry.endDate || "";
-    const irrigations = managementPeriods(field.fieldId, year, /間断灌水/);
-    const deeps = managementPeriods(field.fieldId, year, /深水管理/);
-    const drains = managementPeriods(field.fieldId, year, /稲刈り前の落水|^落水$/);
-    const legacyDrainDate = latestFieldWorkDate(field.fieldId, year, /稲刈り前.*落水|^落水$/);
-    const management = dashboardWaterStatus(dateText, dryStart, dryActualEnd, irrigations, deeps, drains, legacyDrainDate);
+    const irrigations = waterRows(periods, "intermittent");
+    const deeps = waterRows(periods, "deep");
+    const drains = waterRows(periods, "drain");
+    const management = dashboardWaterStatus(dateText, dryStart, dryActualEnd, irrigations, deeps, drains, "");
     const growthMarkers = [
       { label: "田植（基準）", date: planting, baseline: true },
       { label: "分げつ", date: growthDate },
@@ -704,7 +724,6 @@
         if (!start) return [{ label: "落水予定", date: row.startDate || row.date || row.endDate || "", estimated: true }];
         return [{ label: "落水開始", date: start }, { label: "落水完了", date: row.actualEndDate || "" }];
       }),
-      { label: "落水", date: legacyDrainDate }
     ];
     return `
       <section class="home-linked-flow" aria-label="生育と水管理の今期工程">
@@ -1079,6 +1098,7 @@
   function actualHeadingDate(field, dateText) {
     if (!field) return "";
     const year = cropYear(dateText);
+    if (state.growthSummaryFor) return state.growthSummaryFor(field.fieldId, year, dateText).headingDate;
     const observedLog = state.growthLogsFor(field.fieldId)
       .filter((row) => String(row.date || "").startsWith(`${year}-`))
       .slice()
@@ -1096,7 +1116,7 @@
   function headingDateInfo(field, cached, planting, headingTarget, dateText) {
     const actual = actualHeadingDate(field, dateText);
     if (actual) return { date: actual, source: "出穂確認", actual: true };
-    const currentPanicleLog = panicleLogForYear(field.fieldId, cropYear(dateText));
+    const currentPanicleLog = panicleLogForYear(field.fieldId, cropYear(dateText), dateText);
     const panicle = RiceOS.agro && RiceOS.agro.panicleEstimate && currentPanicleLog
       ? RiceOS.agro.panicleEstimate(field, currentPanicleLog.panicleLengthMm, currentPanicleLog.date)
       : null;
@@ -1181,7 +1201,7 @@
 
   function renderHeatMeter(field) {
     const planting = plantingDateForYear(field.fieldId, cropYear(U.today()));
-    const panicleLog = panicleLogForYear(field.fieldId, cropYear(U.today()));
+    const panicleLog = panicleLogForYear(field.fieldId, cropYear(U.today()), U.today());
     const target = accumulatedTempTarget(field);
     const panicleTarget = panicleTempTarget(field);
     const key = heatCacheKey(field, planting, U.today());
@@ -1254,10 +1274,11 @@
   }
 
   function latestWaterPeriod(fieldId, year, throughDate) {
-    return (state.irrigationsFor ? state.irrigationsFor(fieldId, year) : [])
-      .filter((row) => /間断灌水|深水管理|稲刈り前の落水|^落水$/.test(String(row.method || "")))
-      .filter((row) => !isPlannedPeriod(row))
-      .filter((row) => !throughDate || String(row.startDate || row.date || "") <= String(throughDate))
+    return waterRows(resolvedWaterPeriods(fieldId, year, throughDate), "intermittent")
+      .concat(waterRows(resolvedWaterPeriods(fieldId, year, throughDate), "deep"))
+      .concat(waterRows(resolvedWaterPeriods(fieldId, year, throughDate), "drain"))
+      .filter((row) => row.startDate)
+      .filter((row) => !row.actualEndDate || !throughDate || row.actualEndDate > throughDate)
       .slice()
       .sort((a, b) => String(b.startDate || b.date || "").localeCompare(String(a.startDate || a.date || "")))[0] || null;
   }
@@ -1267,11 +1288,11 @@
     const year = cropYear(date);
     const planting = plantingDateForYear(field.fieldId, year);
     if (!planting) return { key: "waiting", label: "水管理", value: "田植日未登録", percent: 0, detail: "今年度の田植日が未登録です。" };
-    const latestDry = latestDryPeriod(field.fieldId, year, date);
-    const dryPeriod = latestDry && !isPlannedPeriod(latestDry) ? latestDry : null;
-    const dryStart = dryPeriod && dryPeriod.startDate || (state.workDateForField ? state.workDateForField(field.fieldId, ["中干し開始"], "first", year) : "");
+    const periods = resolvedWaterPeriods(field.fieldId, year, date);
+    const dryPeriod = waterRows(periods, "dry").at(-1) || null;
+    const dryStart = dryPeriod && dryPeriod.startDate || "";
     const dryEnd = dryPeriod && dryPeriod.endDate || "";
-    const dryActualEnd = dryPeriod && dryPeriod.actualEndDate || (state.workDateForField ? state.workDateForField(field.fieldId, ["中干し終了"], "first", year) : "");
+    const dryActualEnd = dryPeriod && dryPeriod.actualEndDate || "";
     const dryTargetDays = U.number(dryPeriod && dryPeriod.targetDays, 0);
     const irrigation = latestWaterPeriod(field.fieldId, year, date);
     const dryIsCurrent = dryStart && (!dryActualEnd || String(dryActualEnd) > String(date));
@@ -1317,10 +1338,10 @@
     const year = cropYear(U.today());
     const planting = plantingDateForYear(field.fieldId, year);
     const dap = planting ? U.daysBetween(planting, U.today()) : "";
-    const dryPeriod = latestDryPeriod(field.fieldId, year);
-    const dryStart = dryPeriod && dryPeriod.startDate || (state.workDateForField ? state.workDateForField(field.fieldId, ["中干し開始"], "first", year) : "");
+    const dryPeriod = waterRows(resolvedWaterPeriods(field.fieldId, year, U.today()), "dry").at(-1) || null;
+    const dryStart = dryPeriod && dryPeriod.startDate || "";
     const dryEnd = dryPeriod && dryPeriod.endDate || "";
-    const dryActualEnd = dryPeriod && dryPeriod.actualEndDate || (state.workDateForField ? state.workDateForField(field.fieldId, ["中干し終了"], "first", year) : "");
+    const dryActualEnd = dryPeriod && dryPeriod.actualEndDate || "";
     const dryDays = U.number(dryPeriod && dryPeriod.targetDays, 0);
     const dryPlannedDays = dryStart && dryEnd ? U.daysBetween(dryStart, dryEnd) : dryDays;
     const dryActualDays = dryStart && dryActualEnd ? U.daysBetween(dryStart, dryActualEnd) : "";
@@ -1335,7 +1356,7 @@
     const panicleTemp = variety && variety.panicleAccumulatedTempTarget || "";
     const headingTemp = variety && variety.headingAccumulatedTempTarget || "";
     const headingDate = actualHeadingDate(field, U.today());
-    const currentPanicleLog = panicleLogForYear(field.fieldId, year);
+    const currentPanicleLog = panicleLogForYear(field.fieldId, year, U.today());
     const panicle = RiceOS.agro && RiceOS.agro.panicleEstimate && currentPanicleLog
       ? RiceOS.agro.panicleEstimate(field, currentPanicleLog.panicleLengthMm, currentPanicleLog.date)
       : null;

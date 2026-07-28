@@ -83,6 +83,23 @@ const mismatchedSeasonData = S.normalize({
   fields: [{ fieldId: "field_mismatched_note", name: "mismatched note", varietyId: "variety_test", seasonNotes: [{ date: "2025-08-01", season: 2026, text: "must follow date" }] }]
 });
 assert(mismatchedSeasonData.fields[0].seasonNotes[0].season === 2025, "imported season note did not follow its date year");
+const mismatchedGrowthSeasonData = S.normalize({
+  varieties: oldData.varieties,
+  fields: [{ fieldId: "field_mismatched_growth", name: "mismatched growth", varietyId: "variety_test" }],
+  growthLogs: [{
+    logId: "growth_mismatched_season",
+    date: "2025-07-10",
+    season: 2026,
+    fieldId: "field_mismatched_growth",
+    panicleLengthMm: "20",
+    headingObserved: true,
+    observedStage: "heading",
+    stageConfirmed: true
+  }]
+});
+const mismatchedGrowth = mismatchedGrowthSeasonData.growthLogs[0];
+assert(mismatchedGrowth.season === 2025, "imported growth log did not follow its date year");
+assert(mismatchedGrowth.logId === "growth_mismatched_season" && mismatchedGrowth.panicleLengthMm === "20" && mismatchedGrowth.headingObserved, "growth migration lost panicle or heading evidence");
 
 memory.set(S.STORE_KEY, JSON.stringify(oldData));
 
@@ -108,6 +125,23 @@ assert(state.saveGrowthLogsBatch([
 ], "group growth") !== null, "グループ生育記録を一括保存できない");
 assert(state.data().growthLogs.length === beforeGrowthBatch + 2, "グループ生育記録の件数が一致しない");
 assert(["field_a", "field_b"].every((fieldId) => state.data().growthLogs.some((row) => row.logId === `growth_group_${fieldId.slice(-1)}` && row.fieldId === fieldId)), "グループ生育記録が圃場別に保存されていない");
+const beforeInvalidGrowthBatch = state.data().growthLogs.length;
+assert(state.saveGrowthLogsBatch([
+  { date: "2026-06-06", fieldId: "field_a", panicleLengthMm: "2" },
+  { date: "2026-06-06", fieldId: "亀石グループ", panicleLengthMm: "2" }
+], "invalid group growth") === null, "グループ名だけの生育ログを保存できてしまう");
+assert(state.data().growthLogs.length === beforeInvalidGrowthBatch, "不正な一括生育ログで一部の圃場だけ保存された");
+assert(state.saveGrowthLogsBatch([
+  { date: "2026-06-06", fieldId: "field_a", panicleLengthMm: "2" },
+  { date: "2026-06-06", fieldId: "field_a", panicleLengthMm: "2" }
+], "duplicate group growth") === null, "重複した圃場IDの一括生育ログを保存できてしまう");
+assert(state.data().growthLogs.length === beforeInvalidGrowthBatch, "重複した一括生育ログで件数が増えた");
+state.updateField("field_b", { status: "終了" });
+assert(state.saveGrowthLogsBatch([
+  { date: "2026-06-06", fieldId: "field_b", panicleLengthMm: "2" }
+], "archived growth") === null, "終了した圃場へ生育ログを保存できてしまう");
+assert(state.data().growthLogs.length === beforeInvalidGrowthBatch, "終了圃場への生育ログで件数が増えた");
+state.updateField("field_b", { status: "使用中" });
 
 state.updateField("field_a", { nextSeasonMemo: "keep this carryover" });
 const carryoverBeforeSeasonNotes = state.field("field_a").nextSeasonMemo;
@@ -251,6 +285,46 @@ state.saveGrowthLog({
   observedStage: "heading",
   stageConfirmed: true
 });
+state.saveGrowthLog({
+  date: "2025-06-20",
+  fieldId: "field_a",
+  panicleLengthMm: "1",
+  observedStage: "panicle",
+  stageConfirmed: true
+});
+state.saveGrowthLog({
+  date: "2026-06-26",
+  fieldId: "field_a",
+  panicleLengthMm: "8",
+  observedStage: "panicle",
+  stageConfirmed: true
+});
+state.saveGrowthLog({
+  date: "2026-07-10",
+  fieldId: "field_a",
+  observedStage: "heading",
+  stageConfirmed: false
+});
+const growthBeforeSummary = JSON.stringify(state.data().growthLogs);
+const growth2025 = state.growthSummaryFor("field_a", 2025);
+const growth2026ThroughJune = state.growthSummaryFor("field_a", 2026, { asOfDate: "2026-06-30" });
+const growth2026 = state.growthSummaryFor("field_a", 2026);
+assert(growth2025.panicleLog && growth2025.panicleLog.date === "2025-06-20", "growth summary leaked a panicle record from another year");
+assert(growth2025.headingDate === "2025-07-15" && growth2025.headingSource === "fieldWork", "growth summary did not retain heading work fallback");
+assert(growth2026ThroughJune.panicleLog && growth2026ThroughJune.panicleLog.date === "2026-06-26", "growth summary did not use the latest panicle record in its year");
+assert(growth2026ThroughJune.headingDate === "", "growth summary included a future heading record");
+assert(growth2026.headingDate === "2026-07-03", "growth summary did not use the earliest confirmed heading evidence");
+growth2026.panicleLog.panicleLengthMm = "999";
+assert(state.growthLogsFor("field_a", 2026).some((row) => row.date === "2026-06-26" && row.panicleLengthMm === "8"), "growth summary exposed a mutable saved growth log");
+assert(JSON.stringify(state.data().growthLogs) === growthBeforeSummary, "growth summary mutated saved growth logs");
+state.saveGrowthLog({
+  date: "2026-07-10",
+  fieldId: "field_b",
+  observedStage: "heading",
+  stageConfirmed: false
+});
+const unconfirmedHeading = state.growthSummaryFor("field_b", 2026);
+assert(unconfirmedHeading.headingDate === "" && unconfirmedHeading.confirmedHeading === null, "unconfirmed heading was treated as a confirmed heading record");
 state.saveDryPeriod({
   date: "2025-06-02",
   fieldId: "field_a",
@@ -331,6 +405,23 @@ assert(state.saveIrrigationsBatch([{
 const deepWater = state.irrigationsFor("field_b", 2026).find((row) => row.irrigationId === "deep_water_field_b");
 assert(deepWater && deepWater.method === "深水管理" && deepWater.targetDepthCm === "10", "深水管理の追加項目が保存されていない");
 assert(state.field("field_b").intermittentStartDate === intermittentStartBeforeDeep, "深水管理が間断灌水の開始日キャッシュを上書きした");
+
+// Water periods are resolved read-only from both dedicated water records and
+// older work records. The resolver must not migrate, delete, or duplicate data.
+state.saveFieldWork({ workId: "water_legacy_intermit_start", date: "2026-08-01", fieldIds: ["field_a"], workName: "間断灌水開始" });
+state.saveFieldWork({ workId: "water_legacy_intermit_end", date: "2026-08-04", fieldIds: ["field_a"], workName: "間断灌水終了" });
+state.saveFieldWork({ workId: "water_duplicate_direct", date: "2026-06-12", fieldIds: ["field_b"], workName: "間断灌水開始" });
+state.saveFieldWork({ workId: "water_mixed_deep_end", date: "2026-07-04", fieldIds: ["field_b"], workName: "深水管理終了" });
+const waterDataBeforeResolve = JSON.stringify(state.data().irrigations);
+const resolvedA2026 = state.resolvedWaterPeriodsFor("field_a", { year: 2026, includePlanned: true });
+const resolvedB2026 = state.resolvedWaterPeriodsFor("field_b", { year: 2026, includePlanned: true });
+assert(resolvedA2026.some((row) => row.kind === "intermittent" && row.startDate === "2026-08-01" && row.actualEndDate === "2026-08-04" && row.source === "legacy-work"), "作業記録だけの間断灌水期間を復元できない");
+assert(resolvedB2026.filter((row) => row.kind === "intermittent" && row.startDate === "2026-06-12").length === 2, "同日の直接記録と作業記録を勝手に統合した");
+assert(resolvedB2026.some((row) => row.kind === "deep" && row.startDate === "2026-07-01" && !row.actualEndDate && row.source === "direct"), "直接記録の終了日を作業記録で勝手に補完した");
+assert(resolvedB2026.some((row) => row.kind === "deep" && !row.startDate && row.actualEndDate === "2026-07-04" && row.source === "legacy-work"), "作業記録だけの終了事実を残せない");
+assert(state.resolvedWaterPeriodsFor("field_b", { year: 2026, includePlanned: true, forDisplay: true }).filter((row) => row.kind === "intermittent" && row.startDate === "2026-06-12").length === 1, "完全一致する水管理の表示重複を畳めない");
+assert(JSON.stringify(state.data().irrigations) === waterDataBeforeResolve, "水管理の表示解決で保存済みデータが書き換わった");
+assert(!state.resolvedWaterPeriodsFor("field_a", { year: 2025 }).some((row) => row.startDate === "2026-08-01"), "水管理の表示解決で年度をまたいだ");
 
 state.saveIrrigation({
   date: "2025-06-09",

@@ -83,6 +83,11 @@
     const field = fieldOf(fieldOrId);
     if (!field) return null;
     const targetYear = year && year !== "all" ? String(year) : "";
+    const summary = state().growthSummaryFor && state().growthSummaryFor(field.fieldId, targetYear || undefined);
+    if (summary && summary.headingDate) return null;
+    if (summary && summary.panicleLog) {
+      return panicleEstimate(field, summary.panicleLog.panicleLengthMm, summary.panicleLog.date);
+    }
     const logs = state().growthLogsFor(field.fieldId, targetYear || undefined)
       .slice()
       .sort((a, b) => String(b.date).localeCompare(String(a.date)));
@@ -282,26 +287,24 @@
   function managementStatus(field, date) {
     const targetDate = date || U.today();
     const year = U.dateYear(targetDate);
-    const dry = (state().dryPeriodsFor(field.fieldId, year) || [])
-      .filter((row) => String(row.date || row.startDate || "") <= targetDate)
-      .slice().sort((a, b) => String(a.date || a.startDate || "").localeCompare(String(b.date || b.startDate || ""))).pop() || null;
-    const fieldDryEnd = U.isInYear(field.drainageActualEndDate, year) ? field.drainageActualEndDate : "";
-    const dryEnd = dry && dry.actualEndDate || fieldDryEnd || "";
-    const deepWater = (state().irrigationsFor(field.fieldId, year) || [])
-      .filter((row) => /深水管理/.test(String(row.method || "")) && String(row.startDate || row.date || "") <= targetDate)
-      .slice().sort((a, b) => String(a.startDate || a.date || "").localeCompare(String(b.startDate || b.date || ""))).pop() || null;
+    const periods = state().resolvedWaterPeriodsFor
+      ? state().resolvedWaterPeriodsFor(field.fieldId, { year, throughDate: targetDate, includePlanned: true, forDisplay: true })
+      : [];
+    const latest = (kind) => periods.filter((row) => row.kind === kind)
+      .slice().sort((a, b) => String(b.startDate || b.actualEndDate || "").localeCompare(String(a.startDate || a.actualEndDate || "")))[0] || null;
+    const dry = latest("dry");
+    const dryEnd = dry && dry.actualEndDate || "";
+    const deepWater = latest("deep");
     if (deepWater && !(deepWater.actualEndDate && deepWater.actualEndDate <= targetDate)) {
-      return { key: "deepWater", label: "深水管理中", tone: "water", date: deepWater.startDate || deepWater.date || "" };
+      return { key: "deepWater", label: "深水管理中", tone: "water", date: deepWater.startDate || "" };
     }
-    const irrigation = (state().irrigationsFor(field.fieldId, year) || [])
-      .filter((row) => /間断灌水/.test(String(row.method || "")) && String(row.startDate || row.date || "") <= targetDate)
-      .slice().sort((a, b) => String(a.startDate || a.date || "").localeCompare(String(b.startDate || b.date || ""))).pop() || null;
+    const irrigation = latest("intermittent");
     if (irrigation) {
       const ended = irrigation.actualEndDate && irrigation.actualEndDate <= targetDate;
-      return { key: ended ? "intermittentCompleted" : "intermittent", label: ended ? "間断灌水完了" : "間断灌水中", tone: ended ? "ok" : "water", date: irrigation.actualEndDate || irrigation.startDate || irrigation.date || "" };
+      return { key: ended ? "intermittentCompleted" : "intermittent", label: ended ? "間断灌水完了" : "間断灌水中", tone: ended ? "ok" : "water", date: irrigation.actualEndDate || irrigation.startDate || "" };
     }
     if (dryEnd) return { key: "dryCompleted", label: "中干し完了", tone: "ok", date: dryEnd };
-    if (dry && (dry.startDate || dry.status === "実施中")) return { key: "drying", label: "中干し中", tone: "warn", date: dry.startDate || dry.date || "" };
+    if (dry && dry.startDate) return { key: "drying", label: "中干し中", tone: "warn", date: dry.startDate };
     return { key: "dryWaiting", label: "中干し未実施", tone: "waiting", date: "" };
   }
 

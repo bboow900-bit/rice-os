@@ -324,6 +324,49 @@
     return dates.filter(Boolean).sort()[0] || "";
   }
 
+  function growthSummaryFor(fieldId, year, options) {
+    const targetYear = year === "all" || year === "" || year === null ? undefined : year;
+    const asOfDate = typeof options === "object" && options !== null ? options.asOfDate : options;
+    const onOrBefore = (row) => !asOfDate || String(row.date || "") <= String(asOfDate);
+    const logs = growthLogsFor(fieldId, targetYear)
+      .filter(onOrBefore)
+      .slice()
+      .sort((a, b) => String(a.date || "").localeCompare(String(b.date || "")));
+    const panicleLog = logs.filter((log) => U.number(log.panicleLengthMm, 0) > 0).at(-1) || null;
+    const headingLog = logs.find((log) => log.headingObserved || (log.stageConfirmed && log.observedStage === "heading")) || null;
+    const headingDate = headingDateForField(fieldId, targetYear, asOfDate);
+    const headingSource = headingLog ? "growthLog" : (headingDate ? "fieldWork" : "");
+    const latestLog = logs.at(-1) || null;
+    const copyEvidence = (log) => log ? {
+      logId: String(log.logId || ""),
+      date: String(log.date || ""),
+      panicleLengthMm: String(log.panicleLengthMm || ""),
+      headingObserved: Boolean(log.headingObserved),
+      observedStage: String(log.observedStage || ""),
+      stageConfirmed: Boolean(log.stageConfirmed)
+    } : null;
+    const panicle = copyEvidence(panicleLog);
+    const confirmedHeading = copyEvidence(headingLog);
+    const stageEvidence = headingDate
+      ? { key: "heading", date: headingDate, certainty: "確定", source: headingSource }
+      : panicle
+        ? { key: "panicle", date: panicle.date, certainty: "確定", source: "growthLog" }
+        : null;
+    return {
+      fieldId: String(fieldId || ""),
+      year: targetYear === undefined ? "" : String(targetYear),
+      asOfDate: String(asOfDate || ""),
+      latestLog: copyEvidence(latestLog),
+      panicleLog: panicle,
+      headingLog: confirmedHeading,
+      panicle,
+      confirmedHeading,
+      headingDate,
+      headingSource,
+      stageEvidence
+    };
+  }
+
   function scheduleText(value) {
     return String(value || "")
       .replace(/予定|確認|作業|実施|散布|開始|終了|する|します|\s/g, "")
@@ -552,6 +595,16 @@
   function saveGrowthLogsBatch(records, message) {
     const rows = Array.isArray(records) ? records.filter(Boolean) : [];
     if (!rows.length) return null;
+    const validFieldIds = new Set(activeFields().map((item) => item.fieldId));
+    if (rows.some((record) => !record.fieldId || !validFieldIds.has(record.fieldId))) {
+      lastError = new Error("生育ログの圃場が見つかりません。保存は行いませんでした。");
+      return null;
+    }
+    const newFieldIds = rows.filter((record) => !record.logId).map((record) => record.fieldId);
+    if (new Set(newFieldIds).size !== newFieldIds.length) {
+      lastError = new Error("同じ圃場が一括生育記録に重複しています。保存は行いませんでした。");
+      return null;
+    }
     return mutate((d) => {
       rows.forEach((record) => saveGrowthLogToDraft(d, record));
     }, message || `生育ログを${rows.length}件保存しました`);
@@ -1026,6 +1079,174 @@
     return (data().irrigations || []).filter((i) => i.fieldId === fieldId && isInYear(i, year));
   }
 
+  const WATER_PERIOD_TYPES = {
+    dry: { label: "中干し", method: "中干し" },
+    intermittent: { label: "間断灌水", method: "間断灌水" },
+    deep: { label: "深水管理", method: "深水管理" },
+    drain: { label: "稲刈り前の落水", method: "稲刈り前の落水" }
+  };
+
+  function waterPeriodYear(record) {
+    const date = record && (record.startDate || record.date || record.actualEndDate || record.endDate || "");
+    return U.dateYear(date) || String(record && record.season || "");
+  }
+
+  function waterKindFromMethod(method) {
+    const text = String(method || "");
+    if (/中干し/.test(text)) return "dry";
+    if (/間断灌水/.test(text)) return "intermittent";
+    if (/深水/.test(text)) return "deep";
+    if (/稲刈り前.*落水|^落水$/.test(text)) return "drain";
+    return "";
+  }
+
+  function waterEventFromWorkName(workName) {
+    const text = String(workName || "");
+    if (/中干し.*(終了|完了)|中干完了/.test(text)) return { kind: "dry", phase: "end" };
+    if (/中干し.*開始/.test(text)) return { kind: "dry", phase: "start" };
+    if (/間断灌水.*(終了|完了)/.test(text)) return { kind: "intermittent", phase: "end" };
+    if (/間断灌水.*開始/.test(text)) return { kind: "intermittent", phase: "start" };
+    if (/深水.*(終了|完了)/.test(text)) return { kind: "deep", phase: "end" };
+    if (/深水(管理)?(開始)?/.test(text)) return { kind: "deep", phase: "start" };
+    if (/落水.*(終了|完了)/.test(text)) return { kind: "drain", phase: "end" };
+    if (/稲刈り前.*落水|^落水$/.test(text)) return { kind: "drain", phase: "start" };
+    return null;
+  }
+
+  function waterPeriodStatus(period) {
+    if (!period.startDate && period.actualEndDate) return "orphanEnd";
+    if (period.actualEndDate) return "completed";
+    if (period.startDate) return "active";
+    return "planned";
+  }
+
+  function directWaterPeriodsFor(fieldId, year, includePlanned) {
+    const directDry = (data().dryPeriods || []).filter((row) => row.fieldId === fieldId);
+    const directWater = (data().irrigations || []).filter((row) => row.fieldId === fieldId);
+    return [...directDry, ...directWater].map((row) => {
+      const kind = row.type === "dryPeriod" || /中干し/.test(String(row.method || "")) ? "dry" : waterKindFromMethod(row.method);
+      if (!kind) return null;
+      const startDate = String(row.startDate || row.date || "");
+      const actualEndDate = String(row.actualEndDate || "");
+      const plannedEndDate = String(row.endDate || "");
+      const planned = !startDate && Boolean(row.plannedStartDate || plannedEndDate || /予定/.test(String(row.status || row.periodStatus || "")));
+      return {
+        periodId: `direct:${kind}:${row.dryPeriodId || row.irrigationId || row.date || ""}`,
+        kind,
+        label: WATER_PERIOD_TYPES[kind].label,
+        fieldId,
+        season: waterPeriodYear(row),
+        startDate,
+        plannedEndDate,
+        actualEndDate,
+        targetDays: String(row.targetDays || ""),
+        status: waterPeriodStatus({ startDate, actualEndDate }),
+        source: "direct",
+        directId: row.dryPeriodId || row.irrigationId || "",
+        sourceWorkIds: [],
+        planned,
+        raw: row
+      };
+    }).filter((row) => row && (!year || row.season === String(year)) && (includePlanned || !row.planned));
+  }
+
+  function legacyWaterPeriodsFor(fieldId, year) {
+    const works = (data().fieldWorks || [])
+      .filter((row) => (row.fieldIds || []).includes(fieldId) && (!year || waterPeriodYear(row) === String(year)))
+      .map((row) => ({ row, event: waterEventFromWorkName(row.workName) }))
+      .filter((item) => item.event)
+      .sort((a, b) => String(a.row.date || "").localeCompare(String(b.row.date || "")) || String(a.row.workId || "").localeCompare(String(b.row.workId || "")));
+    const periods = [];
+    const open = { dry: [], intermittent: [], deep: [], drain: [] };
+    works.forEach(({ row, event }) => {
+      const type = WATER_PERIOD_TYPES[event.kind];
+      if (event.phase === "start") {
+        const period = {
+          periodId: `work:${event.kind}:${row.workId || row.date || periods.length}`,
+          kind: event.kind,
+          label: type.label,
+          fieldId,
+          season: waterPeriodYear(row),
+          startDate: String(row.date || ""),
+          plannedEndDate: "",
+          actualEndDate: "",
+          targetDays: "",
+          status: "active",
+          source: "legacy-work",
+          directId: "",
+          sourceWorkIds: row.workId ? [row.workId] : [],
+          planned: false,
+          raw: row
+        };
+        periods.push(period);
+        open[event.kind].push(period);
+        return;
+      }
+      const current = open[event.kind].pop();
+      if (current) {
+        current.actualEndDate = String(row.date || "");
+        current.status = "completed";
+        if (row.workId) current.sourceWorkIds.push(row.workId);
+        return;
+      }
+      periods.push({
+        periodId: `work:${event.kind}:end:${row.workId || row.date || periods.length}`,
+        kind: event.kind,
+        label: type.label,
+        fieldId,
+        season: waterPeriodYear(row),
+        startDate: "",
+        plannedEndDate: "",
+        actualEndDate: String(row.date || ""),
+        targetDays: "",
+        status: "orphanEnd",
+        source: "legacy-work",
+        directId: "",
+        sourceWorkIds: row.workId ? [row.workId] : [],
+        planned: false,
+        raw: row
+      });
+    });
+    return periods;
+  }
+
+  // This is read-only. It keeps direct water records authoritative while making
+  // legacy work records visible everywhere until the user explicitly edits them.
+  function resolvedWaterPeriodsFor(fieldId, options) {
+    const opts = options || {};
+    const year = opts.year === undefined || opts.year === null || String(opts.year) === "all" ? "" : String(opts.year);
+    const throughDate = String(opts.throughDate || "");
+    const direct = directWaterPeriodsFor(fieldId, year, Boolean(opts.includePlanned));
+    const legacy = legacyWaterPeriodsFor(fieldId, year);
+    // Do not infer that separate records describe one period. A direct record
+    // and an old work record may be repeated work on the same day. They remain
+    // independent until a future explicit relation field links them.
+    const periods = [...direct, ...legacy]
+      .filter((period) => !throughDate || !period.startDate || period.startDate <= throughDate)
+      .map((period) => {
+        if (!throughDate || !period.actualEndDate || period.actualEndDate <= throughDate) return period;
+        return { ...period, actualEndDate: "", status: period.startDate ? "active" : period.status };
+      })
+      .sort((a, b) => String(a.startDate || a.actualEndDate || "").localeCompare(String(b.startDate || b.actualEndDate || "")));
+    if (!opts.forDisplay) return periods;
+    // Only collapse records whose complete visible boundaries are identical.
+    // This is a presentation aid, not a data merge: near matches remain separate.
+    const byBoundary = new Map();
+    periods.forEach((period) => {
+      const key = [period.kind, period.startDate, period.actualEndDate, period.plannedEndDate].join("|");
+      const current = byBoundary.get(key);
+      if (!current) {
+        byBoundary.set(key, { ...period, displayRecordCount: 1 });
+        return;
+      }
+      current.displayRecordCount += 1;
+      if (current.source === "legacy-work" && period.source === "direct") {
+        Object.assign(current, { ...period, displayRecordCount: current.displayRecordCount });
+      }
+    });
+    return Array.from(byBoundary.values());
+  }
+
   function seasonNotesForField(fieldId, year) {
     const fieldRecord = field(fieldId);
     return (fieldRecord && Array.isArray(fieldRecord.seasonNotes) ? fieldRecord.seasonNotes : [])
@@ -1105,6 +1326,7 @@
     plantingDateForField,
     workDateForField,
     headingDateForField,
+    growthSummaryFor,
     fieldWorksByNameFor,
     saveFieldWork,
     deleteFieldWork,
@@ -1133,6 +1355,7 @@
     growthLogsFor,
     dryPeriodsFor,
     irrigationsFor,
+    resolvedWaterPeriodsFor,
     seasonNotesForField,
     saveSeasonNote,
     deleteSeasonNote,

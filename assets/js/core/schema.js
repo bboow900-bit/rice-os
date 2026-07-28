@@ -5,7 +5,7 @@
   const U = RiceOS.utils;
 
   const SCHEMA_VERSION = 14;
-  const APP_VERSION = "20260728_ver157";
+  const APP_VERSION = "20260728_ver164";
   const STORE_KEY = "rice_os_v8_stable";
   const BACKUP_KEY = "rice_os_v8_stable_backup";
   const LEGACY_STORES = [
@@ -373,7 +373,8 @@
       logId: String(g.logId || g.id || U.id("growth", date)),
       type: "growthLog",
       date,
-      season: U.number(g.season, U.season(date)),
+      // 年度は日付から再計算する。旧JSONの stale season で年間履歴が混ざらないようにする。
+      season: U.season(date),
       fieldId: String(g.fieldId || ""),
       orphanedFieldId: String(g.orphanedFieldId || ""),
       leafCount: String(g.leafCount || ""),

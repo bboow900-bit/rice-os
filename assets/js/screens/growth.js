@@ -11,7 +11,8 @@
   let timelineOpen = false;
 
   function setBulkFields(ids) {
-    bulkFieldIds = (ids || []).filter(Boolean);
+    const activeIds = new Set(state.activeFields().map((field) => field.fieldId));
+    bulkFieldIds = Array.from(new Set((ids || []).filter((id) => activeIds.has(id))));
   }
 
   function clearBulkFields() {
@@ -40,8 +41,9 @@
 
   function latestPanicleLog(fieldId, dateText) {
     const year = cropYear(dateText);
+    if (state.growthSummaryFor) return state.growthSummaryFor(fieldId, year, { asOfDate: dateText }).panicleLog;
     return state.growthLogsFor(fieldId)
-      .filter((log) => String(log.date || "").startsWith(`${year}-`) && U.number(log.panicleLengthMm, 0) > 0)
+      .filter((log) => String(log.date || "").startsWith(`${year}-`) && String(log.date || "") <= String(dateText) && U.number(log.panicleLengthMm, 0) > 0)
       .slice()
       .sort((a, b) => String(b.date).localeCompare(String(a.date)))[0] || null;
   }
@@ -115,7 +117,12 @@
     const selected = groups.find((item) => item.name === group.value);
     if (!isGroup) {
       const field = state.field(U.$("gField").value);
-      notice.textContent = field ? `${field.name} に個別記録します` : "圃場を選択してください";
+      const quickHeading = document.querySelector('[data-action="save-heading-observed"]');
+      const headingDate = field ? observedHeadingDate(field.fieldId, U.$("gDate").value || U.today()) : "";
+      if (quickHeading) quickHeading.disabled = Boolean(headingDate);
+      notice.textContent = field
+        ? (headingDate ? `${field.name} は出穂確認済みです。修正はタイムラインから行えます。` : `${field.name} に個別記録します`)
+        : "圃場を選択してください";
       return;
     }
     if (!selected) {
@@ -127,9 +134,14 @@
     const caution = varieties.size > 1 || plantingDates.size > 1 ? " 品種または田植日が異なる圃場があります。" : "";
     const panicleTargets = targetFieldsForStageRecord("panicle");
     const headingTargets = targetFieldsForStageRecord("heading");
+    const quickHeading = document.querySelector('[data-action="save-heading-observed"]');
     const recorded = panicleTargets.skipped.length ? ` 幼穂入力済み ${panicleTargets.skipped.length}圃場は除外します。` : "";
     const headed = headingTargets.skipped.length ? ` 出穂確認済み ${headingTargets.skipped.length}圃場は除外します。` : "";
-    notice.textContent = `${selected.name}グループの${selected.fields.length}圃場が対象です。幼穂長・出穂は未記録の圃場に同じ日付で保存します。${recorded}${headed}${caution}`;
+    const complete = !panicleTargets.fields.length && !headingTargets.fields.length
+      ? " このグループは幼穂・出穂を記録済みです。修正はタイムラインから行えます。"
+      : "";
+    if (quickHeading) quickHeading.disabled = !headingTargets.fields.length;
+    notice.textContent = `${selected.name}グループの${selected.fields.length}圃場が対象です。幼穂長・出穂は未記録の圃場に同じ日付で保存します。${recorded}${headed}${complete}${caution}`;
   }
 
   function setInputMode(mode) {
@@ -208,11 +220,12 @@
 
   function observedHeadingDate(fieldId, dateText) {
     const year = cropYear(dateText);
+    if (state.growthSummaryFor) return state.growthSummaryFor(fieldId, year, { asOfDate: dateText }).headingDate;
     return state.growthLogsFor(fieldId)
       .filter((log) => String(log.date || "").startsWith(`${year}-`))
       .slice()
       .sort((a, b) => String(a.date).localeCompare(String(b.date)))
-      .find((log) => log.headingObserved)?.date || "";
+      .find((log) => log.headingObserved || (log.stageConfirmed && log.observedStage === "heading"))?.date || "";
   }
 
   function renderPaniclePanel() {
@@ -670,7 +683,13 @@
       const panicleTargets = targetFieldsForStageRecord("panicle");
       const headingTargets = targetFieldsForStageRecord("heading");
       const groupedStageTargets = headingObserved ? headingTargets : panicleTargets;
-      const targets = !common.logId && (common.panicleLengthMm || headingObserved) && groupedStageTargets.fields.length
+      const isStageRecord = !common.logId && Boolean(common.panicleLengthMm || headingObserved);
+      const isGroupStageRecord = isStageRecord && U.$("gPanicleTargetMode") && U.$("gPanicleTargetMode").value === "group";
+      if (isGroupStageRecord && !groupedStageTargets.fields.length) {
+        U.toast(`${groupedStageTargets.name || "このグループ"}は、選択日の${headingObserved ? "出穂" : "幼穂"}をすでに登録済みです`);
+        return;
+      }
+      const targets = isGroupStageRecord
         ? groupedStageTargets.fields.map((field) => field.fieldId)
         : (!common.logId && bulkFieldIds.length > 1 ? bulkFieldIds : [U.$("gField").value]);
       const stageLabel = headingObserved ? "出穂" : `幼穂長 ${common.panicleLengthMm}mm`;

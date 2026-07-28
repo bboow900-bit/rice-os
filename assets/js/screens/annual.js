@@ -472,7 +472,10 @@
     const planting = firstDate(fieldYearRows(field.fieldId, yearValue()), (row) => row.kind === "fieldWork" && /田植/.test(String(row.title || "")));
     const asOfDate = stageAsOfDateForField(field.fieldId);
     const dap = planting ? U.daysBetween(planting, asOfDate) : "";
-    const dryStart = workDateForAnnualYear(field.fieldId, "中干し開始");
+    const dryStart = state.resolvedWaterPeriodsFor
+      ? state.resolvedWaterPeriodsFor(field.fieldId, { year: yearValue() === "all" ? undefined : yearValue(), throughDate: asOfDate, forDisplay: true })
+        .filter((row) => row.kind === "dry").map((row) => row.startDate).filter(Boolean).sort()[0] || ""
+      : "";
     if (dap !== "" && dap >= 30 && dap <= 50 && !dryStart) return { label: "中干し候補", tone: "warn" };
     if (!stats.growth) return { label: "生育記録未入力", tone: "warn" };
     const lastDays = stats.lastDate ? U.daysBetween(stats.lastDate, asOfDate) : "";
@@ -482,12 +485,15 @@
 
   function fieldStats(field) {
     const rows = fieldRows(field.fieldId);
+    const resolvedWater = state.resolvedWaterPeriodsFor
+      ? state.resolvedWaterPeriodsFor(field.fieldId, { year: yearValue() === "all" ? undefined : yearValue(), includePlanned: true, forDisplay: true })
+      : [];
     return {
       rows,
       total: rows.length,
       work: rows.filter((row) => row.kind === "fieldWork").length,
       growth: rows.filter((row) => row.kind === "growth").length,
-      water: rows.filter((row) => row.kind === "dry" || row.kind === "irrigation").length,
+      water: resolvedWater.length,
       photos: rows.filter((row) => row.photoData || row.photo).length,
       lastDate: maxDate(rows.map((row) => row.date))
     };
@@ -697,36 +703,31 @@
 
   function latestPanicleLogForYear(fieldId, year) {
     const targetYear = year && year !== "all" ? String(year) : "";
-    return state.growthLogsFor(fieldId, targetYear || undefined)
-      .filter((row) => U.number(row.panicleLengthMm, 0) > 0)
-      .slice()
-      .sort((a, b) => String(b.date).localeCompare(String(a.date)))[0] || null;
+    return state.growthSummaryFor
+      ? state.growthSummaryFor(fieldId, targetYear || undefined).panicleLog
+      : state.growthLogsFor(fieldId, targetYear || undefined)
+        .filter((row) => U.number(row.panicleLengthMm, 0) > 0)
+        .slice()
+        .sort((a, b) => String(b.date).localeCompare(String(a.date)))[0] || null;
   }
 
   function dryCompletionForYear(fieldId, year) {
-    const dryDate = state.dryPeriodsFor(fieldId)
-      .filter((row) => String(row.season || String(row.date || "").slice(0, 4)) === String(year))
+    if (!state.resolvedWaterPeriodsFor) return "";
+    return state.resolvedWaterPeriodsFor(fieldId, { year, includePlanned: true, forDisplay: true })
+      .filter((row) => row.kind === "dry")
       .map((row) => row.actualEndDate)
       .filter(Boolean)
       .sort()
       .pop() || "";
-    const workDate = fieldYearRows(fieldId, year)
-      .filter((row) => row.kind === "fieldWork" && /中干し終了|中干し完了|中干完了/.test(String(row.title || "")))
-      .map((row) => row.date)
-      .filter(Boolean)
-      .sort()
-      .pop() || "";
-    return dryDate || workDate;
   }
 
   function renderKarteTab(field) {
     const variety = state.variety(field.varietyId);
     const planting = firstDate(fieldYearRows(field.fieldId, yearValue()), (row) => row.kind === "fieldWork" && /田植/.test(String(row.title || "")));
-    const dryStart = workDateForAnnualYear(field.fieldId, "中干し開始");
-    const dryEnd = workDateForAnnualYear(field.fieldId, ["中干し終了", "中干し完了", "中干完了"], "last");
-    const intermittentStart = workDateForAnnualYear(field.fieldId, "間断灌水開始");
     const riceStage = riceStageNumberForField(field);
     const panicleLog = latestPanicleLogForYear(field.fieldId, yearValue());
+    const growthSummary = state.growthSummaryFor ? state.growthSummaryFor(field.fieldId, yearValue()) : null;
+    const headingDate = growthSummary && growthSummary.headingDate || "";
     const panicle = RiceOS.agro && RiceOS.agro.latestPanicleEstimate
       ? RiceOS.agro.latestPanicleEstimate(field, yearValue())
       : null;
@@ -775,10 +776,10 @@
             <h3>幼穂・出穂予測</h3>
           </div>
           <div class="annual-kv-list">
-            ${targetLine("幼穂長", panicle ? `${panicle.lengthMm}mm (${U.fd(panicle.observedDate)})` : "未入力")}
+            ${targetLine("幼穂長", panicle ? `${panicle.lengthMm}mm (${U.fd(panicle.observedDate)})` : (panicleLog ? `${panicleLog.panicleLengthMm}mm (${U.fd(panicleLog.date)})` : "未入力"))}
             ${targetLine("入力済み幼穂長", panicleLog ? `${panicleLog.panicleLengthMm}mm (${U.fd(panicleLog.date)})` : "未入力")}
-            ${targetLine("出穂まで", panicle ? `あと約${panicle.daysToHeading}日` : "幼穂長を記録してください")}
-            ${targetLine("出穂目安", panicle ? `${U.fd(panicle.date)}ごろ` : "-")}
+            ${targetLine("出穂", headingDate ? `実績 ${U.fd(headingDate)}` : (panicle ? `あと約${panicle.daysToHeading}日` : "幼穂長を記録してください"))}
+            ${targetLine("出穂目安", headingDate ? "出穂実績を記録済み" : (panicle ? `${U.fd(panicle.date)}ごろ` : "-"))}
           </div>
         </section>
       </div>
@@ -833,9 +834,14 @@
   function dryByDate(fieldId, year) {
     const map = new Map();
     const targetYear = year && year !== "all" ? String(year) : undefined;
-    state.dryPeriodsFor(fieldId, targetYear).forEach((row) => {
-      if (!map.has(row.date)) map.set(row.date, []);
-      map.get(row.date).push(row);
+    const periods = state.resolvedWaterPeriodsFor
+      ? state.resolvedWaterPeriodsFor(fieldId, { year: targetYear, includePlanned: true, forDisplay: true }).filter((row) => row.kind === "dry")
+      : [];
+    periods.forEach((period) => {
+      [period.startDate, period.actualEndDate].filter(Boolean).forEach((date) => {
+        if (!map.has(date)) map.set(date, []);
+        map.get(date).push({ ...(period.raw || {}), date, startDate: period.startDate, actualEndDate: period.actualEndDate });
+      });
     });
     return map;
   }
@@ -843,20 +849,38 @@
   function renderGrowthTab(field) {
     const selectedYear = yearValue();
     const targetYear = selectedYear === "all" ? undefined : String(selectedYear);
-    const dryRows = state.dryPeriodsFor(field.fieldId, targetYear);
     const dryMap = dryByDate(field.fieldId, targetYear);
     const growthRows = state.growthLogsFor(field.fieldId, targetYear);
     const dates = unique([
       ...growthRows.map((row) => row.date),
-      ...dryRows.map((row) => row.date)
+      ...Array.from(dryMap.keys())
     ]).sort((a, b) => String(b).localeCompare(String(a)));
     if (!dates.length) return '<div class="empty">生育記録はまだありません。</div>';
     return `
       <div class="annual-growth-list">
         ${dates.map((date) => {
-          const growth = growthRows.filter((row) => row.date === date)[0] || null;
+          const sameDayGrowth = growthRows.filter((row) => row.date === date);
+          // 幼穂・出穂を別々に登録しても、同日の生育カードで見落とさない。
+          const growth = sameDayGrowth.reduce((merged, row) => ({
+            ...merged,
+            leafCount: row.leafCount || merged.leafCount,
+            tillerCount: row.tillerCount || merged.tillerCount,
+            plantHeightCm: row.plantHeightCm || merged.plantHeightCm,
+            leafColor: row.leafColor && row.leafColor !== "-" ? row.leafColor : merged.leafColor,
+            panicleLengthMm: row.panicleLengthMm || merged.panicleLengthMm,
+            headingObserved: Boolean(merged.headingObserved || row.headingObserved || (row.observedStage === "heading" && row.stageConfirmed)),
+            photoData: row.photoData || merged.photoData
+          }), {
+            leafCount: "",
+            tillerCount: "",
+            plantHeightCm: "",
+            leafColor: "",
+            panicleLengthMm: "",
+            headingObserved: false,
+            photoData: ""
+          });
           const dry = (dryMap.get(date) || [])[0] || null;
-          const photo = growth && growth.photoData || dry && dry.photoData || "";
+          const photo = growth.photoData || dry && dry.photoData || "";
           return `
             <article class="annual-growth-row">
               <div>
@@ -864,9 +888,11 @@
                 <span>田植後 ${U.escapeHTML(String(U.daysAfterPlanting(field, date) || "-"))}日</span>
               </div>
               <dl>
-                <div><dt>分げつ</dt><dd>${U.escapeHTML(growth && growth.tillerCount || "-")}</dd></div>
-                <div><dt>葉色</dt><dd>${U.escapeHTML(growth && growth.leafColor || "-")}</dd></div>
-                <div><dt>草丈</dt><dd>${U.escapeHTML(growth && growth.plantHeightCm ? `${growth.plantHeightCm}cm` : "-")}</dd></div>
+                <div><dt>分げつ</dt><dd>${U.escapeHTML(growth.tillerCount || "-")}</dd></div>
+                <div><dt>葉色</dt><dd>${U.escapeHTML(growth.leafColor || "-")}</dd></div>
+                <div><dt>草丈</dt><dd>${U.escapeHTML(growth.plantHeightCm ? `${growth.plantHeightCm}cm` : "-")}</dd></div>
+                <div><dt>幼穂</dt><dd>${U.escapeHTML(growth.panicleLengthMm ? `${growth.panicleLengthMm}mm` : "-")}</dd></div>
+                <div><dt>出穂</dt><dd>${U.escapeHTML(growth.headingObserved ? "確認" : "-")}</dd></div>
                 <div><dt>ひび</dt><dd>${U.escapeHTML(dry && dry.crackCm ? `${dry.crackCm}cm` : "-")}</dd></div>
                 <div><dt>沈み</dt><dd>${U.escapeHTML(dry && dry.sinkCm ? `${dry.sinkCm}cm` : "-")}</dd></div>
               </dl>
@@ -951,79 +977,26 @@
 
   function waterPeriodsForField(field) {
     const selectedYear = yearValue();
-    const isSelectedYear = (item) => selectedYear === "all" || String(item.season || String(item.date || "").slice(0, 4)) === String(selectedYear);
-    const d = state.data();
-    const periods = [];
-    const directLabels = new Set();
-
-    (d.dryPeriods || []).filter((item) => item.fieldId === field.fieldId && isSelectedYear(item)).forEach((item) => {
-      const label = "中干し";
-      directLabels.add(label);
-      periods.push({
-        id: item.dryPeriodId,
-        label,
-        tone: waterPeriodTone(label),
-        startDate: item.startDate || item.date || "",
-        plannedEndDate: item.endDate || "",
-        actualEndDate: item.actualEndDate || "",
-        targetDays: item.targetDays || "",
-        status: item.status || "",
-        memo: item.memo || "",
-        source: "専用記録"
-      });
-    });
-
-    (d.irrigations || []).filter((item) => item.fieldId === field.fieldId && isSelectedYear(item)).forEach((item) => {
-      const label = waterPeriodLabel(item.method);
-      if (!label) return;
-      directLabels.add(label);
-      periods.push({
-        id: item.irrigationId,
-        label,
-        tone: waterPeriodTone(label),
-        startDate: item.startDate || item.date || "",
-        plannedEndDate: item.endDate || "",
-        actualEndDate: item.actualEndDate || "",
-        targetDays: item.targetDays || "",
-        status: item.periodStatus || item.status || "",
-        memo: item.memo || "",
-        source: "専用記録"
-      });
-    });
-
-    const works = (d.fieldWorks || []).filter((item) => (item.fieldIds || []).includes(field.fieldId) && isSelectedYear(item));
-    const firstWorkDate = (test) => works.filter((item) => test(String(item.workName || ""))).map((item) => item.date).filter(Boolean).sort()[0] || "";
-    const lastWorkDate = (test) => works.filter((item) => test(String(item.workName || ""))).map((item) => item.date).filter(Boolean).sort().at(-1) || "";
-    const manualDefinitions = [
-      { label: "中干し", start: (name) => /中干し.*開始|中干し開始/.test(name), end: (name) => /中干し.*終了|中干し.*完了|中干完了/.test(name) },
-      { label: "間断灌水", start: (name) => /間断灌水.*開始|間断灌水開始/.test(name), end: (name) => /間断灌水.*終了|間断灌水.*完了/.test(name) },
-      { label: "深水管理", start: (name) => /深水.*開始|深水管理/.test(name), end: (name) => /深水.*終了|深水管理.*完了/.test(name) },
-      { label: "稲刈り前の落水", start: (name) => /稲刈り前.*落水|^落水$/.test(name), end: (name) => /落水.*終了|落水.*完了/.test(name) }
-    ];
-
-    manualDefinitions.forEach((definition) => {
-      if (directLabels.has(definition.label)) return;
-      const startDate = firstWorkDate(definition.start);
-      const actualEndDate = lastWorkDate(definition.end);
-      if (!startDate && !actualEndDate) return;
-      periods.push({
-        id: `work-${definition.label}-${startDate || actualEndDate}`,
-        label: definition.label,
-        tone: waterPeriodTone(definition.label),
-        startDate,
-        plannedEndDate: "",
-        actualEndDate,
-        targetDays: "",
-        status: actualEndDate ? "完了" : "実施中",
-        memo: "",
-        source: "作業記録から反映"
-      });
-    });
-
-    return periods
+    const year = selectedYear === "all" ? undefined : String(selectedYear);
+    const resolved = state.resolvedWaterPeriodsFor
+      ? state.resolvedWaterPeriodsFor(field.fieldId, { year, includePlanned: true, forDisplay: true })
+      : [];
+    return resolved
+      .map((period) => ({
+        id: period.periodId,
+        label: period.label,
+        tone: waterPeriodTone(period.label),
+        startDate: period.startDate || "",
+        plannedEndDate: period.plannedEndDate || "",
+        actualEndDate: period.actualEndDate || "",
+        targetDays: period.targetDays || "",
+        status: period.status || "",
+        memo: period.raw && period.raw.memo || "",
+        source: period.source === "legacy-work" ? "作業記録から反映" : (period.source === "mixed" ? "作業・水管理記録を統合" : "水管理記録")
+      }))
       .map((period) => ({
         ...period,
-        sequence: periods.filter((other) => other.label === period.label
+        sequence: resolved.filter((other) => other.label === period.label
           && String(other.startDate || other.actualEndDate || "") <= String(period.startDate || period.actualEndDate || "")).length
       }))
       .sort((a, b) => String(b.startDate || b.actualEndDate).localeCompare(String(a.startDate || a.actualEndDate)));
@@ -1131,21 +1104,30 @@
     return periodSnapshot(rows.filter((row) => pattern.test(String(row.raw && row.raw.method || row.title || ""))));
   }
 
+  function resolvedPeriodSnapshot(fieldId, year, kind) {
+    if (!state.resolvedWaterPeriodsFor) return { text: "", days: "", startDate: "", endDate: "" };
+    const rows = state.resolvedWaterPeriodsFor(fieldId, { year, includePlanned: true, forDisplay: true })
+      .filter((row) => row.kind === kind)
+      .map((row) => ({ startDate: row.startDate, actualEndDate: row.actualEndDate }));
+    return periodSnapshot(rows);
+  }
+
   function fieldYearSnapshot(field, year) {
     const rows = fieldYearRows(field.fieldId, year);
     const works = rows.filter((row) => row.kind === "fieldWork");
     const growth = rows.filter((row) => row.kind === "growth");
-    const dry = rows.filter((row) => row.kind === "dry");
-    const water = rows.filter((row) => row.kind === "irrigation");
-    const waterWorks = works.filter((row) => /中干し|間断灌水/.test(String(row.title || "")));
     const planting = firstDate(works, (row) => /田植/.test(String(row.title || "")));
-    const heading = firstDate(growth, (row) => Boolean(row.raw && (row.raw.headingObserved || row.raw.observedStage === "heading" && row.raw.stageConfirmed))) || firstDate(works, (row) => /出穂/.test(String(row.title || "")));
+    const growthSummary = state.growthSummaryFor ? state.growthSummaryFor(field.fieldId, year) : null;
+    const heading = growthSummary && growthSummary.headingDate
+      || firstDate(growth, (row) => Boolean(row.raw && (row.raw.headingObserved || row.raw.observedStage === "heading" && row.raw.stageConfirmed)))
+      || firstDate(works, (row) => /出穂/.test(String(row.title || "")));
     const harvest = firstDate(works, (row) => /収穫|稲刈/.test(String(row.title || "")));
     const materialRows = works.filter((row) => String(row.raw && row.raw.material || "").trim());
-    const panicle = growth.map((row) => row.raw).filter((row) => U.number(row && row.panicleLengthMm, 0) > 0).sort((a, b) => String(a.date).localeCompare(String(b.date)))[0] || null;
-    const dryPeriod = periodSnapshot(dry);
-    const intermittent = waterPeriodSnapshot(water, /間断/);
-    const deepWater = waterPeriodSnapshot(water, /深水/);
+    const panicle = growthSummary && growthSummary.panicleLog
+      || growth.map((row) => row.raw).filter((row) => U.number(row && row.panicleLengthMm, 0) > 0).sort((a, b) => String(a.date).localeCompare(String(b.date)))[0] || null;
+    const dryPeriod = resolvedPeriodSnapshot(field.fieldId, year, "dry");
+    const intermittent = resolvedPeriodSnapshot(field.fieldId, year, "intermittent");
+    const deepWater = resolvedPeriodSnapshot(field.fieldId, year, "deep");
     const resultRows = (state.data().varietyResults || []).filter((row) => String(row.season) === String(year) && row.varietyId === field.varietyId);
     const result = resultRows.find((row) => row.fieldId === field.fieldId) || resultRows.find((row) => !row.fieldId) || null;
     const resultScope = result && result.fieldId ? "" : (result ? "（品種集計）" : "");
@@ -1153,7 +1135,7 @@
       year,
       planting,
       trays: field.seedlingBoxes || "",
-      dry: dryPeriod.text || (waterWorks.some((row) => /中干し/.test(String(row.title || ""))) ? "作業実績あり（期間未記録）" : ""),
+      dry: dryPeriod.text,
       dryDays: dryPeriod.days,
       intermittent: intermittent.text,
       deepWater: deepWater.text,
@@ -1222,36 +1204,27 @@
     // Use the year-scoped state APIs here. Older imports can have a stale season field.
     const works = state.fieldWorksFor(field.fieldId, year);
     const growth = state.growthLogsFor(field.fieldId, year);
-    const dryRows = state.dryPeriodsFor(field.fieldId, year);
-    const irrigationRows = state.irrigationsFor(field.fieldId, year);
+    const waterPeriods = state.resolvedWaterPeriodsFor
+      ? state.resolvedWaterPeriodsFor(field.fieldId, { year, includePlanned: true, forDisplay: true })
+      : [];
     const entries = [];
     const firstWorkDate = (pattern) => works.filter((row) => pattern.test(String(row.workName || ""))).map((row) => row.date).filter(Boolean).sort()[0] || "";
     const planting = state.plantingDateForField(field.fieldId, year);
     if (planting) entries.push({ date: planting, label: "田植え", detail: U.fd(planting), tone: "planting", kind: "point" });
 
-    const dryPeriod = periodSnapshot(dryRows);
-    const dryStart = dryPeriod.startDate || firstWorkDate(/中干し開始/);
-    const dryEnd = dryPeriod.endDate || firstWorkDate(/中干し終了|中干し完了|中干完了/);
-    const dryEntry = timelinePeriod("中干し", dryStart, dryEnd, "dry");
-    if (dryEntry) entries.push(dryEntry);
+    waterPeriods.forEach((period) => {
+      const tone = period.kind === "dry" ? "dry" : "water";
+      const entry = timelinePeriod(period.label, period.startDate, period.actualEndDate, tone);
+      if (entry) entries.push(entry);
+    });
 
-    const intermittentPeriod = periodSnapshot(irrigationRows.filter((row) => /間断/.test(String(row.method || ""))));
-    const intermittentStart = intermittentPeriod.startDate || firstWorkDate(/間断灌水開始/);
-    const intermittentEnd = intermittentPeriod.endDate || firstWorkDate(/間断灌水終了|間断灌水完了/);
-    const intermittentEntry = timelinePeriod("間断灌水", intermittentStart, intermittentEnd, "water");
-    if (intermittentEntry) entries.push(intermittentEntry);
-
-    const deepPeriod = periodSnapshot(irrigationRows.filter((row) => /深水/.test(String(row.method || ""))));
-    const deepStart = deepPeriod.startDate || firstWorkDate(/深水.*開始|深水管理/);
-    const deepEnd = deepPeriod.endDate || firstWorkDate(/深水.*終了|深水管理.*完了/);
-    const deepEntry = timelinePeriod("深水管理", deepStart, deepEnd, "water");
-    if (deepEntry) entries.push(deepEntry);
-
-    const panicle = growth.filter((row) => U.number(row.panicleLengthMm, 0) > 0)
-      .slice().sort((a, b) => String(b.date).localeCompare(String(a.date)))[0] || null;
+    const growthSummary = state.growthSummaryFor ? state.growthSummaryFor(field.fieldId, year) : null;
+    const panicle = growthSummary && growthSummary.panicleLog
+      || growth.filter((row) => U.number(row.panicleLengthMm, 0) > 0)
+        .slice().sort((a, b) => String(b.date).localeCompare(String(a.date)))[0] || null;
     if (panicle) entries.push({ date: panicle.date, label: "幼穂確認", detail: `${U.fd(panicle.date)} / 幼穂長 ${panicle.panicleLengthMm}mm`, tone: "panicle", kind: "point" });
 
-    const heading = state.headingDateForField(field.fieldId, year) || firstWorkDate(/出穂/);
+    const heading = growthSummary && growthSummary.headingDate || firstWorkDate(/出穂/);
     if (heading) entries.push({ date: heading, label: "出穂", detail: U.fd(heading), tone: "heading", kind: "point" });
 
     const harvest = state.workDateForField(field.fieldId, ["収穫", "稲刈り"], "first", year);
@@ -1283,6 +1256,8 @@
       `収穫 ${snapshot.harvest}`,
       snapshot.yield ? `収量 ${snapshot.yield}` : "収量 未記録",
       snapshot.quality ? `品質 ${snapshot.quality}` : "品質 未記録",
+      snapshot.panicle ? `幼穂確認 ${snapshot.panicle}` : "幼穂確認 未記録",
+      snapshot.heading ? `出穂日 ${U.fd(snapshot.heading)}` : "出穂日 未記録",
       snapshot.workHours ? `作業時間 ${U.formatHours(snapshot.workHours)}` : "作業時間 未記録",
       noteStatus
     ];
@@ -1310,7 +1285,7 @@
       ["品質", snapshotText(current.quality), snapshotText(previous.quality)],
       ["写真", current.photos ? `${current.photos}枚` : "未記録", previous.photos ? `${previous.photos}枚` : "未記録"]
     ];
-    const keyLabels = new Set(["田植え日", "中干し", "出穂日", "収穫量"]);
+    const keyLabels = new Set(["田植え日", "中干し", "幼穂確認", "出穂日", "収穫量"]);
     const keyRows = rows.filter((row) => keyLabels.has(row[0]));
     const detailRows = rows.filter((row) => !keyLabels.has(row[0]));
     const missing = rows.filter((row) => row[1] === "未記録").map((row) => row[0]);

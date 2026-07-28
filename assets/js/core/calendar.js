@@ -49,6 +49,28 @@
     return state().field(id) && state().field(id).name || "";
   }
 
+  function isWaterWork(work) {
+    return /中干し|中干|間断灌水|深水|稲刈り前.*落水|^落水$/.test(String(work && work.workName || ""));
+  }
+
+  function waterPeriodEntriesForDate(date) {
+    if (!state().resolvedWaterPeriodsFor) return [];
+    const year = String(date || "").slice(0, 4);
+    const entries = [];
+    state().activeFields().forEach((field) => {
+      state().resolvedWaterPeriodsFor(field.fieldId, { year, includePlanned: true, forDisplay: true }).forEach((period) => {
+        const add = (when, title, memo) => {
+          if (when !== date) return;
+          entries.push({ kind: "water", tone: "water", title, subtitle: field.name, memo, record: period });
+        };
+        add(period.startDate, `${period.label} 開始`, period.source === "legacy-work" ? "作業記録から反映" : "水管理記録");
+        add(period.actualEndDate, `${period.label} 完了`, "実績終了日");
+        if (!period.actualEndDate) add(period.plannedEndDate, `${period.label} 終了予定`, "予定終了日");
+      });
+    });
+    return entries;
+  }
+
   function isScheduleDone(schedule) {
     return Boolean(schedule && (schedule.completedAt || schedule.completedByWorkId || schedule.status === "実施済み" || schedule.status === "手動完了"));
   }
@@ -102,7 +124,7 @@
         record: x
       });
     });
-    d.fieldWorks.filter((x) => x.date === date).forEach((x) => {
+    d.fieldWorks.filter((x) => x.date === date && !isWaterWork(x)).forEach((x) => {
       entries.push({
         kind: "work",
         tone: "work",
@@ -123,37 +145,26 @@
         record: x
       });
     });
-    (d.dryPeriods || []).filter((x) => x.date === date || x.startDate === date || x.endDate === date || x.actualEndDate === date).forEach((x) => {
-      entries.push({
-        kind: "dry",
-        tone: "water",
-        title: "中干し",
-        subtitle: fieldName(x.fieldId),
-        memo: [`ひび:${x.crackCm || "-"}cm`, `沈み:${x.sinkCm || "-"}cm`, x.surface || ""].filter(Boolean).join(" / "),
-        hasPhoto: Boolean(x.photoData || x.photo),
-        record: x
-      });
-    });
-    (d.irrigations || []).filter((x) => x.date === date || x.startDate === date || x.endDate === date || x.actualEndDate === date).forEach((x) => {
-      entries.push({
-        kind: "irrigation",
-        tone: "water",
-        title: x.method || "間断灌水",
-        subtitle: fieldName(x.fieldId),
-        memo: [x.periodStatus || "", x.status || ""].filter(Boolean).join(" / "),
-        record: x
-      });
-    });
+    entries.push(...waterPeriodEntriesForDate(date));
     return entries;
   }
 
   function recentEntries(limit) {
     const d = state().data();
+    const resolvedWater = state().activeFields().flatMap((field) => {
+      const year = String(U.today()).slice(0, 4);
+      const periods = state().resolvedWaterPeriodsFor
+        ? state().resolvedWaterPeriodsFor(field.fieldId, { year, includePlanned: true, forDisplay: true })
+        : [];
+      return periods.flatMap((period) => [
+        period.startDate ? { date: period.startDate, title: `${period.label} 開始`, subtitle: field.name, kind: "water", record: period } : null,
+        period.actualEndDate ? { date: period.actualEndDate, title: `${period.label} 完了`, subtitle: field.name, kind: "water", record: period } : null
+      ]).filter(Boolean);
+    });
     const entries = [
-      ...d.fieldWorks.map((x) => ({ date: x.date, title: x.workName, subtitle: fieldNames(x.fieldIds), kind: "work", record: x })),
+      ...d.fieldWorks.filter((x) => !isWaterWork(x)).map((x) => ({ date: x.date, title: x.workName, subtitle: fieldNames(x.fieldIds), kind: "work", record: x })),
       ...d.growthLogs.map((x) => ({ date: x.date, title: "生育ログ", subtitle: fieldName(x.fieldId), kind: "growth", hasPhoto: Boolean(x.photoData || x.photo), record: x })),
-      ...(d.dryPeriods || []).map((x) => ({ date: x.date, title: "中干し", subtitle: fieldName(x.fieldId), kind: "water", hasPhoto: Boolean(x.photoData || x.photo), record: x })),
-      ...(d.irrigations || []).map((x) => ({ date: x.date, title: x.method || "間断灌水", subtitle: fieldName(x.fieldId), kind: "water", record: x }))
+      ...resolvedWater
     ];
     return entries.sort((a, b) => String(b.date).localeCompare(String(a.date))).slice(0, limit || 6);
   }
