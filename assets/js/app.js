@@ -180,6 +180,7 @@
     const updateButton = document.querySelector('[data-action="force-update"]');
     if (updateButton) {
       updateButton.addEventListener("click", () => {
+        if (!confirm("最新版を読み込みます。保存していない入力内容は失われるため、必要な記録は先に保存してください。")) return;
         if (RiceOS.pwa) RiceOS.pwa.forceUpdate();
         else location.reload();
       });

@@ -3,7 +3,8 @@
 
   const RiceOS = window.RiceOS = window.RiceOS || {};
   const NOTIFIED_KEY = "rice_os_notified_alerts";
-  const APP_VERSION = "20260729_ver175";
+  const APP_VERSION = "20260729_ver177";
+  const UPDATE_RELOAD_KEY = "rice_os_pwa_reload_version";
 
   let deferredPrompt = null;
 
@@ -35,7 +36,9 @@
 
     if (!canUseServiceWorker()) return;
 
-    navigator.serviceWorker.register(`./service-worker.js?v=${APP_VERSION}`)
+    // Keep this URL stable. Older installed clients can then discover a new
+    // worker instead of continuing to check only their old versioned URL.
+    navigator.serviceWorker.register("./service-worker.js", { updateViaCache: "none" })
       .then((registration) => {
         registration.update();
       })
@@ -122,12 +125,43 @@
     return count;
   }
 
+  function currentVersionUrl() {
+    const url = new URL(location.href);
+    url.searchParams.set("v", APP_VERSION);
+    return url.href;
+  }
+
+  function waitForControllerChange(timeoutMs) {
+    return new Promise((resolve) => {
+      let settled = false;
+      const finish = () => {
+        if (settled) return;
+        settled = true;
+        navigator.serviceWorker.removeEventListener("controllerchange", finish);
+        resolve();
+      };
+      navigator.serviceWorker.addEventListener("controllerchange", finish, { once: true });
+      setTimeout(finish, timeoutMs);
+    });
+  }
+
   async function forceUpdate() {
-    if (canUseServiceWorker()) {
-      const registrations = await navigator.serviceWorker.getRegistrations();
-      await Promise.all(registrations.map((registration) => registration.update()));
+    if (!canUseServiceWorker()) {
+      location.replace(currentVersionUrl());
+      return;
     }
-    location.reload();
+    const registration = await navigator.serviceWorker.getRegistration()
+      || await navigator.serviceWorker.register("./service-worker.js", { updateViaCache: "none" });
+    const controllerChanged = waitForControllerChange(3500);
+    await registration.update();
+    if (registration.waiting) registration.waiting.postMessage({ type: "SKIP_WAITING" });
+    await controllerChanged;
+    try {
+      sessionStorage.setItem(UPDATE_RELOAD_KEY, APP_VERSION);
+    } catch (error) {
+      // The versioned URL still makes a fresh page request when storage is unavailable.
+    }
+    location.replace(currentVersionUrl());
   }
 
   RiceOS.pwa = {

@@ -1,5 +1,5 @@
-const CACHE_NAME = "rice-karte-20260729-175";
-const APP_VERSION = "20260729_ver175";
+const CACHE_NAME = "rice-karte-20260729-177";
+const APP_VERSION = "20260729_ver177";
 const CACHE_PREFIX = "rice-karte-";
 const RETAINED_APP_CACHES = 2;
 
@@ -116,6 +116,10 @@ self.addEventListener("activate", (event) => {
   );
 });
 
+self.addEventListener("message", (event) => {
+  if (event.data && event.data.type === "SKIP_WAITING") self.skipWaiting();
+});
+
 self.addEventListener("fetch", (event) => {
   const request = event.request;
   if (request.method !== "GET") return;
@@ -125,7 +129,7 @@ self.addEventListener("fetch", (event) => {
 
   if (request.mode === "navigate") {
     event.respondWith(
-      fetch(request)
+      fetch(new Request(request, { cache: "reload" }))
         .then((response) => {
           const copy = response.clone();
           caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
