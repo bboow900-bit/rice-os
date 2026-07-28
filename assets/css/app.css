@@ -1683,7 +1683,7 @@
 .annual-water-editor small { color: #607579; font-size: 11px; }
 .annual-water-period-actions { display: flex; align-items: center; justify-content: flex-end; gap: 7px; margin-top: 8px; }
 .annual-water-period-actions > span { margin-right: auto; color: #6b7d70; font-size: 10px; font-weight: 750; }
-.annual-water-period-actions button { min-height: 34px; min-width: 72px; font-size: 11px; }
+.annual-water-period-actions button { min-height: 44px; min-width: 84px; font-size: 11px; }
 .annual-water-period-actions .secondary { min-width: 88px; }
 @media (max-width: 390px) {
   .annual-water-period-dates { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -11455,6 +11455,54 @@ label {
   font-size: 11px;
   font-weight: 700;
   line-height: 1.45;
+}
+
+.annual-water-review-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 16px;
+  padding: 11px;
+  border: 1px solid #ead7ac;
+  border-radius: 13px;
+  background: linear-gradient(135deg, #fffaf0, #fffdf8);
+}
+
+.annual-water-review-note {
+  margin: -2px 1px 1px;
+  color: #766b54;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.annual-water-review {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 9px;
+  padding: 10px;
+  border: 1px solid #ecdcb8;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, .8);
+}
+
+.annual-water-review > div:first-child { min-width: 0; }
+.annual-water-review span,
+.annual-water-review b,
+.annual-water-review small { display: block; }
+.annual-water-review span { color: #9a6c22; font-size: 10px; font-weight: 900; }
+.annual-water-review b { overflow: hidden; margin-top: 2px; color: #403820; font-size: 13px; font-weight: 900; text-overflow: ellipsis; white-space: nowrap; }
+.annual-water-review small { margin-top: 2px; color: #7b735e; font-size: 10px; font-weight: 750; }
+.annual-water-review-actions { display: grid; gap: 5px; justify-items: end; }
+.annual-water-review-actions button { min-width: 128px; min-height: 44px; padding: 7px 10px; font-size: 11px; }
+.annual-water-review-actions em { max-width: 128px; padding: 7px 8px; border-radius: 999px; background: #dff1e2; color: #267044; font-size: 10px; font-style: normal; font-weight: 900; text-align: center; }
+.annual-water-review.migrated { border-color: #c9dfcd; background: #f8fcf7; }
+
+@media (max-width: 480px) {
+  .annual-water-review { grid-template-columns: 1fr; }
+  .annual-water-review-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); width: 100%; }
+  .annual-water-review-actions button { min-width: 0; width: 100%; }
+  .annual-water-review-actions em { justify-self: start; }
 }
 
 .field-hub-list,

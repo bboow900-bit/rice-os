@@ -234,11 +234,11 @@
   }
 
   function isDryStartWorkName(workName) {
-    return workTextMatches(workName, ["中干し開始", "荳ｭ蟷ｲ縺鈴幕蟋・"]);
+    return !/予定|確認/.test(String(workName || "")) && workTextMatches(workName, ["中干し開始", "荳ｭ蟷ｲ縺鈴幕蟋・"]);
   }
 
   function isDryEndWorkName(workName) {
-    return workTextMatches(workName, ["中干し終了", "中干し完了", "中干完了", "荳ｭ蟷ｲ縺礼ｵゆｺ・"]);
+    return !/予定|確認/.test(String(workName || "")) && workTextMatches(workName, ["中干し終了", "中干し完了", "中干完了", "荳ｭ蟷ｲ縺礼ｵゆｺ・"]);
   }
 
   function isHeadingWorkName(workName) {
@@ -1059,10 +1059,18 @@
       if (previous && previous.actualEndDate && !normalized.actualEndDate) refreshDryingSummary(d, normalized.fieldId);
   }
 
+  function unlinkLegacyWaterPeriod(d, periodId, kind) {
+    d.fieldWorks = (d.fieldWorks || []).map((work) => ({
+      ...work,
+      waterMigrationLinks: (work.waterMigrationLinks || []).filter((link) => link.periodId !== periodId || link.kind !== kind)
+    }));
+  }
+
   function deleteDryPeriod(dryPeriodId) {
     return mutate((d) => {
       const removed = (d.dryPeriods || []).find((item) => item.dryPeriodId === dryPeriodId);
       d.dryPeriods = (d.dryPeriods || []).filter((item) => item.dryPeriodId !== dryPeriodId);
+      unlinkLegacyWaterPeriod(d, dryPeriodId, "dry");
       if (removed) {
         refreshDryingSummary(d, removed.fieldId);
       }
@@ -1136,6 +1144,7 @@
     return mutate((d) => {
       const removed = (d.irrigations || []).find((item) => item.irrigationId === irrigationId);
       d.irrigations = (d.irrigations || []).filter((item) => item.irrigationId !== irrigationId);
+      unlinkLegacyWaterPeriod(d, irrigationId, waterKindFromMethod(removed && removed.method));
       if (removed && /間断/.test(String(removed.method || ""))) refreshIntermittentSummary(d, removed.fieldId);
     }, "水管理を削除しました");
   }
@@ -1174,6 +1183,13 @@
     return data().fieldWorks.filter((w) => (w.fieldIds || []).includes(fieldId) && isInYear(w, year));
   }
 
+  function isMigratedWaterWork(work, fieldId) {
+    if (!work || !Array.isArray(work.waterMigrationLinks) || !work.waterMigrationLinks.length) return false;
+    if (fieldId) return work.waterMigrationLinks.some((link) => link.fieldId === fieldId);
+    const fieldIds = work.fieldIds || [];
+    return Boolean(fieldIds.length) && fieldIds.every((id) => work.waterMigrationLinks.some((link) => link.fieldId === id));
+  }
+
   function growthLogsFor(fieldId, year) {
     return data().growthLogs.filter((g) => g.fieldId === fieldId && isInYear(g, year));
   }
@@ -1208,15 +1224,30 @@
   }
 
   function waterEventFromWorkName(workName) {
-    const text = String(workName || "");
-    if (/中干し.*(終了|完了)|中干完了/.test(text)) return { kind: "dry", phase: "end" };
-    if (/中干し.*開始/.test(text)) return { kind: "dry", phase: "start" };
-    if (/間断灌水.*(終了|完了)/.test(text)) return { kind: "intermittent", phase: "end" };
-    if (/間断灌水.*開始/.test(text)) return { kind: "intermittent", phase: "start" };
-    if (/深水.*(終了|完了)/.test(text)) return { kind: "deep", phase: "end" };
-    if (/深水(管理)?(開始)?/.test(text)) return { kind: "deep", phase: "start" };
-    if (/落水.*(終了|完了)/.test(text)) return { kind: "drain", phase: "end" };
-    if (/稲刈り前.*落水|^落水$/.test(text)) return { kind: "drain", phase: "start" };
+    const text = String(workName || "").trim();
+    if (!text || /予定|確認/.test(text)) return null;
+    const type = /中干し/.test(text) ? "dry"
+      : /間断灌水/.test(text) ? "intermittent"
+      : /深水管理|深水/.test(text) ? "deep"
+      : /稲刈り前.*落水/.test(text) ? "drain" : "";
+    if (!type) return null;
+    if (/終了|完了/.test(text)) return { kind: type, phase: "end" };
+    if (/開始/.test(text)) return { kind: type, phase: "start" };
+    return null;
+  }
+
+  // Older versions stored water management as ordinary work names. Keep those
+  // rows visible for reconciliation, but do not let ambiguous names update a
+  // current field summary until the user explicitly adopts them.
+  function legacyWaterEventFromWorkName(workName) {
+    const explicit = waterEventFromWorkName(workName);
+    if (explicit) return explicit;
+    const text = String(workName || "").trim();
+    if (!text || /予定|確認/.test(text)) return null;
+    if (/^中干し$/.test(text)) return { kind: "dry", phase: "legacy" };
+    if (/^間断灌水$/.test(text)) return { kind: "intermittent", phase: "legacy" };
+    if (/^(深水管理|深水)$/.test(text)) return { kind: "deep", phase: "legacy" };
+    if (/^(稲刈り前の落水|落水)$/.test(text)) return { kind: "drain", phase: "legacy" };
     return null;
   }
 
@@ -1257,17 +1288,22 @@
     }).filter((row) => row && (!year || row.season === String(year)) && (includePlanned || !row.planned));
   }
 
-  function legacyWaterPeriodsFor(fieldId, year) {
+  function legacyWaterKey(fieldId, kind, sourceWorkIds) {
+    return [fieldId, kind, ...(sourceWorkIds || []).map(String).sort()].join("|");
+  }
+
+  function legacyWaterPeriodsFor(fieldId, year, options) {
+    const opts = options || {};
     const works = (data().fieldWorks || [])
       .filter((row) => (row.fieldIds || []).includes(fieldId) && (!year || waterPeriodYear(row) === String(year)))
-      .map((row) => ({ row, event: waterEventFromWorkName(row.workName) }))
+      .map((row) => ({ row, event: legacyWaterEventFromWorkName(row.workName) }))
       .filter((item) => item.event)
       .sort((a, b) => String(a.row.date || "").localeCompare(String(b.row.date || "")) || String(a.row.workId || "").localeCompare(String(b.row.workId || "")));
     const periods = [];
     const open = { dry: [], intermittent: [], deep: [], drain: [] };
     works.forEach(({ row, event }) => {
       const type = WATER_PERIOD_TYPES[event.kind];
-      if (event.phase === "start") {
+      if (event.phase === "start" || event.phase === "legacy") {
         const period = {
           periodId: `work:${event.kind}:${row.workId || row.date || periods.length}`,
           kind: event.kind,
@@ -1282,6 +1318,7 @@
           source: "legacy-work",
           directId: "",
           sourceWorkIds: row.workId ? [row.workId] : [],
+          requiresDateReview: event.phase === "legacy",
           planned: false,
           raw: row
         };
@@ -1314,7 +1351,115 @@
         raw: row
       });
     });
-    return periods;
+    return periods.map((period) => {
+      const legacyKey = legacyWaterKey(fieldId, period.kind, period.sourceWorkIds);
+      const linked = period.sourceWorkIds.length > 0 && period.sourceWorkIds.every((workId) => {
+        const work = (data().fieldWorks || []).find((row) => row.workId === workId);
+        return (work && work.waterMigrationLinks || []).some((link) => link.fieldId === fieldId && link.kind === period.kind && link.legacyKey === legacyKey);
+      });
+      const linkedPeriodId = period.sourceWorkIds.map((workId) => {
+        const work = (data().fieldWorks || []).find((row) => row.workId === workId);
+        const link = (work && work.waterMigrationLinks || []).find((item) => item.fieldId === fieldId && item.kind === period.kind && item.legacyKey === legacyKey);
+        return link && link.periodId || "";
+      }).find(Boolean) || "";
+      return { ...period, legacyKey, migrated: linked, linkedPeriodId };
+    }).filter((period) => (opts.includeMigrated || !period.migrated)
+      && (opts.includeUnreviewed || !period.requiresDateReview));
+  }
+
+  function legacyWaterReviewFor(fieldId, options) {
+    const opts = options || {};
+    const year = opts.year === undefined || opts.year === null || String(opts.year) === "all" ? "" : String(opts.year);
+    return legacyWaterPeriodsFor(fieldId, year, { includeMigrated: true, includeUnreviewed: true });
+  }
+
+  function directWaterMatchesForLegacy(fieldId, legacyKey) {
+    const period = legacyWaterPeriodsFor(fieldId, "", { includeMigrated: true, includeUnreviewed: true })
+      .find((item) => item.legacyKey === legacyKey);
+    if (!period || !period.startDate || !period.actualEndDate) return [];
+    return directWaterPeriodsFor(fieldId, "", true).filter((row) => row.kind === period.kind
+      && row.startDate === period.startDate && row.actualEndDate === period.actualEndDate);
+  }
+
+  function importLegacyWaterPeriod(fieldId, legacyKey, existingPeriodId) {
+    const period = legacyWaterPeriodsFor(fieldId, "", { includeMigrated: true })
+      .find((item) => item.legacyKey === legacyKey);
+    if (!period || period.migrated || !period.sourceWorkIds.length || !period.startDate || !period.actualEndDate) return null;
+    let periodId = "";
+    const saved = mutate((d) => {
+      const directRows = period.kind === "dry" ? d.dryPeriods : d.irrigations;
+      const same = existingPeriodId && directRows.find((row) => row.fieldId === fieldId
+        && (row.dryPeriodId === existingPeriodId || row.irrigationId === existingPeriodId)
+        && waterKindFromMethod(row.method || (period.kind === "dry" ? "中干し" : "")) === period.kind
+        && String(row.startDate || row.date || "") === String(period.startDate)
+        && String(row.actualEndDate || "") === String(period.actualEndDate));
+      periodId = same ? (same.dryPeriodId || same.irrigationId) : "";
+      if (!periodId) {
+        periodId = U.id(period.kind === "dry" ? "dry" : "irrigation", period.startDate || period.actualEndDate || U.today());
+        const base = {
+          fieldId,
+          date: period.startDate || period.actualEndDate || U.today(),
+          startDate: period.startDate || "",
+          actualEndDate: period.actualEndDate || "",
+          status: period.actualEndDate ? "完了" : "実施中",
+          periodStatus: period.actualEndDate ? "完了" : "実施中",
+          referenceRecordIds: period.sourceWorkIds.slice(),
+          batchId: period.raw && period.raw.batchId || "",
+          batchFieldIds: period.raw && period.raw.batchFieldIds || [],
+          memo: "旧作業記録から取り込み"
+        };
+        if (period.kind === "dry") saveDryPeriodToDraft(d, { ...base, dryPeriodId: periodId });
+        else saveIrrigationToDraft(d, { ...base, irrigationId: periodId, method: WATER_PERIOD_TYPES[period.kind].method });
+      }
+      period.sourceWorkIds.forEach((workId) => {
+        const index = d.fieldWorks.findIndex((row) => row.workId === workId);
+        if (index < 0) return;
+        const links = d.fieldWorks[index].waterMigrationLinks || [];
+        if (links.some((link) => link.fieldId === fieldId && link.kind === period.kind && link.legacyKey === legacyKey)) return;
+        d.fieldWorks[index] = {
+          ...d.fieldWorks[index],
+          waterMigrationLinks: [...links, { fieldId, kind: period.kind, legacyKey, periodId, linkedAt: U.now() }],
+          updatedAt: U.now()
+        };
+      });
+    }, "旧作業記録を水管理へ取り込みました。元の作業記録は残しています。");
+    return saved ? periodId : "";
+  }
+
+  function adoptLegacyWaterPeriod(fieldId, legacyKey) {
+    const period = legacyWaterPeriodsFor(fieldId, "", { includeMigrated: true, includeUnreviewed: true })
+      .find((item) => item.legacyKey === legacyKey);
+    if (!period || period.migrated || !period.sourceWorkIds.length || (!period.startDate && !period.actualEndDate)) return null;
+    let periodId = "";
+    const saved = mutate((d) => {
+      periodId = U.id(period.kind === "dry" ? "dry" : "irrigation", period.startDate || period.actualEndDate || U.today());
+      const base = {
+        fieldId,
+        date: period.startDate || period.actualEndDate || U.today(),
+        startDate: period.startDate || "",
+        actualEndDate: period.actualEndDate || "",
+        status: period.actualEndDate ? "完了" : "実施中",
+        periodStatus: period.actualEndDate ? "完了" : "実施中",
+        referenceRecordIds: period.sourceWorkIds.slice(),
+        batchId: period.raw && period.raw.batchId || "",
+        batchFieldIds: period.raw && period.raw.batchFieldIds || [],
+        memo: "旧作業記録から引き継ぎ（期間を確認）"
+      };
+      if (period.kind === "dry") saveDryPeriodToDraft(d, { ...base, dryPeriodId: periodId });
+      else saveIrrigationToDraft(d, { ...base, irrigationId: periodId, method: WATER_PERIOD_TYPES[period.kind].method });
+      period.sourceWorkIds.forEach((workId) => {
+        const index = d.fieldWorks.findIndex((row) => row.workId === workId);
+        if (index < 0) return;
+        const links = d.fieldWorks[index].waterMigrationLinks || [];
+        if (links.some((link) => link.fieldId === fieldId && link.kind === period.kind && link.legacyKey === legacyKey)) return;
+        d.fieldWorks[index] = {
+          ...d.fieldWorks[index],
+          waterMigrationLinks: [...links, { fieldId, kind: period.kind, legacyKey, periodId, linkedAt: U.now() }],
+          updatedAt: U.now()
+        };
+      });
+    }, "旧作業記録を水管理の下書きへ引き継ぎました。期間を確認してください。");
+    return saved ? { kind: period.kind, id: periodId } : null;
   }
 
   // This is read-only. It keeps direct water records authoritative while making
@@ -1464,11 +1609,16 @@
     markNotificationCheck,
     undoLastSave,
     fieldWorksFor,
+    isMigratedWaterWork,
     waterEventForWorkName: waterEventFromWorkName,
     growthLogsFor,
     dryPeriodsFor,
     irrigationsFor,
     resolvedWaterPeriodsFor,
+    legacyWaterReviewFor,
+    directWaterMatchesForLegacy,
+    importLegacyWaterPeriod,
+    adoptLegacyWaterPeriod,
     seasonNotesForField,
     saveSeasonNote,
     deleteSeasonNote,

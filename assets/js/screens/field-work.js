@@ -374,11 +374,19 @@
     let rows = state.data().fieldWorks.filter((work) => !(state.waterEventForWorkName && state.waterEventForWorkName(work.workName)));
     if (recentScope.startsWith("field:")) {
       const fieldId = recentScope.slice("field:".length);
-      rows = rows.filter((work) => (work.fieldIds || []).includes(fieldId));
+      rows = rows.filter((work) => (work.fieldIds || []).includes(fieldId) && !(state.isMigratedWaterWork && state.isMigratedWaterWork(work, fieldId)));
     }
     if (recentScope.startsWith("group:")) {
       const group = recentScope.slice("group:".length);
-      rows = rows.filter((work) => (work.fieldIds || []).some((id) => state.field(id) && state.field(id).fieldGroupId === group));
+      const groupFieldIds = state.activeFields().filter((field) => field.fieldGroupId === group).map((field) => field.fieldId);
+      rows = rows.filter((work) => (work.fieldIds || []).some((id) => groupFieldIds.includes(id))
+        && !(work.fieldIds || []).filter((id) => groupFieldIds.includes(id)).every((id) => state.isMigratedWaterWork && state.isMigratedWaterWork(work, id)));
+    }
+    if (!recentScope || recentScope === "all") {
+      rows = rows.flatMap((work) => {
+        const visibleFieldIds = (work.fieldIds || []).filter((fieldId) => !(state.isMigratedWaterWork && state.isMigratedWaterWork(work, fieldId)));
+        return visibleFieldIds.length ? [{ ...work, fieldIds: visibleFieldIds }] : [];
+      });
     }
     rows = rows.sort((a, b) => String(b.date).localeCompare(String(a.date))).slice(0, 40);
     U.$("fieldWorkCount").textContent = `${rows.length}件`;

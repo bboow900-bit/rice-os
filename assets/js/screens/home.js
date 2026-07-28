@@ -218,7 +218,7 @@
 
   function normalWorksFor(fieldId, year) {
     return state.fieldWorksFor(fieldId, year)
-      .filter((row) => !(state.waterEventForWorkName && state.waterEventForWorkName(row.workName)));
+      .filter((row) => !(state.waterEventForWorkName && state.waterEventForWorkName(row.workName)) && !(state.isMigratedWaterWork && state.isMigratedWaterWork(row, fieldId)));
   }
 
   function latestDecisionRecord(fieldId, year) {

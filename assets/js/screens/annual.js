@@ -288,14 +288,17 @@
     const d = state.data();
     // 専用の水管理期間として残る記録は、作業一覧との重複を避ける。
     const fieldWorks = d.fieldWorks
-      .filter((w) => !(state.waterEventForWorkName && state.waterEventForWorkName(w.workName)))
-      .map((w) => makeRow("fieldWork", w, {
+      .filter((w) => !(state.waterEventForWorkName && state.waterEventForWorkName(w.workName)) && !(state.isMigratedWaterWork && state.isMigratedWaterWork(w)))
+      .flatMap((w) => {
+      const visibleFieldIds = (w.fieldIds || []).filter((fieldId) => !(state.isMigratedWaterWork && state.isMigratedWaterWork(w, fieldId)));
+      if (!visibleFieldIds.length) return [];
+      return [makeRow("fieldWork", w, {
       id: w.workId,
       date: w.date,
       season: w.season,
       title: w.workName,
       worker: w.worker || "",
-      fieldIds: w.fieldIds || [],
+      fieldIds: visibleFieldIds,
       hours: w.hours || "",
       kindIcon: workIcon(w.workName),
       photoData: w.photoData || "",
@@ -306,7 +309,8 @@
         w.weather ? `天気 ${w.weather}` : "",
         w.memo || ""
       ]
-      }));
+      })];
+      });
     const growth = d.growthLogs.map((g) => makeRow("growth", g, {
       id: g.logId,
       date: g.date,
@@ -791,7 +795,7 @@
     const targetYear = year && year !== "all" ? String(year) : undefined;
     return [
       ...state.growthLogsFor(fieldId, targetYear).map((row) => ({ date: row.date, title: "生育", photoData: row.photoData, photo: row.photo })),
-      ...state.fieldWorksFor(fieldId, targetYear).filter((row) => !(state.waterEventForWorkName && state.waterEventForWorkName(row.workName))).map((row) => ({ date: row.date, title: row.workName || "作業", photoData: row.photoData, photo: row.photo })),
+      ...state.fieldWorksFor(fieldId, targetYear).filter((row) => !(state.waterEventForWorkName && state.waterEventForWorkName(row.workName)) && !(state.isMigratedWaterWork && state.isMigratedWaterWork(row, fieldId))).map((row) => ({ date: row.date, title: row.workName || "作業", photoData: row.photoData, photo: row.photo })),
       ...state.dryPeriodsFor(fieldId, targetYear).map((row) => ({ date: row.date, title: "中干し", photoData: row.photoData, photo: row.photo }))
     ].filter((row) => row.photoData || row.photo).sort((a, b) => String(b.date).localeCompare(String(a.date)));
   }
@@ -944,8 +948,15 @@
   }
 
   function renderWorkTab(field) {
-    const rows = rowsForField(rowsForYear(allRows()), field.fieldId)
-      .filter((row) => row.kind === "fieldWork" && !/中干し|間断灌水|湿潤灌漑|入水|落水/.test(String(row.title || "")))
+    const rows = state.fieldWorksFor(field.fieldId, yearValue() === "all" ? undefined : yearValue())
+      .filter((row) => !(state.waterEventForWorkName && state.waterEventForWorkName(row.workName))
+        && !(state.isMigratedWaterWork && state.isMigratedWaterWork(row, field.fieldId)))
+      .map((row) => makeRow("fieldWork", row, {
+        id: row.workId, date: row.date, season: row.season, title: row.workName,
+        worker: row.worker || "", fieldIds: [field.fieldId], hours: row.hours || "",
+        kindIcon: workIcon(row.workName), photoData: row.photoData || "", photo: row.photo || "",
+        detailParts: [row.machine ? `機械 ${row.machine}` : "", row.material ? `資材 ${row.material} ${row.amount || ""}` : "", row.memo || ""].filter(Boolean)
+      }))
       .sort((a, b) => String(b.date).localeCompare(String(a.date)));
     if (!rows.length) return '<div class="empty">作業記録はまだありません。</div>';
     return `<div class="annual-entry-list field-view">${rows.map((row) => renderEntry(row, true)).join("")}</div>`;
@@ -1007,6 +1018,22 @@
       .sort((a, b) => String(b.startDate || b.actualEndDate).localeCompare(String(a.startDate || a.actualEndDate)));
   }
 
+  function legacyWaterReviewRowsForField(field) {
+    const selectedYear = yearValue();
+    const year = selectedYear === "all" ? undefined : String(selectedYear);
+    const rows = state.legacyWaterReviewFor ? state.legacyWaterReviewFor(field.fieldId, { year }) : [];
+    return rows.map((period) => ({
+      legacyKey: period.legacyKey || "",
+      kind: period.kind || "",
+      label: period.label || "水管理",
+      startDate: period.startDate || "",
+      actualEndDate: period.actualEndDate || "",
+      status: period.status || "",
+      migrated: Boolean(period.migrated),
+      sourceWorkIds: Array.isArray(period.sourceWorkIds) ? period.sourceWorkIds.slice() : []
+    })).sort((a, b) => String(b.startDate || b.actualEndDate).localeCompare(String(a.startDate || a.actualEndDate)));
+  }
+
   function renderWaterPeriod(period) {
     const plannedDays = Number(period.targetDays) || waterPeriodDays(period.startDate, period.plannedEndDate);
     const completed = Boolean(period.actualEndDate) || /完了|終了/.test(String(period.status || ""));
@@ -1017,8 +1044,7 @@
     const progress = plannedDays ? Math.max(0, Math.min(100, Math.round((Number(progressDays || 0) / Number(plannedDays)) * 100))) : 0;
     const subtitle = completed ? "完了" : (period.startDate ? "継続中" : "開始日を記録してください");
     const heading = `${period.label}${period.sequence > 1 ? ` ${period.sequence}回目` : ""}`;
-    const isLegacyWork = period.sourceType === "legacy-work";
-    const actionLabel = isLegacyWork ? "元の作業記録" : "編集";
+    const actionLabel = "編集";
     return `
       <article class="annual-water-period annual-water-period-${U.attr(period.tone)}">
         <div class="annual-water-period-head">
@@ -1033,7 +1059,22 @@
         </div>
         ${plannedDays ? `<div class="annual-water-period-progress"><i><em style="width:${progress}%"></em></i><span>予定 ${plannedDays}日${progressDays !== "" ? ` / ${completed ? "実績" : "経過"} ${progressDays}日` : ""}</span></div>` : ""}
         ${period.memo ? `<p class="annual-water-period-memo">${U.escapeHTML(period.memo)}</p>` : ""}
-        ${period.editId ? `<div class="annual-water-period-actions">${isLegacyWork ? `<span>旧作業記録から反映</span>` : `<button type="button" class="secondary" data-annual-water-edit="${U.attr(period.editKind)}" data-id="${U.attr(period.editId)}">${actionLabel}</button>`}<button type="button" class="danger" data-annual-water-delete="${U.attr(period.editKind)}" data-id="${U.attr(period.editId)}">${isLegacyWork ? "元の作業を削除" : "削除"}</button></div>` : ""}
+        ${period.editId ? `<div class="annual-water-period-actions"><button type="button" class="secondary" data-annual-water-edit="${U.attr(period.editKind)}" data-id="${U.attr(period.editId)}">${actionLabel}</button><button type="button" class="danger" data-annual-water-delete="${U.attr(period.editKind)}" data-id="${U.attr(period.editId)}">削除</button></div>` : ""}
+      </article>
+    `;
+  }
+
+  function renderLegacyWaterReviewRow(period) {
+    const dates = period.startDate && period.actualEndDate
+      ? `${U.fd(period.startDate)} - ${U.fd(period.actualEndDate)}`
+      : (period.startDate ? `${U.fd(period.startDate)} 開始` : `${U.fd(period.actualEndDate)} 終了記録`);
+    const canImport = Boolean(period.startDate && period.actualEndDate && !period.migrated);
+    return `
+      <article class="annual-water-review ${period.migrated ? "migrated" : ""}">
+        <div><span>${U.escapeHTML(period.label)}</span><b>${U.escapeHTML(dates)}</b><small>旧作業記録 ${U.escapeHTML(String(period.sourceWorkIds.length))}件</small></div>
+        <div class="annual-water-review-actions">
+          ${period.migrated ? '<em>取込済み（元作業は保持）</em>' : (canImport ? `<button type="button" class="primary" data-annual-water-import="${U.attr(period.legacyKey)}">水管理へ取り込む</button>` : `<button type="button" class="secondary" data-annual-water-continue="${U.attr(period.legacyKey)}">水管理で続き入力</button>`)}
+        </div>
       </article>
     `;
   }
@@ -1063,9 +1104,12 @@
   }
 
   function renderWaterTab(field) {
-    const periods = waterPeriodsForField(field);
-    if (!periods.length) return '<div class="empty">中干し・間断灌水・深水管理・稲刈り前の落水を記録すると、期間をここで振り返れます。</div>';
-    return `${renderWaterEditor(field)}<section class="annual-water-periods"><div class="annual-water-periods-heading"><div><span>水管理の振り返り</span><h3>いつから、いつまで行ったか</h3></div><small>${periods.length}件</small></div>${periods.map(renderWaterPeriod).join("")}</section>`;
+    const directPeriods = waterPeriodsForField(field).filter((period) => period.sourceType === "direct");
+    const legacyPeriods = legacyWaterReviewRowsForField(field).filter((period) => !period.migrated);
+    if (!directPeriods.length && !legacyPeriods.length) return '<div class="empty">中干し・間断灌水・深水管理・稲刈り前の落水を記録すると、期間をここで振り返れます。</div>';
+    return `${renderWaterEditor(field)}
+      <section class="annual-water-periods"><div class="annual-water-periods-heading"><div><span>水管理として登録済み</span><h3>開始日と終了日を管理</h3></div><small>${directPeriods.length}件</small></div>${directPeriods.length ? directPeriods.map(renderWaterPeriod).join("") : '<div class="empty compact">水管理として登録済みの期間はありません。</div>'}</section>
+      ${legacyPeriods.length ? `<section class="annual-water-review-list"><div class="annual-water-periods-heading"><div><span>照合待ち</span><h3>旧作業記録から見つかった水管理</h3></div><small>${legacyPeriods.length}件</small></div><p class="annual-water-review-note">元の作業記録は残したまま、水管理へ取り込めます。</p>${legacyPeriods.map(renderLegacyWaterReviewRow).join("")}</section>` : ""}`;
   }
 
   function renderPhotoTab(field) {
@@ -1538,6 +1582,35 @@
       const waterDelete = event.target.closest("[data-annual-water-delete]");
       if (waterDelete) {
         deleteWaterPeriod(waterDelete.dataset.annualWaterDelete, waterDelete.dataset.id);
+        return;
+      }
+      const waterImport = event.target.closest("[data-annual-water-import]");
+      if (waterImport && selectedFieldId && state.importLegacyWaterPeriod) {
+        const candidate = legacyWaterReviewRowsForField(state.field(selectedFieldId)).find((item) => item.legacyKey === waterImport.dataset.annualWaterImport);
+        if (!candidate) return;
+        const matches = state.directWaterMatchesForLegacy ? state.directWaterMatchesForLegacy(selectedFieldId, candidate.legacyKey) : [];
+        if (matches.length > 1) {
+          alert("同じ期間の水管理記録が複数あります。先に登録済みの水管理を確認・整理してから取り込んでください。");
+          return;
+        }
+        const existingId = matches[0] && matches[0].directId || "";
+        const prompt = existingId
+          ? `${candidate.label}（${U.fd(candidate.startDate)} - ${U.fd(candidate.actualEndDate)}）と同じ期間の水管理記録があります。\n既存の水管理記録へ関連付けます。元の作業記録は削除されません。`
+          : `${candidate.label}（${U.fd(candidate.startDate)} - ${U.fd(candidate.actualEndDate)}）を水管理へ取り込みます。\n元の作業記録は削除されません。`;
+        if (!confirm(prompt)) return;
+        const savedId = state.importLegacyWaterPeriod(selectedFieldId, candidate.legacyKey, existingId);
+        if (savedId) render();
+        return;
+      }
+      const waterContinue = event.target.closest("[data-annual-water-continue]");
+      if (waterContinue && selectedFieldId && state.adoptLegacyWaterPeriod) {
+        const candidate = legacyWaterReviewRowsForField(state.field(selectedFieldId)).find((item) => item.legacyKey === waterContinue.dataset.annualWaterContinue);
+        if (!candidate || !confirm(`${candidate.label}の旧作業記録を水管理の下書きへ引き継ぎます。\n元の作業記録は残したまま、足りない開始日または終了日を確認できます。`)) return;
+        const adopted = state.adoptLegacyWaterPeriod(selectedFieldId, candidate.legacyKey);
+        if (!adopted) return;
+        waterEditDraft = { kind: adopted.kind === "dry" ? "dry" : "irrigation", id: adopted.id };
+        render();
+        setTimeout(() => U.$("annualTimeline").querySelector("[data-annual-water-editor]")?.scrollIntoView({ behavior: "smooth", block: "start" }), 30);
         return;
       }
       if (event.target.closest("[data-annual-water-cancel]")) {

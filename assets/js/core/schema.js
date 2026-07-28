@@ -4,8 +4,8 @@
   const RiceOS = window.RiceOS = window.RiceOS || {};
   const U = RiceOS.utils;
 
-  const SCHEMA_VERSION = 15;
-  const APP_VERSION = "20260728_ver169";
+  const SCHEMA_VERSION = 16;
+  const APP_VERSION = "20260729_ver172";
   const STORE_KEY = "rice_os_v8_stable";
   const BACKUP_KEY = "rice_os_v8_stable_backup";
   const LEGACY_STORES = [
@@ -377,6 +377,13 @@
       orphanedFieldIds: ensureArray(w.orphanedFieldIds).map(String),
       batchId: String(w.batchId || ""),
       batchFieldIds: ensureArray(w.batchFieldIds || w.fieldIds).map(String),
+      waterMigrationLinks: ensureArray(w.waterMigrationLinks).map((link) => ({
+        fieldId: String(link && link.fieldId || ""),
+        kind: String(link && link.kind || ""),
+        legacyKey: String(link && link.legacyKey || ""),
+        periodId: String(link && link.periodId || ""),
+        linkedAt: String(link && link.linkedAt || U.now())
+      })).filter((link) => link.fieldId && link.kind && link.legacyKey && link.periodId),
       timeAccounting: String(w.timeAccounting || (ensureArray(w.fieldIds).length > 1 ? "shared" : "single")),
       totalHours: String(w.totalHours || w.hours || ""),
       fieldAllocatedHours: w.fieldAllocatedHours && typeof w.fieldAllocatedHours === "object" ? w.fieldAllocatedHours : {},
