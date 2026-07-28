@@ -404,7 +404,7 @@
     }
   }
 
-  function prefillFields(date, fieldIds) {
+  function prefillFields(date, fieldIds, typeKey) {
     bulkFieldIds = (fieldIds || []).filter(Boolean);
     U.$("waterDate").value = date || U.today();
     const matchingGroup = groups().find((group) => group.fields.length === bulkFieldIds.length && group.fields.every((field) => bulkFieldIds.includes(field.fieldId)));
@@ -416,7 +416,11 @@
       U.$("waterTargetMode").value = "field";
       if (bulkFieldIds[0]) U.$("waterField").value = bulkFieldIds[0];
     }
+    focusedTypeKey = typeForKey(typeKey) ? typeKey : "";
     render();
+    if (focusedTypeKey) {
+      setTimeout(() => document.querySelector(`[data-water-type-card="${U.attr(focusedTypeKey)}"]`)?.scrollIntoView({ behavior: "smooth", block: "center" }), 30);
+    }
   }
 
   function bind() {

@@ -130,7 +130,7 @@
 
   function latestResolvedWaterPeriod(fieldId, kind) {
     return resolvedWaterPeriodsForField(fieldId, currentSeasonYear())
-      .filter((row) => row.kind === kind)
+      .filter((row) => row.kind === kind && row.startDate)
       .slice()
       .sort((a, b) => String(b.startDate || b.actualEndDate || "").localeCompare(String(a.startDate || a.actualEndDate || "")))[0] || null;
   }
@@ -441,7 +441,7 @@
     const targetYear = year || currentSeasonYear();
     const photos = [
       ...state.growthLogsFor(fieldId, targetYear).map((row) => ({ date: row.date, photoData: row.photoData, photo: row.photo, title: "生育" })),
-      ...state.fieldWorksFor(fieldId, targetYear).map((row) => ({ date: row.date, photoData: row.photoData, photo: row.photo, title: row.workName || "作業" })),
+      ...state.fieldWorksFor(fieldId, targetYear).filter((row) => !(state.waterEventForWorkName && state.waterEventForWorkName(row.workName))).map((row) => ({ date: row.date, photoData: row.photoData, photo: row.photo, title: row.workName || "作業" })),
       ...state.dryPeriodsFor(fieldId, targetYear).map((row) => ({ date: row.date, photoData: row.photoData, photo: row.photo, title: "中干し" }))
     ].filter((row) => row.photoData || row.photo);
     const sorted = photos.sort((a, b) => String(b.date).localeCompare(String(a.date)));
@@ -1111,13 +1111,13 @@
         RiceOS.app.show("growth");
         RiceOS.screens.growth.prefillDate(U.today(), field.fieldId);
       }
-      if (action === "add-dry" && RiceOS.screens.dryPeriod) {
-        RiceOS.app.show("dry-period");
-        RiceOS.screens.dryPeriod.prefillDate(U.today(), field.fieldId);
+      if (action === "add-dry" && RiceOS.screens.irrigation) {
+        RiceOS.app.show("irrigation");
+        RiceOS.screens.irrigation.prefillDate(U.today(), field.fieldId, "dry");
       }
       if (action === "add-irrigation" && RiceOS.screens.irrigation) {
         RiceOS.app.show("irrigation");
-        RiceOS.screens.irrigation.prefillDate(U.today(), field.fieldId);
+        RiceOS.screens.irrigation.prefillDate(U.today(), field.fieldId, "intermittent");
       }
       if (action === "photos" && RiceOS.screens.photos) {
         RiceOS.app.show("photos");

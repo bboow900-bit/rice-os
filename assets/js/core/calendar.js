@@ -61,7 +61,8 @@
       state().resolvedWaterPeriodsFor(field.fieldId, { year, includePlanned: true, forDisplay: true }).forEach((period) => {
         const add = (when, title, memo) => {
           if (when !== date) return;
-          entries.push({ kind: "water", tone: "water", title, subtitle: field.name, memo, record: period });
+          const entryKind = period.source === "direct" ? (period.kind === "dry" ? "dry" : "irrigation") : "water";
+          entries.push({ kind: entryKind, tone: "water", title, subtitle: field.name, memo, record: period });
         };
         add(period.startDate, `${period.label} 開始`, period.source === "legacy-work" ? "作業記録から反映" : "水管理記録");
         add(period.actualEndDate, `${period.label} 完了`, "実績終了日");
@@ -157,8 +158,8 @@
         ? state().resolvedWaterPeriodsFor(field.fieldId, { year, includePlanned: true, forDisplay: true })
         : [];
       return periods.flatMap((period) => [
-        period.startDate ? { date: period.startDate, title: `${period.label} 開始`, subtitle: field.name, kind: "water", record: period } : null,
-        period.actualEndDate ? { date: period.actualEndDate, title: `${period.label} 完了`, subtitle: field.name, kind: "water", record: period } : null
+        period.startDate ? { date: period.startDate, title: `${period.label} 開始`, subtitle: field.name, kind: period.source === "direct" ? (period.kind === "dry" ? "dry" : "irrigation") : "water", record: period } : null,
+        period.actualEndDate ? { date: period.actualEndDate, title: `${period.label} 完了`, subtitle: field.name, kind: period.source === "direct" ? (period.kind === "dry" ? "dry" : "irrigation") : "water", record: period } : null
       ]).filter(Boolean);
     });
     const entries = [

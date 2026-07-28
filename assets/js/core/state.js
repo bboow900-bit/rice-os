@@ -220,6 +220,21 @@
     field.drainageSummaryYear = cacheYearForDate(field.drainageActualEndDate || field.drainageStartDate);
   }
 
+  function refreshIntermittentSummary(d, fieldId) {
+    const field = d.fields.find((item) => item.fieldId === fieldId);
+    if (!field) return;
+    const directStarts = (d.irrigations || [])
+      .filter((item) => item.fieldId === fieldId && /間断/.test(String(item.method || "")) && item.startDate)
+      .map((item) => item.startDate);
+    const legacyStarts = (d.fieldWorks || [])
+      .filter((item) => (item.fieldIds || []).includes(fieldId) && waterEventFromWorkName(item.workName)?.kind === "intermittent" && waterEventFromWorkName(item.workName)?.phase === "start")
+      .map((item) => item.date)
+      .filter(Boolean);
+    const latest = [...directStarts, ...legacyStarts].sort().pop() || "";
+    field.intermittentStartDate = latest;
+    field.intermittentSummaryYear = latest ? cacheYearForDate(latest) : "";
+  }
+
   function startIntermittentAfterDrying(d, fieldId, completedDate, sourceKey) {
     if (!fieldId || !completedDate) return;
     const field = d.fields.find((item) => item.fieldId === fieldId);
@@ -428,6 +443,10 @@
   }
 
   function saveFieldWork(record) {
+    if (waterEventFromWorkName(record && record.workName) && !(record && record.legacyWaterRecord)) {
+      if (typeof alert === "function") alert("中干し・間断灌水・深水・落水は、水管理として記録してください。");
+      return null;
+    }
     return mutate((d) => {
       const date = record.date || U.today();
       const previous = record.workId ? d.fieldWorks.find((work) => work.workId === record.workId) : null;
@@ -572,24 +591,36 @@
     }, workSaveFeedback(record));
   }
 
-  function deleteFieldWork(workId) {
+  function deleteFieldWorks(workIds, message) {
+    const ids = [...new Set((Array.isArray(workIds) ? workIds : [workIds]).map(String).filter(Boolean))];
+    if (!ids.length) return null;
     return mutate((d) => {
-      const removed = d.fieldWorks.find((work) => work.workId === workId);
-      d.fieldWorks = d.fieldWorks.filter((w) => w.workId !== workId);
-      if (removed && isDryEndWorkName(removed.workName)) {
-        (removed.fieldIds || []).forEach((fieldId) => {
-          refreshDryingSummary(d, fieldId);
+      const removed = d.fieldWorks.filter((work) => ids.includes(work.workId));
+      d.fieldWorks = d.fieldWorks.filter((work) => !ids.includes(work.workId));
+      const dryFields = new Set();
+      const intermittentFields = new Set();
+      removed.forEach((work) => {
+        (work.fieldIds || []).forEach((fieldId) => {
+          if (isDryStartWorkName(work.workName) || isDryEndWorkName(work.workName)) dryFields.add(fieldId);
+          const event = waterEventFromWorkName(work.workName);
+          if (event && event.kind === "intermittent") intermittentFields.add(fieldId);
         });
-      }
+      });
+      dryFields.forEach((fieldId) => refreshDryingSummary(d, fieldId));
+      intermittentFields.forEach((fieldId) => refreshIntermittentSummary(d, fieldId));
       (d.schedules || []).forEach((schedule) => {
-        if (schedule.completedByWorkId !== workId) return;
+        if (!ids.includes(schedule.completedByWorkId)) return;
         schedule.status = "予定";
         schedule.completedAt = "";
         schedule.completedByWorkId = "";
         schedule.completionReason = "";
         schedule.updatedAt = U.now();
       });
-    }, "圃場作業を削除しました");
+    }, message || "圃場作業を削除しました");
+  }
+
+  function deleteFieldWork(workId) {
+    return deleteFieldWorks([workId]);
   }
 
   function saveGrowthLogsBatch(records, message) {
@@ -1029,7 +1060,9 @@
 
   function deleteIrrigation(irrigationId) {
     return mutate((d) => {
+      const removed = (d.irrigations || []).find((item) => item.irrigationId === irrigationId);
       d.irrigations = (d.irrigations || []).filter((item) => item.irrigationId !== irrigationId);
+      if (removed && /間断/.test(String(removed.method || ""))) refreshIntermittentSummary(d, removed.fieldId);
     }, "水管理を削除しました");
   }
 
@@ -1229,20 +1262,17 @@
       })
       .sort((a, b) => String(a.startDate || a.actualEndDate || "").localeCompare(String(b.startDate || b.actualEndDate || "")));
     if (!opts.forDisplay) return periods;
-    // Only collapse records whose complete visible boundaries are identical.
-    // This is a presentation aid, not a data merge: near matches remain separate.
+    // Only collapse records from the same source. A direct water record and an
+    // older work record stay separately actionable even when their dates match.
     const byBoundary = new Map();
     periods.forEach((period) => {
-      const key = [period.kind, period.startDate, period.actualEndDate, period.plannedEndDate].join("|");
+      const key = [period.source, period.kind, period.startDate, period.actualEndDate, period.plannedEndDate].join("|");
       const current = byBoundary.get(key);
       if (!current) {
         byBoundary.set(key, { ...period, displayRecordCount: 1 });
         return;
       }
       current.displayRecordCount += 1;
-      if (current.source === "legacy-work" && period.source === "direct") {
-        Object.assign(current, { ...period, displayRecordCount: current.displayRecordCount });
-      }
     });
     return Array.from(byBoundary.values());
   }
@@ -1330,6 +1360,7 @@
     fieldWorksByNameFor,
     saveFieldWork,
     deleteFieldWork,
+    deleteFieldWorks,
     saveGrowthLog,
     saveGrowthLogsBatch,
     deleteGrowthLog,
@@ -1352,6 +1383,7 @@
     markNotificationCheck,
     undoLastSave,
     fieldWorksFor,
+    waterEventForWorkName: waterEventFromWorkName,
     growthLogsFor,
     dryPeriodsFor,
     irrigationsFor,

@@ -8,8 +8,8 @@
     if (!record) return "";
     if (kind === "work" || kind === "fieldWork") return record.workId || "";
     if (kind === "growth") return record.logId || "";
-    if (kind === "dry") return record.dryPeriodId || "";
-    if (kind === "irrigation") return record.irrigationId || "";
+    if (kind === "dry") return record.dryPeriodId || record.directId || "";
+    if (kind === "irrigation") return record.irrigationId || record.directId || "";
     if (kind === "schedule") return record.scheduleId || "";
     if (kind === "other") return record.otherWorkId || "";
     return record.id || "";
@@ -47,7 +47,7 @@
     }
     if ((kind === "dry" || kind === "irrigation") && RiceOS.screens.annual) {
       RiceOS.app.show("annual", { skipHistory: true });
-      RiceOS.screens.annual.openWaterEditor(kind, kind === "dry" ? record.dryPeriodId : record.irrigationId);
+      RiceOS.screens.annual.openWaterEditor(kind, kind === "dry" ? (record.dryPeriodId || record.directId) : (record.irrigationId || record.directId));
       return true;
     }
     if (kind === "schedule") {
@@ -62,8 +62,8 @@
     if (!confirm(`この${labelFor(kind)}を削除しますか？`)) return false;
     if (kind === "work" || kind === "fieldWork") state.deleteFieldWork(record.workId);
     else if (kind === "growth") state.deleteGrowthLog(record.logId);
-    else if (kind === "dry") state.deleteDryPeriod(record.dryPeriodId);
-    else if (kind === "irrigation") state.deleteIrrigation(record.irrigationId);
+    else if (kind === "dry") state.deleteDryPeriod(record.dryPeriodId || record.directId);
+    else if (kind === "irrigation") state.deleteIrrigation(record.irrigationId || record.directId);
     else if (kind === "schedule") state.deleteSchedule(record.scheduleId);
     else if (kind === "other") state.deleteOtherWork(record.otherWorkId);
     else return false;

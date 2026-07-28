@@ -265,13 +265,15 @@ state.saveFieldWork({
   date: "2025-06-01",
   fieldIds: ["field_a"],
   workName: "中干し開始",
-  hours: "1"
+  hours: "1",
+  legacyWaterRecord: true
 });
 state.saveFieldWork({
   date: "2026-06-05",
   fieldIds: ["field_a"],
   workName: "中干し開始",
-  hours: "1"
+  hours: "1",
+  legacyWaterRecord: true
 });
 state.saveFieldWork({
   date: "2025-07-15",
@@ -386,7 +388,8 @@ state.saveFieldWork({
   workId: "dry_end_manual_work",
   date: "2026-06-16",
   fieldIds: ["field_a"],
-  workName: "中干し終了"
+  workName: "中干し終了",
+  legacyWaterRecord: true
 });
 assert(!state.irrigationsFor("field_a", 2026).some((row) => row.autoStartedFromDrySource === "work:dry_end_manual_work"), "drying-end work unexpectedly created intermittent irrigation");
 state.deleteFieldWork("dry_end_manual_work");
@@ -408,10 +411,13 @@ assert(state.field("field_b").intermittentStartDate === intermittentStartBeforeD
 
 // Water periods are resolved read-only from both dedicated water records and
 // older work records. The resolver must not migrate, delete, or duplicate data.
-state.saveFieldWork({ workId: "water_legacy_intermit_start", date: "2026-08-01", fieldIds: ["field_a"], workName: "間断灌水開始" });
-state.saveFieldWork({ workId: "water_legacy_intermit_end", date: "2026-08-04", fieldIds: ["field_a"], workName: "間断灌水終了" });
-state.saveFieldWork({ workId: "water_duplicate_direct", date: "2026-06-12", fieldIds: ["field_b"], workName: "間断灌水開始" });
-state.saveFieldWork({ workId: "water_mixed_deep_end", date: "2026-07-04", fieldIds: ["field_b"], workName: "深水管理終了" });
+state.saveFieldWork({ workId: "water_legacy_intermit_start", date: "2026-08-01", fieldIds: ["field_a"], workName: "間断灌水開始", legacyWaterRecord: true });
+state.saveFieldWork({ workId: "water_legacy_intermit_end", date: "2026-08-04", fieldIds: ["field_a"], workName: "間断灌水終了", legacyWaterRecord: true });
+state.saveFieldWork({ workId: "water_duplicate_direct", date: "2026-06-12", fieldIds: ["field_b"], workName: "間断灌水開始", legacyWaterRecord: true });
+state.saveFieldWork({ workId: "water_mixed_deep_end", date: "2026-07-04", fieldIds: ["field_b"], workName: "深水管理終了", legacyWaterRecord: true });
+const workCountBeforeBlockedWaterSave = state.data().fieldWorks.length;
+assert(state.saveFieldWork({ date: "2026-08-10", fieldIds: ["field_a"], workName: "中干し開始" }) === null, "新しい中干しを通常作業として保存してしまう");
+assert(state.data().fieldWorks.length === workCountBeforeBlockedWaterSave, "水管理を通常作業へ追加してしまう");
 const waterDataBeforeResolve = JSON.stringify(state.data().irrigations);
 const resolvedA2026 = state.resolvedWaterPeriodsFor("field_a", { year: 2026, includePlanned: true });
 const resolvedB2026 = state.resolvedWaterPeriodsFor("field_b", { year: 2026, includePlanned: true });
@@ -419,9 +425,11 @@ assert(resolvedA2026.some((row) => row.kind === "intermittent" && row.startDate 
 assert(resolvedB2026.filter((row) => row.kind === "intermittent" && row.startDate === "2026-06-12").length === 2, "同日の直接記録と作業記録を勝手に統合した");
 assert(resolvedB2026.some((row) => row.kind === "deep" && row.startDate === "2026-07-01" && !row.actualEndDate && row.source === "direct"), "直接記録の終了日を作業記録で勝手に補完した");
 assert(resolvedB2026.some((row) => row.kind === "deep" && !row.startDate && row.actualEndDate === "2026-07-04" && row.source === "legacy-work"), "作業記録だけの終了事実を残せない");
-assert(state.resolvedWaterPeriodsFor("field_b", { year: 2026, includePlanned: true, forDisplay: true }).filter((row) => row.kind === "intermittent" && row.startDate === "2026-06-12").length === 1, "完全一致する水管理の表示重複を畳めない");
+assert(state.resolvedWaterPeriodsFor("field_b", { year: 2026, includePlanned: true, forDisplay: true }).filter((row) => row.kind === "intermittent" && row.startDate === "2026-06-12").length === 2, "新旧の水管理記録が削除不能な一枚に統合されている");
 assert(JSON.stringify(state.data().irrigations) === waterDataBeforeResolve, "水管理の表示解決で保存済みデータが書き換わった");
 assert(!state.resolvedWaterPeriodsFor("field_a", { year: 2025 }).some((row) => row.startDate === "2026-08-01"), "水管理の表示解決で年度をまたいだ");
+state.deleteFieldWork("water_legacy_intermit_start");
+assert(!state.resolvedWaterPeriodsFor("field_a", { year: 2026, includePlanned: true }).some((row) => row.sourceWorkIds && row.sourceWorkIds.includes("water_legacy_intermit_start")), "旧作業由来の水管理を削除できない");
 
 state.saveIrrigation({
   date: "2025-06-09",

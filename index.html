@@ -10,12 +10,12 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="稲作カルテ">
-  <link rel="manifest" href="manifest.webmanifest?v=20260728_ver165">
+  <link rel="manifest" href="manifest.webmanifest?v=20260728_ver166">
   <link rel="icon" href="assets/icons/icon-192.png">
   <link rel="apple-touch-icon" href="assets/icons/icon-192.png">
   <title>稲作カルテ</title>
-  <link rel="stylesheet" href="assets/css/app.css?v=20260728_ver165">
-  <link rel="stylesheet" href="assets/css/field-management.css?v=20260728_ver165">
+  <link rel="stylesheet" href="assets/css/app.css?v=20260728_ver166">
+  <link rel="stylesheet" href="assets/css/field-management.css?v=20260728_ver166">
   <style>
     @media (max-width: 900px) {
       body .app-shell .side-nav .nav-item { display: none !important; }
@@ -590,7 +590,7 @@
             <button class="common-master-card green" data-jump-screen="fields"><img src="assets/images/menu-icons/field-master.png" alt=""><b>圃場マスター</b><small>土質・面積・グループ</small><em data-master-count="fields">-</em></button>
             <button class="common-master-card green" data-jump-screen="recipes"><img src="assets/images/menu-icons/recipe.png" alt=""><b>栽培レシピ</b><small>品種単位の設定</small><em data-master-count="varieties">-</em></button>
             <button class="common-master-card amber" data-jump-screen="recipes"><img src="assets/images/menu-icons/transplanter.png" alt=""><b>田植え機</b><small>株間・苗箱の設定</small><em data-master-count="transplanter">-</em></button>
-            <button class="common-master-card amber" data-jump-screen="dry-period"><img src="assets/images/menu-icons/dry-period.png" alt=""><b>中干し</b><small>目標・実施期間</small><em data-master-count="dryPeriods">-</em></button>
+            <button class="common-master-card amber" data-jump-screen="irrigation" data-water-type="dry"><img src="assets/images/menu-icons/dry-period.png" alt=""><b>中干し</b><small>目標・実施期間</small><em data-master-count="dryPeriods">-</em></button>
             <button class="common-master-card water" data-jump-screen="irrigation"><img src="assets/images/menu-icons/irrigation.png" alt=""><b>間断 / 湿潤</b><small>水管理の記録</small><em data-master-count="irrigations">-</em></button>
             <button class="common-master-card amber" data-jump-screen="materials"><img src="assets/images/menu-icons/materials.png" alt=""><b>資材管理</b><small>在庫・使用量</small><em data-master-count="materials">-</em></button>
             <button class="common-master-card" data-jump-screen="photos"><img src="assets/images/menu-icons/photos.png" alt=""><b>写真</b><small>比較素材</small><em data-master-count="photos">-</em></button>
@@ -715,33 +715,33 @@
 
   <div id="toast" class="toast hidden" role="status"></div>
 
-  <script src="assets/js/core/utils.js?v=20260728_ver165"></script>
-  <script src="assets/js/core/schema.js?v=20260728_ver165"></script>
-  <script src="assets/js/core/storage.js?v=20260728_ver165"></script>
-  <script src="assets/js/core/state.js?v=20260728_ver165"></script>
-  <script src="assets/js/core/agro.js?v=20260728_ver165"></script>
-  <script src="assets/js/core/record-actions.js?v=20260728_ver165"></script>
-  <script src="assets/js/core/calendar.js?v=20260728_ver165"></script>
-  <script src="assets/js/core/alerts.js?v=20260728_ver165"></script>
-  <script src="assets/js/core/weather.js?v=20260728_ver165"></script>
-  <script src="assets/js/core/pwa.js?v=20260728_ver165"></script>
-  <script src="assets/js/screens/home.js?v=20260728_ver165"></script>
-  <script src="assets/js/screens/calendar.js?v=20260728_ver165"></script>
-  <script src="assets/js/screens/bottom-sheet.js?v=20260728_ver165"></script>
-  <script src="assets/js/screens/recipes.js?v=20260728_ver165"></script>
-  <script src="assets/js/screens/fields.js?v=20260728_ver165"></script>
-  <script src="assets/js/screens/field-work.js?v=20260728_ver165"></script>
-  <script src="assets/js/screens/fertilizer.js?v=20260728_ver165"></script>
-  <script src="assets/js/screens/growth.js?v=20260728_ver165"></script>
-  <script src="assets/js/screens/dry-period.js?v=20260728_ver165"></script>
-  <script src="assets/js/screens/irrigation.js?v=20260728_ver165"></script>
-  <script src="assets/js/screens/photos.js?v=20260728_ver165"></script>
-  <script src="assets/js/screens/other-work.js?v=20260728_ver165"></script>
-  <script src="assets/js/screens/annual.js?v=20260728_ver165"></script>
-  <script src="assets/js/screens/materials.js?v=20260728_ver165"></script>
-  <script src="assets/js/screens/results.js?v=20260728_ver165"></script>
-  <script src="assets/js/screens/notices.js?v=20260728_ver165"></script>
-  <script src="assets/js/screens/data.js?v=20260728_ver165"></script>
-  <script src="assets/js/app.js?v=20260728_ver165"></script>
+  <script src="assets/js/core/utils.js?v=20260728_ver166"></script>
+  <script src="assets/js/core/schema.js?v=20260728_ver166"></script>
+  <script src="assets/js/core/storage.js?v=20260728_ver166"></script>
+  <script src="assets/js/core/state.js?v=20260728_ver166"></script>
+  <script src="assets/js/core/agro.js?v=20260728_ver166"></script>
+  <script src="assets/js/core/record-actions.js?v=20260728_ver166"></script>
+  <script src="assets/js/core/calendar.js?v=20260728_ver166"></script>
+  <script src="assets/js/core/alerts.js?v=20260728_ver166"></script>
+  <script src="assets/js/core/weather.js?v=20260728_ver166"></script>
+  <script src="assets/js/core/pwa.js?v=20260728_ver166"></script>
+  <script src="assets/js/screens/home.js?v=20260728_ver166"></script>
+  <script src="assets/js/screens/calendar.js?v=20260728_ver166"></script>
+  <script src="assets/js/screens/bottom-sheet.js?v=20260728_ver166"></script>
+  <script src="assets/js/screens/recipes.js?v=20260728_ver166"></script>
+  <script src="assets/js/screens/fields.js?v=20260728_ver166"></script>
+  <script src="assets/js/screens/field-work.js?v=20260728_ver166"></script>
+  <script src="assets/js/screens/fertilizer.js?v=20260728_ver166"></script>
+  <script src="assets/js/screens/growth.js?v=20260728_ver166"></script>
+  <script src="assets/js/screens/dry-period.js?v=20260728_ver166"></script>
+  <script src="assets/js/screens/irrigation.js?v=20260728_ver166"></script>
+  <script src="assets/js/screens/photos.js?v=20260728_ver166"></script>
+  <script src="assets/js/screens/other-work.js?v=20260728_ver166"></script>
+  <script src="assets/js/screens/annual.js?v=20260728_ver166"></script>
+  <script src="assets/js/screens/materials.js?v=20260728_ver166"></script>
+  <script src="assets/js/screens/results.js?v=20260728_ver166"></script>
+  <script src="assets/js/screens/notices.js?v=20260728_ver166"></script>
+  <script src="assets/js/screens/data.js?v=20260728_ver166"></script>
+  <script src="assets/js/app.js?v=20260728_ver166"></script>
 </body>
 </html>

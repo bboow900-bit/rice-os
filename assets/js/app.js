@@ -195,6 +195,10 @@
       }
       event.preventDefault();
       show(target);
+      if (target === "irrigation" && jump.dataset.waterType && RiceOS.screens.irrigation) {
+        const firstField = RiceOS.state.activeFields()[0];
+        RiceOS.screens.irrigation.prefillDate(U.today(), firstField && firstField.fieldId, jump.dataset.waterType);
+      }
     });
 
     U.$$(".quick-button[data-work-shortcut]").forEach((button) => {

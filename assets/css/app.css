@@ -1681,8 +1681,17 @@
 .annual-water-editor > div:first-child > span { color: #2383a1; font-size: 10px; font-weight: 850; }
 .annual-water-editor h3 { margin: 0; color: #174c5e; font-size: 16px; }
 .annual-water-editor small { color: #607579; font-size: 11px; }
-.annual-water-period-actions { display: flex; justify-content: flex-end; margin-top: 8px; }
-.annual-water-period-actions .secondary { min-height: 34px; min-width: 88px; font-size: 11px; }
+.annual-water-period-actions { display: flex; align-items: center; justify-content: flex-end; gap: 7px; margin-top: 8px; }
+.annual-water-period-actions > span { margin-right: auto; color: #6b7d70; font-size: 10px; font-weight: 750; }
+.annual-water-period-actions button { min-height: 34px; min-width: 72px; font-size: 11px; }
+.annual-water-period-actions .secondary { min-width: 88px; }
+@media (max-width: 390px) {
+  .annual-water-period-dates { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .annual-water-period-dates span:last-child { grid-column: 1 / -1; border-top: 1px solid color-mix(in srgb, var(--water-line) 65%, white); border-left: 0; }
+  .annual-water-period-actions { flex-wrap: wrap; }
+  .annual-water-period-actions > span { width: 100%; }
+  .annual-water-period-actions button { flex: 1 1 0; min-width: 0; }
+}
 .annual-season-note-list { display: grid; gap: 6px; margin-top: 8px; }
 .annual-season-note-list article { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: start; gap: 7px; padding: 8px; border: 1px solid #e1e9dc; border-radius: 9px; background: #fff; }
 .annual-season-note-list time { color: #4f8757; font-size: 10px; font-weight: 900; white-space: nowrap; }

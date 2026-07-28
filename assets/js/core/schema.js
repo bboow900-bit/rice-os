@@ -5,7 +5,7 @@
   const U = RiceOS.utils;
 
   const SCHEMA_VERSION = 14;
-  const APP_VERSION = "20260728_ver165";
+  const APP_VERSION = "20260728_ver166";
   const STORE_KEY = "rice_os_v8_stable";
   const BACKUP_KEY = "rice_os_v8_stable_backup";
   const LEGACY_STORES = [
@@ -171,17 +171,9 @@
     "代かき",
     "田植え",
     "補植",
-    "入水",
-    "落水",
     "除草剤",
     "草刈り",
     "溝切り",
-    "中干し開始",
-    "中干し終了",
-    "間断灌水開始",
-    "間断灌水終了",
-    "湿潤灌漑開始",
-    "湿潤灌漑終了",
     "追肥",
     "防除",
     "稲刈り",

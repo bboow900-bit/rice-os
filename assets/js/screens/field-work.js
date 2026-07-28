@@ -26,7 +26,6 @@
     { key: "planting", label: "田植え", workName: "田植え", machine: "田植機", hours: 120, memo: "田植え作業。田植日としてカルテへ自動反映。" },
     { key: "herbicide", label: "除草剤", workName: "除草剤", machine: "散布機", material: "recipe", hours: 60, memo: "除草剤散布。薬剤名・水深・風を現場確認。" },
     { key: "mowing", label: "草刈り", workName: "草刈り", machine: "草刈り機", hours: 90, memo: "畦畔・周辺の草刈り。" },
-    { key: "dry-start", label: "中干し開始", workName: "中干し開始", machine: "", hours: 30, memo: "中干し開始。ひび割れ・沈み込みは中干し記録で確認。" },
     { key: "fertilizer", label: "追肥", workName: "追肥", machine: "散布機", material: "recipe", hours: 60, memo: "追肥。葉色と生育状況を見て判断。" },
     { key: "pest", label: "防除", workName: "防除", machine: "動力噴霧機", material: "recipe", hours: 90, memo: "防除作業。風・天候を確認。" },
     { key: "heading", label: "出穂確認", workName: "出穂確認", machine: "", hours: 15, memo: "出穂を確認。出穂後積算気温の起点として使用。" },
@@ -319,7 +318,7 @@
 
   function workNameFromSchedule(schedule) {
     const text = String(schedule && (schedule.title || schedule.scheduleType) || "");
-    const names = ["田植え", "代かき", "草刈り", "除草剤", "追肥", "防除", "溝切り", "中干し開始", "中干し終了", "稲刈り", "出穂確認"];
+    const names = ["田植え", "代かき", "草刈り", "除草剤", "追肥", "防除", "溝切り", "稲刈り", "出穂確認"];
     return names.find((name) => text.includes(name.replace("開始", "").replace("終了", ""))) || text.replace(/予定|確認候補|確認/g, "").trim() || "その他";
   }
 
@@ -380,7 +379,7 @@
   }
 
   function renderList() {
-    let rows = state.data().fieldWorks.slice();
+    let rows = state.data().fieldWorks.filter((work) => !(state.waterEventForWorkName && state.waterEventForWorkName(work.workName)));
     if (recentScope.startsWith("field:")) {
       const fieldId = recentScope.slice("field:".length);
       rows = rows.filter((work) => (work.fieldIds || []).includes(fieldId));
@@ -641,6 +640,13 @@
       const ids = selectedFieldIds();
       if (!ids.length) {
         alert("対象圃場を選んでください。");
+        return;
+      }
+      const waterEvent = state.waterEventForWorkName && state.waterEventForWorkName(U.$("fwName").value);
+      if (waterEvent) {
+        RiceOS.app.show("irrigation", { skipHistory: true });
+        RiceOS.screens.irrigation.prefillFields(U.$("fwDate").value || U.today(), ids, waterEvent.kind);
+        U.toast("水管理として入力します。開始または終了を記録してください。");
         return;
       }
       const saved = state.saveFieldWork({

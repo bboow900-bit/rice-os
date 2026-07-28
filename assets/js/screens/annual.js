@@ -288,7 +288,7 @@
     const d = state.data();
     // 専用の水管理期間として残る記録は、作業一覧との重複を避ける。
     const fieldWorks = d.fieldWorks
-      .filter((w) => !/湿潤灌漑|稲刈り前の落水|落水/.test(String(w.workName || "")))
+      .filter((w) => !(state.waterEventForWorkName && state.waterEventForWorkName(w.workName)))
       .map((w) => makeRow("fieldWork", w, {
       id: w.workId,
       date: w.date,
@@ -791,7 +791,7 @@
     const targetYear = year && year !== "all" ? String(year) : undefined;
     return [
       ...state.growthLogsFor(fieldId, targetYear).map((row) => ({ date: row.date, title: "生育", photoData: row.photoData, photo: row.photo })),
-      ...state.fieldWorksFor(fieldId, targetYear).map((row) => ({ date: row.date, title: row.workName || "作業", photoData: row.photoData, photo: row.photo })),
+      ...state.fieldWorksFor(fieldId, targetYear).filter((row) => !(state.waterEventForWorkName && state.waterEventForWorkName(row.workName))).map((row) => ({ date: row.date, title: row.workName || "作業", photoData: row.photoData, photo: row.photo })),
       ...state.dryPeriodsFor(fieldId, targetYear).map((row) => ({ date: row.date, title: "中干し", photoData: row.photoData, photo: row.photo }))
     ].filter((row) => row.photoData || row.photo).sort((a, b) => String(b.date).localeCompare(String(a.date)));
   }
@@ -996,6 +996,7 @@
         sourceType: period.source || "",
         editKind: period.source === "direct" ? (period.kind === "dry" ? "dry" : "irrigation") : "fieldWork",
         editId: period.source === "direct" ? period.directId : (period.sourceWorkIds || [])[0] || "",
+        sourceWorkIds: Array.isArray(period.sourceWorkIds) ? period.sourceWorkIds.slice() : [],
         source: period.source === "legacy-work" ? "作業記録から反映" : (period.source === "mixed" ? "作業・水管理記録を統合" : "水管理記録")
       }))
       .map((period) => ({
@@ -1016,7 +1017,8 @@
     const progress = plannedDays ? Math.max(0, Math.min(100, Math.round((Number(progressDays || 0) / Number(plannedDays)) * 100))) : 0;
     const subtitle = completed ? "完了" : (period.startDate ? "継続中" : "開始日を記録してください");
     const heading = `${period.label}${period.sequence > 1 ? ` ${period.sequence}回目` : ""}`;
-    const actionLabel = period.sourceType === "legacy-work" ? "作業記録を編集" : "編集";
+    const isLegacyWork = period.sourceType === "legacy-work";
+    const actionLabel = isLegacyWork ? "元の作業記録" : "編集";
     return `
       <article class="annual-water-period annual-water-period-${U.attr(period.tone)}">
         <div class="annual-water-period-head">
@@ -1031,7 +1033,7 @@
         </div>
         ${plannedDays ? `<div class="annual-water-period-progress"><i><em style="width:${progress}%"></em></i><span>予定 ${plannedDays}日${progressDays !== "" ? ` / ${completed ? "実績" : "経過"} ${progressDays}日` : ""}</span></div>` : ""}
         ${period.memo ? `<p class="annual-water-period-memo">${U.escapeHTML(period.memo)}</p>` : ""}
-        ${period.editId ? `<div class="annual-water-period-actions"><button type="button" class="secondary" data-annual-water-edit="${U.attr(period.editKind)}" data-id="${U.attr(period.editId)}">${actionLabel}</button></div>` : ""}
+        ${period.editId ? `<div class="annual-water-period-actions">${isLegacyWork ? `<span>旧作業記録から反映</span>` : `<button type="button" class="secondary" data-annual-water-edit="${U.attr(period.editKind)}" data-id="${U.attr(period.editId)}">${actionLabel}</button>`}<button type="button" class="danger" data-annual-water-delete="${U.attr(period.editKind)}" data-id="${U.attr(period.editId)}">${isLegacyWork ? "元の作業を削除" : "削除"}</button></div>` : ""}
       </article>
     `;
   }
@@ -1433,6 +1435,26 @@
     return true;
   }
 
+  function deleteWaterPeriod(kind, id) {
+    if (!id) return false;
+    const legacy = kind === "fieldWork";
+    const legacyPeriod = legacy && selectedFieldId ? waterPeriodsForField(state.field(selectedFieldId)).find((row) => row.editId === id && row.editKind === "fieldWork") : null;
+    const legacyIds = legacyPeriod && legacyPeriod.sourceWorkIds.length ? legacyPeriod.sourceWorkIds : [id];
+    const legacyWorks = legacy ? state.data().fieldWorks.filter((row) => legacyIds.includes(row.workId)) : [];
+    const targetCount = legacyWorks.reduce((count, row) => Math.max(count, (row.fieldIds || []).length), 0);
+    const message = legacy
+      ? `この旧作業記録由来の水管理を削除しますか？\n\n開始・終了を含む${legacyIds.length}件の元作業記録も削除されます。${targetCount > 1 ? `対象の${targetCount}圃場にも反映されます。` : ""}`
+      : "この水管理記録を削除しますか？";
+    if (!confirm(message)) return false;
+    const saved = legacy
+      ? (state.deleteFieldWorks ? state.deleteFieldWorks(legacyIds, "旧作業由来の水管理を削除しました") : legacyIds.map((workId) => state.deleteFieldWork(workId)).every(Boolean))
+      : (kind === "dry" ? state.deleteDryPeriod(id) : state.deleteIrrigation(id));
+    if (!saved) return false;
+    waterEditDraft = null;
+    render();
+    return true;
+  }
+
   function canHandleBack() {
     return Boolean(waterEditDraft || selectedFieldId);
   }
@@ -1511,6 +1533,11 @@
       if (waterEdit) {
         if (waterEdit.dataset.annualWaterEdit === "fieldWork") editRow("fieldWork", waterEdit.dataset.id);
         else openWaterEditor(waterEdit.dataset.annualWaterEdit, waterEdit.dataset.id);
+        return;
+      }
+      const waterDelete = event.target.closest("[data-annual-water-delete]");
+      if (waterDelete) {
+        deleteWaterPeriod(waterDelete.dataset.annualWaterDelete, waterDelete.dataset.id);
         return;
       }
       if (event.target.closest("[data-annual-water-cancel]")) {

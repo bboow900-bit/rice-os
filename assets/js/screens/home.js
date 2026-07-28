@@ -222,6 +222,11 @@
     return rows[0] || null;
   }
 
+  function normalWorksFor(fieldId, year) {
+    return state.fieldWorksFor(fieldId, year)
+      .filter((row) => !(state.waterEventForWorkName && state.waterEventForWorkName(row.workName)));
+  }
+
   function latestDecisionRecord(fieldId, year) {
     const today = U.today();
     const isActualDate = (value) => Boolean(value) && String(value).startsWith(`${year}-`) && String(value) <= today;
@@ -232,7 +237,7 @@
       return isActualDate(startDate) ? { date: startDate, type, title: startTitle } : null;
     };
     const records = [
-      ...state.fieldWorksFor(fieldId, year).map((row) => ({ date: row.date, type: "作業", title: row.workName || "作業記録" })),
+      ...normalWorksFor(fieldId, year).map((row) => ({ date: row.date, type: "作業", title: row.workName || "作業記録" })),
       ...state.growthLogsFor(fieldId, year).map((row) => ({ date: row.date, type: "生育", title: row.tillerCount ? `分げつ ${row.tillerCount}本` : "生育記録" })),
       ...(state.dryPeriodsFor ? state.dryPeriodsFor(fieldId, year) : []).map((row) => periodRecord(row, "中干し", "中干し開始", "中干し完了")),
       ...(state.irrigationsFor ? state.irrigationsFor(fieldId, year) : [])
@@ -413,7 +418,7 @@
   ];
 
   function seasonRowsForField(fieldId, year) {
-    return state.fieldWorksFor(fieldId)
+    return normalWorksFor(fieldId)
       .filter((row) => String(row.season || String(row.date || "").slice(0, 4)) === String(year));
   }
 
@@ -444,7 +449,7 @@
   function latestFieldPhoto(fieldId, year) {
     const rows = [
       ...state.growthLogsFor(fieldId, year),
-      ...state.fieldWorksFor(fieldId, year),
+      ...normalWorksFor(fieldId, year),
       ...(state.dryPeriodsFor ? state.dryPeriodsFor(fieldId, year) : []),
       ...(state.irrigationsFor ? state.irrigationsFor(fieldId, year) : [])
     ].filter((row) => (row.photoData || row.photo));
@@ -455,7 +460,7 @@
     const previousDate = addYears(dateText, -1);
     const previousYear = cropYear(previousDate);
     const candidates = [
-      ...state.fieldWorksFor(field.fieldId).map((row) => ({ ...row, kind: "作業", title: row.workName, text: row.memo || "" })),
+      ...normalWorksFor(field.fieldId).map((row) => ({ ...row, kind: "作業", title: row.workName, text: row.memo || "" })),
       ...state.growthLogsFor(field.fieldId).map((row) => ({ ...row, kind: "生育", title: row.tillerCount ? `分げつ ${row.tillerCount}本` : "生育記録", text: row.memo || "" })),
       ...(state.dryPeriodsFor ? state.dryPeriodsFor(field.fieldId) : []).map((row) => ({ ...row, kind: "中干し", title: row.actualEndDate ? "中干し完了" : "中干し記録", text: row.memo || "" })),
       ...(state.irrigationsFor ? state.irrigationsFor(field.fieldId) : []).filter((row) => row.method !== "湿潤灌漑").map((row) => ({ ...row, kind: "水管理", title: row.method || "水管理記録", text: row.memo || "" }))
@@ -766,7 +771,7 @@
 
   function lastFieldActivityDate(fieldId, year) {
     const rows = [
-      ...state.fieldWorksFor(fieldId, year),
+      ...normalWorksFor(fieldId, year),
       ...state.growthLogsFor(fieldId, year),
       ...(state.dryPeriodsFor ? state.dryPeriodsFor(fieldId, year) : []),
       ...(state.irrigationsFor ? state.irrigationsFor(fieldId, year) : []).filter((row) => row.method !== "湿潤灌漑")

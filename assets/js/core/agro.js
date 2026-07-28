@@ -290,7 +290,9 @@
     const periods = state().resolvedWaterPeriodsFor
       ? state().resolvedWaterPeriodsFor(field.fieldId, { year, throughDate: targetDate, includePlanned: true, forDisplay: true })
       : [];
-    const latest = (kind) => periods.filter((row) => row.kind === kind)
+    // An old imported "end" work without its matching start is useful in
+    // history, but it must never become the current management status.
+    const latest = (kind) => periods.filter((row) => row.kind === kind && row.startDate)
       .slice().sort((a, b) => String(b.startDate || b.actualEndDate || "").localeCompare(String(a.startDate || a.actualEndDate || "")))[0] || null;
     const dry = latest("dry");
     const dryEnd = dry && dry.actualEndDate || "";
