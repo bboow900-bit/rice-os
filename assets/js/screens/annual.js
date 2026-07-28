@@ -1267,71 +1267,135 @@
     `;
   }
 
-  function timelinePeriod(label, startDate, endDate, tone, source) {
-    if (!startDate && !endDate) return null;
-    const start = startDate || endDate;
-    const days = startDate && endDate ? U.daysBetween(startDate, endDate) : "";
-    const detail = startDate && endDate
-      ? `${U.fd(startDate)} 開始 → ${U.fd(endDate)} 完了`
-      : startDate ? `開始 ${U.fd(startDate)} / 完了日未記録` : `完了 ${U.fd(endDate)}`;
-    return { date: start, label, detail, days, tone, kind: "period", category: "水管理", source: source === "legacy-work" ? "旧作業記録" : "実績" };
+  function isTimelineDate(value) {
+    const text = String(value || "");
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) return false;
+    const date = new Date(`${text}T00:00:00`);
+    return !Number.isNaN(date.getTime()) && date.getFullYear() === Number(text.slice(0, 4)) && date.getMonth() + 1 === Number(text.slice(5, 7)) && date.getDate() === Number(text.slice(8, 10));
+  }
+
+  function timelineDays(startDate, endDate) {
+    if (!isTimelineDate(startDate) || !isTimelineDate(endDate)) return "";
+    const days = Number(U.daysBetween(startDate, endDate));
+    return Number.isFinite(days) && days >= 0 ? days : "";
+  }
+
+  function timelineDateParts(value, includeYear) {
+    if (!isTimelineDate(value)) return { text: "", day: "", weekday: "" };
+    const date = new Date(`${value}T00:00:00`);
+    const prefix = includeYear ? `${date.getFullYear()}/` : "";
+    const day = `${prefix}${date.getMonth() + 1}/${date.getDate()}`;
+    const weekday = `（${["日", "月", "火", "水", "木", "金", "土"][date.getDay()]}）`;
+    return { text: `${day}${weekday}`, day, weekday };
+  }
+
+  function timelineWorkEntry(row) {
+    const name = String(row.workName || "作業記録");
+    const isHarvest = /収穫|稲刈り/.test(name) && !/落水/.test(name);
+    return {
+      id: row.workId,
+      editKind: "fieldWork",
+      date: String(row.date || ""),
+      label: name,
+      category: isHarvest ? "収穫" : "農作業",
+      tone: isHarvest ? "harvest" : "work",
+      detail: String(row.material || row.machine || "作業記録")
+    };
+  }
+
+  function timelineWaterEntry(period) {
+    const startDate = isTimelineDate(period.startDate) ? period.startDate : "";
+    const endDate = isTimelineDate(period.actualEndDate) ? period.actualEndDate : "";
+    const date = startDate || endDate;
+    if (!date) return null;
+    const validEnd = !startDate || !endDate || endDate >= startDate;
+    const range = startDate && endDate && validEnd
+      ? `${timelineDateParts(startDate).text}開始 → ${timelineDateParts(endDate).text}完了`
+      : startDate && endDate ? `${timelineDateParts(startDate).text}開始 → 終了日を確認`
+      : startDate ? `${timelineDateParts(startDate).text}開始 → 継続中` : `${timelineDateParts(endDate).text}完了`;
+    const days = validEnd ? timelineDays(startDate, endDate) : "";
+    const legacyIds = period.sourceWorkIds || [];
+    return {
+      id: period.directId || legacyIds[0] || period.periodId || "",
+      // A legacy period can span multiple original work records. Keep those
+      // records intact and return to the water review tab instead of guessing
+      // which one the user intended to edit.
+      editKind: period.directId ? (period.kind === "dry" ? "dry" : "irrigation") : legacyIds.length === 1 ? "fieldWork" : "waterReview",
+      date,
+      label: String(period.label || "水管理"),
+      category: "水管理",
+      tone: "water",
+      detail: range,
+      days
+    };
   }
 
   function fieldYearTimeline(field, year) {
-    // Use the year-scoped state APIs here. Older imports can have a stale season field.
     const works = state.fieldWorksFor(field.fieldId, year)
-      .filter((row) => !/予定|確認/.test(String(row.workName || "")));
+      .filter((row) => !/予定|確認/.test(String(row.workName || "")))
+      .filter((row) => !(state.waterEventForWorkName && state.waterEventForWorkName(row.workName)))
+      .filter((row) => !(state.isMigratedWaterWork && state.isMigratedWaterWork(row, field.fieldId)));
     const growth = state.growthLogsFor(field.fieldId, year);
     const waterPeriods = state.resolvedWaterPeriodsFor
       ? state.resolvedWaterPeriodsFor(field.fieldId, { year, includePlanned: false, forDisplay: true })
       : [];
-    const entries = [];
-    const firstWorkDate = (pattern) => works.filter((row) => pattern.test(String(row.workName || ""))).map((row) => row.date).filter(Boolean).sort()[0] || "";
-    const planting = firstWorkDate(/田植/);
-    if (planting) entries.push({ date: planting, label: "田植え", detail: "田植え後 0日", tone: "planting", kind: "point", category: "農作業", source: "実績" });
+    const others = (state.data().otherWorks || [])
+      .filter((row) => (row.relatedFieldIds || row.fieldIds || []).includes(field.fieldId))
+      .filter((row) => String(row.season || String(row.date || "").slice(0, 4)) === String(year))
+      .filter((row) => !/予定|確認/.test(String(row.workName || "")));
+    const entries = works.map(timelineWorkEntry);
 
-    waterPeriods.forEach((period) => {
-      const tone = period.kind === "dry" ? "dry" : "water";
-      const entry = timelinePeriod(period.label, period.startDate, period.actualEndDate, tone, period.source);
-      if (entry) entries.push(entry);
-    });
+    waterPeriods
+      .filter((period) => !/予定/.test(String(period.status || "")) && !/予定/.test(String(period.raw && (period.raw.status || period.raw.periodStatus) || "")))
+      .map(timelineWaterEntry).filter(Boolean).forEach((entry) => entries.push(entry));
+    growth
+      .filter((row) => row.headingObserved || row.observedStage === "heading" && row.stageConfirmed)
+      .forEach((row) => entries.push({
+        id: row.logId,
+        editKind: "growth",
+        date: String(row.date || ""),
+        label: "出穂",
+        category: "生育",
+        tone: "growth",
+        detail: "生育記録から確定"
+      }));
+    others.forEach((row) => entries.push({
+      id: row.otherWorkId,
+      editKind: "other",
+      date: String(row.date || ""),
+      label: String(row.workName || "その他の記録"),
+      category: "その他",
+      tone: "other",
+      detail: row.quantity ? `数量 ${row.quantity}` : "その他の記録"
+    }));
 
-    const growthSummary = state.growthSummaryFor ? state.growthSummaryFor(field.fieldId, year) : null;
-    const panicleLogs = growth.filter((row) => U.number(row.panicleLengthMm, 0) > 0)
-      .slice().sort((a, b) => String(a.date).localeCompare(String(b.date)));
-    const panicle = growthSummary && growthSummary.panicleLog || panicleLogs.at(-1) || null;
-    if (panicle) {
-      const observation = panicleLogs.length > 1 ? `幼穂観察 ${panicleLogs.length}回 / 最新 ${panicle.panicleLengthMm}mm` : `幼穂長 ${panicle.panicleLengthMm}mm`;
-      entries.push({ date: panicle.date, label: "幼穂確認", detail: observation, tone: "panicle", kind: "point", category: "生育", source: "実測" });
-    }
-
-    const observedHeading = growth.filter((row) => row.headingObserved || row.observedStage === "heading" && row.stageConfirmed)
-      .slice().sort((a, b) => String(a.date).localeCompare(String(b.date)))[0] || null;
-    const heading = observedHeading && observedHeading.date || firstWorkDate(/出穂/);
-    if (heading) entries.push({ date: heading, label: "出穂", detail: observedHeading ? "生育記録から確定" : "作業記録", tone: "heading", kind: "point", category: "生育", source: observedHeading ? "実測" : "作業" });
-
-    const harvest = firstWorkDate(/収穫|稲刈り/);
-    if (harvest) entries.push({ date: harvest, label: "収穫", detail: "収穫作業", tone: "harvest", kind: "point", category: "収穫", source: "実績" });
-
-    works.filter((row) => /代かき|除草|追肥|防除|草刈り|溝切り/.test(String(row.workName || ""))).forEach((row) => {
-      const detail = [row.machine, row.material].filter(Boolean).join(" / ") || "作業記録";
-      entries.push({ date: row.date, label: row.workName, detail, tone: "work", kind: "point", category: "農作業", source: "実績" });
-    });
-    return entries.sort((a, b) => String(a.date).localeCompare(String(b.date)) || String(a.label).localeCompare(String(b.label)));
+    return entries
+      .filter((entry) => isTimelineDate(entry.date) && entry.id)
+      .sort((a, b) => String(a.date).localeCompare(String(b.date)) || String(a.category).localeCompare(String(b.category)) || String(a.label).localeCompare(String(b.label)));
   }
 
   function renderYearFlow(field) {
     const year = reviewYearValue();
     const entries = fieldYearTimeline(field, year);
-    const planting = entries.find((entry) => entry.label === "田植え")?.date || "";
-    const harvest = entries.find((entry) => entry.label === "収穫")?.date || "";
-    const seasonLength = planting && harvest ? U.daysBetween(planting, harvest) : "";
-    const seasonText = planting ? `${U.fd(planting)}${harvest ? ` → ${U.fd(harvest)}${seasonLength !== "" ? ` / ${seasonLength}日` : ""}` : " → 収穫記録待ち"}` : "田植え記録待ち";
+    const planting = entries.find((entry) => /田植/.test(entry.label))?.date || "";
+    const harvest = entries.find((entry) => entry.category === "収穫")?.date || "";
+    const seasonLength = timelineDays(planting, harvest);
+    const seasonText = planting
+      ? `${timelineDateParts(planting, true).text} → ${harvest ? `${timelineDateParts(harvest, true).text}${seasonLength !== "" ? ` / ${seasonLength}日` : ""}` : "収穫記録待ち"}`
+      : "田植え記録待ち";
+    let previousDate = "";
+    const items = entries.map((entry) => {
+      const showDate = entry.date !== previousDate;
+      previousDate = entry.date;
+      const date = timelineDateParts(entry.date);
+      const dateHtml = showDate ? `<time datetime="${U.attr(entry.date)}"><span>${U.escapeHTML(date.day)}</span><small>${U.escapeHTML(date.weekday)}</small></time>` : '<time class="annual-year-flow-repeat" aria-hidden="true"></time>';
+      return `<li class="${U.attr(entry.tone)}">${dateHtml}<span class="annual-year-flow-rail" aria-hidden="true"><i></i></span><button type="button" class="annual-year-flow-entry" data-annual-flow-open-kind="${U.attr(entry.editKind)}" data-annual-flow-open-id="${U.attr(entry.id)}"><span class="annual-year-flow-title"><em>${U.escapeHTML(entry.category || "記録")}</em><b>${U.escapeHTML(entry.label)}</b><strong aria-hidden="true">〉</strong></span><span class="annual-year-flow-detail">${U.escapeHTML(entry.detail)}</span>${entry.days !== "" ? `<span class="annual-year-flow-days">${U.escapeHTML(String(entry.days))}日間</span>` : ""}</button></li>`;
+    }).join("");
     return `
       <section class="annual-year-flow" aria-label="${U.escapeHTML(year)}年の一年の流れ">
         <div class="annual-year-flow-head"><div><span>${U.escapeHTML(year)}年の記録</span><h3>一年の流れ</h3></div><small>実績のみ</small></div>
         <p class="annual-year-flow-season">${U.escapeHTML(seasonText)}</p>
-        ${entries.length ? `<ol>${entries.map((entry) => `<li class="${U.attr(entry.tone)} ${U.attr(entry.kind)}"><time>${U.escapeHTML(U.fd(entry.date))}</time><span class="annual-year-flow-rail" aria-hidden="true"><i></i></span><div class="annual-year-flow-entry"><div class="annual-year-flow-title"><em>${U.escapeHTML(entry.category || "記録")}</em><b>${U.escapeHTML(entry.label)}</b><small>${U.escapeHTML(entry.source || "実績")}</small></div><p>${U.escapeHTML(entry.detail)}</p>${entry.days !== "" ? `<span class="annual-year-flow-days">${U.escapeHTML(String(entry.days))}日間</span>` : ""}</div></li>`).join("")}</ol>` : '<p class="annual-year-flow-empty">田植え・水管理・幼穂・出穂・収穫の実績を残すと、ここに一年の流れが並びます。</p>'}
+        ${items ? `<ol>${items}</ol>` : '<p class="annual-year-flow-empty">田植え・水管理・出穂・収穫などの実績を残すと、ここに一年の流れが並びます。</p>'}
       </section>
     `;
   }
@@ -1470,6 +1534,11 @@
       RiceOS.screens.growth.editLog(id);
       return;
     }
+    if (kind === "other" && RiceOS.screens.otherWork && RiceOS.screens.otherWork.editWork) {
+      RiceOS.app.show("other-work");
+      RiceOS.screens.otherWork.editWork(id);
+      return;
+    }
     if (kind === "dry" || kind === "irrigation") {
       openWaterEditor(kind, id);
       return;
@@ -1581,6 +1650,19 @@
       if (event.target.closest("[data-annual-back]")) {
         handleBack();
         window.scrollTo({ top: 0, behavior: "smooth" });
+        return;
+      }
+      const flowOpen = event.target.closest("[data-annual-flow-open-kind]");
+      if (flowOpen) {
+        const kind = flowOpen.dataset.annualFlowOpenKind;
+        if (kind === "waterReview") {
+          selectedTab = "water";
+          waterEditDraft = null;
+          render();
+          setTimeout(() => U.$("annualTimeline").querySelector(".annual-water-review-list, .annual-water-periods")?.scrollIntoView({ behavior: "smooth", block: "start" }), 30);
+          return;
+        }
+        editRow(kind, flowOpen.dataset.annualFlowOpenId);
         return;
       }
       const tab = event.target.closest("[data-annual-tab]");

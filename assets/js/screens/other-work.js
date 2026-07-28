@@ -123,5 +123,10 @@
   }
 
   RiceOS.screens = RiceOS.screens || {};
-  RiceOS.screens.otherWork = { render, bind, resetForm };
+  function editWork(otherWorkId) {
+    const work = state.data().otherWorks.find((item) => item.otherWorkId === otherWorkId);
+    if (work) fillEdit(work);
+  }
+
+  RiceOS.screens.otherWork = { render, bind, resetForm, editWork };
 })();

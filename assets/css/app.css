@@ -1700,7 +1700,7 @@
 .annual-season-note-list button { padding: 3px 5px; border: 0; border-radius: 5px; background: #eef5eb; color: #397241; font: inherit; font-size: 9px; font-weight: 850; }
 .annual-season-note-list button.danger { background: #fff0ee; color: #b75048; }
 .annual-season-note-empty { margin: 8px 0 0; padding: 8px; border-radius: 8px; background: #f7f8f4; color: #748074; font-size: 11px; line-height: 1.4; }
-.annual-year-flow { margin: 12px 11px; padding: 13px 11px 11px; border: 1px solid #d5e3d2; border-radius: 10px; background: #fcfdf8; box-shadow: 0 8px 18px rgba(62, 91, 58, .06); }
+.annual-year-flow { margin: 12px 11px; padding: 13px 11px 18px; border: 1px solid #d5e3d2; border-radius: 10px; background: #fcfdf8; box-shadow: 0 8px 18px rgba(62, 91, 58, .06); }
 .annual-year-flow-head { display: flex; align-items: end; justify-content: space-between; gap: 8px; }
 .annual-year-flow-head span { display: block; color: #718073; font-size: 10px; font-weight: 800; }
 .annual-year-flow-head h3 { margin: 2px 0 0; color: #24663a; font-size: 16px; font-weight: 900; }
@@ -1709,29 +1709,34 @@
 .annual-year-flow ol { display: grid; gap: 0; margin: 12px 0 0; padding: 0; list-style: none; }
 .annual-year-flow li { display: grid; grid-template-columns: 52px 18px minmax(0, 1fr); column-gap: 7px; align-items: stretch; min-width: 0; padding: 0 0 12px; }
 .annual-year-flow li:last-child { padding-bottom: 0; }
-.annual-year-flow time { padding-top: 9px; color: #415143; font-size: 11px; font-weight: 900; line-height: 1.2; text-align: right; }
+.annual-year-flow time { padding-top: 9px; color: #415143; font-size: 11px; font-weight: 900; line-height: 1.15; text-align: right; }
+.annual-year-flow time span, .annual-year-flow time small { display: block; }
+.annual-year-flow time small { margin-top: 1px; color: #718073; font-size: 9px; font-weight: 800; }
+.annual-year-flow time.annual-year-flow-repeat { visibility: hidden; }
 .annual-year-flow-rail { position: relative; display: block; min-height: 100%; }
 .annual-year-flow-rail::before { content: ""; position: absolute; top: 0; bottom: -12px; left: 8px; width: 2px; background: #d8e4d4; }
-.annual-year-flow li:last-child .annual-year-flow-rail::before { bottom: 50%; }
+.annual-year-flow li:last-child .annual-year-flow-rail::before { bottom: auto; height: 15px; }
 .annual-year-flow-rail i { position: absolute; z-index: 1; top: 9px; left: 3px; width: 9px; height: 9px; border: 2px solid #fcfdf8; border-radius: 50%; background: #4e9c59; box-shadow: 0 0 0 2px #a9d0ac; }
-.annual-year-flow-entry { min-width: 0; padding: 8px 9px; border: 1px solid #e0e9dc; border-radius: 8px; background: #fff; box-shadow: 0 3px 8px rgba(56, 81, 52, .045); }
+.annual-year-flow-entry { display: block; width: 100%; min-width: 0; padding: 8px 9px; border: 1px solid #e0e9dc; border-left: 3px solid #5f9b5b; border-radius: 8px; background: #fff; box-shadow: 0 3px 8px rgba(56, 81, 52, .045); color: inherit; cursor: pointer; font: inherit; text-align: left; }
+.annual-year-flow-entry:focus-visible { outline: 3px solid #93c78f; outline-offset: 2px; }
 .annual-year-flow-title { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .annual-year-flow-title em { flex: 0 0 auto; padding: 3px 5px; border-radius: 4px; background: #e5f5e6; color: #35733f; font-size: 9px; font-style: normal; font-weight: 900; }
-.annual-year-flow-title b { min-width: 0; color: #2e4733; font-size: 13px; font-weight: 900; line-height: 1.25; }
-.annual-year-flow-title small { margin-left: auto; color: #7b887b; font-size: 9px; font-weight: 800; white-space: nowrap; }
-.annual-year-flow-entry p { margin: 4px 0 0; color: #647266; font-size: 11px; font-weight: 750; line-height: 1.4; }
+.annual-year-flow-title b { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; color: #2e4733; font-size: 13px; font-weight: 900; line-height: 1.25; }
+.annual-year-flow-title strong { flex: 0 0 auto; color: #7b887b; font-size: 15px; font-weight: 800; line-height: 1; }
+.annual-year-flow-detail { display: block; margin-top: 4px; overflow-wrap: anywhere; color: #647266; font-size: 11px; font-weight: 750; line-height: 1.4; }
 .annual-year-flow-days { display: inline-block; margin-top: 5px; padding: 2px 6px; border-radius: 999px; background: #e5f3fb; color: #26759d; font-size: 10px; font-weight: 900; }
-.annual-year-flow li.dry .annual-year-flow-rail i { background: #d28a29; box-shadow: 0 0 0 2px #f0d29d; }
-.annual-year-flow li.dry .annual-year-flow-title em { background: #fff0d6; color: #a96317; }
 .annual-year-flow li.water .annual-year-flow-rail i { background: #348fbe; box-shadow: 0 0 0 2px #b9ddeb; }
 .annual-year-flow li.water .annual-year-flow-title em { background: #e2f2fa; color: #23779f; }
-.annual-year-flow li.panicle .annual-year-flow-rail i { background: #739c45; box-shadow: 0 0 0 2px #cfe1b9; }
-.annual-year-flow li.panicle .annual-year-flow-title em { background: #edf6dd; color: #5c8735; }
-.annual-year-flow li.heading .annual-year-flow-rail i { background: #a98730; box-shadow: 0 0 0 2px #eadba9; }
-.annual-year-flow li.heading .annual-year-flow-title em { background: #fff4d9; color: #947329; }
+.annual-year-flow li.water .annual-year-flow-entry { border-left-color: #348fbe; }
+.annual-year-flow li.growth .annual-year-flow-rail i { background: #7b9f4d; box-shadow: 0 0 0 2px #d5e6be; }
+.annual-year-flow li.growth .annual-year-flow-title em { background: #edf6df; color: #66863e; }
+.annual-year-flow li.growth .annual-year-flow-entry { border-left-color: #7b9f4d; }
 .annual-year-flow li.harvest .annual-year-flow-rail i { background: #b47732; box-shadow: 0 0 0 2px #e6c79f; }
 .annual-year-flow li.harvest .annual-year-flow-title em { background: #fff0dd; color: #a66a28; }
-.annual-year-flow li.work .annual-year-flow-rail i { background: #5f9b5b; box-shadow: 0 0 0 2px #c8dfc4; }
+.annual-year-flow li.harvest .annual-year-flow-entry { border-left-color: #b47732; }
+.annual-year-flow li.other .annual-year-flow-rail i { background: #89918a; box-shadow: 0 0 0 2px #d7dcd8; }
+.annual-year-flow li.other .annual-year-flow-title em { background: #eef0ee; color: #687168; }
+.annual-year-flow li.other .annual-year-flow-entry { border-left-color: #89918a; }
 .annual-year-flow-empty { margin: 10px 0 0; padding: 9px; border-radius: 8px; background: #f6f8f3; color: #748074; font-size: 11px; line-height: 1.5; }
 /* Mobile primary route: Home, calendar, record, fields, review. */
 @media (max-width: 900px) {
