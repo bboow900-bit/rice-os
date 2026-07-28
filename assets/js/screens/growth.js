@@ -20,19 +20,12 @@
   }
 
   function fieldGroupName(field) {
-    const raw = String(field && (field.fieldGroupId || field.district) || "").trim();
-    return raw ? raw.replace(/グループ$/, "") : "";
+    const group = state.groupForField ? state.groupForField(field) : null;
+    return group ? group.name : "";
   }
 
   function fieldGroups() {
-    const groups = new Map();
-    state.activeFields().forEach((field) => {
-      const name = fieldGroupName(field);
-      if (!name) return;
-      if (!groups.has(name)) groups.set(name, []);
-      groups.get(name).push(field);
-    });
-    return Array.from(groups.entries()).map(([name, fields]) => ({ name, fields }));
+    return state.groupedFields({ includeUnassigned: false });
   }
 
   function cropYear(dateText) {
@@ -54,7 +47,7 @@
     const groupSelect = U.$("gPanicleGroup");
     if (!selectedField) return { name: "", fields: [], skipped: [] };
     if (!mode || mode.value !== "group") return { name: selectedField.name, fields: [selectedField], skipped: [] };
-    const group = fieldGroups().find((item) => item.name === groupSelect.value);
+    const group = fieldGroups().find((item) => item.fieldGroupId === groupSelect.value);
     if (!group) return { name: "", fields: [], skipped: [] };
     const date = U.$("gDate").value || U.today();
     const skip = kind === "heading"
@@ -111,10 +104,10 @@
     const notice = U.$("gPanicleTargetNotice");
     if (!mode || !group || !label || !notice) return;
     const groups = fieldGroups();
-    U.setOptions(group, groups.map((item) => ({ value: item.name, label: `${item.name}グループ (${item.fields.length}圃場)` })), group.value || (groups[0] && groups[0].name) || "");
+    U.setOptions(group, groups.map((item) => ({ value: item.fieldGroupId, label: `${item.name}グループ (${item.fields.length}圃場)` })), group.value || (groups[0] && groups[0].fieldGroupId) || "");
     const isGroup = mode.value === "group";
     label.classList.toggle("hidden", !isGroup || !groups.length);
-    const selected = groups.find((item) => item.name === group.value);
+    const selected = groups.find((item) => item.fieldGroupId === group.value);
     if (!isGroup) {
       const field = state.field(U.$("gField").value);
       const quickHeading = document.querySelector('[data-action="save-heading-observed"]');

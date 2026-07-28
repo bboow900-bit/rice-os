@@ -86,19 +86,13 @@
   }
 
   function homeGroupName(field) {
-    const configured = String(field && (field.fieldGroupId || field.district) || "").trim();
-    if (configured) return configured;
-    return String(field && field.name || "").trim().split(/[\s　]+/)[0] || "未設定";
+    const group = state.groupForField ? state.groupForField(field) : null;
+    return group ? group.name : "未設定";
   }
 
   function homeGroups() {
-    const groups = new Map();
-    state.activeFields().forEach((field) => {
-      const name = homeGroupName(field);
-      groups.set(name, (groups.get(name) || 0) + 1);
-    });
-    return Array.from(groups.entries())
-      .map(([name, count]) => ({ name, count }))
+    return state.groupedFields({ includeUnassigned: true })
+      .map((group) => ({ fieldGroupId: group.fieldGroupId, name: group.unassigned ? "グループ未設定" : group.name, count: group.fields.length }))
       .sort((a, b) => a.name.localeCompare(b.name));
   }
 
@@ -804,9 +798,9 @@
     const candidates = candidatesForDate(U.today());
     const overdue = overdueSchedules();
     const rows = state.activeFields()
-      .filter((field) => homeGroupFilter === "all" || homeGroupName(field) === homeGroupFilter)
+      .filter((field) => homeGroupFilter === "all" || field.fieldGroupId === homeGroupFilter || (!field.fieldGroupId && homeGroupFilter === ""))
       .sort((a, b) => homeGroupName(a).localeCompare(homeGroupName(b)) || String(a.name).localeCompare(String(b.name)));
-    const groupOptions = [`<option value="all">すべてのグループ（${state.activeFields().length}圃場）</option>`, ...homeGroups().map((group) => `<option value="${U.attr(group.name)}" ${group.name === homeGroupFilter ? "selected" : ""}>${U.escapeHTML(group.name)}グループ（${group.count}圃場）</option>`)].join("");
+    const groupOptions = [`<option value="all">すべてのグループ（${state.activeFields().length}圃場）</option>`, ...homeGroups().map((group) => `<option value="${U.attr(group.fieldGroupId)}" ${group.fieldGroupId === homeGroupFilter ? "selected" : ""}>${U.escapeHTML(group.name)}（${group.count}圃場）</option>`)].join("");
     return `
       <section class="home-decision-hero">
         <div><p>今日・今週の判断</p><h2>田んぼの今を、先に見る</h2><small>${U.escapeHTML(U.fd(U.today()))} / ${U.escapeHTML(todayEntries.length ? `今日の記録 ${todayEntries.length}件` : "今日の記録はありません")}</small></div>

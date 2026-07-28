@@ -74,6 +74,41 @@
     return fields().filter((f) => !["休止", "終了"].includes(f.status));
   }
 
+  function fieldGroups() {
+    return (data().fieldGroups || []).slice()
+      .sort((a, b) => U.number(a.sortOrder, 0) - U.number(b.sortOrder, 0) || String(a.name || "").localeCompare(String(b.name || "")));
+  }
+
+  function fieldGroup(fieldGroupId) {
+    return fieldGroups().find((group) => group.fieldGroupId === fieldGroupId) || null;
+  }
+
+  function groupForField(fieldOrId) {
+    const item = typeof fieldOrId === "string" ? field(fieldOrId) : fieldOrId;
+    return item && item.fieldGroupId ? fieldGroup(item.fieldGroupId) : null;
+  }
+
+  function fieldsForGroup(fieldGroupId, options) {
+    const opts = options || {};
+    const rows = opts.includeInactive ? fields() : activeFields();
+    return rows.filter((item) => item.fieldGroupId === fieldGroupId);
+  }
+
+  function groupedFields(options) {
+    const opts = options || {};
+    const includeInactive = Boolean(opts.includeInactive);
+    const includeUnassigned = Boolean(opts.includeUnassigned);
+    const result = fieldGroups().map((group) => ({
+      ...group,
+      fields: fieldsForGroup(group.fieldGroupId, { includeInactive })
+    })).filter((group) => opts.includeEmpty || group.fields.length);
+    if (includeUnassigned) {
+      const rows = (includeInactive ? fields() : activeFields()).filter((item) => !item.fieldGroupId || !fieldGroup(item.fieldGroupId));
+      if (rows.length) result.push({ fieldGroupId: "", name: "未設定", aliases: [], sortOrder: Number.MAX_SAFE_INTEGER, fields: rows, unassigned: true });
+    }
+    return result;
+  }
+
   function variety(varietyId) {
     return varieties().find((v) => v.varietyId === varietyId);
   }
@@ -115,6 +150,7 @@
         fieldId: newId,
         name: cleanName,
         areaA: 0,
+        fieldGroupId: "",
         plantingDate: "",
         fixedMemo: "",
         memo: "",
@@ -128,8 +164,40 @@
   function updateField(fieldId, patch) {
     return mutate((d) => {
       const index = d.fields.findIndex((f) => f.fieldId === fieldId);
-      if (index >= 0) d.fields[index] = { ...d.fields[index], ...patch, updatedAt: U.now() };
+      if (index < 0) return;
+      const next = { ...d.fields[index], ...patch, updatedAt: U.now() };
+      const groupId = String(next.fieldGroupId || "");
+      if (groupId && !(d.fieldGroups || []).some((group) => group.fieldGroupId === groupId)) throw new Error("圃場グループが見つかりません。圃場マスターで選び直してください。");
+      d.fields[index] = next;
     }, "圃場マスターを保存しました");
+  }
+
+  function addFieldGroup(name) {
+    const cleanName = S.normalizeGroupLabel(name);
+    if (!cleanName) return "";
+    let newId = "";
+    const saved = mutate((d) => {
+      const existing = (d.fieldGroups || []).find((group) => S.normalizeGroupLabel(group.name) === cleanName || (group.aliases || []).some((alias) => S.normalizeGroupLabel(alias) === cleanName));
+      if (existing) {
+        newId = existing.fieldGroupId;
+        return;
+      }
+      newId = U.id("group", U.today());
+      d.fieldGroups = d.fieldGroups || [];
+      d.fieldGroups.push({ fieldGroupId: newId, name: cleanName, aliases: [], sortOrder: (d.fieldGroups.length + 1) * 10 });
+    }, "圃場グループを追加しました");
+    return saved ? newId : "";
+  }
+
+  function updateFieldGroup(fieldGroupId, patch) {
+    return mutate((d) => {
+      const index = (d.fieldGroups || []).findIndex((group) => group.fieldGroupId === fieldGroupId);
+      if (index < 0) return;
+      const name = patch && patch.name === undefined ? d.fieldGroups[index].name : S.normalizeGroupLabel(patch && patch.name);
+      if (!name) throw new Error("圃場グループ名を入力してください。");
+      if ((d.fieldGroups || []).some((group, groupIndex) => groupIndex !== index && S.normalizeGroupLabel(group.name) === name)) throw new Error("同じ圃場グループ名がすでにあります。");
+      d.fieldGroups[index] = { ...d.fieldGroups[index], ...patch, name, updatedAt: U.now() };
+    }, "圃場グループを更新しました");
   }
 
   function deleteField(fieldId) {
@@ -821,6 +889,8 @@
         date,
         season: U.season(date),
         fieldIds: record.fieldIds || [],
+        batchId: record.batchId || "",
+        batchFieldIds: record.batchFieldIds || record.fieldIds || [],
         scheduleType: record.scheduleType || "作業予定",
         title: record.title || record.scheduleType || "予定",
         status: record.status || "予定",
@@ -941,6 +1011,8 @@
         date,
         season: U.season(date),
         fieldId: record.fieldId || "",
+        batchId: record.batchId || previous && previous.batchId || "",
+        batchFieldIds: record.batchFieldIds || previous && previous.batchFieldIds || [],
         status: record.status || (record.actualEndDate ? "完了" : "実施中"),
         startDate: record.startDate || "",
         endDate: record.endDate || "",
@@ -1019,6 +1091,8 @@
         date,
         season: U.season(date),
         fieldId: record.fieldId || "",
+        batchId: record.batchId || previous && previous.batchId || "",
+        batchFieldIds: record.batchFieldIds || previous && previous.batchFieldIds || [],
         method: record.method || "間断灌水",
         periodStatus: record.periodStatus || (record.actualEndDate ? "完了" : "実施中"),
         startDate: record.startDate || "",
@@ -1346,12 +1420,19 @@
     varieties,
     fields,
     activeFields,
+    fieldGroups,
+    fieldGroup,
+    groupForField,
+    fieldsForGroup,
+    groupedFields,
     variety,
     field,
     addVariety,
     updateVariety,
     addField,
     updateField,
+    addFieldGroup,
+    updateFieldGroup,
     deleteField,
     plantingDateForField,
     workDateForField,

@@ -34,18 +34,12 @@
   }
 
   function groupName(field) {
-    return String(field && (field.fieldGroupId || field.district) || "").trim().replace(/グループ$/, "");
+    const group = state.groupForField ? state.groupForField(field) : null;
+    return group ? group.name : "";
   }
 
   function groups() {
-    const map = new Map();
-    state.activeFields().forEach((field) => {
-      const name = groupName(field);
-      if (!name) return;
-      if (!map.has(name)) map.set(name, []);
-      map.get(name).push(field);
-    });
-    return Array.from(map.entries()).map(([name, fields]) => ({ name, fields }));
+    return state.groupedFields({ includeUnassigned: false });
   }
 
   function targetFields() {
@@ -55,7 +49,7 @@
     }
     const selected = state.field(U.$("waterField").value);
     if (U.$("waterTargetMode").value !== "group") return selected ? [selected] : [];
-    const group = groups().find((item) => item.name === U.$("waterGroup").value);
+    const group = groups().find((item) => item.fieldGroupId === U.$("waterGroup").value);
     return group ? group.fields : [];
   }
 
@@ -64,7 +58,7 @@
       const fields = targetFields();
       return fields.length > 1 ? `${fields[0].name}ほか` : fields[0]?.name || "圃場";
     }
-    if (U.$("waterTargetMode").value === "group") return `${U.$("waterGroup").value || "圃場"}グループ`;
+    if (U.$("waterTargetMode").value === "group") return `${state.fieldGroup(U.$("waterGroup").value)?.name || "圃場"}グループ`;
     return state.field(U.$("waterField").value)?.name || "圃場";
   }
 
@@ -168,7 +162,7 @@
   function renderOptions() {
     U.setOptions(U.$("waterField"), state.activeFields().map((field) => ({ value: field.fieldId, label: field.name })), U.$("waterField").value || firstFieldId());
     const list = groups();
-    U.setOptions(U.$("waterGroup"), list.map((group) => ({ value: group.name, label: `${group.name}グループ (${group.fields.length}圃場)` })), U.$("waterGroup").value || list[0]?.name || "");
+    U.setOptions(U.$("waterGroup"), list.map((group) => ({ value: group.fieldGroupId, label: `${group.name}グループ (${group.fields.length}圃場)` })), U.$("waterGroup").value || list[0]?.fieldGroupId || "");
     const groupMode = U.$("waterTargetMode").value === "group";
     U.$("waterGroupLabel").classList.toggle("hidden", !groupMode);
     U.$("waterFieldLabel").classList.toggle("hidden", groupMode);
@@ -301,10 +295,12 @@
     const verb = mode === "start" ? "開始" : "終了";
     if (!confirm(`${targetLabel()}の${fields.length}圃場へ、${U.fd(date)}に${type.label}の${verb}を記録します。`)) return;
     if (mode === "start") {
+      const batchId = fields.length > 1 ? U.id("water-batch", date) : "";
+      const batchFieldIds = fields.map((field) => field.fieldId);
       if (type.source === "dry") {
-        state.saveDryPeriodsBatch(fields.map((field) => ({ fieldId: field.fieldId, date, startDate: date, targetDays: String(type.target(field) || ""), status: "実施中", memo: "" })), `${targetLabel()}の中干しを開始しました`);
+        state.saveDryPeriodsBatch(fields.map((field) => ({ fieldId: field.fieldId, batchId, batchFieldIds, date, startDate: date, targetDays: String(type.target(field) || ""), status: "実施中", memo: "" })), `${targetLabel()}の中干しを開始しました`);
       } else {
-        state.saveIrrigationsBatch(fields.map((field) => irrigationRecord(field, type.method, date, "", "")), `${targetLabel()}の${type.label}を開始しました`);
+        state.saveIrrigationsBatch(fields.map((field) => ({ ...irrigationRecord(field, type.method, date, "", ""), batchId, batchFieldIds })), `${targetLabel()}の${type.label}を開始しました`);
       }
     } else {
       const records = fields.map((field) => {
@@ -411,7 +407,7 @@
     if (matchingGroup) {
       bulkFieldIds = [];
       U.$("waterTargetMode").value = "group";
-      U.$("waterGroup").value = matchingGroup.name;
+      U.$("waterGroup").value = matchingGroup.fieldGroupId;
     } else {
       U.$("waterTargetMode").value = "field";
       if (bulkFieldIds[0]) U.$("waterField").value = bulkFieldIds[0];

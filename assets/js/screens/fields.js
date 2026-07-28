@@ -207,26 +207,18 @@
   }
 
   function groupName(field) {
-    const raw = String(field.fieldGroupId || field.district || "").trim();
-    if (raw) return raw;
-    const first = String(field.name || "").split(/[ 　]/)[0];
-    return first || "未設定";
+    const group = state.groupForField ? state.groupForField(field) : null;
+    return group ? group.name : "未設定";
   }
 
   function groupedFields() {
-    const map = new Map();
-    state.activeFields().forEach((field) => {
-      const name = groupName(field);
-      if (!map.has(name)) map.set(name, []);
-      map.get(name).push(field);
-    });
-    return Array.from(map.entries())
-      .map(([name, fields]) => ({ name, fields, area: fields.reduce((sum, field) => sum + U.number(field.areaA, 0), 0) }))
+    return (state.groupedFields ? state.groupedFields({ includeUnassigned: true }) : [])
+      .map((group) => ({ ...group, area: group.fields.reduce((sum, field) => sum + U.number(field.areaA, 0), 0) }))
       .sort((a, b) => b.fields.length - a.fields.length || a.name.localeCompare(b.name));
   }
 
-  function fieldsForGroup(name) {
-    const group = groupedFields().find((item) => item.name === name);
+  function fieldsForGroup(fieldGroupId) {
+    const group = groupedFields().find((item) => item.fieldGroupId === fieldGroupId);
     return group ? group.fields : [];
   }
 
@@ -277,9 +269,9 @@
   }
 
   function renderMasterSummary() {
-    const fields = state.fields();
+    const fields = state.activeFields();
     const area = fields.reduce((sum, field) => sum + U.number(field.areaA, 0), 0);
-    const groups = groupedFields().length;
+    const groups = state.fieldGroups ? state.fieldGroups().length : groupedFields().length;
     return `
       <section class="field-master-summary">
         <div><small>管理面積</small><b>${U.escapeHTML(String(Math.round(area * 10) / 10))}a</b></div>
@@ -318,28 +310,27 @@
   }
 
   function renderGroupCards() {
-    const groups = groupedFields().slice(0, 4);
+    const groups = groupedFields();
     return `
       <section class="field-master-section">
         <div class="field-master-section-head">
           <h3>圃場グループ</h3>
-          <span>一括登録の土台</span>
+          <div><span>一括登録の土台</span><button type="button" class="secondary" data-field-group-add>＋ グループ追加</button></div>
         </div>
         <div class="field-group-list">
           ${groups.map((group) => {
             const riceStage = riceStageNumberForGroup(group);
-            const isOpen = activeBulkGroup === group.name;
+            const isOpen = activeBulkGroup === group.fieldGroupId;
             return `
-            <article class="field-group-card ${isOpen ? "open" : ""}" data-field-group-card="${U.attr(group.name)}">
+            <article class="field-group-card ${isOpen ? "open" : ""}" data-field-group-card="${U.attr(group.fieldGroupId)}">
               <span class="field-group-rice stage-${U.attr(String(riceStage).padStart(2, "0"))}" aria-hidden="true">${groupRiceImage(riceStage)}</span>
               <div class="field-group-main">
-                <h4>${U.escapeHTML(group.name === "未設定" ? "未設定グループ" : `${group.name}グループ`)}</h4>
+                <h4>${U.escapeHTML(group.unassigned ? "グループ未設定" : `${group.name}グループ`)}</h4>
                 <p>${U.escapeHTML(String(group.fields.length))}圃場 / ${U.escapeHTML(String(Math.round(group.area * 10) / 10))}a</p>
                 <div>${group.fields.slice(0, 5).map((field) => `<span>${U.escapeHTML(field.name)}</span>`).join("")}</div>
               </div>
               <div class="field-group-card-actions">
-                <button type="button" data-field-group-action="bulk" data-field-group="${U.attr(group.name)}">一括登録</button>
-                <button type="button" data-field-group-action="edit" data-field-group="${U.attr(group.name)}">編集</button>
+                ${group.unassigned ? "" : `<button type="button" data-field-group-action="bulk" data-field-group="${U.attr(group.fieldGroupId)}">一括登録</button><button type="button" data-field-group-action="edit" data-field-group="${U.attr(group.fieldGroupId)}">編集</button>`}
               </div>
               ${isOpen ? `
                 <div class="field-group-field-panel">
@@ -867,10 +858,10 @@
 
   function renderFieldListView() {
     const groups = groupedFields();
-    const groupOptions = [`<option value="all">すべてのグループ</option>`, ...groups.map((group) => `<option value="${U.attr(group.name)}">${U.escapeHTML(group.name)} (${group.fields.length})</option>`)].join("");
+    const groupOptions = [`<option value="all">すべてのグループ</option>`, ...groups.map((group) => `<option value="${U.attr(group.fieldGroupId)}">${U.escapeHTML(group.unassigned ? "グループ未設定" : group.name)} (${group.fields.length})</option>`)].join("");
     const query = fieldSearch.trim().toLowerCase();
     const visible = state.activeFields()
-      .filter((field) => fieldGroupFilter === "all" || groupName(field) === fieldGroupFilter)
+      .filter((field) => fieldGroupFilter === "all" || field.fieldGroupId === fieldGroupFilter || (!field.fieldGroupId && fieldGroupFilter === ""))
       .filter((field) => !query || `${field.name} ${state.variety(field.varietyId) && state.variety(field.varietyId).name || ""} ${field.district || ""}`.toLowerCase().includes(query))
       .slice()
       .sort((a, b) => U.number(a.sortOrder, 0) - U.number(b.sortOrder, 0) || String(a.name).localeCompare(String(b.name)));
@@ -878,7 +869,7 @@
         <section class="field-hub-list">
         <div class="field-hub-intro"><div><span>圃場一覧</span><h3>田んぼを管理する</h3><small>圃場名・品種・面積・グループなど固定情報を整えます。</small></div><button class="primary" type="button" data-action="add-field">＋ 圃場追加</button></div>
         <div class="field-hub-filters"><input type="search" data-field-search placeholder="圃場名・品種・地区で検索" value="${U.attr(fieldSearch)}"><select data-field-group-filter>${groupOptions}</select></div>
-        <div class="field-hub-groups">${groups.map((group) => `<div><button type="button" data-field-group-open="${U.attr(group.name)}"><span>${U.escapeHTML(group.name)}</span><small>${group.fields.length}圃場 / ${Math.round(group.area * 10) / 10}a</small></button><button type="button" data-field-group-bulk="${U.attr(group.name)}">一括作業入力</button></div>`).join("")}</div>
+        <div class="field-hub-groups">${groups.map((group) => `<div><button type="button" data-field-group-open="${U.attr(group.fieldGroupId)}"><span>${U.escapeHTML(group.unassigned ? "グループ未設定" : group.name)}</span><small>${group.fields.length}圃場 / ${Math.round(group.area * 10) / 10}a</small></button>${group.unassigned ? "" : `<button type="button" data-field-group-bulk="${U.attr(group.fieldGroupId)}">一括作業入力</button>`}</div>`).join("")}</div>
         <div class="field-hub-cards">${visible.length ? visible.map(renderFieldListCard).join("") : '<div class="empty">条件に合う圃場はありません。</div>'}</div>
       </section>
     `;
@@ -921,7 +912,7 @@
         <details class="form-section" open><summary>基本情報</summary><div class="form-grid dense inline-grid">${input(field, "name", "圃場名")}${input(field, "district", "地区")}<label>品種<select data-field-id="${U.attr(field.fieldId)}" data-field-field="varietyId">${varietyOptions(field.varietyId)}</select></label>${input(field, "areaA", "面積(a)", "number")}<label>状態<select data-field-id="${U.attr(field.fieldId)}" data-field-field="status">${statusOptions(field.status)}</select></label>${input(field, "sortOrder", "表示順", "number")}</div></details>
         <details class="form-section"><summary>栽培条件・圃場カルテ</summary><div class="form-grid dense inline-grid"><label>土質<select data-field-id="${U.attr(field.fieldId)}" data-field-field="soilType">${optionTags(SOIL_TYPES, field.soilType)}</select></label><label>水持ち<select data-field-id="${U.attr(field.fieldId)}" data-field-field="waterHolding">${optionTags(WATER_LEVELS, field.waterHolding)}</select></label>${arrayInput(field, "fieldFeatures", "圃場特徴", FEATURES)}${input(field, "targetCrackCm", "目標ひび割れ幅(cm)")}${input(field, "targetSinkCm", "目標沈み込み(cm)")}</div></details>
         <details class="form-section"><summary>苗箱・田植機の設定</summary><div class="form-grid dense inline-grid">${input(field, "seedlingBoxes", "実使用苗箱数", "number")}<label>栽培レシピ（品種）<select data-field-id="${U.attr(field.fieldId)}" data-field-field="varietyId">${varietyOptions(field.varietyId)}</select></label></div><p class="hint-text">株間・坪あたり株数・基肥などの共通設定は、選択した栽培レシピを参照します。</p></details>
-        <details class="form-section"><summary>グループ・水管理目標・メモ</summary><div class="form-grid dense inline-grid">${input(field, "fieldGroupId", "圃場グループ")}${input(field, "drainageTargetDays", "中干し目安日数", "number")}${input(field, "intermittentIntervalDays", "間断灌水目安日数", "number")}</div><label>固定メモ<textarea data-field-id="${U.attr(field.fieldId)}" data-field-field="fixedMemo">${U.escapeHTML(field.fixedMemo || "")}</textarea></label></details>
+        <details class="form-section"><summary>グループ・水管理目標・メモ</summary><div class="form-grid dense inline-grid"><label>圃場グループ<select data-field-id="${U.attr(field.fieldId)}" data-field-field="fieldGroupId"><option value="">未設定</option>${state.fieldGroups().map((group) => `<option value="${U.attr(group.fieldGroupId)}" ${field.fieldGroupId === group.fieldGroupId ? "selected" : ""}>${U.escapeHTML(group.name)}</option>`).join("")}</select></label>${input(field, "drainageTargetDays", "中干し目安日数", "number")}${input(field, "intermittentIntervalDays", "間断灌水目安日数", "number")}</div><label>固定メモ<textarea data-field-id="${U.attr(field.fieldId)}" data-field-field="fixedMemo">${U.escapeHTML(field.fixedMemo || "")}</textarea></label></details>
         <div class="record-actions single-action"><button class="secondary danger" type="button" data-field-action="delete" data-field-id="${U.attr(field.fieldId)}">圃場を削除</button></div>
       </section>
     `;
@@ -945,8 +936,9 @@
   }
 
   function addFieldToGroup(group) {
-    const groupNameValue = group === "未設定" ? "" : group;
-    const defaultName = groupNameValue ? `${groupNameValue} 新規` : "新しい圃場";
+    const groupNameValue = group || "";
+    const groupMaster = groupNameValue ? state.fieldGroup(groupNameValue) : null;
+    const defaultName = groupMaster ? `${groupMaster.name} 新規` : "新しい圃場";
     const name = prompt("追加する圃場名を入力してください", defaultName);
     if (name === null) return;
     const cleanName = name.trim() || defaultName;
@@ -1023,6 +1015,16 @@
         render();
         return;
       }
+      const addGroup = event.target.closest("[data-field-group-add]");
+      if (addGroup) {
+        const name = prompt("圃場グループ名を入力してください", "");
+        if (name === null) return;
+        const groupId = state.addFieldGroup(name);
+        if (!groupId) return;
+        activeBulkGroup = groupId;
+        render();
+        return;
+      }
       const groupBulk = event.target.closest("[data-field-group-bulk]");
       if (groupBulk && RiceOS.app && RiceOS.screens.fieldWork) {
         const ids = fieldsForGroup(groupBulk.dataset.fieldGroupBulk || "").map((field) => field.fieldId);
@@ -1048,18 +1050,14 @@
           return;
         }
         if (groupButton.dataset.fieldGroupAction === "edit") {
-          const fields = fieldsForGroup(group);
-          const nextName = prompt("グループ名を入力してください", group === "未設定" ? "" : group);
+          const master = state.fieldGroup(group);
+          if (!master) return;
+          const nextName = prompt("グループ名を入力してください", master.name);
           if (nextName === null) return;
           const cleanName = nextName.trim();
-          const saved = state.mutate((d) => {
-            const ids = new Set(fields.map((field) => field.fieldId));
-            d.fields.forEach((field) => {
-              if (ids.has(field.fieldId)) field.fieldGroupId = cleanName;
-            });
-          }, "圃場グループを更新しました");
+          const saved = state.updateFieldGroup(group, { name: cleanName });
           if (!saved) return;
-          activeBulkGroup = cleanName;
+          activeBulkGroup = group;
           render();
           return;
         }
@@ -1156,7 +1154,8 @@
   function openGroup(groupName) {
     fieldView = "list";
     fieldSearch = "";
-    fieldGroupFilter = groupName || "all";
+    const master = state.fieldGroup(groupName) || state.fieldGroups().find((group) => group.name === groupName);
+    fieldGroupFilter = master ? master.fieldGroupId : "all";
     render();
     window.scrollTo({ top: 0, behavior: "smooth" });
   }

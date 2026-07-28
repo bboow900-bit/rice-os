@@ -115,6 +115,7 @@
 
   const COLLECTION_IDS = {
     varieties: "varietyId",
+    fieldGroups: "fieldGroupId",
     fields: "fieldId",
     fieldWorks: "workId",
     growthLogs: "logId",

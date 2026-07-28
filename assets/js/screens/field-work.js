@@ -37,20 +37,12 @@
   }
 
   function fieldGroupName(field) {
-    const raw = String(field && (field.fieldGroupId || field.district) || "").trim();
-    if (raw) return raw.replace(/グループ$/, "");
-    const first = String(field && field.name || "").split(/[ 　]/)[0];
-    return first || "未設定";
+    const group = state.groupForField ? state.groupForField(field) : null;
+    return group ? group.name : "";
   }
 
   function fieldGroups() {
-    const map = new Map();
-    state.activeFields().forEach((field) => {
-      const name = fieldGroupName(field);
-      if (!map.has(name)) map.set(name, []);
-      map.get(name).push(field);
-    });
-    return Array.from(map.entries()).map(([name, fields]) => ({ name, fields }));
+    return state.groupedFields({ includeUnassigned: false });
   }
 
   function updateFieldSelectionSummary() {
@@ -225,8 +217,8 @@
     if (U.$("fwGroupPicks")) {
       const current = new Set(selected);
       U.$("fwGroupPicks").innerHTML = fieldGroups().map((group) => `
-        <button class="field-group-pick ${group.fields.every((field) => current.has(field.fieldId)) ? "active" : ""}" type="button" data-fw-group="${U.attr(group.name)}">
-          ${U.escapeHTML(group.name === "未設定" ? "未設定" : `${group.name}グループ`)}
+        <button class="field-group-pick ${group.fields.every((field) => current.has(field.fieldId)) ? "active" : ""}" type="button" data-fw-group="${U.attr(group.fieldGroupId)}">
+          ${U.escapeHTML(`${group.name}グループ`)}
           <span>${U.escapeHTML(String(group.fields.length))}圃場 / ${U.escapeHTML(String(Math.round(group.fields.reduce((sum, field) => sum + U.number(field.areaA, 0), 0) * 10) / 10))}a</span>
         </button>
       `).join("");
@@ -344,7 +336,7 @@
     const groups = fieldGroups();
     const options = [
       { value: "all", label: "全圃場" },
-      ...groups.map((group) => ({ value: `group:${group.name}`, label: `${group.name}グループ` })),
+      ...groups.map((group) => ({ value: `group:${group.fieldGroupId}`, label: `${group.name}グループ` })),
       ...state.activeFields().map((field) => ({ value: `field:${field.fieldId}`, label: field.name }))
     ];
     if (!options.some((option) => option.value === recentScope)) recentScope = "all";
@@ -386,7 +378,7 @@
     }
     if (recentScope.startsWith("group:")) {
       const group = recentScope.slice("group:".length);
-      rows = rows.filter((work) => (work.fieldIds || []).some((id) => fieldGroupName(state.field(id)) === group));
+      rows = rows.filter((work) => (work.fieldIds || []).some((id) => state.field(id) && state.field(id).fieldGroupId === group));
     }
     rows = rows.sort((a, b) => String(b.date).localeCompare(String(a.date))).slice(0, 40);
     U.$("fieldWorkCount").textContent = `${rows.length}件`;
@@ -573,9 +565,7 @@
       if (groupButton) {
         const group = groupButton.dataset.fwGroup || "";
         const current = new Set(selectedFieldIds());
-        const ids = state.activeFields()
-          .filter((field) => fieldGroupName(field) === group)
-          .map((field) => field.fieldId);
+        const ids = state.fieldsForGroup(group).map((field) => field.fieldId);
         const allSelected = ids.length && ids.every((id) => current.has(id));
         ids.forEach((id) => {
           if (allSelected) current.delete(id);

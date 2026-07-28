@@ -57,10 +57,11 @@
     const toneClass = entry.tone || "";
     const canCompleteSchedule = entry.kind === "schedule" && id && !scheduleDone(entry.record);
     const fieldId = entry.record && (entry.record.fieldId || (entry.record.fieldIds || [])[0]) || "";
-    const fieldIds = entry.record && (entry.record.fieldIds || (fieldId ? [fieldId] : [])) || [];
+    const fieldIds = entry.record && (entry.record.batchFieldIds || entry.record.fieldIds || (fieldId ? [fieldId] : [])) || [];
     const targetFields = fieldIds.map((id) => RiceOS.state.field(id)).filter(Boolean);
-    const groupNames = [...new Set(targetFields.map((field) => String(field.fieldGroupId || field.district || "").trim()).filter(Boolean))];
-    const groupName = fieldIds.length > 1 && groupNames.length === 1 ? groupNames[0] : "";
+    const groupIds = [...new Set(targetFields.map((field) => RiceOS.state.groupForField(field)?.fieldGroupId || "").filter(Boolean))];
+    const groupId = fieldIds.length > 1 && groupIds.length === 1 ? groupIds[0] : "";
+    const groupName = groupId ? RiceOS.state.fieldGroup(groupId)?.name || "" : "";
     return `
       <div class="mini-card ${U.attr(entry.kind)} ${U.attr(toneClass)}">
         <b>${U.escapeHTML(entry.title)}</b>
@@ -70,7 +71,7 @@
         ${entry.hasPhoto ? '<span class="pill info">写真あり</span>' : ""}
         ${id ? `
           <div class="record-actions mini-actions">
-            ${groupName ? `<button class="secondary" type="button" data-calendar-open-group="${U.attr(groupName)}">${U.escapeHTML(groupName)}グループを見る</button>` : ""}
+            ${groupName ? `<button class="secondary" type="button" data-calendar-open-group="${U.attr(groupId)}">${U.escapeHTML(groupName)}グループを見る</button>` : ""}
             ${!groupName && fieldIds.length === 1 ? `<button class="secondary" type="button" data-calendar-open-field="${U.attr(fieldId)}">圃場を見る</button>` : ""}
             ${!groupName && fieldIds.length > 1 ? '<button class="secondary" type="button" data-calendar-open-group="">対象圃場を見る</button>' : ""}
             ${canCompleteSchedule ? `<button class="primary" type="button" data-calendar-action="complete" data-kind="${U.attr(entry.kind)}" data-id="${U.attr(id)}">実施を記録</button>` : ""}

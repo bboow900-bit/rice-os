@@ -108,18 +108,15 @@
   }
 
   function fieldGroupName(field) {
-    return String(field && (field.fieldGroupId || field.district) || "").trim();
+    const group = state.groupForField ? state.groupForField(field) : null;
+    return group ? group.name : "";
   }
 
   function scheduleGroups() {
-    const map = new Map();
-    state.activeFields().forEach((field) => {
-      const name = fieldGroupName(field);
-      if (!name) return;
-      if (!map.has(name)) map.set(name, []);
-      map.get(name).push(field.fieldId);
-    });
-    return Array.from(map.entries()).map(([name, fieldIds]) => ({ name, fieldIds }));
+    return state.groupedFields({ includeUnassigned: false }).map((group) => ({
+      ...group,
+      fieldIds: group.fields.map((field) => field.fieldId)
+    }));
   }
 
   function renderScheduleTargets(record) {
@@ -128,7 +125,7 @@
     const groupLabel = U.$("sheetScheduleGroupLabel");
     if (!mode || !group || !groupLabel) return;
     const groups = scheduleGroups();
-    U.setOptions(group, groups.map((item) => ({ value: item.name, label: `${item.name} (${item.fieldIds.length}圃場)` })), group.value || (groups[0] && groups[0].name) || "");
+    U.setOptions(group, groups.map((item) => ({ value: item.fieldGroupId, label: `${item.name} (${item.fieldIds.length}圃場)` })), group.value || (groups[0] && groups[0].fieldGroupId) || "");
     mode.value = record ? "field" : (mode.value || "field");
     groupLabel.classList.toggle("hidden", mode.value !== "group" || !groups.length);
     mode.disabled = Boolean(record);
@@ -224,7 +221,7 @@
       : null;
     const mode = U.$("sheetScheduleTargetMode") ? U.$("sheetScheduleTargetMode").value : "field";
     const groups = scheduleGroups();
-    const group = groups.find((item) => item.name === (U.$("sheetScheduleGroup") && U.$("sheetScheduleGroup").value));
+    const group = groups.find((item) => item.fieldGroupId === (U.$("sheetScheduleGroup") && U.$("sheetScheduleGroup").value));
     const targets = existing
       ? [existing.fieldIds || []]
       : mode === "all"
@@ -232,12 +229,16 @@
         : mode === "group" && group
           ? group.fieldIds.map((fieldId) => [fieldId])
           : [activeFieldId() ? [activeFieldId()] : []];
+    const batchId = !existing && targets.length > 1 ? U.id("schedule-batch", selectedDate) : "";
+    const batchFieldIds = !existing && targets.length > 1 ? targets.flat() : [];
     savingSchedule = true;
     const saved = targets.every((fieldIds) => state.saveSchedule({
       ...(existing || {}),
       scheduleId: existing ? editingScheduleId : undefined,
       date: selectedDate,
       fieldIds,
+      batchId,
+      batchFieldIds,
       scheduleType: title,
       title,
       memo,

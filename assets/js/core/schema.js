@@ -4,8 +4,8 @@
   const RiceOS = window.RiceOS = window.RiceOS || {};
   const U = RiceOS.utils;
 
-  const SCHEMA_VERSION = 14;
-  const APP_VERSION = "20260728_ver166";
+  const SCHEMA_VERSION = 15;
+  const APP_VERSION = "20260728_ver169";
   const STORE_KEY = "rice_os_v8_stable";
   const BACKUP_KEY = "rice_os_v8_stable_backup";
   const LEGACY_STORES = [
@@ -86,6 +86,13 @@
     sortOrder: 0
   };
 
+  const DEFAULT_FIELD_GROUPS = [
+    { fieldGroupId: "group_kaipa", name: "開パ", aliases: ["開パグループ"], sortOrder: 10 },
+    { fieldGroupId: "group_nashibatake", name: "梨畑", aliases: ["梨畑グループ"], sortOrder: 20 },
+    { fieldGroupId: "group_wakudaira", name: "和久平", aliases: ["和久平グループ"], sortOrder: 30 },
+    { fieldGroupId: "group_kameishi", name: "亀石", aliases: ["亀石グループ"], sortOrder: 40 }
+  ];
+
   const DEFAULT_VARIETIES = [
     {
       varietyId: "variety_tennotsubu",
@@ -116,6 +123,7 @@
     {
       fieldId: "field_kai_pa_ue",
       name: "開パ 上",
+      fieldGroupId: "group_kaipa",
       varietyId: "variety_tennotsubu",
       areaA: 20,
       sortOrder: 10
@@ -123,6 +131,7 @@
     {
       fieldId: "field_kai_pa_shita",
       name: "開パ 下",
+      fieldGroupId: "group_kaipa",
       varietyId: "variety_tennotsubu",
       areaA: 20,
       sortOrder: 20
@@ -130,6 +139,7 @@
     {
       fieldId: "field_nashibatake",
       name: "梨畑",
+      fieldGroupId: "group_nashibatake",
       varietyId: "variety_koshihikari",
       areaA: 32,
       sortOrder: 30
@@ -137,6 +147,7 @@
     {
       fieldId: "field_wakudaira",
       name: "和久平",
+      fieldGroupId: "group_wakudaira",
       varietyId: "variety_tennotsubu",
       areaA: 0,
       sortOrder: 40
@@ -144,6 +155,7 @@
     {
       fieldId: "field_kameishi_hidariue",
       name: "亀石 左上",
+      fieldGroupId: "group_kameishi",
       varietyId: "variety_tennotsubu",
       areaA: 0,
       sortOrder: 50
@@ -151,6 +163,7 @@
     {
       fieldId: "field_kameishi_hidarishita",
       name: "亀石 左下",
+      fieldGroupId: "group_kameishi",
       varietyId: "variety_tennotsubu",
       areaA: 0,
       sortOrder: 60
@@ -158,6 +171,7 @@
     {
       fieldId: "field_kameishi_migishita",
       name: "亀石 右下",
+      fieldGroupId: "group_kameishi",
       varietyId: "variety_tennotsubu",
       areaA: 0,
       sortOrder: 70
@@ -245,6 +259,40 @@
     v.varietyId = canonicalId("variety", v.varietyId || v.id, v.name || `品種${index + 1}`);
     v.name = String(v.name || `品種${index + 1}`);
     return v;
+  }
+
+  function normalizeGroupLabel(value) {
+    return String(value || "").trim().replace(/\s+/g, " ").replace(/グループ$/, "").trim();
+  }
+
+  function groupIdForLabel(label) {
+    const normalized = normalizeGroupLabel(label);
+    if (!normalized) return "";
+    return `group_${Array.from(normalized).map((char) => char.codePointAt(0).toString(36)).join("_")}`;
+  }
+
+  function normalizeFieldGroup(input, index) {
+    const group = input || {};
+    const name = normalizeGroupLabel(group.name || group.label || group.fieldGroupId || group.id);
+    const aliases = Array.from(new Set(ensureArray(group.aliases)
+      .map(normalizeGroupLabel)
+      .filter(Boolean)
+      .filter((alias) => alias !== name)));
+    return {
+      fieldGroupId: String(group.fieldGroupId || group.groupId || group.id || groupIdForLabel(name)),
+      name,
+      aliases,
+      sortOrder: U.number(group.sortOrder, (index + 1) * 10)
+    };
+  }
+
+  function defaultGroupIdForFieldName(name) {
+    const normalized = String(name || "").replace(/[\s　()（）]/g, "");
+    if (/^開パ[上下]$/.test(normalized)) return "group_kaipa";
+    if (/^梨畑$/.test(normalized)) return "group_nashibatake";
+    if (/^和久平$/.test(normalized)) return "group_wakudaira";
+    if (/^亀石(左上|左下|右上|右下|中央)?$/.test(normalized)) return "group_kameishi";
+    return "";
   }
 
   function normalizeField(input, index, fallbackVarietyId) {
@@ -462,6 +510,8 @@
       date,
       season: U.number(s.season, U.season(date)),
       fieldIds: ensureArray(s.fieldIds).map(String),
+      batchId: String(s.batchId || ""),
+      batchFieldIds: ensureArray(s.batchFieldIds || s.fieldIds).map(String),
       orphanedFieldIds: ensureArray(s.orphanedFieldIds).map(String),
       scheduleType: String(s.scheduleType || s.kind || "作業予定"),
       title: String(s.title || s.workName || s.scheduleType || "予定"),
@@ -487,6 +537,8 @@
       date,
       season: U.number(d.season, U.season(date)),
       fieldId: String(d.fieldId || ""),
+      batchId: String(d.batchId || ""),
+      batchFieldIds: ensureArray(d.batchFieldIds).map(String),
       orphanedFieldId: String(d.orphanedFieldId || ""),
       status: String(d.status || (d.actualEndDate ? "完了" : "実施中")),
       startDate: String(d.startDate || d.drainageStartDate || ""),
@@ -523,6 +575,8 @@
       date,
       season: U.number(i.season, U.season(date)),
       fieldId: String(i.fieldId || ""),
+      batchId: String(i.batchId || ""),
+      batchFieldIds: ensureArray(i.batchFieldIds).map(String),
       orphanedFieldId: String(i.orphanedFieldId || ""),
       method: String(i.method || i.irrigationType || "間断灌水"),
       periodStatus: String(i.periodStatus || (i.actualEndDate ? "完了" : "実施中")),
@@ -636,6 +690,50 @@
     });
     fields = dedupeBy(fields, "fieldId").sort((a, b) => U.number(a.sortOrder, 0) - U.number(b.sortOrder, 0));
 
+    // Field groups are master data. Older saves held a free-form label directly
+    // on each field, so consolidate those labels once while preserving field IDs.
+    const groupSources = [
+      ...ensureArray(source.fieldGroups).map(normalizeFieldGroup),
+      ...DEFAULT_FIELD_GROUPS.map(normalizeFieldGroup)
+    ].filter((group) => group.fieldGroupId && group.name);
+    // A user-created master wins over the built-in master when names match.
+    // This keeps old group IDs stable while treating "亀石" and "亀石グループ" as one group.
+    const seenGroupLabels = new Set();
+    let fieldGroups = groupSources.filter((group) => {
+      const label = normalizeGroupLabel(group.name);
+      if (seenGroupLabels.has(label)) return false;
+      seenGroupLabels.add(label);
+      return true;
+    });
+    const groupById = new Map(fieldGroups.map((group) => [group.fieldGroupId, group]));
+    const groupByLabel = new Map();
+    fieldGroups.forEach((group) => {
+      [group.name, ...(group.aliases || [])].forEach((label) => groupByLabel.set(normalizeGroupLabel(label), group));
+    });
+    fields.forEach((field) => {
+      let legacyValue = String(field.fieldGroupId || "");
+      if (!legacyValue) {
+        // Only known legacy default field names are inferred. Other blank values
+        // remain unassigned rather than being guessed from a district or memo.
+        legacyValue = defaultGroupIdForFieldName(field.name);
+        if (!legacyValue) return;
+        field.fieldGroupId = legacyValue;
+      }
+      const normalizedLabel = normalizeGroupLabel(legacyValue);
+      let group = groupById.get(legacyValue) || groupByLabel.get(normalizedLabel);
+      if (!group) {
+        group = normalizeFieldGroup({ name: normalizedLabel, aliases: normalizedLabel !== legacyValue ? [legacyValue] : [], sortOrder: (fieldGroups.length + 1) * 10 }, fieldGroups.length);
+        fieldGroups.push(group);
+        groupById.set(group.fieldGroupId, group);
+        [group.name, ...(group.aliases || [])].forEach((label) => groupByLabel.set(normalizeGroupLabel(label), group));
+      }
+      field.fieldGroupId = group.fieldGroupId;
+    });
+    fieldGroups = fieldGroups
+      .map((group, index) => normalizeFieldGroup(group, index))
+      .filter((group) => group.fieldGroupId && group.name)
+      .sort((a, b) => U.number(a.sortOrder, 0) - U.number(b.sortOrder, 0) || a.name.localeCompare(b.name));
+
     const fieldIds = new Set(fields.map((f) => f.fieldId));
     fields.forEach((f) => {
       if (!varieties.some((v) => v.varietyId === f.varietyId)) f.varietyId = fallbackVarietyId || "";
@@ -667,17 +765,20 @@
     const schedules = dedupeBy(ensureArray(source.schedules).map(normalizeSchedule), "scheduleId").map((s) => ({
       ...s,
       orphanedFieldIds: Array.from(new Set([...(s.orphanedFieldIds || []), ...ensureArray(s.fieldIds).filter((id) => !fieldIds.has(id))])),
-      fieldIds: ensureArray(s.fieldIds).filter((id) => fieldIds.has(id))
+      fieldIds: ensureArray(s.fieldIds).filter((id) => fieldIds.has(id)),
+      batchFieldIds: ensureArray(s.batchFieldIds || s.fieldIds).filter((id) => fieldIds.has(id))
     }));
     const dryPeriods = dedupeBy(ensureArray(source.dryPeriods).map(normalizeDryPeriod), "dryPeriodId").map((d) => ({
       ...d,
       orphanedFieldId: d.orphanedFieldId || orphan(d.fieldId),
-      fieldId: fieldIds.has(d.fieldId) ? d.fieldId : ""
+      fieldId: fieldIds.has(d.fieldId) ? d.fieldId : "",
+      batchFieldIds: ensureArray(d.batchFieldIds).filter((id) => fieldIds.has(id))
     }));
     const irrigations = dedupeBy(ensureArray(source.irrigations).map(normalizeIrrigation), "irrigationId").map((i) => ({
       ...i,
       orphanedFieldId: i.orphanedFieldId || orphan(i.fieldId),
-      fieldId: fieldIds.has(i.fieldId) ? i.fieldId : ""
+      fieldId: fieldIds.has(i.fieldId) ? i.fieldId : "",
+      batchFieldIds: ensureArray(i.batchFieldIds).filter((id) => fieldIds.has(id))
     }));
     const shipments = dedupeBy(ensureArray(source.shipments).map(normalizeShipment), "shipmentId");
     const confirmationCandidates = dedupeBy(ensureArray(source.confirmationCandidates).map(normalizeConfirmationCandidate), "candidateId")
@@ -688,6 +789,7 @@
       schemaVersion: SCHEMA_VERSION,
       appVersion: String(source.appVersion || source.meta && source.meta.appVersion || APP_VERSION),
       varieties,
+      fieldGroups,
       fields,
       fieldWorks,
       growthLogs,
@@ -723,6 +825,7 @@
   function emptyData() {
     return normalize({
       varieties: U.clone(DEFAULT_VARIETIES),
+      fieldGroups: U.clone(DEFAULT_FIELD_GROUPS),
       fields: U.clone(DEFAULT_FIELDS),
       fieldWorks: [],
       growthLogs: [],
@@ -756,6 +859,7 @@
     BACKUP_KEY,
     LEGACY_STORES,
     DEFAULT_VARIETIES,
+    DEFAULT_FIELD_GROUPS,
     DEFAULT_FIELDS,
     FIELD_WORK_NAMES,
     OTHER_WORK_NAMES,
@@ -773,6 +877,7 @@
     leafColorLabel,
     leafColorScoreFromText,
     normalize,
+    normalizeGroupLabel,
     normalizeSeasonNote,
     emptyData,
     phase

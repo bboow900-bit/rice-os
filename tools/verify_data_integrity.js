@@ -74,6 +74,23 @@ const legacyNotesData = S.normalize({
     seasonNotes: [{ id: "legacy_note_2025", date: "2025-09-20", memo: "legacy carryover" }]
   }]
 });
+
+const groupMigration = S.normalize({
+  varieties: oldData.varieties,
+  fields: [
+    { fieldId: "group_field_a", name: "亀石 左上", varietyId: "variety_test", fieldGroupId: "亀石" },
+    { fieldId: "group_field_b", name: "亀石 左下", varietyId: "variety_test", fieldGroupId: "亀石グループ" },
+    { fieldId: "group_field_c", name: "試験田", varietyId: "variety_test", fieldGroupId: "" }
+  ],
+  fieldWorks: [{ workId: "group_batch_work", date: "2026-06-01", fieldIds: ["group_field_a", "group_field_b"], batchFieldIds: ["group_field_a", "group_field_b"], batchId: "group_batch" }]
+});
+const kameishiGroup = groupMigration.fieldGroups.find((group) => group.name === "亀石");
+assert(kameishiGroup, "亀石グループのマスター移行に失敗した");
+assert(groupMigration.fields.filter((field) => ["group_field_a", "group_field_b"].includes(field.fieldId)).every((field) => field.fieldGroupId === kameishiGroup.fieldGroupId), "亀石と亀石グループを同じマスターへ統合できない");
+assert(groupMigration.fields.find((field) => field.fieldId === "group_field_c").fieldGroupId === "", "未設定圃場を勝手にグループへ所属させた");
+assert(JSON.stringify(groupMigration.fieldWorks[0].fieldIds) === JSON.stringify(["group_field_a", "group_field_b"]), "グループ移行で作業対象圃場が変わった");
+assert(groupMigration.fieldWorks[0].batchId === "group_batch", "グループ移行で一括作業のbatchIdが変わった");
+assert(JSON.stringify(S.normalize(groupMigration).fieldGroups) === JSON.stringify(groupMigration.fieldGroups), "圃場グループ移行が冪等ではない");
 const legacySeasonNote = legacyNotesData.fields.find((field) => field.fieldId === "field_legacy_notes").seasonNotes[0];
 assert(legacySeasonNote.noteId === "legacy_note_2025", "legacy season note id was not preserved");
 assert(legacySeasonNote.fieldId === "field_legacy_notes" && legacySeasonNote.season === 2025, "legacy season note was not normalized by field and year");
