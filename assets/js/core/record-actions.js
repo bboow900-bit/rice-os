@@ -45,14 +45,9 @@
       RiceOS.screens.growth.editLog(record.logId);
       return true;
     }
-    if (kind === "dry" && RiceOS.screens.dryPeriod) {
-      RiceOS.app.show("dry-period");
-      RiceOS.screens.dryPeriod.editDry(record.dryPeriodId);
-      return true;
-    }
-    if (kind === "irrigation" && RiceOS.screens.irrigation) {
-      RiceOS.app.show("irrigation");
-      RiceOS.screens.irrigation.editIrrigation(record.irrigationId);
+    if ((kind === "dry" || kind === "irrigation") && RiceOS.screens.annual) {
+      RiceOS.app.show("annual", { skipHistory: true });
+      RiceOS.screens.annual.openWaterEditor(kind, kind === "dry" ? record.dryPeriodId : record.irrigationId);
       return true;
     }
     if (kind === "schedule") {

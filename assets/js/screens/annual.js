@@ -10,6 +10,7 @@
   let annualSearchValue = "";
   let annualSortValue = "updated";
   let seasonNoteDraft = null;
+  let waterEditDraft = null;
 
   const KIND_META = {
     fieldWork: { label: "作業", className: "work", icon: "作" },
@@ -992,6 +993,9 @@
         targetDays: period.targetDays || "",
         status: period.status || "",
         memo: period.raw && period.raw.memo || "",
+        sourceType: period.source || "",
+        editKind: period.source === "direct" ? (period.kind === "dry" ? "dry" : "irrigation") : "fieldWork",
+        editId: period.source === "direct" ? period.directId : (period.sourceWorkIds || [])[0] || "",
         source: period.source === "legacy-work" ? "作業記録から反映" : (period.source === "mixed" ? "作業・水管理記録を統合" : "水管理記録")
       }))
       .map((period) => ({
@@ -1012,6 +1016,7 @@
     const progress = plannedDays ? Math.max(0, Math.min(100, Math.round((Number(progressDays || 0) / Number(plannedDays)) * 100))) : 0;
     const subtitle = completed ? "完了" : (period.startDate ? "継続中" : "開始日を記録してください");
     const heading = `${period.label}${period.sequence > 1 ? ` ${period.sequence}回目` : ""}`;
+    const actionLabel = period.sourceType === "legacy-work" ? "作業記録を編集" : "編集";
     return `
       <article class="annual-water-period annual-water-period-${U.attr(period.tone)}">
         <div class="annual-water-period-head">
@@ -1026,14 +1031,39 @@
         </div>
         ${plannedDays ? `<div class="annual-water-period-progress"><i><em style="width:${progress}%"></em></i><span>予定 ${plannedDays}日${progressDays !== "" ? ` / ${completed ? "実績" : "経過"} ${progressDays}日` : ""}</span></div>` : ""}
         ${period.memo ? `<p class="annual-water-period-memo">${U.escapeHTML(period.memo)}</p>` : ""}
+        ${period.editId ? `<div class="annual-water-period-actions"><button type="button" class="secondary" data-annual-water-edit="${U.attr(period.editKind)}" data-id="${U.attr(period.editId)}">${actionLabel}</button></div>` : ""}
       </article>
+    `;
+  }
+
+  function waterRecord(kind, id) {
+    if (kind === "dry") return state.data().dryPeriods.find((row) => row.dryPeriodId === id) || null;
+    if (kind === "irrigation") return state.data().irrigations.find((row) => row.irrigationId === id) || null;
+    return null;
+  }
+
+  function renderWaterEditor(field) {
+    if (!waterEditDraft) return "";
+    const record = waterRecord(waterEditDraft.kind, waterEditDraft.id);
+    if (!record || record.fieldId !== field.fieldId) return "";
+    const label = waterEditDraft.kind === "dry" ? "中干し" : (record.method || "水管理");
+    return `
+      <section class="annual-water-editor" data-annual-water-editor>
+        <div><span>振り返りから編集</span><h3>${U.escapeHTML(label)}</h3><small>${U.escapeHTML(field.name)}の記録を修正します</small></div>
+        <form data-annual-water-edit-form class="annual-season-note-editor">
+          <input type="hidden" name="kind" value="${U.attr(waterEditDraft.kind)}"><input type="hidden" name="id" value="${U.attr(waterEditDraft.id)}">
+          <div class="form-grid dense"><label>開始日<input name="startDate" type="date" value="${U.attr(record.startDate || record.date || "")}" required></label><label>終了日<input name="actualEndDate" type="date" value="${U.attr(record.actualEndDate || "")}"></label></div>
+          <label>メモ<textarea name="memo">${U.escapeHTML(record.memo || "")}</textarea></label>
+          <div><button type="button" class="secondary" data-annual-water-cancel>キャンセル</button><button type="submit" class="primary">変更を保存</button></div>
+        </form>
+      </section>
     `;
   }
 
   function renderWaterTab(field) {
     const periods = waterPeriodsForField(field);
     if (!periods.length) return '<div class="empty">中干し・間断灌水・深水管理・稲刈り前の落水を記録すると、期間をここで振り返れます。</div>';
-    return `<section class="annual-water-periods"><div class="annual-water-periods-heading"><div><span>水管理の振り返り</span><h3>いつから、いつまで行ったか</h3></div><small>${periods.length}件</small></div>${periods.map(renderWaterPeriod).join("")}</section>`;
+    return `${renderWaterEditor(field)}<section class="annual-water-periods"><div class="annual-water-periods-heading"><div><span>水管理の振り返り</span><h3>いつから、いつまで行ったか</h3></div><small>${periods.length}件</small></div>${periods.map(renderWaterPeriod).join("")}</section>`;
   }
 
   function renderPhotoTab(field) {
@@ -1363,6 +1393,7 @@
     if (screen) screen.classList.toggle("annual-detail-mode", Boolean(field));
     U.$("annualTimeline").innerHTML = field ? renderFieldDetail(field) : renderTop(rows);
     renderSortOptions();
+    if (RiceOS.app && RiceOS.app.syncBackButton) RiceOS.app.syncBackButton();
   }
 
   function editRow(kind, id) {
@@ -1376,14 +1407,8 @@
       RiceOS.screens.growth.editLog(id);
       return;
     }
-    if (kind === "dry" && RiceOS.screens.dryPeriod && RiceOS.screens.dryPeriod.editDry) {
-      RiceOS.app.show("dry-period");
-      RiceOS.screens.dryPeriod.editDry(id);
-      return;
-    }
-    if (kind === "irrigation" && RiceOS.screens.irrigation && RiceOS.screens.irrigation.editIrrigation) {
-      RiceOS.app.show("irrigation");
-      RiceOS.screens.irrigation.editIrrigation(id);
+    if (kind === "dry" || kind === "irrigation") {
+      openWaterEditor(kind, id);
       return;
     }
     if (kind === "schedule") {
@@ -1395,6 +1420,37 @@
       if (memo === null) return;
       state.saveSchedule({ ...item, title, memo });
     }
+  }
+
+  function openWaterEditor(kind, id) {
+    const record = waterRecord(kind, id);
+    if (!record) return false;
+    selectedFieldId = record.fieldId;
+    selectedTab = "water";
+    waterEditDraft = { kind, id };
+    render();
+    setTimeout(() => U.$("annualTimeline").querySelector("[data-annual-water-editor]")?.scrollIntoView({ behavior: "smooth", block: "start" }), 30);
+    return true;
+  }
+
+  function canHandleBack() {
+    return Boolean(waterEditDraft || selectedFieldId);
+  }
+
+  function handleBack() {
+    if (waterEditDraft) {
+      waterEditDraft = null;
+      render();
+      return true;
+    }
+    if (selectedFieldId) {
+      selectedFieldId = "";
+      selectedTab = "karte";
+      seasonNoteDraft = null;
+      render();
+      return true;
+    }
+    return false;
   }
 
   function deleteRow(kind, id) {
@@ -1421,6 +1477,7 @@
   function openField(fieldId) {
     selectedFieldId = fieldId || "";
     selectedTab = "karte";
+    waterEditDraft = null;
     render();
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
@@ -1433,20 +1490,31 @@
       if (open) {
         selectedFieldId = open.dataset.annualOpenField;
         selectedTab = "karte";
+        waterEditDraft = null;
         render();
         window.scrollTo({ top: 0, behavior: "smooth" });
         return;
       }
       if (event.target.closest("[data-annual-back]")) {
-        selectedFieldId = "";
-        selectedTab = "karte";
-        render();
+        handleBack();
         window.scrollTo({ top: 0, behavior: "smooth" });
         return;
       }
       const tab = event.target.closest("[data-annual-tab]");
       if (tab) {
         selectedTab = tab.dataset.annualTab;
+        waterEditDraft = null;
+        render();
+        return;
+      }
+      const waterEdit = event.target.closest("[data-annual-water-edit]");
+      if (waterEdit) {
+        if (waterEdit.dataset.annualWaterEdit === "fieldWork") editRow("fieldWork", waterEdit.dataset.id);
+        else openWaterEditor(waterEdit.dataset.annualWaterEdit, waterEdit.dataset.id);
+        return;
+      }
+      if (event.target.closest("[data-annual-water-cancel]")) {
+        waterEditDraft = null;
         render();
         return;
       }
@@ -1536,8 +1604,29 @@
       if (["areaA"].includes(key)) value = U.number(value, 0);
       state.updateField(selectedFieldId, { [key]: value });
     });
+    U.$("annualTimeline").addEventListener("submit", (event) => {
+      const form = event.target.closest("[data-annual-water-edit-form]");
+      if (!form) return;
+      event.preventDefault();
+      const formData = new FormData(form);
+      const kind = String(formData.get("kind") || "");
+      const id = String(formData.get("id") || "");
+      const record = waterRecord(kind, id);
+      const startDate = String(formData.get("startDate") || "");
+      const actualEndDate = String(formData.get("actualEndDate") || "");
+      if (!record || !startDate) return;
+      if (actualEndDate && actualEndDate < startDate) {
+        alert("終了日は開始日以降の日付にしてください。");
+        return;
+      }
+      const next = { ...record, date: startDate, season: String(startDate).slice(0, 4), startDate, actualEndDate, status: actualEndDate ? "完了" : "実施中", periodStatus: actualEndDate ? "完了" : "実施中", memo: String(formData.get("memo") || "").trim() };
+      const saved = kind === "dry" ? state.saveDryPeriod(next) : state.saveIrrigation(next);
+      if (!saved) return;
+      waterEditDraft = null;
+      render();
+    });
   }
 
   RiceOS.screens = RiceOS.screens || {};
-  RiceOS.screens.annual = { render, bind, openField };
+  RiceOS.screens.annual = { render, bind, openField, openWaterEditor, handleBack, canHandleBack };
 })();

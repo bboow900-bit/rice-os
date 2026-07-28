@@ -1676,6 +1676,13 @@
 .annual-season-note-editor textarea { min-height: 58px; padding: 7px 8px; line-height: 1.4; resize: vertical; }
 .annual-season-note-editor > div { display: flex; justify-content: flex-end; gap: 7px; }
 .annual-season-note-editor button { min-height: 33px; padding: 6px 11px; font-size: 11px; }
+.annual-water-editor { display: grid; gap: 9px; margin: 0 0 10px; padding: 11px; border: 1px solid #b7d9e9; border-radius: 10px; background: linear-gradient(135deg, #eefaff, #f8fcf6); box-shadow: 0 6px 16px rgba(37, 114, 139, .08); }
+.annual-water-editor > div:first-child { display: grid; gap: 2px; }
+.annual-water-editor > div:first-child > span { color: #2383a1; font-size: 10px; font-weight: 850; }
+.annual-water-editor h3 { margin: 0; color: #174c5e; font-size: 16px; }
+.annual-water-editor small { color: #607579; font-size: 11px; }
+.annual-water-period-actions { display: flex; justify-content: flex-end; margin-top: 8px; }
+.annual-water-period-actions .secondary { min-height: 34px; min-width: 88px; font-size: 11px; }
 .annual-season-note-list { display: grid; gap: 6px; margin-top: 8px; }
 .annual-season-note-list article { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: start; gap: 7px; padding: 8px; border: 1px solid #e1e9dc; border-radius: 9px; background: #fff; }
 .annual-season-note-list time { color: #4f8757; font-size: 10px; font-weight: 900; white-space: nowrap; }

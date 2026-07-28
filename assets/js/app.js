@@ -6,7 +6,6 @@
 
   let activeScreen = "home";
   let bound = false;
-  const screenHistory = [];
   const initialScreens = new Set([
     "home",
     "fields",
@@ -50,16 +49,14 @@
   function updateBackButton() {
     const button = U.$("appBackButton");
     if (!button) return;
-    button.classList.toggle("hidden", activeScreen === "home" && !screenHistory.length);
+    const mod = screenModule(activeScreen);
+    const canGoBack = Boolean(mod && typeof mod.canHandleBack === "function" && mod.canHandleBack());
+    button.classList.toggle("hidden", !canGoBack);
   }
 
   function show(screenId, options) {
     const opts = options || {};
     if (!initialScreens.has(screenId)) screenId = "home";
-    if (!opts.skipHistory && activeScreen && activeScreen !== screenId) {
-      screenHistory.push(activeScreen);
-      if (screenHistory.length > 20) screenHistory.shift();
-    }
     activeScreen = screenId;
     U.$$(".screen").forEach((section) => {
       section.classList.toggle("active", section.id === `screen-${screenId}`);
@@ -79,10 +76,7 @@
     const mod = screenModule(activeScreen);
     if (mod && typeof mod.handleBack === "function" && mod.handleBack()) {
       updateBackButton();
-      return;
     }
-    const previous = screenHistory.pop();
-    show(previous || "home", { skipHistory: true });
   }
 
   function markSaved(message, statusValue) {
@@ -125,10 +119,15 @@
     U.$$(".nav-item").forEach((button) => {
       button.addEventListener("click", () => {
         if (button.dataset.screen === "field-work" && RiceOS.bottomSheet) {
+          window.scrollTo({ top: 0, behavior: "smooth" });
           RiceOS.bottomSheet.open(U.today());
           return;
         }
-        show(button.dataset.screen);
+        if (button.dataset.screen === activeScreen) {
+          window.scrollTo({ top: 0, behavior: "smooth" });
+          return;
+        }
+        show(button.dataset.screen, { skipHistory: true });
       });
     });
     const backButton = U.$("appBackButton");
@@ -253,6 +252,7 @@
     init,
     show,
     back,
+    syncBackButton: updateBackButton,
     renderAll,
     markSaved
   };

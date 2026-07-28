@@ -970,11 +970,11 @@
       render();
       return true;
     }
-    if (window.scrollY > 80) {
-      window.scrollTo({ top: 0, behavior: "smooth" });
-      return true;
-    }
     return false;
+  }
+
+  function canHandleBack() {
+    return fieldView === "settings" || fieldView === "detail";
   }
 
   function render() {
@@ -987,6 +987,7 @@
       ${fieldView === "detail" && selectedField() ? renderFieldDetailView(selectedField()) : ""}
       ${fieldView === "list" ? renderFieldListView() : ""}
     `;
+    if (RiceOS.app && RiceOS.app.syncBackButton) RiceOS.app.syncBackButton();
   }
 
   function bind() {
@@ -1161,5 +1162,5 @@
   }
 
   RiceOS.screens = RiceOS.screens || {};
-  RiceOS.screens.fields = { render, bind, handleBack, openField, openGroup, preserveOnDataChange: true };
+  RiceOS.screens.fields = { render, bind, handleBack, canHandleBack, openField, openGroup, preserveOnDataChange: true };
 })();
