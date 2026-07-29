@@ -528,7 +528,8 @@
   }
 
   function annualGrowthSummary(field, year, stage, plantingDate, asOfDate) {
-    const latest = state.growthLogsFor(field.fieldId, year).filter((row) => row.date)
+    const latest = state.growthLogsFor(field.fieldId, year)
+      .filter((row) => row.date && row.date <= asOfDate)
       .slice().sort((a, b) => String(b.date).localeCompare(String(a.date)))[0] || null;
     const dap = plantingDate ? U.daysBetween(plantingDate, asOfDate) : "";
     const detail = latest
@@ -558,6 +559,21 @@
       ? `${U.fd(start)}〜${U.fd(end)}${days === "" || days < 0 ? "" : ` / ${days}日`}`
       : start ? `${U.fd(start)}開始 / 継続中` : `${U.fd(end)}完了`;
     return { label: active ? activeLabel : management && management.label || activeLabel, detail };
+  }
+
+  function renderYearFlowStatusOverview(stage, stageImage, growth, water) {
+    return `
+      <section class="annual-status-overview annual-year-flow-status" aria-label="一年の流れの生育と水管理">
+        <button type="button" class="annual-status-summary growth stage-${U.attr(stage && stage.current && stage.current.key || "waiting")}" data-annual-tab="growth">
+          <span class="annual-status-summary-image">${annualPickerRiceImage(stageImage)}</span>
+          <div><small>生育記録</small><b>${U.escapeHTML(stage && stage.current && stage.current.label || "記録待ち")}</b><p>${U.escapeHTML(growth.detail)}</p></div>
+        </button>
+        <button type="button" class="annual-status-summary water" data-annual-tab="water">
+          <span class="annual-status-summary-icon" aria-hidden="true">💧</span>
+          <div><small>水管理</small><b>${U.escapeHTML(water.label)}</b><p>${U.escapeHTML(water.detail)}</p></div>
+        </button>
+      </section>
+    `;
   }
 
   function riceStageNumberForField(field) {
@@ -1412,7 +1428,7 @@
       .sort((a, b) => String(a.date).localeCompare(String(b.date)) || String(a.category).localeCompare(String(b.category)) || String(a.label).localeCompare(String(b.label)));
   }
 
-  function renderYearFlow(field) {
+  function renderYearFlow(field, statusOverview) {
     const year = reviewYearValue();
     const entries = fieldYearTimeline(field, year);
     const planting = entries.find((entry) => /田植/.test(entry.label))?.date || "";
@@ -1433,6 +1449,7 @@
       <section class="annual-year-flow" aria-label="${U.escapeHTML(year)}年の一年の流れ">
         <div class="annual-year-flow-head"><div><span>${U.escapeHTML(year)}年の記録</span><h3>一年の流れ</h3></div><small>実績のみ</small></div>
         <p class="annual-year-flow-season">${U.escapeHTML(seasonText)}</p>
+        ${statusOverview || ""}
         ${items ? `<ol>${items}</ol>` : '<p class="annual-year-flow-empty">田植え・水管理・出穂・収穫などの実績を残すと、ここに一年の流れが並びます。</p>'}
       </section>
     `;
@@ -1459,7 +1476,7 @@
     return `<div class="annual-compare-check complete"><b>収穫後の振り返り</b><span>${U.escapeHTML(facts.join(" / "))}</span><button type="button" class="secondary" data-annual-reflection-focus>気づき・来年メモへ</button></div>`;
   }
 
-  function renderYearCompare(field) {
+  function renderYearCompare(field, statusOverview) {
     const currentYear = yearValue() === "all" ? String(new Date().getFullYear()) : String(yearValue());
     const previousYear = String(Number(currentYear) - 1);
     const current = fieldYearSnapshot(field, currentYear);
@@ -1489,7 +1506,7 @@
         <div class="annual-compare-head"><div><span>来年につなぐ比較</span><h3>${U.escapeHTML(currentYear)}年と${U.escapeHTML(previousYear)}年</h3></div><small>${U.escapeHTML(field.name)} / ${U.escapeHTML(varietyName(field))}</small></div>
         <div class="annual-compare-table"><div class="annual-compare-row annual-compare-label"><b>比較項目</b><b>${U.escapeHTML(currentYear)}年</b><b>${U.escapeHTML(previousYear)}年</b></div>${keyRows.map((row) => `<div class="annual-compare-row"><span>${U.escapeHTML(row[0])}</span><b class="${row[1] === "未記録" ? "missing" : ""}">${U.escapeHTML(row[1])}</b><b class="${row[2] === "未記録" ? "missing" : ""}">${U.escapeHTML(row[2])}</b></div>`).join("")}</div>
         <details class="annual-compare-details"><summary>すべての比較項目を見る (${detailRows.length})</summary><div class="annual-compare-table">${detailRows.map((row) => `<div class="annual-compare-row"><span>${U.escapeHTML(row[0])}</span><b class="${row[1] === "未記録" ? "missing" : ""}">${U.escapeHTML(row[1])}</b><b class="${row[2] === "未記録" ? "missing" : ""}">${U.escapeHTML(row[2])}</b></div>`).join("")}</div></details>
-        ${renderYearFlow(field)}
+        ${renderYearFlow(field, statusOverview)}
         ${renderEndSeasonReflection(field, current)}
         ${missing.length ? `<div class="annual-compare-check"><b>翌年比較のため、今年はここを残す</b><span>${U.escapeHTML(missing.join(" / "))}</span></div>` : '<div class="annual-compare-check complete"><b>比較に必要な基本記録がそろっています</b><span>来年の判断材料として使えます</span></div>'}
         ${renderSeasonNotes(field)}
@@ -1520,17 +1537,7 @@
           </div>
           <button type="button" class="annual-detail-menu" aria-label="メニュー">…</button>
         </div>
-        <section class="annual-status-overview" aria-label="生育と水管理の現在状況">
-          <button type="button" class="annual-status-summary growth stage-${U.attr(stage && stage.current && stage.current.key || "waiting")}" data-annual-tab="growth">
-            <span class="annual-status-summary-image">${annualPickerRiceImage(stageImage)}</span>
-            <div><small>現在の生育</small><b>${U.escapeHTML(stage && stage.current && stage.current.label || "記録待ち")}</b><p>${U.escapeHTML(growth.detail)}</p></div>
-          </button>
-          <button type="button" class="annual-status-summary water" data-annual-tab="water">
-            <span class="annual-status-summary-icon" aria-hidden="true">💧</span>
-            <div><small>現在の水管理</small><b>${U.escapeHTML(water.label)}</b><p>${U.escapeHTML(water.detail)}</p></div>
-          </button>
-        </section>
-        ${renderYearCompare(field)}
+        ${renderYearCompare(field, renderYearFlowStatusOverview(stage, stageImage, growth, water))}
         ${renderTabs(field)}
         ${renderAnnualFab(field.fieldId)}
       </div>

@@ -10699,6 +10699,29 @@ label {
 #screen-annual .annual-status-summary.water b { color: #1a5874; }
 #screen-annual .annual-status-summary p { margin: 4px 0 0; color: #5f7163; font-size: 10px; font-weight: 750; line-height: 1.35; }
 
+#screen-annual .annual-year-flow-status {
+  gap: 5px;
+  margin: 9px 0 12px;
+}
+
+#screen-annual .annual-year-flow-status .annual-status-summary {
+  grid-template-columns: 28px minmax(0, 1fr);
+  min-height: 94px;
+  padding: 8px 7px;
+  gap: 5px;
+}
+
+#screen-annual .annual-year-flow-status .annual-status-summary-image,
+#screen-annual .annual-year-flow-status .annual-status-summary-icon,
+#screen-annual .annual-year-flow-status .annual-status-summary-image img {
+  width: 28px;
+  height: 28px;
+}
+
+#screen-annual .annual-year-flow-status .annual-status-summary-icon { font-size: 21px; }
+#screen-annual .annual-year-flow-status .annual-status-summary b { font-size: 13px; }
+#screen-annual .annual-year-flow-status .annual-status-summary p { font-size: 9px; }
+
 @media (max-width: 380px) {
   #screen-annual .annual-status-summary { min-height: 100px; padding: 8px 7px; gap: 5px; }
   #screen-annual .annual-status-summary b { font-size: 14px; }
