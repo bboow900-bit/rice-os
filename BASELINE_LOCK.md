@@ -33,6 +33,7 @@ Run all of the following from the repository root:
 
 ```powershell
 node tools/verify_data_integrity.js
+node tools/verify_record_semantics.js
 node tools/verify_regression_contract.js
 node --check assets/js/core/state.js
 node --check assets/js/core/agro.js

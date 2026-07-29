@@ -245,6 +245,14 @@
     return workTextMatches(workName, "出穂");
   }
 
+  // A schedule is intent, while a field-work record is an actual result.
+  // Keep actual observations such as "出穂確認"; only explicit plans and
+  // confirmation candidates are excluded from biological calculations.
+  function isActualFieldWork(work) {
+    const name = String(work && work.workName || "");
+    return Boolean(work && work.date) && !/(?:予定|確認候補)/.test(name);
+  }
+
   function isInYear(record, year) {
     const date = record && (record.date || record.startDate || record.actualEndDate || record.endDate);
     return U.isInYear(date, year);
@@ -365,7 +373,7 @@
 
   function fieldWorksByNameFor(fieldId, names, year) {
     return data().fieldWorks
-      .filter((work) => (work.fieldIds || []).includes(fieldId) && matchesWorkName(work, names) && isInYear(work, year))
+      .filter((work) => (work.fieldIds || []).includes(fieldId) && isActualFieldWork(work) && matchesWorkName(work, names) && isInYear(work, year))
       .sort((a, b) => String(a.date).localeCompare(String(b.date)));
   }
 
@@ -547,7 +555,11 @@
         fertilizerTotalKg: record.fertilizerTotalKg || "",
         fertilizerBagCount: record.fertilizerBagCount || "",
         sourceScheduleId: record.sourceScheduleId || previous && previous.sourceScheduleId || "",
-        growthSnapshots: record.growthSnapshots || {},
+        // The regular work form does not edit fertilizer decision snapshots.
+        // Retain them until the dedicated fertilizer flow explicitly replaces them.
+        growthSnapshots: record.growthSnapshots === undefined
+          ? (previous && previous.growthSnapshots || {})
+          : record.growthSnapshots,
         weather: record.weather || "",
         weatherAuto: record.weatherAuto || null,
         photo: record.photo || "",
@@ -1584,6 +1596,8 @@
     headingDateForField,
     growthSummaryFor,
     fieldWorksByNameFor,
+    isActualFieldWork,
+    isHeadingWorkName,
     saveFieldWork,
     deleteFieldWork,
     deleteFieldWorks,

@@ -319,12 +319,14 @@
     const year = String(date).slice(0, 4);
     const beforeOrOn = (row) => String(row.date || "") <= date;
     const works = state().fieldWorksFor(field.fieldId)
+      .filter((row) => state().isActualFieldWork ? state().isActualFieldWork(row) : !/(?:予定|確認候補)/.test(String(row.workName || "")))
       .filter((row) => String(row.date || "").startsWith(`${year}-`) && beforeOrOn(row));
     const growth = state().growthLogsFor(field.fieldId)
       .filter((row) => String(row.date || "").startsWith(`${year}-`) && beforeOrOn(row));
     const plantingRows = works.filter((row) => /田植/.test(String(row.workName || "")));
-    const planting = plantingRows.map((row) => row.date).filter(Boolean).sort()[0]
-      || (String(field.plantingDate || "").startsWith(`${year}-`) ? field.plantingDate : "");
+    const planting = state().plantingDateForField
+      ? state().plantingDateForField(field.fieldId, year)
+      : plantingRows.map((row) => row.date).filter(Boolean).sort()[0] || "";
     const recordedHeadingDate = headingDateInYear(field.fieldId, year, date);
     const dap = planting ? U.daysBetween(planting, date) : "";
     const headingDays = planting && recordedHeadingDate ? U.daysBetween(planting, recordedHeadingDate) : "";

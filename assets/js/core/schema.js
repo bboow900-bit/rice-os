@@ -699,23 +699,45 @@
 
     // Field groups are master data. Older saves held a free-form label directly
     // on each field, so consolidate those labels once while preserving field IDs.
+    const savedGroups = ensureArray(source.fieldGroups).map(normalizeFieldGroup);
+    const defaultGroups = DEFAULT_FIELD_GROUPS.map(normalizeFieldGroup);
+    const defaultsById = new Map(defaultGroups.map((group) => [group.fieldGroupId, group]));
+    const savedGroupIds = new Set(savedGroups.map((group) => group.fieldGroupId));
     const groupSources = [
-      ...ensureArray(source.fieldGroups).map(normalizeFieldGroup),
-      ...DEFAULT_FIELD_GROUPS.map(normalizeFieldGroup)
+      ...savedGroups.map((group) => {
+        const fallback = defaultsById.get(group.fieldGroupId);
+        if (!fallback) return group;
+        return {
+          ...group,
+          // A renamed built-in group still recognizes its old label in legacy
+          // field data without recreating a second master record.
+          aliases: Array.from(new Set([
+            ...(group.aliases || []),
+            fallback.name,
+            ...(fallback.aliases || [])
+          ].filter((label) => normalizeGroupLabel(label) && normalizeGroupLabel(label) !== normalizeGroupLabel(group.name))))
+        };
+      }),
+      ...defaultGroups.filter((group) => !savedGroupIds.has(group.fieldGroupId))
     ].filter((group) => group.fieldGroupId && group.name);
-    // A user-created master wins over the built-in master when names match.
-    // This keeps old group IDs stable while treating "亀石" and "亀石グループ" as one group.
-    const seenGroupLabels = new Set();
+    // A user master wins over a built-in master by ID first.
+    // Without the ID check, renaming a default group re-added the old default
+    // group on every normalization pass.
+    const seenGroupIds = new Set();
     let fieldGroups = groupSources.filter((group) => {
-      const label = normalizeGroupLabel(group.name);
-      if (seenGroupLabels.has(label)) return false;
-      seenGroupLabels.add(label);
+      if (seenGroupIds.has(group.fieldGroupId)) return false;
+      seenGroupIds.add(group.fieldGroupId);
       return true;
     });
     const groupById = new Map(fieldGroups.map((group) => [group.fieldGroupId, group]));
     const groupByLabel = new Map();
     fieldGroups.forEach((group) => {
-      [group.name, ...(group.aliases || [])].forEach((label) => groupByLabel.set(normalizeGroupLabel(label), group));
+      [group.name, ...(group.aliases || [])].forEach((label) => {
+        const normalized = normalizeGroupLabel(label);
+        // A legacy free-form label can be ambiguous. Keep the first stable
+        // master rather than silently moving records with an explicit ID.
+        if (normalized && !groupByLabel.has(normalized)) groupByLabel.set(normalized, group);
+      });
     });
     fields.forEach((field) => {
       let legacyValue = String(field.fieldGroupId || "");

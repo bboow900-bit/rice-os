@@ -20,8 +20,10 @@ function versions(text) {
 
 function main() {
   cp.execFileSync(process.execPath, [path.join(__dirname, "verify_data_integrity.js")], { stdio: "inherit" });
+  cp.execFileSync(process.execPath, [path.join(__dirname, "verify_record_semantics.js")], { stdio: "inherit" });
 
   const index = read("index.html");
+  const mobile = read("mobile.html");
   const app = read("assets/js/app.js");
   const schema = read("assets/js/core/schema.js");
   const state = read("assets/js/core/state.js");
@@ -50,6 +52,7 @@ function main() {
   const workerVersion = (worker.match(/APP_VERSION\s*=\s*"([^"]+)"/) || [])[1];
   assert(pwaVersion && workerVersion && pwaVersion === workerVersion, "PWA module and service worker versions differ");
   assert(index.includes(`?v=${pwaVersion}`), "Index asset versions do not match the PWA version");
+  assert(mobile.includes(`?v=${pwaVersion}`), "Mobile launcher version does not match the PWA version");
   assert(!versions(index).some((version) => version !== pwaVersion), "Index contains stale versioned assets");
 
   console.log("PASS regression contract", JSON.stringify({ pwaVersion }));

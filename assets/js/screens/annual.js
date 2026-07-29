@@ -469,7 +469,7 @@
     if (selectedYear === "all" || String(selectedYear) === currentYear) return U.today();
 
     const latestRecordDate = maxDate(fieldYearRows(fieldId, selectedYear)
-      .filter((row) => row.kind !== "schedule" && !/予定|確認/.test(String(row.title || "")))
+      .filter((row) => row.kind !== "schedule" && !/(?:予定|確認候補)/.test(String(row.title || "")))
       .map((row) => row.date));
     return latestRecordDate || `${selectedYear}-12-31`;
   }
@@ -1387,8 +1387,11 @@
   }
 
   function fieldYearTimeline(field, year) {
-    const works = state.fieldWorksFor(field.fieldId, year)
-      .filter((row) => !/予定|確認/.test(String(row.workName || "")))
+    const allWorks = state.fieldWorksFor(field.fieldId, year)
+      .filter((row) => state.isActualFieldWork ? state.isActualFieldWork(row) : !/(?:予定|確認候補)/.test(String(row.workName || "")));
+    const headingWorks = allWorks.filter((row) => state.isHeadingWorkName && state.isHeadingWorkName(row.workName));
+    const works = allWorks
+      .filter((row) => !(state.isHeadingWorkName && state.isHeadingWorkName(row.workName)))
       .filter((row) => !(state.waterEventForWorkName && state.waterEventForWorkName(row.workName)))
       .filter((row) => !(state.isMigratedWaterWork && state.isMigratedWaterWork(row, field.fieldId)));
     const growth = state.growthLogsFor(field.fieldId, year);
@@ -1398,7 +1401,7 @@
     const others = (state.data().otherWorks || [])
       .filter((row) => (row.relatedFieldIds || row.fieldIds || []).includes(field.fieldId))
       .filter((row) => String(row.season || String(row.date || "").slice(0, 4)) === String(year))
-      .filter((row) => !/予定|確認/.test(String(row.workName || "")));
+      .filter((row) => !/(?:予定|確認候補)/.test(String(row.workName || "")));
     const entries = works.map(timelineWorkEntry);
 
     waterPeriods
@@ -1414,7 +1417,22 @@
         category: "生育",
         tone: "growth",
         lane: "growth",
-        detail: row.headingObserved || row.observedStage === "heading" && row.stageConfirmed ? "出穂を確認" : `幼穂 ${row.panicleLengthMm}mm`
+        detail: row.headingObserved || row.observedStage === "heading" && row.stageConfirmed ? "確認済み" : `幼穂 ${row.panicleLengthMm}mm`
+      }));
+    const headingGrowthDates = new Set(growth
+      .filter((row) => row.headingObserved || row.observedStage === "heading" && row.stageConfirmed)
+      .map((row) => String(row.date || "")));
+    headingWorks
+      .filter((row) => !headingGrowthDates.has(String(row.date || "")))
+      .forEach((row) => entries.push({
+        id: row.workId,
+        editKind: "fieldWork",
+        date: String(row.date || ""),
+        label: "出穂",
+        category: "生育",
+        tone: "growth",
+        lane: "growth",
+        detail: "確認済み"
       }));
     others.forEach((row) => entries.push({
       id: row.otherWorkId,
