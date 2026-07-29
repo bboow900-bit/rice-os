@@ -1353,6 +1353,7 @@
       label: name,
       category: isHarvest ? "収穫" : "農作業",
       tone: isHarvest ? "harvest" : "work",
+      lane: "work",
       detail: String(row.material || row.machine || "作業記録")
     };
   }
@@ -1379,6 +1380,7 @@
       label: String(period.label || "水管理"),
       category: "水管理",
       tone: "water",
+      lane: "water",
       detail: range,
       days
     };
@@ -1403,15 +1405,16 @@
       .filter((period) => !/予定/.test(String(period.status || "")) && !/予定/.test(String(period.raw && (period.raw.status || period.raw.periodStatus) || "")))
       .map(timelineWaterEntry).filter(Boolean).forEach((entry) => entries.push(entry));
     growth
-      .filter((row) => row.headingObserved || row.observedStage === "heading" && row.stageConfirmed)
+      .filter((row) => row.headingObserved || row.observedStage === "heading" && row.stageConfirmed || U.number(row.panicleLengthMm, 0) > 0)
       .forEach((row) => entries.push({
         id: row.logId,
         editKind: "growth",
         date: String(row.date || ""),
-        label: "出穂",
+        label: row.headingObserved || row.observedStage === "heading" && row.stageConfirmed ? "出穂" : "幼穂確認",
         category: "生育",
         tone: "growth",
-        detail: "生育記録から確定"
+        lane: "growth",
+        detail: row.headingObserved || row.observedStage === "heading" && row.stageConfirmed ? "出穂を確認" : `幼穂 ${row.panicleLengthMm}mm`
       }));
     others.forEach((row) => entries.push({
       id: row.otherWorkId,
@@ -1420,6 +1423,7 @@
       label: String(row.workName || "その他の記録"),
       category: "その他",
       tone: "other",
+      lane: "work",
       detail: row.quantity ? `数量 ${row.quantity}` : "その他の記録"
     }));
 
@@ -1437,20 +1441,27 @@
     const seasonText = planting
       ? `${timelineDateParts(planting, true).text} → ${harvest ? `${timelineDateParts(harvest, true).text}${seasonLength !== "" ? ` / ${seasonLength}日` : ""}` : "収穫記録待ち"}`
       : "田植え記録待ち";
-    let previousDate = "";
-    const items = entries.map((entry) => {
-      const showDate = entry.date !== previousDate;
-      previousDate = entry.date;
-      const date = timelineDateParts(entry.date);
-      const dateHtml = showDate ? `<time datetime="${U.attr(entry.date)}"><span>${U.escapeHTML(date.day)}</span><small>${U.escapeHTML(date.weekday)}</small></time>` : '<time class="annual-year-flow-repeat" aria-hidden="true"></time>';
-      return `<li class="${U.attr(entry.tone)}">${dateHtml}<span class="annual-year-flow-rail" aria-hidden="true"><i></i></span><button type="button" class="annual-year-flow-entry" data-annual-flow-open-kind="${U.attr(entry.editKind)}" data-annual-flow-open-id="${U.attr(entry.id)}"><span class="annual-year-flow-title"><em>${U.escapeHTML(entry.category || "記録")}</em><b>${U.escapeHTML(entry.label)}</b><strong aria-hidden="true">〉</strong></span><span class="annual-year-flow-detail">${U.escapeHTML(entry.detail)}</span>${entry.days !== "" ? `<span class="annual-year-flow-days">${U.escapeHTML(String(entry.days))}日間</span>` : ""}</button></li>`;
+    const rowsByDate = new Map();
+    entries.forEach((entry) => {
+      if (!rowsByDate.has(entry.date)) rowsByDate.set(entry.date, { date: entry.date, work: [], water: [], growth: [] });
+      const row = rowsByDate.get(entry.date);
+      row[entry.lane === "water" ? "water" : entry.lane === "growth" ? "growth" : "work"].push(entry);
+    });
+    const flowCard = (entry) => `<button type="button" class="annual-year-flow-lane-card ${U.attr(entry.tone)}" data-annual-flow-open-kind="${U.attr(entry.editKind)}" data-annual-flow-open-id="${U.attr(entry.id)}"><span class="annual-year-flow-lane-title"><em>${U.escapeHTML(entry.category || "記録")}</em><b>${U.escapeHTML(entry.label)}</b><strong aria-hidden="true">〉</strong></span><span class="annual-year-flow-lane-detail">${U.escapeHTML(entry.detail)}</span>${entry.days !== "" ? `<span class="annual-year-flow-lane-days">${U.escapeHTML(String(entry.days))}日間</span>` : ""}</button>`;
+    const items = Array.from(rowsByDate.values()).map((row, index, allRows) => {
+      const date = timelineDateParts(row.date);
+      const work = row.work.length ? row.work.map(flowCard).join("") : '<span class="annual-year-flow-lane-empty" aria-hidden="true"></span>';
+      const water = row.water.length ? row.water.map(flowCard).join("") : '<span class="annual-year-flow-lane-empty" aria-hidden="true"></span>';
+      const growth = row.growth.length ? `<div class="annual-year-flow-milestones">${row.growth.map((entry) => `<button type="button" data-annual-flow-open-kind="${U.attr(entry.editKind)}" data-annual-flow-open-id="${U.attr(entry.id)}">${U.escapeHTML(entry.label)}: ${U.escapeHTML(entry.detail)}</button>`).join("")}</div>` : "";
+      return `<li class="annual-year-flow-row${index === allRows.length - 1 ? " last" : ""}"><div class="annual-year-flow-lane work">${work}</div><div class="annual-year-flow-axis"><time datetime="${U.attr(row.date)}"><span>${U.escapeHTML(date.day)}</span><small>${U.escapeHTML(date.weekday)}</small></time><i aria-hidden="true"></i></div><div class="annual-year-flow-lane water">${water}</div>${growth}</li>`;
     }).join("");
     return `
       <section class="annual-year-flow" aria-label="${U.escapeHTML(year)}年の一年の流れ">
         <div class="annual-year-flow-head"><div><span>${U.escapeHTML(year)}年の記録</span><h3>一年の流れ</h3></div><small>実績のみ</small></div>
         <p class="annual-year-flow-season">${U.escapeHTML(seasonText)}</p>
         ${statusOverview || ""}
-        ${items ? `<ol>${items}</ol>` : '<p class="annual-year-flow-empty">田植え・水管理・出穂・収穫などの実績を残すと、ここに一年の流れが並びます。</p>'}
+        <div class="annual-year-flow-lane-head"><b>圃場作業</b><span>日付</span><b>水管理</b></div>
+        ${items ? `<ol class="annual-year-flow-grid">${items}</ol>` : '<p class="annual-year-flow-empty">田植え・水管理・出穂・収穫などの実績を残すと、ここに一年の流れが並びます。</p>'}
       </section>
     `;
   }

@@ -10722,6 +10722,125 @@ label {
 #screen-annual .annual-year-flow-status .annual-status-summary b { font-size: 13px; }
 #screen-annual .annual-year-flow-status .annual-status-summary p { font-size: 9px; }
 
+/* Annual flow: field work and water management share one date axis. */
+#screen-annual .annual-year-flow-lane-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 44px minmax(0, 1fr);
+  gap: 5px;
+  align-items: center;
+  margin: 10px 0 5px;
+}
+
+#screen-annual .annual-year-flow-lane-head b,
+#screen-annual .annual-year-flow-lane-head span {
+  color: #50634f;
+  font-size: 10px;
+  font-weight: 900;
+  text-align: center;
+}
+
+#screen-annual .annual-year-flow-lane-head b:first-child { color: #647a2b; }
+#screen-annual .annual-year-flow-lane-head b:last-child { color: #287a9f; }
+
+#screen-annual .annual-year-flow .annual-year-flow-grid {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+#screen-annual .annual-year-flow .annual-year-flow-grid > .annual-year-flow-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 44px minmax(0, 1fr);
+  gap: 5px;
+  align-items: stretch;
+  min-width: 0;
+  padding: 0 0 10px;
+}
+
+#screen-annual .annual-year-flow-row::before {
+  position: absolute;
+  top: 0;
+  bottom: -10px;
+  left: calc(50% - 1px);
+  width: 2px;
+  background: #c9dbd0;
+  content: "";
+}
+
+#screen-annual .annual-year-flow-row.last::before { bottom: 23px; }
+
+#screen-annual .annual-year-flow-lane {
+  display: grid;
+  align-content: start;
+  gap: 5px;
+  min-width: 0;
+}
+
+#screen-annual .annual-year-flow-axis {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  align-content: start;
+  justify-items: center;
+  min-width: 0;
+  padding-top: 8px;
+}
+
+#screen-annual .annual-year-flow-axis time {
+  display: grid;
+  justify-items: center;
+  padding: 0;
+  background: #fcfdf8;
+  color: #39533f;
+  font-size: 10px;
+  font-weight: 900;
+  line-height: 1.15;
+  text-align: center;
+}
+
+#screen-annual .annual-year-flow-axis time small { margin-top: 2px; color: #758477; font-size: 9px; }
+#screen-annual .annual-year-flow-axis i { width: 9px; height: 9px; margin-top: 5px; border: 2px solid #fcfdf8; border-radius: 50%; background: #5ca367; box-shadow: 0 0 0 2px #b4d5b8; }
+
+#screen-annual .annual-year-flow-lane-card {
+  display: block;
+  min-width: 0;
+  padding: 7px;
+  border: 1px solid #dbe6ce;
+  border-left: 3px solid #8da84d;
+  border-radius: 8px;
+  background: #fffefa;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+#screen-annual .annual-year-flow-lane.water .annual-year-flow-lane-card { border-color: #c2dfed; border-left-color: #368fbb; background: #fbfeff; }
+#screen-annual .annual-year-flow-lane-card.harvest { border-color: #ead2aa; border-left-color: #b77932; background: #fffdf8; }
+#screen-annual .annual-year-flow-lane-card.other { border-color: #d8dfd8; border-left-color: #89918a; }
+#screen-annual .annual-year-flow-lane-card:focus-visible { outline: 3px solid #93c78f; outline-offset: 2px; }
+
+#screen-annual .annual-year-flow-lane-title { display: flex; align-items: start; gap: 3px; min-width: 0; }
+#screen-annual .annual-year-flow-lane-title em { flex: 0 0 auto; padding: 2px 3px; border-radius: 4px; background: #edf4d4; color: #61772d; font-size: 8px; font-style: normal; font-weight: 900; }
+#screen-annual .annual-year-flow-lane.water .annual-year-flow-lane-title em { background: #e1f1f9; color: #28789c; }
+#screen-annual .annual-year-flow-lane-title b { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; color: #29452e; font-size: 12px; font-weight: 900; line-height: 1.25; }
+#screen-annual .annual-year-flow-lane-title strong { flex: 0 0 auto; color: #7b887b; font-size: 13px; line-height: 1; }
+#screen-annual .annual-year-flow-lane-detail { display: block; margin-top: 4px; overflow-wrap: anywhere; color: #617064; font-size: 9px; font-weight: 750; line-height: 1.35; }
+#screen-annual .annual-year-flow-lane-days { display: inline-block; margin-top: 4px; padding: 2px 4px; border-radius: 999px; background: #e4f3fa; color: #26759d; font-size: 9px; font-weight: 900; }
+
+#screen-annual .annual-year-flow-milestones { display: flex; grid-column: 1 / -1; flex-wrap: wrap; gap: 4px; padding: 0 0 1px; }
+#screen-annual .annual-year-flow-milestones button { padding: 3px 6px; border: 1px solid #d8e8bd; border-radius: 999px; background: #f2f8e7; color: #607b35; font: inherit; font-size: 9px; font-weight: 850; line-height: 1.3; }
+
+@media (max-width: 380px) {
+  #screen-annual .annual-year-flow-lane-head,
+  #screen-annual .annual-year-flow .annual-year-flow-grid > .annual-year-flow-row { grid-template-columns: minmax(0, 1fr) 40px minmax(0, 1fr); gap: 4px; }
+  #screen-annual .annual-year-flow-lane-card { padding: 6px; }
+  #screen-annual .annual-year-flow-lane-title b { font-size: 11px; }
+}
+
 @media (max-width: 380px) {
   #screen-annual .annual-status-summary { min-height: 100px; padding: 8px 7px; gap: 5px; }
   #screen-annual .annual-status-summary b { font-size: 14px; }
