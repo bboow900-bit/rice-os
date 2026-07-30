@@ -10853,25 +10853,14 @@ label {
 #screen-annual .annual-year-flow-lane.water .annual-year-flow-lane-card { border-color: #c2dfed; border-left-color: #368fbb; background: #fbfeff; }
 #screen-annual .annual-year-flow-lane.water .annual-year-flow-lane-card { position: relative; z-index: 1; }
 #screen-annual .annual-year-flow-lane.water .annual-year-flow-lane-card.water-start,
-#screen-annual .annual-year-flow-lane.water .annual-year-flow-lane-card.water-end { margin-left: 11px; }
-#screen-annual .annual-year-flow-lane.water .annual-year-flow-lane-card.water-start::after {
+#screen-annual .annual-year-flow-lane.water .annual-year-flow-lane-card.water-end { margin-left: 13px; }
+#screen-annual .annual-year-flow-lane.water .annual-year-flow-lane-card.water-start::before,
+#screen-annual .annual-year-flow-lane.water .annual-year-flow-lane-card.water-end::before {
   position: absolute;
-  top: 100%;
-  left: -8px;
-  width: 0;
-  height: 10px;
-  border-left: 2px solid #4aa9cd;
-  content: "";
-}
-#screen-annual .annual-year-flow-lane.water .annual-year-flow-lane-card.water-start::before {
-  position: absolute;
-  top: calc(100% + 6px);
-  left: -11px;
-  width: 6px;
-  height: 6px;
-  border-right: 2px solid #4aa9cd;
-  border-bottom: 2px solid #4aa9cd;
-  transform: rotate(45deg);
+  top: 17px;
+  left: -13px;
+  width: 13px;
+  border-top: 2px solid #4aa9cd;
   content: "";
 }
 #screen-annual .annual-year-flow-lane.water .annual-year-flow-lane-card.water-end {
@@ -10893,8 +10882,20 @@ label {
   border-radius: 2px;
   background: #66b7d5;
   content: "";
+  pointer-events: none;
 }
-#screen-annual .annual-year-flow-water-track.start { top: 28px; }
+#screen-annual .annual-year-flow-water-track.start { top: 0; }
+#screen-annual .annual-year-flow-water-track.start::before {
+  position: absolute;
+  top: 13px;
+  left: -3px;
+  width: 6px;
+  height: 6px;
+  border: 2px solid #419dbe;
+  border-radius: 50%;
+  background: #edf9fd;
+  content: "";
+}
 #screen-annual .annual-year-flow-water-track.end { bottom: auto; height: 27px; }
 #screen-annual .annual-year-flow-water-track.end::after {
   position: absolute;
