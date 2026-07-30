@@ -10850,18 +10850,25 @@ label {
   text-align: left;
 }
 
-#screen-annual .annual-year-flow-lane.water .annual-year-flow-lane-card { border-color: #c2dfed; border-left-color: #368fbb; background: #fbfeff; }
-#screen-annual .annual-year-flow-lane.water .annual-year-flow-lane-card { position: relative; z-index: 1; }
-#screen-annual .annual-year-flow-lane.water .annual-year-flow-lane-card.water-start,
-#screen-annual .annual-year-flow-lane.water .annual-year-flow-lane-card.water-end,
-#screen-annual .annual-year-flow-lane.water .annual-year-flow-lane-card.water-current { margin-left: 25px; }
+#screen-annual .annual-year-flow-lane.water { padding-left: var(--water-gutter, 25px); gap: 8px; }
+#screen-annual .annual-year-flow-lane.water .annual-year-flow-lane-card {
+  position: relative;
+  z-index: 1;
+  min-height: 58px;
+  padding: 8px;
+  border: 1px solid #b9ddec;
+  border-left: 4px solid #318db8;
+  border-radius: 9px;
+  background: linear-gradient(135deg, #ffffff 0%, #effaff 100%);
+  box-shadow: 0 3px 0 rgba(42, 122, 156, 0.09);
+}
 #screen-annual .annual-year-flow-lane.water .annual-year-flow-lane-card.water-start::before,
 #screen-annual .annual-year-flow-lane.water .annual-year-flow-lane-card.water-end::before,
 #screen-annual .annual-year-flow-lane.water .annual-year-flow-lane-card.water-current::before {
   position: absolute;
-  top: 18px;
-  left: -25px;
-  width: 25px;
+  top: 22px;
+  left: calc(-1 * var(--water-gutter, 25px));
+  width: var(--water-gutter, 25px);
   border-top: 2px solid #4aa9cd;
   content: "";
 }
@@ -10886,37 +10893,41 @@ label {
   top: -10px;
   bottom: -10px;
   left: calc(4px + (var(--water-track) * 12px));
-  width: 2px;
-  border-radius: 2px;
-  background: #66b7d5;
+  width: 9px;
+  border: 1px solid #b7ddea;
+  border-left: 3px solid #52a8cb;
+  border-radius: 7px;
+  background: rgba(219, 244, 252, 0.78);
+  box-sizing: border-box;
   content: "";
   pointer-events: none;
 }
-#screen-annual .annual-year-flow-water-track.start { top: 0; }
+#screen-annual .annual-year-flow-water-track.start { top: 19px; }
 #screen-annual .annual-year-flow-water-track.start::before {
   position: absolute;
-  top: 13px;
-  left: -3px;
-  width: 6px;
-  height: 6px;
-  border: 2px solid #419dbe;
+  top: -5px;
+  left: -4px;
+  width: 8px;
+  height: 8px;
+  border: 2px solid #2d91bb;
   border-radius: 50%;
-  background: #edf9fd;
+  background: #e9f8fd;
+  box-shadow: 0 0 0 2px #fff;
   content: "";
 }
-#screen-annual .annual-year-flow-water-track.end { bottom: auto; height: 27px; }
+#screen-annual .annual-year-flow-water-track.end { bottom: auto; height: 25px; }
 #screen-annual .annual-year-flow-water-track.end::after {
   position: absolute;
-  bottom: -2px;
-  left: -3px;
-  width: 6px;
-  height: 6px;
+  bottom: -5px;
+  left: -4px;
+  width: 8px;
+  height: 8px;
   border: 2px solid #419dbe;
   border-radius: 50%;
   background: #edf9fd;
   content: "";
 }
-#screen-annual .annual-year-flow-water-track.current { bottom: auto; height: 27px; }
+#screen-annual .annual-year-flow-water-track.current { bottom: auto; height: 25px; }
 #screen-annual .annual-year-flow-water-track.current::after {
   position: absolute;
   bottom: -3px;
@@ -10936,6 +10947,38 @@ label {
 }
 #screen-annual .annual-year-flow-water-track.transition::before,
 #screen-annual .annual-year-flow-water-track.transition::after { display: none; }
+#screen-annual .annual-year-flow-lane.water .annual-year-flow-lane-card .annual-year-flow-lane-detail { color: #3a6f83; font-size: 9.5px; }
+#screen-annual .annual-year-flow-lane.water .annual-year-flow-lane-card .annual-year-flow-lane-days { background: #caecf7; color: #186d91; }
+#screen-annual .annual-year-flow-water-marker {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 1px 5px;
+  width: calc(100% - 2px);
+  min-height: 32px;
+  padding: 5px 7px;
+  border: 1px dashed #a6d3e4;
+  border-left: 3px solid #4b9ec0;
+  border-radius: 7px;
+  background: rgba(246, 252, 255, 0.96);
+  color: #246d8d;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+#screen-annual .annual-year-flow-water-marker::before {
+  position: absolute;
+  top: 16px;
+  left: calc(-1 * var(--water-gutter, 25px));
+  width: var(--water-gutter, 25px);
+  border-top: 2px solid #4aa9cd;
+  content: "";
+}
+#screen-annual .annual-year-flow-water-marker span { min-width: 0; overflow-wrap: anywhere; font-size: 10px; font-weight: 950; line-height: 1.2; }
+#screen-annual .annual-year-flow-water-marker small { grid-column: 1 / 2; min-width: 0; overflow-wrap: anywhere; color: #4a7689; font-size: 8px; font-weight: 750; line-height: 1.25; }
+#screen-annual .annual-year-flow-water-marker strong { grid-column: 2; grid-row: 1 / 3; align-self: center; color: #5f8190; font-size: 13px; }
+#screen-annual .annual-year-flow-water-marker.current { border-style: solid; background: #edf9fe; }
 #screen-annual .annual-year-flow-lane-card.harvest { border-color: #ead2aa; border-left-color: #b77932; background: #fffdf8; }
 #screen-annual .annual-year-flow-lane-card.other { border-color: #d8dfd8; border-left-color: #89918a; }
 #screen-annual .annual-year-flow-lane-card:focus-visible { outline: 3px solid #93c78f; outline-offset: 2px; }

@@ -68,6 +68,14 @@ assert(assigned[0].periodTrack === assigned[1].periodTrack, "Same-day water hand
 assert(assigned[1].periodTransition === true, "Same-day intermittent irrigation start was not marked as a handoff");
 assert(assigned[1].periodLineEndDate === "2026-07-31", "Ongoing water management did not stop at the display date");
 
+const overlapping = global.RiceOS.annualTest.assignWaterPeriodTracks([
+  { id: "overlap-a", editId: "overlap-a", lane: "water", periodRole: "start", periodStartDate: "2026-07-01", periodEndDate: "2026-07-10", periodLineEndDate: "2026-07-10" },
+  { id: "overlap-b", editId: "overlap-b", lane: "water", periodRole: "start", periodStartDate: "2026-07-02", periodEndDate: "2026-07-11", periodLineEndDate: "2026-07-11" },
+  { id: "overlap-c", editId: "overlap-c", lane: "water", periodRole: "start", periodStartDate: "2026-07-03", periodEndDate: "2026-07-12", periodLineEndDate: "2026-07-12" }
+]);
+assert(new Set(overlapping.map((entry) => entry.periodTrack)).size === 3, "Three overlapping water periods were collapsed into fewer tracks");
+assert(global.RiceOS.annualTest.waterTrackInfo(overlapping, "2026-07-04").maxTrack === 2, "Third overlapping water period did not reserve a visible track");
+
 const sameDay = [
   { periodRole: "start", label: "間断灌水" },
   { periodRole: "end", label: "中干し 完了" }
@@ -76,9 +84,10 @@ assert(sameDay.map((entry) => entry.periodRole).join(",") === "end,start", "Same
 
 const timeline = global.RiceOS.annualTest.fieldYearTimeline(state.fields()[0], 2026);
 const handoffCards = timeline.filter((entry) => entry.date === "2026-07-11" && entry.lane === "water");
-assert(handoffCards.length === 2, "Same-day handoff did not create both completion and new-start cards");
-assert(handoffCards[0].periodRole === "end" && handoffCards[1].periodRole === "start", "Rendered handoff order is not completion then start");
-const ongoingCard = timeline.find((entry) => entry.editId === "intermittent-2026" && entry.periodRole === "current");
+assert(handoffCards.length === 2, "Same-day handoff did not create both a completion marker and new-start card");
+assert(handoffCards[0].periodRole === "end-marker" && handoffCards[1].periodRole === "start", "Rendered handoff order is not completion then start");
+assert(handoffCards.filter((entry) => !entry.isWaterMarker).length === 1, "Same-day handoff duplicated a full water-management card");
+const ongoingCard = timeline.find((entry) => entry.editId === "intermittent-2026" && entry.periodRole === "current" && entry.isWaterMarker);
 assert(ongoingCard && ongoingCard.date === "2026-07-31", "Ongoing period does not render an endpoint at today");
 const currentTrack = global.RiceOS.annualTest.waterTrackMarkup(timeline, "2026-07-31");
 assert(/\bcurrent\b/.test(currentTrack) && !/\bend\b/.test(currentTrack), "Ongoing endpoint is visually marked as completed");

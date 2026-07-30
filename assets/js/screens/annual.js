@@ -1432,7 +1432,7 @@
   }
 
   function waterRoleRank(entry) {
-    return ({ end: 0, "orphan-end": 1, start: 2, current: 3 })[entry.periodRole] ?? 4;
+    return ({ end: 0, "end-marker": 0, "orphan-end": 1, start: 2, current: 3 })[entry.periodRole] ?? 4;
   }
 
   // Assign a stable display track to each derived period. A same-day handoff
@@ -1450,11 +1450,11 @@
         const availableTrack = trackEnds.findIndex((trackEnd) => trackEnd < startDate);
         const rawTrack = transitionTrack >= 0 ? transitionTrack : (availableTrack >= 0 ? availableTrack : trackEnds.length);
         trackEnds[rawTrack] = endDate;
-        return { ...entry, periodTrack: Math.min(rawTrack, 1), periodTransition: transitionTrack >= 0 };
+        return { ...entry, periodTrack: rawTrack, periodTransition: transitionTrack >= 0 };
       });
   }
 
-  function waterTrackMarkup(entries, rowDate) {
+  function waterTrackInfo(entries, rowDate) {
     const active = entries
       .filter((entry) => entry.lane === "water" && entry.periodRole === "start")
       .filter((entry) => entry.periodTrack >= 0 && entry.periodStartDate && entry.periodLineEndDate && entry.periodStartDate <= rowDate && rowDate <= entry.periodLineEndDate);
@@ -1463,15 +1463,21 @@
       const current = tracks.get(entry.periodTrack);
       if (!current || String(entry.periodStartDate) > String(current.periodStartDate)) tracks.set(entry.periodTrack, entry);
     });
-    return Array.from(tracks.values())
-      .sort((a, b) => a.periodTrack - b.periodTrack)
-      .map((entry) => {
+    const trackEntries = Array.from(tracks.values()).sort((a, b) => a.periodTrack - b.periodTrack);
+    return {
+      markup: trackEntries.map((entry) => {
         const handoff = active.some((candidate) => candidate.periodTrack === entry.periodTrack && candidate.periodTransition && candidate.periodStartDate === rowDate);
         const isStart = entry.periodStartDate === rowDate;
         const isCurrent = !entry.periodEndDate && entry.periodLineEndDate === rowDate;
         const isEnd = !isCurrent && entry.periodLineEndDate === rowDate;
         return `<i class="annual-year-flow-water-track${isStart ? " start" : ""}${isEnd ? " end" : ""}${isCurrent ? " current" : ""}${handoff ? " transition" : ""}" style="--water-track:${entry.periodTrack}" aria-hidden="true"></i>`;
-      }).join("");
+      }).join(""),
+      maxTrack: trackEntries.length ? Math.max(...trackEntries.map((entry) => entry.periodTrack)) : 0
+    };
+  }
+
+  function waterTrackMarkup(entries, rowDate) {
+    return waterTrackInfo(entries, rowDate).markup;
   }
 
   function fieldYearTimeline(field, year) {
@@ -1485,29 +1491,38 @@
       .filter((period) => !/予定/.test(String(period.status || "")) && !/予定/.test(String(period.sourceStatus || "")))
       .map(timelineWaterEntry).filter(Boolean));
     waterEntries.forEach((entry) => {
+      if (entry.periodStartDate && entry.periodEndDate && entry.periodEndDate > entry.periodStartDate) {
+        entry.days = entry.periodDays;
+      }
+      if (entry.periodStartDate && !entry.periodEndDate && entry.periodLineEndDate && entry.periodLineEndDate > entry.periodStartDate) {
+        entry.days = timelineDays(entry.periodStartDate, entry.periodLineEndDate);
+      }
       entries.push(entry);
-      // 終了日も年表の地点にして、開始から完了までを右レーンで追えるようにする。
+      // 期間の完了日は、カードではなく帯の終点として置く。開始カードに
+      // 開始・完了・日数を集約することで、同じ水管理を二度読ませない。
       if (entry.periodStartDate && entry.periodEndDate && entry.periodEndDate > entry.periodStartDate) {
         entries.push({
           ...entry,
-          id: `${entry.editId}:end`,
+          id: `${entry.editId}:end-marker`,
           date: entry.periodEndDate,
           label: `${entry.label} 完了`,
           detail: `${timelineDateParts(entry.periodEndDate).text}完了 / 実績${entry.periodDays}日`,
           days: "",
-          periodRole: "end"
+          periodRole: "end-marker",
+          isWaterMarker: true
         });
       }
       if (entry.periodStartDate && !entry.periodEndDate && entry.periodLineEndDate && entry.periodLineEndDate > entry.periodStartDate) {
         const elapsed = timelineDays(entry.periodStartDate, entry.periodLineEndDate);
         entries.push({
           ...entry,
-          id: `${entry.editId}:current`,
+          id: `${entry.editId}:current-marker`,
           date: entry.periodLineEndDate,
           label: `${entry.label} 継続中`,
-          detail: `${timelineDateParts(entry.periodLineEndDate).text}時点 / 経過${elapsed}日`,
+          detail: `${timelineDateParts(entry.periodLineEndDate).text}時点 / 継続${elapsed}日`,
           days: "",
-          periodRole: "current"
+          periodRole: "current",
+          isWaterMarker: true
         });
       }
     });
@@ -1571,13 +1586,19 @@
     });
     rowsByDate.forEach((row) => row.water.sort((a, b) => waterRoleRank(a) - waterRoleRank(b) || String(a.label).localeCompare(String(b.label))));
     const flowCard = (entry) => `<button type="button" class="annual-year-flow-lane-card ${U.attr(entry.tone)}${entry.periodRole ? ` water-${U.attr(entry.periodRole)}` : ""}" data-annual-flow-open-kind="${U.attr(entry.editKind)}" data-annual-flow-open-id="${U.attr(entry.editId || entry.id)}"><span class="annual-year-flow-lane-title"><em>${U.escapeHTML(entry.category || "記録")}</em><b>${U.escapeHTML(entry.label)}</b><strong aria-hidden="true">〉</strong></span><span class="annual-year-flow-lane-detail">${U.escapeHTML(entry.detail)}</span>${entry.days !== "" && entry.days != null ? `<span class="annual-year-flow-lane-days">${U.escapeHTML(String(entry.days))}日間</span>` : ""}</button>`;
+    const flowMarker = (entry) => `<button type="button" class="annual-year-flow-water-marker ${U.attr(entry.periodRole || "")}" data-annual-flow-open-kind="${U.attr(entry.editKind)}" data-annual-flow-open-id="${U.attr(entry.editId || entry.id)}"><span>${U.escapeHTML(entry.label)}</span><small>${U.escapeHTML(entry.detail)}</small><strong aria-hidden="true">〉</strong></button>`;
     const items = Array.from(rowsByDate.values()).map((row, index, allRows) => {
       const date = timelineDateParts(row.date);
       const work = row.work.length ? row.work.map(flowCard).join("") : '<span class="annual-year-flow-lane-empty" aria-hidden="true"></span>';
-      const water = row.water.length ? row.water.map(flowCard).join("") : '<span class="annual-year-flow-lane-empty" aria-hidden="true"></span>';
-      const waterTracks = waterTrackMarkup(entries, row.date);
+      const waterCards = row.water.filter((entry) => !entry.isWaterMarker);
+      const waterMarkers = row.water.filter((entry) => entry.isWaterMarker);
+      const water = waterCards.length || waterMarkers.length
+        ? `${waterMarkers.filter((entry) => entry.periodRole === "end-marker").map(flowMarker).join("")}${waterCards.map(flowCard).join("")}${waterMarkers.filter((entry) => entry.periodRole !== "end-marker").map(flowMarker).join("")}`
+        : '<span class="annual-year-flow-lane-empty" aria-hidden="true"></span>';
+      const waterTrack = waterTrackInfo(entries, row.date);
+      const waterGutter = 25 + waterTrack.maxTrack * 12;
       const growth = row.growth.length ? `<div class="annual-year-flow-milestones">${row.growth.map((entry) => `<button type="button" data-annual-flow-open-kind="${U.attr(entry.editKind)}" data-annual-flow-open-id="${U.attr(entry.id)}">${U.escapeHTML(entry.label)}: ${U.escapeHTML(entry.detail)}</button>`).join("")}</div>` : "";
-      return `<li class="annual-year-flow-row${index === allRows.length - 1 ? " last" : ""}"><div class="annual-year-flow-lane work">${work}</div><div class="annual-year-flow-axis"><time datetime="${U.attr(row.date)}"><span>${U.escapeHTML(date.day)}</span><small>${U.escapeHTML(date.weekday)}</small></time><i aria-hidden="true"></i></div><div class="annual-year-flow-lane water">${waterTracks}${water}</div>${growth}</li>`;
+      return `<li class="annual-year-flow-row${index === allRows.length - 1 ? " last" : ""}"><div class="annual-year-flow-lane work">${work}</div><div class="annual-year-flow-axis"><time datetime="${U.attr(row.date)}"><span>${U.escapeHTML(date.day)}</span><small>${U.escapeHTML(date.weekday)}</small></time><i aria-hidden="true"></i></div><div class="annual-year-flow-lane water" style="--water-gutter:${waterGutter}px">${waterTrack.markup}${water}</div>${growth}</li>`;
     }).join("");
     return `
       <section class="annual-year-flow" aria-label="${U.escapeHTML(year)}年の一年の流れ">
@@ -2053,7 +2074,7 @@
 
   // A small pure surface for the record-preservation verifier. It is only
   // exposed when the Node test harness opts in, never in the running app.
-  if (window.__RICEOS_TEST__) RiceOS.annualTest = { assignWaterPeriodTracks, waterRoleRank, waterTrackMarkup, fieldYearTimeline };
+  if (window.__RICEOS_TEST__) RiceOS.annualTest = { assignWaterPeriodTracks, waterRoleRank, waterTrackMarkup, waterTrackInfo, fieldYearTimeline };
 
   RiceOS.screens = RiceOS.screens || {};
   RiceOS.screens.annual = { render, bind, openField, openWaterEditor, handleBack, canHandleBack, resetNavigation };
