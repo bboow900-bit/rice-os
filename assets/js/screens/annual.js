@@ -563,7 +563,10 @@
       && !/予定/.test(String(period.raw && (period.raw.status || period.raw.periodStatus) || "")));
     const active = valid.filter((period) => period.startDate && period.startDate <= asOfDate && (!period.actualEndDate || period.actualEndDate > asOfDate))
       .slice().sort((a, b) => String(b.startDate).localeCompare(String(a.startDate)))[0] || null;
-    const completedByAsOf = valid.filter((period) => String(period.actualEndDate || period.startDate || "") <= asOfDate);
+    const completedByAsOf = valid.filter((period) => isTimelineDate(period.startDate)
+      && isTimelineDate(period.actualEndDate)
+      && period.actualEndDate >= period.startDate
+      && period.actualEndDate <= asOfDate);
     const latest = active || completedByAsOf.slice().sort((a, b) => String(b.actualEndDate || b.startDate || "").localeCompare(String(a.actualEndDate || a.startDate || "")))[0] || null;
     if (!latest) return { label: management && management.label || "中干し未実施", detail: "水管理の記録待ち" };
     const start = latest.startDate || "";
@@ -1107,13 +1110,18 @@
 
   function renderWaterPeriod(period) {
     const plannedDays = Number(period.targetDays) || waterPeriodDays(period.startDate, period.plannedEndDate);
-    const completed = Boolean(period.actualEndDate) || /完了|終了/.test(String(period.status || ""));
-    const displayEnd = period.actualEndDate || (String(yearValue()) === String(new Date().getFullYear()) ? U.today() : "");
+    // 完了は実終了日のみで確定する。表示用の状態文言では実績を補わない。
+    const hasStart = isTimelineDate(period.startDate);
+    const hasEnd = isTimelineDate(period.actualEndDate);
+    const dateOrderInvalid = hasStart && hasEnd && period.actualEndDate < period.startDate;
+    const completed = hasStart && hasEnd && !dateOrderInvalid;
+    const active = hasStart && period.startDate <= U.today() && String(yearValue()) === String(new Date().getFullYear());
+    const displayEnd = completed ? period.actualEndDate : (active ? U.today() : "");
     const elapsedDays = waterPeriodDays(period.startDate, displayEnd);
     const actualDays = completed ? waterPeriodDays(period.startDate, period.actualEndDate) : "";
     const progressDays = actualDays !== "" ? actualDays : elapsedDays;
     const progress = plannedDays ? Math.max(0, Math.min(100, Math.round((Number(progressDays || 0) / Number(plannedDays)) * 100))) : 0;
-    const subtitle = completed ? "完了" : (period.startDate ? "継続中" : "開始日を記録してください");
+    const subtitle = dateOrderInvalid ? "日付要確認" : completed ? "完了" : (period.startDate > U.today() ? "開始前" : (active ? "継続中" : (period.startDate ? "終了日未記録" : "開始日を記録してください")));
     const heading = `${period.label}${period.sequence > 1 ? ` ${period.sequence}回目` : ""}`;
     const actionLabel = "編集";
     return `
@@ -1126,7 +1134,7 @@
         <div class="annual-water-period-dates">
           <span><small>開始</small><b>${U.escapeHTML(period.startDate ? U.fd(period.startDate) : "未記録")}</b></span>
           <span><small>予定終了</small><b>${U.escapeHTML(period.plannedEndDate ? U.fd(period.plannedEndDate) : "未設定")}</b></span>
-          <span><small>実績終了</small><b>${U.escapeHTML(period.actualEndDate ? U.fd(period.actualEndDate) : (completed ? "未記録" : "継続中"))}</b></span>
+          <span><small>実績終了</small><b>${U.escapeHTML(completed ? U.fd(period.actualEndDate) : (dateOrderInvalid ? "日付要確認" : (period.actualEndDate ? "日付要確認" : (active ? "継続中" : "未記録"))))}</b></span>
         </div>
         ${plannedDays ? `<div class="annual-water-period-progress"><i><em style="width:${progress}%"></em></i><span>予定 ${plannedDays}日${progressDays !== "" ? ` / ${completed ? "実績" : "経過"} ${progressDays}日` : ""}</span></div>` : ""}
         ${period.memo ? `<p class="annual-water-period-memo">${U.escapeHTML(period.memo)}</p>` : ""}
@@ -1240,9 +1248,15 @@
     const first = rows[0];
     const startDate = first.startDate || first.date || "";
     const endDate = first.actualEndDate || "";
-    const days = startDate && endDate ? U.daysBetween(startDate, endDate) : "";
+    const validEnd = isTimelineDate(startDate) && isTimelineDate(endDate) && endDate >= startDate;
+    const days = validEnd ? U.daysBetween(startDate, endDate) : "";
+    const isCurrent = isTimelineDate(startDate) && startDate.slice(0, 4) === String(new Date().getFullYear()) && startDate <= U.today();
+    const text = validEnd
+      ? `${U.fd(startDate)}〜${U.fd(endDate)}${days === "" ? "" : ` (${days}日)`}`
+      : endDate ? `${U.fd(startDate)} → 日付要確認`
+        : `${U.fd(startDate)} → ${startDate > U.today() ? "開始前" : (isCurrent ? "継続中" : "終了日未記録")}`;
     return {
-      text: endDate ? `${U.fd(startDate)}〜${U.fd(endDate)}${days === "" ? "" : ` (${days}日)`}` : `${U.fd(startDate)}〜実施中`,
+      text,
       days,
       startDate,
       endDate
@@ -1383,25 +1397,31 @@
     const date = startDate || endDate;
     if (!date) return null;
     const validEnd = !startDate || !endDate || endDate >= startDate;
+    const isCurrentYear = startDate && Number(startDate.slice(0, 4)) === new Date().getFullYear() && startDate <= U.today();
     const range = startDate && endDate && validEnd
       ? `${timelineDateParts(startDate).text}開始 → ${timelineDateParts(endDate).text}完了`
       : startDate && endDate ? `${timelineDateParts(startDate).text}開始 → 終了日を確認`
-      : startDate ? `${timelineDateParts(startDate).text}開始 → 継続中` : `${timelineDateParts(endDate).text}完了`;
+      : startDate ? `${timelineDateParts(startDate).text}開始 → ${isCurrentYear ? "継続中" : "終了日未記録"}` : `${timelineDateParts(endDate).text}完了`;
     const days = validEnd ? timelineDays(startDate, endDate) : "";
     const legacyIds = period.sourceWorkIds || [];
+    const endOnly = !startDate && Boolean(endDate);
     return {
       id: period.directId || legacyIds[0] || period.periodId || "",
+      editId: period.directId || legacyIds[0] || period.periodId || "",
       // A legacy period can span multiple original work records. Keep those
       // records intact and return to the water review tab instead of guessing
       // which one the user intended to edit.
       editKind: period.directId ? (period.kind === "dry" ? "dry" : "irrigation") : legacyIds.length === 1 ? "fieldWork" : "waterReview",
       date,
-      label: String(period.label || "水管理"),
+      label: endOnly ? `${String(period.label || "水管理")} 終了記録` : String(period.label || "水管理"),
       category: "水管理",
       tone: "water",
       lane: "water",
-      detail: range,
-      days
+      detail: endOnly ? `${timelineDateParts(endDate).text}終了 / 開始日未記録` : range,
+      days,
+      periodRole: endOnly ? "orphan-end" : "start",
+      periodStartDate: startDate,
+      periodEndDate: validEnd ? endDate : ""
     };
   }
 
@@ -1412,9 +1432,24 @@
     const { works, headingWorks, growth, waterPeriods, others } = sources;
     const entries = works.map(timelineWorkEntry);
 
-    waterPeriods
+    const waterEntries = waterPeriods
       .filter((period) => !/予定/.test(String(period.status || "")) && !/予定/.test(String(period.sourceStatus || "")))
-      .map(timelineWaterEntry).filter(Boolean).forEach((entry) => entries.push(entry));
+      .map(timelineWaterEntry).filter(Boolean);
+    waterEntries.forEach((entry) => {
+      entries.push(entry);
+      // 終了日も年表の地点にして、開始から完了までを右レーンで追えるようにする。
+      if (entry.periodStartDate && entry.periodEndDate && entry.periodEndDate > entry.periodStartDate) {
+        entries.push({
+          ...entry,
+          id: `${entry.editId}:end`,
+          date: entry.periodEndDate,
+          label: `${entry.label} 完了`,
+          detail: `${timelineDateParts(entry.periodStartDate).text}開始 / ${entry.days}日間`,
+          days: "",
+          periodRole: "end"
+        });
+      }
+    });
     growth
       .filter((row) => row.headingObserved || row.observedStage === "heading" && row.stageConfirmed || U.number(row.panicleLengthMm, 0) > 0)
       .forEach((row) => entries.push({
@@ -1473,13 +1508,24 @@
       const row = rowsByDate.get(entry.date);
       row[entry.lane === "water" ? "water" : entry.lane === "growth" ? "growth" : "work"].push(entry);
     });
-    const flowCard = (entry) => `<button type="button" class="annual-year-flow-lane-card ${U.attr(entry.tone)}" data-annual-flow-open-kind="${U.attr(entry.editKind)}" data-annual-flow-open-id="${U.attr(entry.id)}"><span class="annual-year-flow-lane-title"><em>${U.escapeHTML(entry.category || "記録")}</em><b>${U.escapeHTML(entry.label)}</b><strong aria-hidden="true">〉</strong></span><span class="annual-year-flow-lane-detail">${U.escapeHTML(entry.detail)}</span>${entry.days !== "" ? `<span class="annual-year-flow-lane-days">${U.escapeHTML(String(entry.days))}日間</span>` : ""}</button>`;
+    const flowCard = (entry) => `<button type="button" class="annual-year-flow-lane-card ${U.attr(entry.tone)}${entry.periodRole ? ` water-${U.attr(entry.periodRole)}` : ""}" data-annual-flow-open-kind="${U.attr(entry.editKind)}" data-annual-flow-open-id="${U.attr(entry.editId || entry.id)}"><span class="annual-year-flow-lane-title"><em>${U.escapeHTML(entry.category || "記録")}</em><b>${U.escapeHTML(entry.label)}</b><strong aria-hidden="true">〉</strong></span><span class="annual-year-flow-lane-detail">${U.escapeHTML(entry.detail)}</span>${entry.days !== "" ? `<span class="annual-year-flow-lane-days">${U.escapeHTML(String(entry.days))}日間</span>` : ""}</button>`;
     const items = Array.from(rowsByDate.values()).map((row, index, allRows) => {
       const date = timelineDateParts(row.date);
       const work = row.work.length ? row.work.map(flowCard).join("") : '<span class="annual-year-flow-lane-empty" aria-hidden="true"></span>';
       const water = row.water.length ? row.water.map(flowCard).join("") : '<span class="annual-year-flow-lane-empty" aria-hidden="true"></span>';
+      const activeWater = entries
+        .filter((entry) => entry.lane === "water" && entry.periodRole === "start")
+        .filter((entry) => entry.periodStartDate && entry.periodEndDate && entry.periodStartDate <= row.date && row.date <= entry.periodEndDate)
+        .slice(0, 2);
+      const waterTracks = activeWater.map((entry, trackIndex) => {
+        const isStart = entry.periodStartDate === row.date;
+        const isEnd = entry.periodEndDate === row.date;
+        // 開始カード自身の下向きマーカーを使うため、同じ場所に線を重ねない。
+        if (isStart) return "";
+        return `<i class="annual-year-flow-water-track${isStart ? " start" : ""}${isEnd ? " end" : ""}" style="--water-track:${trackIndex}" aria-hidden="true"></i>`;
+      }).join("");
       const growth = row.growth.length ? `<div class="annual-year-flow-milestones">${row.growth.map((entry) => `<button type="button" data-annual-flow-open-kind="${U.attr(entry.editKind)}" data-annual-flow-open-id="${U.attr(entry.id)}">${U.escapeHTML(entry.label)}: ${U.escapeHTML(entry.detail)}</button>`).join("")}</div>` : "";
-      return `<li class="annual-year-flow-row${index === allRows.length - 1 ? " last" : ""}"><div class="annual-year-flow-lane work">${work}</div><div class="annual-year-flow-axis"><time datetime="${U.attr(row.date)}"><span>${U.escapeHTML(date.day)}</span><small>${U.escapeHTML(date.weekday)}</small></time><i aria-hidden="true"></i></div><div class="annual-year-flow-lane water">${water}</div>${growth}</li>`;
+      return `<li class="annual-year-flow-row${index === allRows.length - 1 ? " last" : ""}"><div class="annual-year-flow-lane work">${work}</div><div class="annual-year-flow-axis"><time datetime="${U.attr(row.date)}"><span>${U.escapeHTML(date.day)}</span><small>${U.escapeHTML(date.weekday)}</small></time><i aria-hidden="true"></i></div><div class="annual-year-flow-lane water">${waterTracks}${water}</div>${growth}</li>`;
     }).join("");
     return `
       <section class="annual-year-flow" aria-label="${U.escapeHTML(year)}年の一年の流れ">

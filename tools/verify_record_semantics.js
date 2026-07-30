@@ -53,6 +53,17 @@ assert(state.headingDateForField(fieldId, 2026) === "2026-08-03", "A planned hea
 assert(!state.isActualFieldWork({ date: "2026-05-01", workName: "\u4e2d\u5e72\u3057\u78ba\u8a8d\u5019\u88dc" }), "A confirmation candidate was classified as actual");
 assert(state.isActualFieldWork({ date: "2026-08-03", workName: "\u51fa\u7a42\u78ba\u8a8d", sourceScheduleId: "schedule_heading" }), "A completed scheduled work was not classified as actual");
 
+load("assets/js/core/agro.js");
+state.saveIrrigation({
+  irrigationId: "invalid_water_period",
+  fieldId,
+  method: "\u9593\u65ad\u704c\u6c34",
+  startDate: "2026-07-20",
+  actualEndDate: "2026-07-10"
+});
+const invalidWaterStatus = global.RiceOS.agro.managementStatus(state.fields().find((field) => field.fieldId === fieldId), "2026-07-30");
+assert(!/\u5b8c\u4e86/.test(String(invalidWaterStatus.label || "")), "An invalid water period was treated as completed management");
+
 state.saveFieldWork({
   workId: "fertilizer-work",
   date: "2026-07-10",

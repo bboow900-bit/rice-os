@@ -287,13 +287,20 @@
   function managementStatus(field, date) {
     const targetDate = date || U.today();
     const year = U.dateYear(targetDate);
+    const validDate = (value) => {
+      const text = String(value || "");
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) return false;
+      const parsed = new Date(`${text}T00:00:00`);
+      return !Number.isNaN(parsed.getTime()) && parsed.getFullYear() === Number(text.slice(0, 4)) && parsed.getMonth() + 1 === Number(text.slice(5, 7)) && parsed.getDate() === Number(text.slice(8, 10));
+    };
     const periods = state().resolvedWaterPeriodsFor
       ? state().resolvedWaterPeriodsFor(field.fieldId, { year, throughDate: targetDate, includePlanned: true, forDisplay: true })
       : [];
     // A period becomes factual only when it has an actual start. Keep plans
     // visible in their own views, but never let them replace current status.
-    const factual = periods.filter((row) => row.startDate && !row.planned && row.startDate <= targetDate);
-    const active = factual.filter((row) => !row.actualEndDate || row.actualEndDate > targetDate)
+    const factual = periods.filter((row) => validDate(row.startDate) && !row.planned && row.startDate <= targetDate);
+    const hasValidEnd = (row) => validDate(row.actualEndDate) && row.actualEndDate >= row.startDate;
+    const active = factual.filter((row) => !row.actualEndDate || (hasValidEnd(row) && row.actualEndDate > targetDate))
       .slice().sort((a, b) => String(b.startDate || "").localeCompare(String(a.startDate || "")));
     const activeKinds = Array.from(new Set(active.map((row) => row.kind)));
     if (activeKinds.length > 1) {
@@ -311,7 +318,7 @@
       const keys = { dry: "drying", intermittent: "intermittent", deep: "deepWater", drain: "draining" };
       return { key: keys[current.kind] || current.kind, label: labels[current.kind] || `${current.label}中`, tone: current.kind === "dry" ? "warn" : "water", date: current.startDate || "" };
     }
-    const completed = factual.filter((row) => row.actualEndDate && row.actualEndDate <= targetDate)
+    const completed = factual.filter((row) => hasValidEnd(row) && row.actualEndDate <= targetDate)
       .slice().sort((a, b) => String(b.actualEndDate || "").localeCompare(String(a.actualEndDate || "")))[0] || null;
     if (completed) return { key: `${completed.kind}Completed`, label: `${completed.label}完了`, tone: "ok", date: completed.actualEndDate || "" };
     return { key: "waterWaiting", label: "水管理未記録", tone: "waiting", date: "" };
