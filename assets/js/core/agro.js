@@ -290,24 +290,31 @@
     const periods = state().resolvedWaterPeriodsFor
       ? state().resolvedWaterPeriodsFor(field.fieldId, { year, throughDate: targetDate, includePlanned: true, forDisplay: true })
       : [];
-    // An old imported "end" work without its matching start is useful in
-    // history, but it must never become the current management status.
-    const latest = (kind) => periods.filter((row) => row.kind === kind && row.startDate)
-      .slice().sort((a, b) => String(b.startDate || b.actualEndDate || "").localeCompare(String(a.startDate || a.actualEndDate || "")))[0] || null;
-    const dry = latest("dry");
-    const dryEnd = dry && dry.actualEndDate || "";
-    const deepWater = latest("deep");
-    if (deepWater && !(deepWater.actualEndDate && deepWater.actualEndDate <= targetDate)) {
-      return { key: "deepWater", label: "深水管理中", tone: "water", date: deepWater.startDate || "" };
+    // A period becomes factual only when it has an actual start. Keep plans
+    // visible in their own views, but never let them replace current status.
+    const factual = periods.filter((row) => row.startDate && !row.planned && row.startDate <= targetDate);
+    const active = factual.filter((row) => !row.actualEndDate || row.actualEndDate > targetDate)
+      .slice().sort((a, b) => String(b.startDate || "").localeCompare(String(a.startDate || "")));
+    const activeKinds = Array.from(new Set(active.map((row) => row.kind)));
+    if (activeKinds.length > 1) {
+      return {
+        key: "overlap",
+        label: "水管理の記録を確認",
+        tone: "warn",
+        date: active[0] && active[0].startDate || "",
+        detail: active.map((row) => row.label).filter((label, index, rows) => rows.indexOf(label) === index).join(" / ")
+      };
     }
-    const irrigation = latest("intermittent");
-    if (irrigation) {
-      const ended = irrigation.actualEndDate && irrigation.actualEndDate <= targetDate;
-      return { key: ended ? "intermittentCompleted" : "intermittent", label: ended ? "間断灌水完了" : "間断灌水中", tone: ended ? "ok" : "water", date: irrigation.actualEndDate || irrigation.startDate || "" };
+    if (active.length) {
+      const current = active[0];
+      const labels = { dry: "中干し中", intermittent: "間断灌水中", deep: "深水管理中", drain: "落水中" };
+      const keys = { dry: "drying", intermittent: "intermittent", deep: "deepWater", drain: "draining" };
+      return { key: keys[current.kind] || current.kind, label: labels[current.kind] || `${current.label}中`, tone: current.kind === "dry" ? "warn" : "water", date: current.startDate || "" };
     }
-    if (dryEnd) return { key: "dryCompleted", label: "中干し完了", tone: "ok", date: dryEnd };
-    if (dry && dry.startDate) return { key: "drying", label: "中干し中", tone: "warn", date: dry.startDate };
-    return { key: "dryWaiting", label: "中干し未実施", tone: "waiting", date: "" };
+    const completed = factual.filter((row) => row.actualEndDate && row.actualEndDate <= targetDate)
+      .slice().sort((a, b) => String(b.actualEndDate || "").localeCompare(String(a.actualEndDate || "")))[0] || null;
+    if (completed) return { key: `${completed.kind}Completed`, label: `${completed.label}完了`, tone: "ok", date: completed.actualEndDate || "" };
+    return { key: "waterWaiting", label: "水管理未記録", tone: "waiting", date: "" };
   }
 
   // Every screen uses this service so confirmed facts and calendar estimates stay aligned.

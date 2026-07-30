@@ -1393,6 +1393,40 @@
       && row.startDate === period.startDate && row.actualEndDate === period.actualEndDate);
   }
 
+  function legacyWaterCarryover(period, fallbackMemo, draft) {
+    const ids = new Set();
+    const rows = [period && period.raw || {}, ...((period && period.sourceWorkIds || []).map((workId) => (draft && draft.fieldWorks || []).find((row) => row.workId === workId) || {}))]
+      .filter((row) => {
+        const key = row.workId || `${row.date || ""}|${row.title || ""}|${row.memo || ""}`;
+        if (ids.has(key)) return false;
+        ids.add(key);
+        return true;
+      });
+    const details = rows.flatMap((raw) => [
+      raw.machine ? `元作業の機械: ${raw.machine}` : "",
+      raw.material ? `元作業の資材: ${raw.material}${raw.amount ? ` ${raw.amount}` : ""}` : "",
+      raw.weather ? `元作業の天気: ${raw.weather}` : "",
+      raw.memo || ""
+    ]).concat(fallbackMemo || "").filter(Boolean);
+    const photoRow = rows.slice().reverse().find((raw) => raw.photoData || raw.photo) || {};
+    return {
+      memo: Array.from(new Set(details)).join("\n"),
+      photo: photoRow.photo || "",
+      photoData: photoRow.photoData || ""
+    };
+  }
+
+  function mergeWaterMemo(existingMemo, carryoverMemo) {
+    return Array.from(new Set([existingMemo || "", carryoverMemo || ""].filter(Boolean))).join("\n");
+  }
+
+  function matchingDirectWaterRow(rows, fieldId, period) {
+    return (rows || []).find((row) => row.fieldId === fieldId
+      && waterKindFromMethod(row.method || (period.kind === "dry" ? "中干し" : "")) === period.kind
+      && String(row.startDate || row.date || "") === String(period.startDate || "")
+      && String(row.actualEndDate || "") === String(period.actualEndDate || "")) || null;
+  }
+
   function importLegacyWaterPeriod(fieldId, legacyKey, existingPeriodId) {
     const period = legacyWaterPeriodsFor(fieldId, "", { includeMigrated: true })
       .find((item) => item.legacyKey === legacyKey);
@@ -1400,11 +1434,12 @@
     let periodId = "";
     const saved = mutate((d) => {
       const directRows = period.kind === "dry" ? d.dryPeriods : d.irrigations;
-      const same = existingPeriodId && directRows.find((row) => row.fieldId === fieldId
+      const selected = existingPeriodId && directRows.find((row) => row.fieldId === fieldId
         && (row.dryPeriodId === existingPeriodId || row.irrigationId === existingPeriodId)
         && waterKindFromMethod(row.method || (period.kind === "dry" ? "中干し" : "")) === period.kind
         && String(row.startDate || row.date || "") === String(period.startDate)
         && String(row.actualEndDate || "") === String(period.actualEndDate));
+      const same = selected || matchingDirectWaterRow(directRows, fieldId, period);
       periodId = same ? (same.dryPeriodId || same.irrigationId) : "";
       if (!periodId) {
         periodId = U.id(period.kind === "dry" ? "dry" : "irrigation", period.startDate || period.actualEndDate || U.today());
@@ -1418,10 +1453,20 @@
           referenceRecordIds: period.sourceWorkIds.slice(),
           batchId: period.raw && period.raw.batchId || "",
           batchFieldIds: period.raw && period.raw.batchFieldIds || [],
-          memo: "旧作業記録から取り込み"
-        };
+        ...legacyWaterCarryover(period, "旧作業記録から取り込み", d)
+      };
         if (period.kind === "dry") saveDryPeriodToDraft(d, { ...base, dryPeriodId: periodId });
         else saveIrrigationToDraft(d, { ...base, irrigationId: periodId, method: WATER_PERIOD_TYPES[period.kind].method });
+      } else {
+        const index = directRows.indexOf(same);
+        directRows[index] = {
+          ...same,
+          referenceRecordIds: Array.from(new Set([...(same.referenceRecordIds || []), ...period.sourceWorkIds])),
+          memo: mergeWaterMemo(same.memo, base.memo),
+          photo: same.photo || base.photo,
+          photoData: same.photoData || base.photoData,
+          updatedAt: U.now()
+        };
       }
       period.sourceWorkIds.forEach((workId) => {
         const index = d.fieldWorks.findIndex((row) => row.workId === workId);
@@ -1444,7 +1489,9 @@
     if (!period || period.migrated || !period.sourceWorkIds.length || (!period.startDate && !period.actualEndDate)) return null;
     let periodId = "";
     const saved = mutate((d) => {
-      periodId = U.id(period.kind === "dry" ? "dry" : "irrigation", period.startDate || period.actualEndDate || U.today());
+      const directRows = period.kind === "dry" ? d.dryPeriods : d.irrigations;
+      const existing = matchingDirectWaterRow(directRows, fieldId, period);
+      periodId = existing ? (existing.dryPeriodId || existing.irrigationId) : U.id(period.kind === "dry" ? "dry" : "irrigation", period.startDate || period.actualEndDate || U.today());
       const base = {
         fieldId,
         date: period.startDate || period.actualEndDate || U.today(),
@@ -1455,10 +1502,22 @@
         referenceRecordIds: period.sourceWorkIds.slice(),
         batchId: period.raw && period.raw.batchId || "",
         batchFieldIds: period.raw && period.raw.batchFieldIds || [],
-        memo: "旧作業記録から引き継ぎ（期間を確認）"
+        ...legacyWaterCarryover(period, "旧作業記録から引き継ぎ（期間を確認）", d)
       };
-      if (period.kind === "dry") saveDryPeriodToDraft(d, { ...base, dryPeriodId: periodId });
-      else saveIrrigationToDraft(d, { ...base, irrigationId: periodId, method: WATER_PERIOD_TYPES[period.kind].method });
+      if (!existing) {
+        if (period.kind === "dry") saveDryPeriodToDraft(d, { ...base, dryPeriodId: periodId });
+        else saveIrrigationToDraft(d, { ...base, irrigationId: periodId, method: WATER_PERIOD_TYPES[period.kind].method });
+      } else {
+        const index = directRows.indexOf(existing);
+        directRows[index] = {
+          ...existing,
+          referenceRecordIds: Array.from(new Set([...(existing.referenceRecordIds || []), ...period.sourceWorkIds])),
+          memo: mergeWaterMemo(existing.memo, base.memo),
+          photo: existing.photo || base.photo,
+          photoData: existing.photoData || base.photoData,
+          updatedAt: U.now()
+        };
+      }
       period.sourceWorkIds.forEach((workId) => {
         const index = d.fieldWorks.findIndex((row) => row.workId === workId);
         if (index < 0) return;

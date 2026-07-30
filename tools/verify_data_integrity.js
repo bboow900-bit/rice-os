@@ -444,6 +444,13 @@ assert(resolvedB2026.some((row) => row.kind === "deep" && row.startDate === "202
 assert(resolvedB2026.some((row) => row.kind === "deep" && !row.startDate && row.actualEndDate === "2026-07-04" && row.source === "legacy-work"), "作業記録だけの終了事実を残せない");
 assert(state.resolvedWaterPeriodsFor("field_b", { year: 2026, includePlanned: true, forDisplay: true }).filter((row) => row.kind === "intermittent" && row.startDate === "2026-06-12").length === 2, "新旧の水管理記録が削除不能な一枚に統合されている");
 assert(JSON.stringify(state.data().irrigations) === waterDataBeforeResolve, "水管理の表示解決で保存済みデータが書き換わった");
+const duplicateLegacy = state.legacyWaterReviewFor("field_b", { year: 2026 })
+  .find((row) => row.sourceWorkIds.includes("water_duplicate_direct"));
+const irrigationCountBeforeAdopt = state.data().irrigations.length;
+const adoptedDuplicate = state.adoptLegacyWaterPeriod("field_b", duplicateLegacy.legacyKey);
+assert(adoptedDuplicate && adoptedDuplicate.id === "intermittent_field_b_2026_01", "同じ水管理期間を既存の直接記録へ関連付けできない");
+assert(state.data().irrigations.length === irrigationCountBeforeAdopt, "旧作業の取り込みで同じ水管理期間を複製した");
+assert(state.data().irrigations.find((row) => row.irrigationId === adoptedDuplicate.id).referenceRecordIds.includes("water_duplicate_direct"), "旧作業との参照関係を残せない");
 assert(!state.resolvedWaterPeriodsFor("field_a", { year: 2025 }).some((row) => row.startDate === "2026-08-01"), "水管理の表示解決で年度をまたいだ");
 state.deleteFieldWork("water_legacy_intermit_start");
 assert(!state.resolvedWaterPeriodsFor("field_a", { year: 2026, includePlanned: true }).some((row) => row.sourceWorkIds && row.sourceWorkIds.includes("water_legacy_intermit_start")), "旧作業由来の水管理を削除できない");
@@ -468,7 +475,7 @@ assert(state.headingDateForField("field_a", 2025) === "2025-07-15", "heading wor
 assert(state.headingDateForField("field_a", 2026) === "2026-07-03", "heading lookup did not include confirmed growth evidence");
 assert(state.dryPeriodsFor("field_a", 2025).every((row) => String(row.date).startsWith("2025-")), "year-scoped drying lookup leaked another year");
 assert(state.irrigationsFor("field_a", 2026).every((row) => String(row.date).startsWith("2026-")), "year-scoped intermittent irrigation lookup leaked another year");
-assert(agro.managementStatus(state.field("field_a"), "2025-06-10").key === "intermittent", "中干し完了後の間断灌水が管理状況へ反映されない");
+assert(agro.managementStatus(state.field("field_a"), "2025-06-10").key === "overlap", "重なった水管理記録を一方的に現在地へ決めている");
 assert(agro.managementStatus(state.field("field_a"), "2026-06-10").key === "drying", "management status leaked a different year");
 
 const beforeRoundTrip = storage.info(state.data());

@@ -722,6 +722,13 @@
     return latestResolvedWaterPeriod(fieldId, "deep");
   }
 
+  // Home and field detail must read exactly the same water-management state.
+  // The core resolver keeps dedicated records and old work records visible.
+  function currentWaterManagement(field) {
+    if (!RiceOS.agro || !RiceOS.agro.managementStatus) return null;
+    return RiceOS.agro.managementStatus(field, U.today());
+  }
+
   function latestSeasonNoteForField(fieldId) {
     if (!state.seasonNotesForField) return null;
     return (state.seasonNotesForField(fieldId, currentSeasonYear()) || []).slice()
@@ -816,6 +823,8 @@
 
   function fieldStatusText(field) {
     const growth = latestGrowthForField(field.fieldId);
+    const management = currentWaterManagement(field);
+    if (management && management.key && management.key !== "waterWaiting") return management.label;
     const dry = drySummary(field);
     const irrigation = latestIrrigationForField(field.fieldId);
     const deepWater = latestDeepWaterForField(field.fieldId);
@@ -832,7 +841,9 @@
     const planting = state.plantingDateForField ? state.plantingDateForField(field.fieldId, year) : "";
     const growth = latestGrowthForField(field.fieldId);
     const dry = drySummary(field);
+    const management = currentWaterManagement(field);
     if (!planting) return { label: "田植え作業を記録", action: "add-work" };
+    if (management && management.key === "dryCompleted") return { label: "間断灌水を記録", action: "add-irrigation" };
     if (dry.actualEndDate && !latestIrrigationForField(field.fieldId)) return { label: "間断灌水を記録", action: "add-irrigation" };
     if (!growth) return { label: "生育を記録", action: "add-growth" };
     return null;

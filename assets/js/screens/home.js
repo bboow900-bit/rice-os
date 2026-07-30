@@ -557,6 +557,13 @@
   }
 
   function waterManagementForField(field, dateText) {
+    if (RiceOS.agro && RiceOS.agro.managementStatus) {
+      const current = RiceOS.agro.managementStatus(field, dateText);
+      return {
+        ...current,
+        evidence: current.date ? `実績 ${U.fd(current.date)}` : "記録待ち"
+      };
+    }
     const year = cropYear(dateText);
     const periods = resolvedWaterPeriods(field.fieldId, year, dateText);
     const dryPeriods = waterRows(periods, "dry");

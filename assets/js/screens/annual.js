@@ -431,7 +431,16 @@
   function renderSummary(rows) {
     const fields = unique(rows.flatMap((row) => row.fieldIds || []));
     const workCount = rows.filter((row) => row.kind === "fieldWork").length;
-    const waterCount = rows.filter((row) => row.kind === "dry" || row.kind === "irrigation").length;
+    // Water history is read through the common resolver so older work records
+    // and direct water entries use the same counting rule as field detail.
+    const selectedYear = yearValue() === "all" ? undefined : yearValue();
+    const waterCount = state.resolvedWaterPeriodsFor
+      ? state.fields().reduce((sum, field) => sum + state.resolvedWaterPeriodsFor(field.fieldId, {
+        year: selectedYear,
+        includePlanned: false,
+        forDisplay: false
+      }).length, 0)
+      : rows.filter((row) => row.kind === "dry" || row.kind === "irrigation").length;
     const growthCount = rows.filter((row) => row.kind === "growth").length;
     return `
       <section class="annual-summary-board">
@@ -849,7 +858,9 @@
     const targetYear = year && year !== "all" ? String(year) : undefined;
     return [
       ...state.growthLogsFor(fieldId, targetYear).map((row) => ({ date: row.date, title: "生育", photoData: row.photoData, photo: row.photo })),
-      ...state.fieldWorksFor(fieldId, targetYear).filter((row) => !(state.waterEventForWorkName && state.waterEventForWorkName(row.workName)) && !(state.isMigratedWaterWork && state.isMigratedWaterWork(row, fieldId))).map((row) => ({ date: row.date, title: row.workName || "作業", photoData: row.photoData, photo: row.photo })),
+      // Migrated water work is hidden from the work list to avoid duplicate
+      // timeline rows, but its photos stay visible in the annual photo record.
+      ...state.fieldWorksFor(fieldId, targetYear).filter((row) => !(state.waterEventForWorkName && state.waterEventForWorkName(row.workName))).map((row) => ({ date: row.date, title: row.workName || "作業", photoData: row.photoData, photo: row.photo })),
       ...state.dryPeriodsFor(fieldId, targetYear).map((row) => ({ date: row.date, title: "中干し", photoData: row.photoData, photo: row.photo }))
     ].filter((row) => row.photoData || row.photo).sort((a, b) => String(b.date).localeCompare(String(a.date)));
   }
@@ -1059,8 +1070,8 @@
         status: period.status || "",
         memo: period.raw && period.raw.memo || "",
         sourceType: period.source || "",
-        editKind: period.source === "direct" ? (period.kind === "dry" ? "dry" : "irrigation") : "fieldWork",
-        editId: period.source === "direct" ? period.directId : (period.sourceWorkIds || [])[0] || "",
+        editKind: period.source === "legacy-work" ? "fieldWork" : (period.kind === "dry" ? "dry" : "irrigation"),
+        editId: period.source === "legacy-work" ? (period.sourceWorkIds || [])[0] || "" : period.directId || "",
         sourceWorkIds: Array.isArray(period.sourceWorkIds) ? period.sourceWorkIds.slice() : [],
         source: period.source === "legacy-work" ? "作業記録から反映" : (period.source === "mixed" ? "作業・水管理記録を統合" : "水管理記録")
       }))
@@ -1158,7 +1169,9 @@
   }
 
   function renderWaterTab(field) {
-    const directPeriods = waterPeriodsForField(field).filter((period) => period.sourceType === "direct");
+    // A future resolver can mark a direct record as "mixed" after an explicit
+    // legacy link. It remains an editable water record, never a hidden row.
+    const directPeriods = waterPeriodsForField(field).filter((period) => period.sourceType !== "legacy-work");
     const legacyPeriods = legacyWaterReviewRowsForField(field).filter((period) => !period.migrated);
     if (!directPeriods.length && !legacyPeriods.length) return '<div class="empty">中干し・間断灌水・深水管理・稲刈り前の落水を記録すると、期間をここで振り返れます。</div>';
     return `${renderWaterEditor(field)}
