@@ -44,8 +44,8 @@ function main() {
   assert(state.includes("plantingDateForField"), "Planting-date resolver is missing");
   assert(state.includes("resolvedWaterPeriodsFor"), "Water-management resolver is missing");
   assert(home.includes("home-linked-flow"), "Home growth/water progress map is missing");
-  assert(annual.includes("annual-year-flow-grid"), "Annual work/water flow is missing");
-  assert(annual.includes("annual-year-flow-lane"), "Annual work/water lanes are missing");
+  assert(annual.includes("annual-year-flow-single"), "Annual one-column flow is missing");
+  assert(annual.includes("annual-year-flow-rail"), "Annual timeline rail is missing");
   assert(index.includes('id="appBackButton"'), "Global back button is missing");
 
   const pwaVersion = (pwa.match(/APP_VERSION\s*=\s*"([^"]+)"/) || [])[1];
