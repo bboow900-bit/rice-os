@@ -349,6 +349,20 @@
     U.toast(`${bulkFieldIds.length}圃場へ同じ生育ログを登録します`);
   }
 
+  function prefillStageRecord(date, fieldIds) {
+    prefillFields(date, fieldIds);
+    const ids = (fieldIds || []).filter(Boolean);
+    const matchingGroup = fieldGroups().find((group) => group.fields.length === ids.length && group.fields.every((field) => ids.includes(field.fieldId)));
+    if (matchingGroup) {
+      U.$("gPanicleTargetMode").value = "group";
+      U.$("gPanicleGroup").value = matchingGroup.fieldGroupId;
+      renderPanicleTargets();
+    }
+    const section = U.$("growthPanicleSection");
+    if (section) section.open = true;
+    setTimeout(() => U.$("gPanicleLengthMm")?.focus(), 40);
+  }
+
   function renderOptions() {
     U.setOptions(U.$("gField"), state.activeFields().map((f) => ({ value: f.fieldId, label: f.name })), U.$("gField").value);
     if (U.$("growthFilterField")) {
@@ -751,5 +765,5 @@
   }
 
   RiceOS.screens = RiceOS.screens || {};
-  RiceOS.screens.growth = { render, bind, resetForm, prefillField, prefillDate, prefillFields, editLog };
+  RiceOS.screens.growth = { render, bind, resetForm, prefillField, prefillDate, prefillFields, prefillStageRecord, editLog };
 })();

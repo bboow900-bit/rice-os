@@ -12,6 +12,7 @@
   }
 
   function entryStatusLabel(entry) {
+    if (entry.planned) return "予定";
     if (entry.kind === "schedule") {
       if (entry.tone === "schedule-overdue") return "超過";
       if (entry.tone === "schedule-done") return "済";
@@ -92,13 +93,19 @@
   function renderSelected() {
     U.$("selectedDateTitle").textContent = `${U.fd(selectedDate)} の記録`;
     const entries = RiceOS.calendar.entriesForDate(selectedDate);
-    const kinds = [...new Set(entries.map((entry) => entryStatusLabel(entry)).filter(Boolean))];
     const meta = U.$("selectedDateMeta");
     if (meta) {
-      meta.textContent = entries.length
-        ? `${entries.length}件の記録${kinds.length ? ` / ${kinds.join("・")}` : ""}`
-        : "記録を追加できます";
+      meta.textContent = entries.length ? `${entries.length}件を確認中` : "この日に記録を追加できます";
     }
+    const target = U.$("selectedDateEntries");
+    if (!target) return;
+    const plans = entries.filter((entry) => entry.planned || (entry.kind === "schedule" && !scheduleDone(entry.record)));
+    const actuals = entries.filter((entry) => !(entry.planned || (entry.kind === "schedule" && !scheduleDone(entry.record))));
+    target.innerHTML = `
+      ${plans.length ? `<section class="calendar-entry-group plan"><h4>予定 <span>${plans.length}件</span></h4>${plans.map(entryHtml).join("")}</section>` : ""}
+      ${actuals.length ? `<section class="calendar-entry-group actual"><h4>実績 <span>${actuals.length}件</span></h4>${actuals.map(entryHtml).join("")}</section>` : ""}
+      ${entries.length ? "" : '<p class="calendar-empty-day">この日の予定・実績はまだありません。</p>'}
+    `;
   }
 
   function render() {
@@ -116,10 +123,47 @@
       if (!day) return;
       selectedDate = day.dataset.date;
       render();
-      if (RiceOS.bottomSheet) RiceOS.bottomSheet.open(selectedDate);
     });
     const openSelected = U.$("selectedDateSummary");
     if (openSelected) openSelected.addEventListener("click", (event) => {
+      const action = event.target.closest("[data-calendar-action]");
+      if (action) {
+        const entry = findEntry(action.dataset.kind, action.dataset.id);
+        if (!entry) return;
+        if (action.dataset.calendarAction === "complete" && entry.kind === "schedule") {
+          if (entry.record.recordKind === "water" && RiceOS.bottomSheet && RiceOS.bottomSheet.openScheduleCompletion) {
+            RiceOS.bottomSheet.openScheduleCompletion(entry.record);
+            return;
+          }
+          RiceOS.state.completeSchedule(action.dataset.id);
+          render();
+          return;
+        }
+        if (action.dataset.calendarAction === "edit" && RiceOS.recordActions) {
+          RiceOS.recordActions.edit(entry.kind, entry.record, { originScreen: "calendar" });
+          return;
+        }
+        if (action.dataset.calendarAction === "delete" && RiceOS.recordActions) {
+          RiceOS.recordActions.remove(entry.kind, entry.record);
+          render();
+          return;
+        }
+      }
+      const fieldButton = event.target.closest("[data-calendar-open-field]");
+      if (fieldButton) {
+        const fieldId = fieldButton.dataset.calendarOpenField;
+        if (fieldId && RiceOS.navigation && RiceOS.navigation.openField) {
+          RiceOS.navigation.openField(fieldId, { originScreen: "calendar" });
+          return;
+        }
+      }
+      const groupButton = event.target.closest("[data-calendar-open-group]");
+      if (groupButton && RiceOS.screens.fields && RiceOS.screens.fields.openGroup) {
+        if (RiceOS.navigation && RiceOS.navigation.clear) RiceOS.navigation.clear();
+        if (RiceOS.app) RiceOS.app.show("fields");
+        RiceOS.screens.fields.openGroup(groupButton.dataset.calendarOpenGroup || "");
+        return;
+      }
       if (!event.target.closest("[data-calendar-open-selected]")) return;
       if (RiceOS.bottomSheet) RiceOS.bottomSheet.open(selectedDate);
     });

@@ -6,6 +6,7 @@
   const state = RiceOS.state;
   let bulkFieldIds = [];
   let focusedTypeKey = "";
+  let pendingWaterSchedule = null;
 
   const ROAD = [
     { key: "establishment", label: "移植・活着", water: "deep", waterLabel: "深水" },
@@ -243,6 +244,17 @@
     return { fields, active, rows, latest };
   }
 
+  function pendingSchedule(fieldId, type, phase, date) {
+    return (state.data().schedules || []).find((item) => item.recordKind === "water"
+      && item.waterKind === type.key
+      && item.waterPhase === phase
+      && item.date === date
+      && (item.fieldIds || []).length === 1
+      && item.fieldIds[0] === fieldId
+      && !item.completedAt
+      && !item.completedByWaterPeriodId) || null;
+  }
+
   function stageText(field, date) {
     if (!field || !date) return "生育記録待ち";
     const stage = currentStage(field, date);
@@ -272,6 +284,12 @@
     const stage = activeItem && stageField ? stageText(stageField, activeItem.startDate) : (latest ? stageText(latest.field, latestItem.startDate || latestItem.date) : "");
     const startEnabled = summary.fields.length > activeCount;
     const endEnabled = activeCount > 0;
+    const phase = activeCount ? "end" : "start";
+    const actionable = summary.fields.filter((field) => phase === "start" ? !activePeriod(field, type, date) : Boolean(activePeriod(field, type, date)));
+    const unscheduled = actionable.filter((field) => !pendingSchedule(field.fieldId, type, phase, date));
+    const countSuffix = isGroup && actionable.length ? ` (${actionable.length}圃場)` : "";
+    const planLabel = unscheduled.length ? `${phase === "end" ? "終了予定を入れる" : "開始予定を入れる"}${isGroup && unscheduled.length !== actionable.length ? ` (${unscheduled.length}圃場)` : ""}` : "予定済み";
+    const actualLabel = phase === "end" ? `終了を記録${countSuffix}` : `${finished ? "もう一度開始" : "開始を記録"}${countSuffix}`;
     const countNote = isGroup ? `${activeCount}/${summary.fields.length}圃場が実施中` : "";
     return `
       <article class="water-period-card ${U.attr(type.tone)} ${focusedTypeKey === type.key ? "focus" : ""}" data-water-type-card="${U.attr(type.key)}">
@@ -283,8 +301,8 @@
         </div>
         ${stage ? `<p class="water-period-stage"><span>${isGroup ? `代表: ${stageField.name}` : "生育との重なり"}</span><b>${U.escapeHTML(stage)}</b></p>` : ""}
         <div class="water-period-actions">
-          <button type="button" class="secondary" data-water-action="${U.attr(`${type.key}-start`)}" ${startEnabled ? "" : "disabled"}>${finished ? "もう一度開始" : "開始を記録"}</button>
-          <button type="button" class="primary" data-water-action="${U.attr(`${type.key}-end`)}" ${endEnabled ? "" : "disabled"}>終了を記録</button>
+          <button type="button" class="secondary" data-water-plan="${U.attr(`${type.key}-${phase}`)}" ${unscheduled.length ? "" : "disabled"}>${U.escapeHTML(planLabel)}</button>
+          <button type="button" class="primary" data-water-action="${U.attr(`${type.key}-${phase}`)}" ${activeCount ? (endEnabled ? "" : "disabled") : (startEnabled ? "" : "disabled")}>${U.escapeHTML(actualLabel)}</button>
         </div>
         ${summary.rows.length > 1 ? `<small class="water-period-history-note">過去を含めて ${isGroup ? `合計${summary.rows.length}件` : `${summary.rows.length}回`}</small>` : ""}
       </article>`;
@@ -311,6 +329,49 @@
     };
   }
 
+  function scheduleTitle(type, phase) {
+    return `${type.label}${phase === "end" ? "終了予定" : "開始予定"}`;
+  }
+
+  function saveWaterSchedule(action) {
+    const [key, phase] = String(action || "").split("-");
+    const type = typeForKey(key);
+    if (!type || !phase) return;
+    const date = U.$("waterDate").value || U.today();
+    const fields = targetFields()
+      .filter((field) => phase === "start" ? !activePeriod(field, type, date) : Boolean(activePeriod(field, type, date)))
+      .filter((field) => !pendingSchedule(field.fieldId, type, phase, date));
+    if (!fields.length) return;
+    const batchId = fields.length > 1 ? U.id("water-schedule-batch", date) : "";
+    const batchFieldIds = fields.map((field) => field.fieldId);
+    const saved = fields.every((field) => state.saveSchedule({
+      date,
+      fieldIds: [field.fieldId],
+      batchId,
+      batchFieldIds,
+      scheduleType: scheduleTitle(type, phase),
+      title: scheduleTitle(type, phase),
+      recordKind: "water",
+      waterKind: type.key,
+      waterPhase: phase,
+      memo: ""
+    }) !== null);
+    if (saved) {
+      U.toast(`${targetLabel()}の${type.label}${phase === "end" ? "終了" : "開始"}予定を登録しました`);
+      render();
+    }
+  }
+
+  function matchingWaterSchedule(fieldId, type, phase, date) {
+    if (pendingWaterSchedule
+      && pendingWaterSchedule.waterKind === type.key
+      && pendingWaterSchedule.waterPhase === phase
+      && (pendingWaterSchedule.fieldIds || []).length === 1
+      && pendingWaterSchedule.fieldIds[0] === fieldId
+      && pendingWaterSchedule.date === date) return pendingWaterSchedule;
+    return pendingSchedule(fieldId, type, phase, date);
+  }
+
   function editableRecordForPeriod(field, period) {
     if (!period) return null;
     if (period.source === "direct") return period.raw || null;
@@ -335,21 +396,29 @@
       const batchId = fields.length > 1 ? U.id("water-batch", date) : "";
       const batchFieldIds = fields.map((field) => field.fieldId);
       if (type.source === "dry") {
-        state.saveDryPeriodsBatch(fields.map((field) => ({ fieldId: field.fieldId, batchId, batchFieldIds, date, startDate: date, targetDays: String(type.target(field) || ""), status: "実施中", memo: "" })), `${targetLabel()}の中干しを開始しました`);
+        state.saveDryPeriodsBatch(fields.map((field) => {
+          const linkedSchedule = matchingWaterSchedule(field.fieldId, type, "start", date);
+          return { fieldId: field.fieldId, batchId, batchFieldIds, date, startDate: date, targetDays: String(type.target(field) || ""), status: "実施中", memo: "", sourceScheduleId: linkedSchedule?.scheduleId || "", sourceSchedulePhase: linkedSchedule ? "start" : "" };
+        }), `${targetLabel()}の中干しを開始しました`);
       } else {
-        state.saveIrrigationsBatch(fields.map((field) => ({ ...irrigationRecord(field, type.method, date, "", ""), batchId, batchFieldIds })), `${targetLabel()}の${type.label}を開始しました`);
+        state.saveIrrigationsBatch(fields.map((field) => {
+          const linkedSchedule = matchingWaterSchedule(field.fieldId, type, "start", date);
+          return { ...irrigationRecord(field, type.method, date, "", ""), batchId, batchFieldIds, sourceScheduleId: linkedSchedule?.scheduleId || "", sourceSchedulePhase: linkedSchedule ? "start" : "" };
+        }), `${targetLabel()}の${type.label}を開始しました`);
       }
     } else {
       const records = fields.map((field) => {
         const active = activePeriod(field, type, date);
         const editable = editableRecordForPeriod(field, active);
-        return editable ? { ...editable, date: editable.date || editable.startDate, actualEndDate: date, status: "完了", periodStatus: "完了" } : null;
+        const linkedSchedule = matchingWaterSchedule(field.fieldId, type, "end", date);
+        return editable ? { ...editable, date: editable.date || editable.startDate, actualEndDate: date, status: "完了", periodStatus: "完了", sourceScheduleId: linkedSchedule?.scheduleId || editable.sourceScheduleId || "", sourceSchedulePhase: linkedSchedule ? "end" : editable.sourceSchedulePhase || "" } : null;
       }).filter(Boolean);
       if (!records.length) return;
       const saved = type.source === "dry" ? state.saveDryPeriodsBatch(records, `${targetLabel()}の中干しを終了しました`) : state.saveIrrigationsBatch(records, `${targetLabel()}の${type.label}を終了しました`);
       if (saved === null) return;
     }
     resetEdit();
+    pendingWaterSchedule = null;
     render();
   }
 
@@ -428,6 +497,7 @@
     U.$("waterField").value = field?.fieldId || "";
     bulkFieldIds = [];
     focusedTypeKey = "";
+    pendingWaterSchedule = null;
     resetEdit();
     render();
   }
@@ -449,6 +519,7 @@
     U.$("waterTargetMode").value = "field";
     if (fieldId) U.$("waterField").value = fieldId;
     focusedTypeKey = typeForKey(typeKey) ? typeKey : "";
+    pendingWaterSchedule = null;
     render();
     if (focusedTypeKey) {
       setTimeout(() => document.querySelector(`[data-water-type-card="${U.attr(focusedTypeKey)}"]`)?.scrollIntoView({ behavior: "smooth", block: "center" }), 30);
@@ -468,10 +539,18 @@
       if (bulkFieldIds[0]) U.$("waterField").value = bulkFieldIds[0];
     }
     focusedTypeKey = typeForKey(typeKey) ? typeKey : "";
+    pendingWaterSchedule = null;
     render();
     if (focusedTypeKey) {
       setTimeout(() => document.querySelector(`[data-water-type-card="${U.attr(focusedTypeKey)}"]`)?.scrollIntoView({ behavior: "smooth", block: "center" }), 30);
     }
+  }
+
+  function prefillSchedule(record) {
+    const fieldIds = (record && record.fieldIds || []).filter(Boolean);
+    pendingWaterSchedule = record && record.recordKind === "water" ? record : null;
+    prefillFields(record && record.date || U.today(), fieldIds, record && record.waterKind || "");
+    pendingWaterSchedule = record && record.recordKind === "water" ? record : null;
   }
 
   function bind() {
@@ -480,6 +559,8 @@
     U.$("waterActionGrid").addEventListener("click", (event) => {
       const button = event.target.closest("[data-water-action]");
       if (button && !button.disabled) recordAction(button.dataset.waterAction);
+      const planButton = event.target.closest("[data-water-plan]");
+      if (planButton) saveWaterSchedule(planButton.dataset.waterPlan);
     });
     U.$("waterHistory").addEventListener("click", (event) => {
       const button = event.target.closest("[data-water-edit]");
@@ -518,5 +599,5 @@
   }
 
   RiceOS.screens = RiceOS.screens || {};
-  RiceOS.screens.irrigation = { render, bind, resetForm, prefillDate, prefillFields, editIrrigation: (id) => fillEdit("irrigation", id) };
+  RiceOS.screens.irrigation = { render, bind, resetForm, prefillDate, prefillFields, prefillSchedule, editIrrigation: (id) => fillEdit("irrigation", id) };
 })();

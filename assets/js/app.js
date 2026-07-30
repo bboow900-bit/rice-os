@@ -50,7 +50,8 @@
     const button = U.$("appBackButton");
     if (!button) return;
     const mod = screenModule(activeScreen);
-    const canGoBack = Boolean(mod && typeof mod.canHandleBack === "function" && mod.canHandleBack());
+    const hasRoute = Boolean(RiceOS.navigation && RiceOS.navigation.current && RiceOS.navigation.current());
+    const canGoBack = hasRoute || Boolean(mod && typeof mod.canHandleBack === "function" && mod.canHandleBack());
     button.classList.toggle("hidden", !canGoBack);
   }
 
@@ -73,6 +74,10 @@
   }
 
   function back() {
+    if (RiceOS.navigation && RiceOS.navigation.back && RiceOS.navigation.back()) {
+      updateBackButton();
+      return;
+    }
     const mod = screenModule(activeScreen);
     if (mod && typeof mod.handleBack === "function" && mod.handleBack()) {
       updateBackButton();
@@ -124,9 +129,13 @@
           return;
         }
         if (button.dataset.screen === activeScreen) {
+          if (RiceOS.navigation && RiceOS.navigation.clear) RiceOS.navigation.clear();
+          const mod = screenModule(activeScreen);
+          if (mod && typeof mod.resetNavigation === "function") mod.resetNavigation();
           window.scrollTo({ top: 0, behavior: "smooth" });
           return;
         }
+        if (RiceOS.navigation && RiceOS.navigation.clear) RiceOS.navigation.clear();
         show(button.dataset.screen, { skipHistory: true });
       });
     });
@@ -222,12 +231,110 @@
     renderAll();
   }
 
+  function resetNestedScreens() {
+    ["annual", "fields"].forEach((screenId) => {
+      const mod = screenModule(screenId);
+      if (mod && typeof mod.resetNavigation === "function") mod.resetNavigation();
+    });
+  }
+
+  function routeToField(route) {
+    const fieldId = route && route.fieldId;
+    if (!fieldId) return false;
+    const options = route.options || {};
+    if (options.destination === "annual-history" && RiceOS.screens.annual && RiceOS.screens.annual.openField) {
+      show("annual", { skipHistory: true });
+      RiceOS.screens.annual.openField(fieldId, options.tab || "karte");
+      return true;
+    }
+    if (!RiceOS.screens.fields || !RiceOS.screens.fields.openField) return false;
+    // A field is always opened through the single field-detail screen.
+    // Annual review remains the origin for record editing, not a competing field detail.
+    show("fields", { skipHistory: true });
+    RiceOS.screens.fields.openField(fieldId);
+    return true;
+  }
+
+  function routeToRecord(route) {
+    const kind = route && route.kind;
+    const id = route && route.id;
+    if (!kind || !id) return false;
+    if ((kind === "work" || kind === "fieldWork") && RiceOS.screens.fieldWork) {
+      show("field-work", { skipHistory: true });
+      RiceOS.screens.fieldWork.editWork(id);
+      return true;
+    }
+    if (kind === "growth" && RiceOS.screens.growth) {
+      show("growth", { skipHistory: true });
+      RiceOS.screens.growth.editLog(id);
+      return true;
+    }
+    if ((kind === "dry" || kind === "irrigation") && RiceOS.screens.annual) {
+      show("annual", { skipHistory: true });
+      return RiceOS.screens.annual.openWaterEditor(kind, id);
+    }
+    if (kind === "other" && RiceOS.screens.otherWork) {
+      show("other-work", { skipHistory: true });
+      RiceOS.screens.otherWork.editWork(id);
+      return true;
+    }
+    return false;
+  }
+
+  function routeBack(destination, leaving) {
+    if (destination && destination.type === "field") return routeToField(destination);
+    if (destination && destination.type === "record") return routeToRecord(destination);
+    const options = leaving && leaving.options || {};
+    // Annual history can be opened from a field detail even when that detail
+    // was reached without a navigation-stack entry. Keep the return target
+    // deterministic instead of reopening the annual history view.
+    if (options.destination === "annual-history" && leaving && leaving.fieldId && RiceOS.screens.fields && RiceOS.screens.fields.openField) {
+      show("fields", { skipHistory: true });
+      RiceOS.screens.fields.openField(leaving.fieldId);
+      return true;
+    }
+    const origin = options.originScreen || "annual";
+    if (origin === "calendar") {
+      if (RiceOS.screens.fields && RiceOS.screens.fields.resetNavigation) RiceOS.screens.fields.resetNavigation();
+      show("calendar", { skipHistory: true });
+      return true;
+    }
+    if (options.fieldId && RiceOS.screens.annual && RiceOS.screens.annual.openField) {
+      show("annual", { skipHistory: true });
+      RiceOS.screens.annual.openField(options.fieldId, options.tab || "karte");
+      return true;
+    }
+    if (origin === "annual" && RiceOS.screens.annual && RiceOS.screens.annual.resetNavigation) {
+      RiceOS.screens.annual.resetNavigation();
+    }
+    if (RiceOS.screens.fields && RiceOS.screens.fields.resetNavigation) {
+      RiceOS.screens.fields.resetNavigation();
+    }
+    show(origin, { skipHistory: true });
+    return true;
+  }
+
+  function configureNavigation() {
+    if (!RiceOS.navigation || !RiceOS.navigation.configure) return;
+    RiceOS.navigation.configure({
+      onOpenField: routeToField,
+      onOpenRecord: routeToRecord,
+      onBack: routeBack,
+      onClear: () => {
+        resetNestedScreens();
+        return true;
+      }
+    });
+  }
+
   function init() {
     activeScreen = initialScreen();
     U.$("todayLabel").textContent = U.fd(U.today());
     bindNav();
     bindScreens();
     bindGlobalActions();
+    configureNavigation();
+    window.addEventListener("riceos:navigationchange", updateBackButton);
     if (RiceOS.pwa) RiceOS.pwa.register();
     if (RiceOS.weather && RiceOS.weather.repairStoredWeatherLabels) {
       const meta = RiceOS.state.data().meta || {};
@@ -258,6 +365,7 @@
     show,
     back,
     syncBackButton: updateBackButton,
+    currentScreen: () => activeScreen,
     renderAll,
     markSaved
   };

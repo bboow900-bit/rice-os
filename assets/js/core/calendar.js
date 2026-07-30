@@ -59,14 +59,14 @@
     const entries = [];
     state().activeFields().forEach((field) => {
       state().resolvedWaterPeriodsFor(field.fieldId, { year, includePlanned: true, forDisplay: true }).forEach((period) => {
-        const add = (when, title, memo) => {
+        const add = (when, title, memo, planned) => {
           if (when !== date) return;
           const entryKind = period.source === "direct" ? (period.kind === "dry" ? "dry" : "irrigation") : "water";
-          entries.push({ kind: entryKind, tone: "water", title, subtitle: field.name, memo, record: period });
+          entries.push({ kind: entryKind, tone: planned ? "schedule" : "water", title, subtitle: field.name, memo, planned: Boolean(planned), record: period });
         };
         add(period.startDate, `${period.label} 開始`, period.source === "legacy-work" ? "作業記録から反映" : "水管理記録");
         add(period.actualEndDate, `${period.label} 完了`, "実績終了日");
-        if (!period.actualEndDate) add(period.plannedEndDate, `${period.label} 終了予定`, "予定終了日");
+        if (!period.actualEndDate) add(period.plannedEndDate, `${period.label} 終了予定`, "予定終了日", true);
       });
     });
     return entries;
@@ -97,7 +97,7 @@
   function entriesForDate(date) {
     const d = state().data();
     const entries = [];
-    (d.schedules || []).filter((x) => x.date === date).forEach((x) => {
+    (d.schedules || []).filter((x) => x.date === date && !(x.recordKind === "water" && isScheduleDone(x))).forEach((x) => {
       const displayStatus = scheduleDisplayStatus(x);
       entries.push({
         kind: "schedule",

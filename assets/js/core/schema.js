@@ -525,8 +525,20 @@
       status: String(s.status || "予定"),
       completedAt: String(s.completedAt || ""),
       completedByWorkId: String(s.completedByWorkId || ""),
+      completedByWaterPeriodId: String(s.completedByWaterPeriodId || ""),
       completedManuallyAt: String(s.completedManuallyAt || ""),
       completionReason: String(s.completionReason || ""),
+      recordKind: String(s.recordKind || ""),
+      waterKind: String(s.waterKind || ""),
+      waterPhase: String(s.waterPhase || ""),
+      ...(s.completionLink && s.completionLink.recordId ? {
+        completionLink: {
+          kind: String(s.completionLink.kind || ""),
+          recordId: String(s.completionLink.recordId || ""),
+          fieldId: String(s.completionLink.fieldId || ""),
+          event: String(s.completionLink.event || "")
+        }
+      } : {}),
       plannedFertilizerName: String(s.plannedFertilizerName || ""),
       plannedFertilizerRateKg10a: String(s.plannedFertilizerRateKg10a || ""),
       memo: String(s.memo || ""),
@@ -561,6 +573,8 @@
       observationSummary: String(d.observationSummary || ""),
       interruptionDays: String(d.interruptionDays || ""),
       referenceRecordIds: ensureArray(d.referenceRecordIds).map(String),
+      sourceScheduleId: String(d.sourceScheduleId || ""),
+      sourceSchedulePhase: String(d.sourceSchedulePhase || ""),
       crackCm: String(d.crackCm || ""),
       sinkCm: String(d.sinkCm || ""),
       surface: String(d.surface || ""),
@@ -600,6 +614,8 @@
       observationSummary: String(i.observationSummary || ""),
       interruptionDays: String(i.interruptionDays || ""),
       referenceRecordIds: ensureArray(i.referenceRecordIds).map(String),
+      sourceScheduleId: String(i.sourceScheduleId || ""),
+      sourceSchedulePhase: String(i.sourceSchedulePhase || ""),
       status: String(i.status || "入水中"),
       autoStartedFromDry: Boolean(i.autoStartedFromDry),
       autoStartedFromDrySource: String(i.autoStartedFromDrySource || ""),

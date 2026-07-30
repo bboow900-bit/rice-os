@@ -33,8 +33,20 @@
     state.saveSchedule({ ...record, title, scheduleType: title, memo });
   }
 
-  function edit(kind, record) {
+  function edit(kind, record, options) {
     if (!record) return false;
+    const routeOptions = options && typeof options === "object" ? options : {};
+    const id = idFor(kind, record);
+    const fieldId = routeOptions.fieldId || record.fieldId || (record.fieldIds || [])[0] || "";
+    if (id && RiceOS.navigation && RiceOS.navigation.openRecord) {
+      const opened = RiceOS.navigation.openRecord(kind, id, {
+        fieldId,
+        originScreen: routeOptions.originScreen || (RiceOS.app && RiceOS.app.currentScreen ? RiceOS.app.currentScreen() : "calendar"),
+        tab: routeOptions.tab || "",
+        replace: Boolean(routeOptions.replace)
+      });
+      if (opened) return true;
+    }
     if ((kind === "work" || kind === "fieldWork") && RiceOS.screens.fieldWork) {
       RiceOS.app.show("field-work");
       RiceOS.screens.fieldWork.editWork(record.workId);

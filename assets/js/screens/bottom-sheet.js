@@ -7,6 +7,7 @@
 
   let selectedDate = U.today();
   let selectedFieldId = "";
+  let selectedKind = "";
   let editingScheduleId = "";
   let savingSchedule = false;
   const SCHEDULE_PRESETS = [
@@ -68,14 +69,18 @@
     U.$("sheetDateTitle").textContent = `${U.fd(selectedDate)} の記録`;
     if (!savingSchedule) hideScheduleForm();
     hideWaterQuick();
-    renderFieldSelect();
+    renderTargetSelect();
+    renderRecordChoice();
     const rows = RiceOS.calendar.entriesForDate(selectedDate);
     U.$("sheetEntries").innerHTML = rows.length ? rows.map(entryHtml).join("") : '<div class="empty">この日の記録はまだありません。</div>';
   }
 
   function open(date, fieldId) {
     selectedDate = date || U.today();
-    selectedFieldId = fieldId || firstFieldId();
+    selectedFieldId = fieldId || "";
+    selectedKind = "";
+    if (U.$("sheetTargetMode")) U.$("sheetTargetMode").value = "field";
+    if (U.$("sheetGroup")) U.$("sheetGroup").value = "";
     render();
     const sheet = U.$("dateSheet");
     sheet.classList.remove("hidden");
@@ -93,18 +98,60 @@
   }
 
   function activeFieldId() {
-    const value = U.$("sheetField") && U.$("sheetField").value || selectedFieldId || firstFieldId();
+    const value = U.$("sheetField") && U.$("sheetField").value || selectedFieldId;
     selectedFieldId = value;
     return value;
   }
 
-  function renderFieldSelect() {
+  function targetFieldIds() {
+    const mode = U.$("sheetTargetMode") && U.$("sheetTargetMode").value || "field";
+    if (mode === "group") {
+      const groupId = U.$("sheetGroup") && U.$("sheetGroup").value || "";
+      const ids = state.fieldsForGroup ? state.fieldsForGroup(groupId).map((field) => field.fieldId) : [];
+      if (ids.length) return ids;
+    }
+    const fieldId = activeFieldId();
+    return fieldId ? [fieldId] : [];
+  }
+
+  function renderTargetSelect() {
     const fields = state.activeFields();
-    if (!selectedFieldId && fields[0]) selectedFieldId = fields[0].fieldId;
-    U.setOptions(U.$("sheetField"), fields.map((field) => ({
+    U.setOptions(U.$("sheetField"), [{ value: "", label: "圃場を選ぶ" }, ...fields.map((field) => ({
       value: field.fieldId,
       label: field.name
-    })), selectedFieldId);
+    }))], selectedFieldId);
+    const groups = scheduleGroups();
+    const mode = U.$("sheetTargetMode");
+    const group = U.$("sheetGroup");
+    if (!mode || !group) return;
+    U.setOptions(group, [{ value: "", label: "グループを選ぶ" }, ...groups.map((item) => ({ value: item.fieldGroupId, label: `${item.name} (${item.fieldIds.length}圃場)` }))], group.value || "");
+    if (!groups.length && mode.value === "group") mode.value = "field";
+    mode.disabled = !groups.length;
+    const isGroup = mode.value === "group" && groups.length > 0;
+    U.$("sheetFieldLabel").classList.toggle("hidden", isGroup);
+    U.$("sheetGroupLabel").classList.toggle("hidden", !isGroup);
+  }
+
+  function kindLabel(kind) {
+    return ({ work: "作業記録", growth: "生育記録", stage: "幼穂・出穂", water: "水管理" })[kind] || "";
+  }
+
+  function renderRecordChoice() {
+    const step = U.$("sheetTargetStep");
+    if (!step) return;
+    step.classList.toggle("hidden", !selectedKind);
+    U.$$("#sheetKindActions [data-sheet-add]").forEach((button) => button.classList.toggle("active", button.dataset.sheetAdd === selectedKind));
+    const label = U.$("sheetSelectedKind");
+    if (label) label.textContent = selectedKind ? `${kindLabel(selectedKind)}を記録します` : "種類を選んでください";
+    const ids = targetFieldIds();
+    const fields = ids.map((id) => state.field(id)).filter(Boolean);
+    const summary = U.$("sheetTargetSummary");
+    if (summary) summary.textContent = fields.length ? `対象: ${fields.map((field) => field.name).join("・")}` : "対象を選択してください";
+    const openButton = U.$("sheetOpenRecord");
+    if (openButton) {
+      openButton.disabled = !selectedKind || !fields.length;
+      openButton.textContent = selectedKind ? `${kindLabel(selectedKind)}の入力を開く` : "入力を開く";
+    }
   }
 
   function fieldGroupName(field) {
@@ -252,16 +299,56 @@
   }
 
   function openScreen(screen, callback) {
+    const fieldIds = targetFieldIds();
+    if (!fieldIds.length) {
+      U.toast("記録する圃場またはグループを選択してください");
+      return;
+    }
     close();
+    if (RiceOS.navigation && RiceOS.navigation.clear) RiceOS.navigation.clear();
     RiceOS.app.show(screen);
-    if (typeof callback === "function") callback(activeFieldId());
+    if (typeof callback === "function") callback(fieldIds);
+  }
+
+  function scheduleRecordKind(record) {
+    if (record && record.recordKind === "water" && record.waterKind) return { kind: "water", waterType: record.waterKind };
+    const title = String(record && (record.title || record.scheduleType) || "");
+    if (/中干し/.test(title)) return { kind: "water", waterType: "dry" };
+    if (/間断|かんだん/.test(title)) return { kind: "water", waterType: "intermittent" };
+    if (/深水/.test(title)) return { kind: "water", waterType: "deep" };
+    if (/落水/.test(title)) return { kind: "water", waterType: "drain" };
+    if (/幼穂|出穂/.test(title)) return { kind: "stage", waterType: "" };
+    return { kind: "work", waterType: "" };
+  }
+
+  function openScheduleCompletion(record) {
+    const target = scheduleRecordKind(record);
+    const fieldIds = (record.fieldIds || []).filter((id) => state.field(id));
+    if (!fieldIds.length) return;
+    close();
+    if (RiceOS.navigation && RiceOS.navigation.clear) RiceOS.navigation.clear();
+    if (target.kind === "water") {
+      RiceOS.app.show("irrigation");
+      RiceOS.screens.irrigation.prefillSchedule(record);
+      return;
+    }
+    if (target.kind === "stage") {
+      RiceOS.app.show("growth");
+      RiceOS.screens.growth.prefillStageRecord(U.today(), fieldIds);
+      return;
+    }
+    RiceOS.app.show("field-work");
+    RiceOS.screens.fieldWork.prefillSchedule(record);
   }
 
   function bind() {
     U.$$("#dateSheet [data-sheet-close]").forEach((el) => el.addEventListener("click", close));
     U.$("sheetField").addEventListener("change", () => {
       selectedFieldId = U.$("sheetField").value;
+      renderRecordChoice();
     });
+    if (U.$("sheetTargetMode")) U.$("sheetTargetMode").addEventListener("change", () => { renderTargetSelect(); renderRecordChoice(); });
+    if (U.$("sheetGroup")) U.$("sheetGroup").addEventListener("change", renderRecordChoice);
     if (U.$("sheetScheduleTargetMode")) {
       U.$("sheetScheduleTargetMode").addEventListener("change", () => renderScheduleTargets());
     }
@@ -281,9 +368,7 @@
             RiceOS.screens.fertilizer.open(entry.record, render);
             return;
           }
-          close();
-          RiceOS.app.show("field-work");
-          RiceOS.screens.fieldWork.prefillSchedule(entry.record);
+          openScheduleCompletion(entry.record);
           return;
         }
         if (actionButton.dataset.sheetAction === "edit") {
@@ -304,7 +389,7 @@
       const presetButton = event.target.closest("[data-schedule-preset]");
       if (waterTypeButton) {
         const typeKey = waterTypeButton.dataset.sheetWaterType || "";
-        openScreen("irrigation", (fieldId) => RiceOS.screens.irrigation.prefillDate(selectedDate, fieldId, typeKey));
+        openScreen("irrigation", (fieldIds) => RiceOS.screens.irrigation.prefillFields(selectedDate, fieldIds, typeKey));
         return;
       }
       if (presetButton) {
@@ -313,17 +398,24 @@
         renderSchedulePresets();
         return;
       }
+      const openRecord = event.target.closest("#sheetOpenRecord");
+      if (openRecord) {
+        if (!selectedKind) return;
+        if (selectedKind === "growth") openScreen("growth", (fieldIds) => RiceOS.screens.growth.prefillFields(selectedDate, fieldIds));
+        else if (selectedKind === "work") openScreen("field-work", (fieldIds) => RiceOS.screens.fieldWork.prefillFields(selectedDate, fieldIds));
+        else if (selectedKind === "stage") openScreen("growth", (fieldIds) => RiceOS.screens.growth.prefillStageRecord(selectedDate, fieldIds));
+        else if (selectedKind === "water") showWaterQuick();
+        return;
+      }
       if (!button) return;
       const action = button.dataset.sheetAdd;
-      if (action === "growth") {
-        openScreen("growth", (fieldId) => RiceOS.screens.growth.prefillDate(selectedDate, fieldId));
-      } else if (action === "work") {
-        openScreen("field-work", (fieldId) => RiceOS.screens.fieldWork.prefillDate(selectedDate, fieldId));
-      } else if (action === "water") {
-        showWaterQuick();
+      if (["growth", "work", "stage", "water"].includes(action)) {
+        selectedKind = action;
+        hideWaterQuick();
+        renderRecordChoice();
       } else if (action === "photo") {
-        openScreen("growth", (fieldId) => {
-          RiceOS.screens.growth.prefillDate(selectedDate, fieldId);
+        openScreen("growth", (fieldIds) => {
+          RiceOS.screens.growth.prefillFields(selectedDate, fieldIds);
           if (U.$("growthPhotoSection")) U.$("growthPhotoSection").open = true;
         });
       } else if (action === "schedule") {
@@ -343,7 +435,7 @@
     }
   }
 
-  RiceOS.bottomSheet = { open, close, render };
+  RiceOS.bottomSheet = { open, close, render, openScheduleCompletion };
   RiceOS.screens = RiceOS.screens || {};
   RiceOS.screens.bottomSheet = { bind };
 })();

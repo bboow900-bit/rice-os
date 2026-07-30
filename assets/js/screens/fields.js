@@ -821,13 +821,25 @@
     `;
   }
 
+  function renderCurrentManagementSummary(field) {
+    const management = currentWaterManagement(field) || { label: "水管理の記録待ち", tone: "waiting", date: "" };
+    const dateLabel = management.date ? `記録日 ${U.fd(management.date)}` : "実績を登録すると現在地に反映されます";
+    const detail = management.detail || dateLabel;
+    return `
+      <section class="field-management-current tone-${U.attr(management.tone || "waiting")}">
+        <div><span>現在の水管理（記録上）</span><b>${U.escapeHTML(management.label)}</b><small>${U.escapeHTML(detail)}</small></div>
+        <p>期間・編集は年間履歴で確認</p>
+      </section>
+    `;
+  }
+
   function fieldStatusText(field) {
     const growth = latestGrowthForField(field.fieldId);
     const management = currentWaterManagement(field);
-    if (management && management.key && management.key !== "waterWaiting") return management.label;
     const dry = drySummary(field);
     const irrigation = latestIrrigationForField(field.fieldId);
     const deepWater = latestDeepWaterForField(field.fieldId);
+    if (management && management.key && management.key !== "waterWaiting") return management.label;
     if (deepWater && !deepWater.actualEndDate) return "深水管理 実施中";
     if (irrigation && !irrigation.actualEndDate) return `${irrigation.label || "間断灌水"} 実施中`;
     if (dry.actualEndDate) return "中干し完了・次の水管理は未開始";
@@ -890,15 +902,14 @@
     const variety = state.variety(field.varietyId);
     const stage = fieldStage(field);
     const photo = latestPhotoForField(field);
-    const dry = drySummary(field);
-    const irrigation = latestIrrigationForField(field.fieldId);
-    const deepWater = latestDeepWaterForField(field.fieldId);
+    const planting = state.plantingDateForField ? state.plantingDateForField(field.fieldId, currentSeasonYear()) : "";
+    const stageDetail = planting ? `田植後 ${Math.max(0, U.daysBetween(planting, U.today()))}日` : "田植え実績を登録すると表示されます";
     return `
       <section class="field-hub-detail">
         <div class="field-hub-detail-head"><button type="button" class="field-hub-back" data-field-view="list" aria-label="圃場一覧へ戻る">‹</button><div><span>圃場情報</span><h3>${U.escapeHTML(field.name)}</h3><small>${U.escapeHTML(variety && variety.name || "品種未設定")} / ${U.escapeHTML(String(field.areaA || 0))}a</small></div><button type="button" class="secondary" data-field-view="settings">編集</button></div>
         <section class="field-hub-now stage-${U.attr(String(stage.number).padStart(2, "0"))}">
           ${photo && photo.photoData ? `<img src="${U.attr(photo.photoData)}" alt="">` : `<span>${groupRiceImage(stage.number)}</span>`}
-          <div><small>現在の状態 / ${U.escapeHTML(stage.certainty)}</small><b>${U.escapeHTML(fieldStatusText(field))}</b><p>${U.escapeHTML(stage.label)}</p></div>
+          <div><small>現在の生育ステージ / ${U.escapeHTML(stage.certainty)}</small><b>${U.escapeHTML(stage.label)}</b><p>${U.escapeHTML(stageDetail)}</p></div>
         </section>
         <section class="field-hub-master-card">
           <div class="field-hub-master-card-head"><b>固定情報</b><span>圃場設定で編集</span></div>
@@ -910,8 +921,9 @@
             <span><small>固定メモ</small><b>${U.escapeHTML(field.fixedMemo || "未設定")}</b></span>
           </div>
         </section>
-        ${renderWaterPeriodOverview(field, dry, irrigation, deepWater)}
-        <section class="field-hub-settings-link"><b>記録は専用画面で管理します</b><span>作業・生育・水管理・写真は「記録入力」や「カレンダー」から登録します。</span></section>
+        ${renderCurrentManagementSummary(field)}
+        <section class="field-hub-settings-link"><b>圃場では固定情報を管理します</b><span>作業・生育・水管理・写真の実績と編集は、「振り返り」にまとめています。</span></section>
+        <button class="secondary field-history-link" type="button" data-field-action="history" data-field-id="${U.attr(field.fieldId)}">この圃場の年間履歴を見る</button>
       </section>
     `;
   }
@@ -976,6 +988,12 @@
     return false;
   }
 
+  function resetNavigation() {
+    activeFieldId = "";
+    fieldView = "list";
+    render();
+  }
+
   function canHandleBack() {
     return fieldView === "settings" || fieldView === "detail";
   }
@@ -1007,6 +1025,10 @@
     U.$("fieldList").addEventListener("click", (event) => {
       const viewButton = event.target.closest("[data-field-view]");
       if (viewButton) {
+        if (viewButton.dataset.fieldView === "list" && RiceOS.navigation && RiceOS.navigation.current && RiceOS.navigation.current()) {
+          RiceOS.app.back();
+          return;
+        }
         fieldView = viewButton.dataset.fieldView || "list";
         render();
         window.scrollTo({ top: 0, behavior: "smooth" });
@@ -1014,6 +1036,7 @@
       }
       const openButton = event.target.closest("[data-field-open]");
       if (openButton) {
+        if (RiceOS.navigation && RiceOS.navigation.openField && RiceOS.navigation.openField(openButton.dataset.fieldOpen, { originScreen: "fields" })) return;
         activeFieldId = openButton.dataset.fieldOpen;
         fieldView = "detail";
         render();
@@ -1107,6 +1130,7 @@
         return;
       }
       if (action === "history") {
+        if (RiceOS.navigation && RiceOS.navigation.openField && RiceOS.navigation.openField(field.fieldId, { originScreen: "fields", destination: "annual-history" })) return;
         RiceOS.app.show("annual");
         if (RiceOS.screens.annual && RiceOS.screens.annual.openField) RiceOS.screens.annual.openField(field.fieldId);
         return;
@@ -1172,5 +1196,5 @@
   }
 
   RiceOS.screens = RiceOS.screens || {};
-  RiceOS.screens.fields = { render, bind, handleBack, canHandleBack, openField, openGroup, preserveOnDataChange: true };
+  RiceOS.screens.fields = { render, bind, handleBack, canHandleBack, openField, openGroup, resetNavigation, preserveOnDataChange: true };
 })();

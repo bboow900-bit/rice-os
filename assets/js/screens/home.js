@@ -319,6 +319,13 @@
     });
   }
 
+  function actualEntriesForDate(date) {
+    return entriesForDate(date).filter((entry) => {
+      if (entry.kind === "candidate" || entry.planned) return false;
+      return entry.kind !== "schedule" || scheduleDone(entry.record);
+    });
+  }
+
   function entriesForCell(date, field) {
     return entriesForDate(date).filter((entry) => entryFieldIds(entry).includes(field.fieldId));
   }
@@ -358,7 +365,7 @@
   }
 
   function renderTodayOverview() {
-    const todayEntries = entriesForDate(U.today()).filter((entry) => entry.kind !== "candidate");
+    const todayEntries = actualEntriesForDate(U.today());
     const overdue = overdueSchedules();
     const candidates = candidatesForDate(U.today());
     const planted = state.activeFields().filter((field) => plantingDateForYear(field.fieldId, cropYear(U.today())));
@@ -801,7 +808,7 @@
   }
 
   function renderDecisionDashboard() {
-    const todayEntries = entriesForDate(U.today()).filter((entry) => entry.kind !== "candidate");
+    const todayEntries = actualEntriesForDate(U.today());
     const candidates = candidatesForDate(U.today());
     const overdue = overdueSchedules();
     const rows = state.activeFields()
@@ -1548,18 +1555,14 @@
   function render() {
     const root = U.$("homeVisualDashboard");
     if (!root) return;
+    // Home is the field-status dashboard. Date-based views live in Calendar.
+    viewMode = "dashboard";
     root.innerHTML = `
       <div class="farm-calendar-home">
         ${renderHeader()}
-        ${viewMode === "dashboard" ? renderDecisionDashboard() : ""}
-        ${viewMode === "week" ? renderWeekView() : ""}
-        ${viewMode === "month" ? renderMonthView() : ""}
-        ${viewMode === "list" ? renderListView() : ""}
-        ${viewMode === "progress" ? renderProgressView() : ""}
-        ${viewMode === "dashboard" ? "" : `<button type="button" class="farm-calendar-fab" data-home-date="${U.attr(U.today())}" aria-label="記録を追加">＋</button>`}
+        ${renderDecisionDashboard()}
       </div>
     `;
-    if (viewMode === "progress") setTimeout(hydrateHeatMeters, 50);
   }
 
   function heatProjectionKey(location) {

@@ -284,6 +284,10 @@
     ].filter(Boolean);
   }
 
+  function completedWaterSchedule(item) {
+    return Boolean(item && item.recordKind === "water" && (item.completedAt || item.completedByWaterPeriodId || item.completionLink));
+  }
+
   function allRows() {
     const d = state.data();
     // 専用の水管理期間として残る記録は、作業一覧との重複を避ける。
@@ -362,7 +366,9 @@
         item.memo || ""
       ]
       }));
-    const schedules = (d.schedules || []).map((item) => makeRow("schedule", item, {
+    // A completed water schedule is represented by its direct period above.
+    // Keep the schedule stored for audit/editing, but do not duplicate it in the annual actual timeline.
+    const schedules = (d.schedules || []).filter((item) => !completedWaterSchedule(item)).map((item) => makeRow("schedule", item, {
       id: item.scheduleId,
       date: item.date,
       season: item.season,
@@ -1400,25 +1406,14 @@
   }
 
   function fieldYearTimeline(field, year) {
-    const allWorks = state.fieldWorksFor(field.fieldId, year)
-      .filter((row) => state.isActualFieldWork ? state.isActualFieldWork(row) : !/(?:予定|確認候補)/.test(String(row.workName || "")));
-    const headingWorks = allWorks.filter((row) => state.isHeadingWorkName && state.isHeadingWorkName(row.workName));
-    const works = allWorks
-      .filter((row) => !(state.isHeadingWorkName && state.isHeadingWorkName(row.workName)))
-      .filter((row) => !(state.waterEventForWorkName && state.waterEventForWorkName(row.workName)))
-      .filter((row) => !(state.isMigratedWaterWork && state.isMigratedWaterWork(row, field.fieldId)));
-    const growth = state.growthLogsFor(field.fieldId, year);
-    const waterPeriods = state.resolvedWaterPeriodsFor
-      ? state.resolvedWaterPeriodsFor(field.fieldId, { year, includePlanned: false, forDisplay: true })
-      : [];
-    const others = (state.data().otherWorks || [])
-      .filter((row) => (row.relatedFieldIds || row.fieldIds || []).includes(field.fieldId))
-      .filter((row) => String(row.season || String(row.date || "").slice(0, 4)) === String(year))
-      .filter((row) => !/(?:予定|確認候補)/.test(String(row.workName || "")));
+    const sources = state.timelineEntriesForField
+      ? state.timelineEntriesForField(field.fieldId, { year, includePlanned: false })
+      : { works: [], headingWorks: [], growth: [], waterPeriods: [], others: [] };
+    const { works, headingWorks, growth, waterPeriods, others } = sources;
     const entries = works.map(timelineWorkEntry);
 
     waterPeriods
-      .filter((period) => !/予定/.test(String(period.status || "")) && !/予定/.test(String(period.raw && (period.raw.status || period.raw.periodStatus) || "")))
+      .filter((period) => !/予定/.test(String(period.status || "")) && !/予定/.test(String(period.sourceStatus || "")))
       .map(timelineWaterEntry).filter(Boolean).forEach((entry) => entries.push(entry));
     growth
       .filter((row) => row.headingObserved || row.observedStage === "heading" && row.stageConfirmed || U.number(row.panicleLengthMm, 0) > 0)
@@ -1623,6 +1618,14 @@
   }
 
   function editRow(kind, id) {
+    if (RiceOS.navigation && RiceOS.navigation.openRecord) {
+      const opened = RiceOS.navigation.openRecord(kind, id, {
+        fieldId: selectedFieldId,
+        originScreen: "annual",
+        tab: selectedTab
+      });
+      if (opened) return;
+    }
     if (kind === "fieldWork" && RiceOS.screens.fieldWork && RiceOS.screens.fieldWork.editWork) {
       RiceOS.app.show("field-work");
       RiceOS.screens.fieldWork.editWork(id);
@@ -1724,13 +1727,21 @@
     if (targetFieldId && RiceOS.screens.fieldWork) RiceOS.screens.fieldWork.prefillDate(U.today(), targetFieldId);
   }
 
-  function openField(fieldId) {
+  function openField(fieldId, tab) {
     selectedFieldId = fieldId || "";
-    selectedTab = "karte";
+    selectedTab = tab || "karte";
     waterEditDraft = null;
     render();
     if (RiceOS.app && RiceOS.app.syncBackButton) RiceOS.app.syncBackButton();
     window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function resetNavigation() {
+    selectedFieldId = "";
+    selectedTab = "karte";
+    seasonNoteDraft = null;
+    waterEditDraft = null;
+    render();
   }
 
   function bind() {
@@ -1739,6 +1750,7 @@
     U.$("annualTimeline").addEventListener("click", (event) => {
       const open = event.target.closest("[data-annual-open-field]");
       if (open) {
+        if (RiceOS.navigation && RiceOS.navigation.openField && RiceOS.navigation.openField(open.dataset.annualOpenField, { originScreen: "annual" })) return;
         selectedFieldId = open.dataset.annualOpenField;
         selectedTab = "karte";
         waterEditDraft = null;
@@ -1748,6 +1760,11 @@
         return;
       }
       if (event.target.closest("[data-annual-back]")) {
+        if (RiceOS.navigation && RiceOS.navigation.current && RiceOS.navigation.current() && RiceOS.app && RiceOS.app.back) {
+          RiceOS.app.back();
+          window.scrollTo({ top: 0, behavior: "smooth" });
+          return;
+        }
         handleBack();
         window.scrollTo({ top: 0, behavior: "smooth" });
         return;
@@ -1775,7 +1792,17 @@
       const waterEdit = event.target.closest("[data-annual-water-edit]");
       if (waterEdit) {
         if (waterEdit.dataset.annualWaterEdit === "fieldWork") editRow("fieldWork", waterEdit.dataset.id);
-        else openWaterEditor(waterEdit.dataset.annualWaterEdit, waterEdit.dataset.id);
+        else {
+          const kind = waterEdit.dataset.annualWaterEdit;
+          const rows = kind === "dry" ? (state.data().dryPeriods || []) : (state.data().irrigations || []);
+          const record = rows.find((row) => String(kind === "dry" ? row.dryPeriodId : row.irrigationId) === String(waterEdit.dataset.id));
+          if (record && RiceOS.recordActions && RiceOS.recordActions.edit && RiceOS.recordActions.edit(kind, record, {
+            originScreen: "annual",
+            tab: "water",
+            replace: true
+          })) return;
+          openWaterEditor(kind, waterEdit.dataset.id);
+        }
         return;
       }
       const waterDelete = event.target.closest("[data-annual-water-delete]");
@@ -1927,5 +1954,5 @@
   }
 
   RiceOS.screens = RiceOS.screens || {};
-  RiceOS.screens.annual = { render, bind, openField, openWaterEditor, handleBack, canHandleBack };
+  RiceOS.screens.annual = { render, bind, openField, openWaterEditor, handleBack, canHandleBack, resetNavigation };
 })();

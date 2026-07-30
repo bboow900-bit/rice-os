@@ -908,8 +908,13 @@
         status: record.status || "予定",
         completedAt: record.completedAt || "",
         completedByWorkId: record.completedByWorkId || "",
+        completedByWaterPeriodId: record.completedByWaterPeriodId || "",
         completedManuallyAt: record.completedManuallyAt || "",
         completionReason: record.completionReason || "",
+        recordKind: record.recordKind || "",
+        waterKind: record.waterKind || "",
+        waterPhase: record.waterPhase || "",
+        ...(record.completionLink && record.completionLink.recordId ? { completionLink: U.clone(record.completionLink) } : {}),
         plannedFertilizerName: record.plannedFertilizerName || "",
         plannedFertilizerRateKg10a: record.plannedFertilizerRateKg10a || "",
         memo: record.memo || "",
@@ -1001,11 +1006,59 @@
     }, "予定を削除しました");
   }
 
+  // A water schedule never becomes the source of truth for water management.
+  // It is completed only when the exact linked direct period was saved.
+  function completeLinkedWaterSchedule(d, record, recordKind, recordId) {
+    const scheduleId = String(record && record.sourceScheduleId || "");
+    const phase = String(record && record.sourceSchedulePhase || "");
+    if (!scheduleId || !phase || !recordId) return;
+    const index = (d.schedules || []).findIndex((schedule) => schedule.scheduleId === scheduleId);
+    if (index < 0) return;
+    const schedule = d.schedules[index];
+    const waterKind = recordKind === "dry" ? "dry" : waterKindFromMethod(record.method);
+    if (schedule.recordKind !== "water" || schedule.waterKind !== waterKind || schedule.waterPhase !== phase) return;
+    if ((schedule.fieldIds || []).length !== 1 || schedule.fieldIds[0] !== record.fieldId) return;
+    const actualDate = phase === "end" ? String(record.actualEndDate || "") : String(record.startDate || record.date || "");
+    // Planned and actual dates may differ. The explicit schedule ID is the link;
+    // the actual boundary must still exist for the requested phase.
+    if (!actualDate) return;
+    const existingLink = schedule.completionLink || null;
+    if (schedule.completedAt && (!existingLink || existingLink.recordId !== recordId || existingLink.kind !== recordKind)) return;
+    d.schedules[index] = {
+      ...schedule,
+      status: "実施済み",
+      completedAt: U.now(),
+      completedByWaterPeriodId: recordId,
+      completionLink: { kind: recordKind, recordId, fieldId: record.fieldId, event: phase },
+      completionReason: `${record.startDate || record.date || ""} の水管理実績と連動`,
+      updatedAt: U.now()
+    };
+  }
+
+  function restoreLinkedWaterSchedule(d, recordKind, recordId) {
+    (d.schedules || []).forEach((schedule, index) => {
+      const link = schedule.completionLink;
+      if (!link || link.kind !== recordKind || link.recordId !== recordId) return;
+      d.schedules[index] = {
+        ...schedule,
+        status: "予定",
+        completedAt: "",
+        completedByWaterPeriodId: "",
+        completionLink: undefined,
+        completionReason: "",
+        updatedAt: U.now()
+      };
+    });
+  }
+
   function saveDryPeriodsBatch(records, message) {
     const rows = Array.isArray(records) ? records.filter(Boolean) : [];
     if (!rows.length) return null;
     return mutate((d) => {
-      rows.forEach((record) => saveDryPeriodToDraft(d, record));
+      rows.forEach((record) => {
+        const saved = saveDryPeriodToDraft(d, record);
+        completeLinkedWaterSchedule(d, saved, "dry", saved.dryPeriodId);
+      });
     }, message || `中干し記録を${rows.length}件保存しました`);
   }
 
@@ -1039,6 +1092,8 @@
         observationSummary: record.observationSummary || "",
         interruptionDays: record.interruptionDays || "",
         referenceRecordIds: record.referenceRecordIds || [],
+        sourceScheduleId: record.sourceScheduleId || previous && previous.sourceScheduleId || "",
+        sourceSchedulePhase: record.sourceSchedulePhase || previous && previous.sourceSchedulePhase || "",
         crackCm: record.crackCm || "",
         sinkCm: record.sinkCm || "",
         surface: record.surface || "",
@@ -1069,6 +1124,7 @@
         }
       }
       if (previous && previous.actualEndDate && !normalized.actualEndDate) refreshDryingSummary(d, normalized.fieldId);
+      return normalized;
   }
 
   function unlinkLegacyWaterPeriod(d, periodId, kind) {
@@ -1082,6 +1138,7 @@
     return mutate((d) => {
       const removed = (d.dryPeriods || []).find((item) => item.dryPeriodId === dryPeriodId);
       d.dryPeriods = (d.dryPeriods || []).filter((item) => item.dryPeriodId !== dryPeriodId);
+      restoreLinkedWaterSchedule(d, "dry", dryPeriodId);
       unlinkLegacyWaterPeriod(d, dryPeriodId, "dry");
       if (removed) {
         refreshDryingSummary(d, removed.fieldId);
@@ -1093,7 +1150,10 @@
     const rows = Array.isArray(records) ? records.filter(Boolean) : [];
     if (!rows.length) return null;
     return mutate((d) => {
-      rows.forEach((record) => saveIrrigationToDraft(d, record));
+      rows.forEach((record) => {
+        const saved = saveIrrigationToDraft(d, record);
+        completeLinkedWaterSchedule(d, saved, "irrigation", saved.irrigationId);
+      });
     }, message || `水管理を${rows.length}件保存しました`);
   }
 
@@ -1128,6 +1188,8 @@
         observationSummary: record.observationSummary || "",
         interruptionDays: record.interruptionDays || "",
         referenceRecordIds: record.referenceRecordIds || [],
+        sourceScheduleId: record.sourceScheduleId || previous && previous.sourceScheduleId || "",
+        sourceSchedulePhase: record.sourceSchedulePhase || previous && previous.sourceSchedulePhase || "",
         status: record.status || "入水中",
         autoStartedFromDry: record.autoStartedFromDry === undefined ? Boolean(previous && previous.autoStartedFromDry) : Boolean(record.autoStartedFromDry),
         autoStartedFromDrySource: record.autoStartedFromDrySource === undefined ? String(previous && previous.autoStartedFromDrySource || "") : String(record.autoStartedFromDrySource || ""),
@@ -1150,12 +1212,14 @@
         }
         if (normalized.targetDays) d.fields[fieldIndex].intermittentIntervalDays = normalized.targetDays;
       }
+      return normalized;
   }
 
   function deleteIrrigation(irrigationId) {
     return mutate((d) => {
       const removed = (d.irrigations || []).find((item) => item.irrigationId === irrigationId);
       d.irrigations = (d.irrigations || []).filter((item) => item.irrigationId !== irrigationId);
+      restoreLinkedWaterSchedule(d, "irrigation", irrigationId);
       unlinkLegacyWaterPeriod(d, irrigationId, waterKindFromMethod(removed && removed.method));
       if (removed && /間断/.test(String(removed.method || ""))) refreshIntermittentSummary(d, removed.fieldId);
     }, "水管理を削除しました");
@@ -1567,6 +1631,46 @@
     return Array.from(byBoundary.values());
   }
 
+  function displayCopy(value) {
+    if (Array.isArray(value)) return value.map(displayCopy);
+    if (value && typeof value === "object") {
+      return Object.keys(value).reduce((copy, key) => {
+        copy[key] = displayCopy(value[key]);
+        return copy;
+      }, {});
+    }
+    return value;
+  }
+
+  // Read-only sources for a field-year timeline. Keep canonical records inside
+  // state and return deep display copies so UI code cannot mutate saved data.
+  function timelineEntriesForField(fieldId, options) {
+    const opts = options || {};
+    const year = opts.year === undefined || opts.year === null || String(opts.year) === "all" ? undefined : String(opts.year);
+    const id = String(fieldId || "");
+    if (!id) return { works: [], headingWorks: [], growth: [], waterPeriods: [], others: [] };
+    const allWorks = fieldWorksFor(id, year)
+      .filter((row) => isActualFieldWork(row))
+      .map(displayCopy);
+    const headingWorks = allWorks.filter((row) => isHeadingWorkName(row.workName));
+    const works = allWorks
+      .filter((row) => !isHeadingWorkName(row.workName))
+      .filter((row) => !waterEventFromWorkName(row.workName))
+      .filter((row) => !isMigratedWaterWork(row, id));
+    const growth = growthLogsFor(id, year).map(displayCopy);
+    const waterPeriods = resolvedWaterPeriodsFor(id, { year, includePlanned: Boolean(opts.includePlanned), forDisplay: true })
+      .map(({ raw, ...period }) => ({
+        ...displayCopy(period),
+        sourceStatus: String(raw && (raw.status || raw.periodStatus) || "")
+      }));
+    const others = (data().otherWorks || [])
+      .filter((row) => (row.relatedFieldIds || row.fieldIds || []).includes(id))
+      .filter((row) => !year || String(row.season || String(row.date || "").slice(0, 4)) === year)
+      .filter((row) => isActualFieldWork(row))
+      .map(displayCopy);
+    return { works, headingWorks, growth, waterPeriods, others };
+  }
+
   function seasonNotesForField(fieldId, year) {
     const fieldRecord = field(fieldId);
     return (fieldRecord && Array.isArray(fieldRecord.seasonNotes) ? fieldRecord.seasonNotes : [])
@@ -1688,6 +1792,7 @@
     dryPeriodsFor,
     irrigationsFor,
     resolvedWaterPeriodsFor,
+    timelineEntriesForField,
     legacyWaterReviewFor,
     directWaterMatchesForLegacy,
     importLegacyWaterPeriod,
