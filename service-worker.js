@@ -1,5 +1,5 @@
-﻿const CACHE_NAME = "rice-karte-20260804-227";
-const APP_VERSION = "20260804_ver227";
+const CACHE_NAME = "rice-karte-20260804-228";
+const APP_VERSION = "20260804_ver228";
 const CACHE_PREFIX = "rice-karte-";
 const RETAINED_APP_CACHES = 2;
 
@@ -54,6 +54,8 @@ const APP_SHELL = [
   "./assets/images/light-icons/muddy-footprint.png",
   "./assets/images/light-icons/dry-cracks.png",
   "./assets/images/light-icons/karte-notebook.png",
+  "./assets/images/light-icons/farm-calendar.png",
+  "./assets/images/light-icons/farm-masters.png",
   "./assets/images/light-icons/rice-sack.png",
   "./assets/images/light-icons/mowing-worker.png",
   "./assets/images/light-icons/dry-paddy.png",
