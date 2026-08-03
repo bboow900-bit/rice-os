@@ -65,6 +65,7 @@
           entries.push({ kind: entryKind, tone: planned ? "schedule" : "water", title, subtitle: field.name, memo, planned: Boolean(planned), record: period });
         };
         add(period.startDate, `${period.label} 開始`, period.source === "legacy-work" ? "作業記録から反映" : "水管理記録");
+        if (!period.startDate) add(period.plannedStartDate, `${period.label} 開始予定`, "予定開始日", true);
         add(period.actualEndDate, `${period.label} 完了`, "実績終了日");
         if (!period.actualEndDate) add(period.plannedEndDate, `${period.label} 終了予定`, "予定終了日", true);
       });
@@ -159,6 +160,7 @@
         : [];
       return periods.flatMap((period) => [
         period.startDate ? { date: period.startDate, title: `${period.label} 開始`, subtitle: field.name, kind: period.source === "direct" ? (period.kind === "dry" ? "dry" : "irrigation") : "water", record: period } : null,
+        !period.startDate && period.plannedStartDate ? { date: period.plannedStartDate, title: `${period.label} 開始予定`, subtitle: field.name, kind: "schedule", planned: true, record: period } : null,
         period.actualEndDate ? { date: period.actualEndDate, title: `${period.label} 完了`, subtitle: field.name, kind: period.source === "direct" ? (period.kind === "dry" ? "dry" : "irrigation") : "water", record: period } : null
       ]).filter(Boolean);
     });

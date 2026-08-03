@@ -11,6 +11,8 @@
   let annualSortValue = "updated";
   let seasonNoteDraft = null;
   let waterEditDraft = null;
+  let reviewView = "overview";
+  let compareFilter = "work";
 
   const KIND_META = {
     fieldWork: { label: "作業", className: "work", icon: "作" },
@@ -1572,7 +1574,82 @@
     return `<div class="annual-compare-check complete"><b>収穫後の振り返り</b><span>${U.escapeHTML(facts.join(" / "))}</span><button type="button" class="secondary" data-annual-reflection-focus>気づき・来年メモへ</button></div>`;
   }
 
+  function compareRecordCard(entry, year, field) {
+    if (!entry) return `<div class="annual-compare-record empty"><span>${U.escapeHTML(year)}年</span><b>記録なし</b><small>今年残すと、来年ここで比べられます</small></div>`;
+    const date = timelineDateParts(entry.date);
+    const days = entry.days !== "" && entry.days != null ? `${entry.days}日間` : "";
+    const planting = state.plantingDateForField ? state.plantingDateForField(field.fieldId, year) : "";
+    const dap = planting && entry.date ? timelineDays(planting, entry.date) : "";
+    const endDap = planting && entry.periodEndDate ? timelineDays(planting, entry.periodEndDate) : "";
+    const timing = entry.tone === "water" && endDap !== ""
+      ? `${year}年 / ${date.text}${dap !== "" ? ` / 開始: 田植後${dap}日` : ""} / 完了: 田植後${endDap}日`
+      : `${year}年 / ${date.text}${dap !== "" ? ` / 田植後${dap}日` : ""}`;
+    return `<button type="button" class="annual-compare-record ${U.attr(entry.tone || "work")}" data-annual-flow-open-kind="${U.attr(entry.editKind)}" data-annual-flow-open-id="${U.attr(entry.editId || entry.id)}"><span>${U.escapeHTML(timing)}</span><b>${U.escapeHTML(entry.label)}</b><small>${U.escapeHTML(entry.detail || "記録あり")}${days ? ` / ${U.escapeHTML(days)}` : ""}</small><strong aria-hidden="true">〉</strong></button>`;
+  }
+
+  function milestoneEntry(entries, pattern) {
+    return entries.find((entry) => !entry.isWaterMarker && pattern.test(`${entry.category || ""} ${entry.label || ""}`)) || null;
+  }
+
+  function compareEntriesForFilter(field, year, filter) {
+    const entries = fieldYearTimeline(field, year)
+      .filter((entry) => !entry.isWaterMarker)
+      .filter((entry) => String(year) !== String(new Date().getFullYear()) || entry.date <= U.today());
+    if (filter === "work") return entries.filter((entry) => entry.lane === "work" && entry.tone !== "harvest" && !/田植/.test(String(entry.label || "")));
+    if (filter === "water") return entries.filter((entry) => entry.tone === "water");
+    if (filter === "growth") return entries.filter((entry) => entry.tone === "growth");
+    if (filter === "harvest") return entries.filter((entry) => entry.tone === "harvest");
+    if (filter === "milestones") return entries.filter((entry) => /田植|中干し|幼穂|出穂|収穫|稲刈/.test(`${entry.category || ""} ${entry.label || ""}`));
+    return entries;
+  }
+
+  function renderReviewOverview(field, statusOverview) {
+    const year = reviewYearValue();
+    const previousYear = String(Number(year) - 1);
+    const snapshot = fieldYearSnapshot(field, year);
+    return `
+      <section class="annual-compare-launch"><div><span>振り返り</span><h3>今年と前年を比べる</h3><p>${U.escapeHTML(year)}年と${U.escapeHTML(previousYear)}年の節目・作業・水管理を、見やすく読み比べます。</p></div><button type="button" class="primary" data-annual-open-compare>比較を開く</button></section>
+      ${renderYearFlow(field, statusOverview)}
+      ${renderEndSeasonReflection(field, snapshot)}
+      ${renderSeasonNotes(field)}
+      <label class="annual-carryover-note"><span>来年に引き継ぐメモ</span><textarea data-annual-field-edit="nextSeasonMemo" placeholder="例: この圃場は中干しを早めに始める。穂肥量は葉色を見て控えめに。">${U.escapeHTML(field.nextSeasonMemo || "")}</textarea><small>圃場マスターに保存され、年度をまたいで確認できます。</small></label>
+    `;
+  }
+
+  function renderComparisonExperience(field) {
+    const currentYear = reviewYearValue();
+    const previousYear = String(Number(currentYear) - 1);
+    const current = fieldYearSnapshot(field, currentYear);
+    const previous = fieldYearSnapshot(field, previousYear);
+    const currentEntries = compareEntriesForFilter(field, currentYear, "all");
+    const previousEntries = compareEntriesForFilter(field, previousYear, "all");
+    const currentPlanting = milestoneEntry(currentEntries, /田植/);
+    const previousPlanting = milestoneEntry(previousEntries, /田植/);
+    const currentHeading = milestoneEntry(currentEntries, /出穂/);
+    const previousHeading = milestoneEntry(previousEntries, /出穂/);
+    const milestones = [["田植え", /田植/], ["中干し", /中干し/], ["幼穂確認", /幼穂/], ["出穂", /出穂/], ["収穫", /収穫|稲刈/]];
+    const filters = [["milestones", "季節の節目"], ["all", "すべて"], ["work", "その他の作業"], ["water", "水管理"], ["growth", "生育"], ["harvest", "収穫"]];
+    const history = (entries, year) => entries.length ? entries.map((entry) => compareRecordCard(entry, year, field)).join("") : `<div class="annual-compare-record empty"><span>${U.escapeHTML(year)}年</span><b>該当する記録なし</b><small>条件を変えるか、次の作業で残しましょう</small></div>`;
+    return `
+      <section class="annual-compare-experience" aria-label="${U.escapeHTML(field.name)}の今年と前年の比較">
+        <div class="annual-compare-experience-head"><button type="button" class="annual-compare-back" data-annual-close-compare aria-label="比較を閉じる">‹</button><div><span>今年と前年を比べる</span><h3>${U.escapeHTML(field.name)}</h3><p>${U.escapeHTML(currentYear)}年と${U.escapeHTML(previousYear)}年 / ${U.escapeHTML(varietyName(field))}</p></div></div>
+        <div class="annual-compare-season-status"><article class="current"><span>${U.escapeHTML(currentYear)}年</span><b>${U.escapeHTML(currentPlanting ? `田植え ${U.fd(currentPlanting.date)}` : "田植え未記録")}</b><small>${U.escapeHTML(currentHeading ? `出穂 ${U.fd(currentHeading.date)}` : "出穂記録待ち")}</small></article><i aria-hidden="true">⇄</i><article><span>${U.escapeHTML(previousYear)}年</span><b>${U.escapeHTML(previousPlanting ? `田植え ${U.fd(previousPlanting.date)}` : "田植え未記録")}</b><small>${U.escapeHTML(previousHeading ? `出穂 ${U.fd(previousHeading.date)}` : "出穂記録なし")}</small></article></div>
+        <section class="annual-compare-milestones"><div class="annual-compare-section-head"><div><span>季節の節目</span><h4>今年と前年の歩み</h4></div><small>実績のみ</small></div>${milestones.map(([label, pattern]) => `<article><span>${U.escapeHTML(label)}</span><div>${compareRecordCard(milestoneEntry(currentEntries, pattern), currentYear, field)}${compareRecordCard(milestoneEntry(previousEntries, pattern), previousYear, field)}</div></article>`).join("")}</section>
+        <section class="annual-compare-history"><div class="annual-compare-section-head"><div><span>比べたい履歴</span><h4>記録を読み比べる</h4></div><small>${U.escapeHTML(currentYear)}年 ⇄ ${U.escapeHTML(previousYear)}年</small></div><div class="annual-compare-filter-row">${filters.map(([id, label]) => `<button type="button" class="${compareFilter === id ? "active" : ""}" data-annual-compare-filter="${U.attr(id)}">${U.escapeHTML(label)}</button>`).join("")}</div><div class="annual-compare-history-grid"><div><b>${U.escapeHTML(currentYear)}年</b>${history(compareEntriesForFilter(field, currentYear, compareFilter), currentYear)}</div><div><b>${U.escapeHTML(previousYear)}年</b>${history(compareEntriesForFilter(field, previousYear, compareFilter), previousYear)}</div></div></section>
+        ${renderAnnualPhotoComparison(field)}
+        <section class="annual-compare-memos"><div><span>今年のひとこと</span><b>${U.escapeHTML(current.memo || "まだ記録がありません")}</b></div><div><span>前年の記憶</span><b>${U.escapeHTML(previous.memo || "前年のメモはありません")}</b></div></section>
+      </section>
+    `;
+  }
+
   function renderYearCompare(field, statusOverview) {
+    if (reviewView === "compare") return renderComparisonExperience(field);
+    return renderReviewOverview(field, statusOverview);
+  }
+
+  // Kept temporarily as an internal reference while the comparison surface
+  // settles; the active UI is rendered by renderComparisonExperience above.
+  function renderLegacyCompareData(field, statusOverview) {
     const currentYear = yearValue() === "all" ? String(new Date().getFullYear()) : String(yearValue());
     const previousYear = String(Number(currentYear) - 1);
     const current = fieldYearSnapshot(field, currentYear);
@@ -1752,16 +1829,24 @@
     selectedTab = "karte";
     seasonNoteDraft = null;
     waterEditDraft = null;
+    reviewView = "overview";
+    compareFilter = "work";
     render();
     if (RiceOS.app && RiceOS.app.syncBackButton) RiceOS.app.syncBackButton();
     return true;
   }
 
   function canHandleBack() {
-    return Boolean(selectedFieldId);
+    return Boolean(selectedFieldId || reviewView === "compare");
   }
 
   function handleBack() {
+    if (reviewView === "compare") {
+      reviewView = "overview";
+      compareFilter = "work";
+      render();
+      return true;
+    }
     return closeFieldDetail();
   }
 
@@ -1790,6 +1875,8 @@
     selectedFieldId = fieldId || "";
     selectedTab = tab || "karte";
     waterEditDraft = null;
+    reviewView = "overview";
+    compareFilter = "work";
     render();
     if (RiceOS.app && RiceOS.app.syncBackButton) RiceOS.app.syncBackButton();
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -1800,6 +1887,8 @@
     selectedTab = "karte";
     seasonNoteDraft = null;
     waterEditDraft = null;
+    reviewView = "overview";
+    compareFilter = "work";
     render();
   }
 
@@ -1828,10 +1917,32 @@
         window.scrollTo({ top: 0, behavior: "smooth" });
         return;
       }
+      if (event.target.closest("[data-annual-open-compare]")) {
+        reviewView = "compare";
+        compareFilter = "work";
+        render();
+        window.scrollTo({ top: 0, behavior: "smooth" });
+        return;
+      }
+      if (event.target.closest("[data-annual-close-compare]")) {
+        reviewView = "overview";
+        compareFilter = "work";
+        render();
+        window.scrollTo({ top: 0, behavior: "smooth" });
+        return;
+      }
+      const compareFilterButton = event.target.closest("[data-annual-compare-filter]");
+      if (compareFilterButton) {
+        compareFilter = compareFilterButton.dataset.annualCompareFilter || "work";
+        render();
+        return;
+      }
       const flowOpen = event.target.closest("[data-annual-flow-open-kind]");
       if (flowOpen) {
         const kind = flowOpen.dataset.annualFlowOpenKind;
         if (kind === "waterReview") {
+          reviewView = "overview";
+          compareFilter = "work";
           selectedTab = "water";
           waterEditDraft = null;
           render();

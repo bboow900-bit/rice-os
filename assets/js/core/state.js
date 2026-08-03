@@ -1340,10 +1340,13 @@
     return [...directDry, ...directWater].map((row) => {
       const kind = row.type === "dryPeriod" || /中干し/.test(String(row.method || "")) ? "dry" : waterKindFromMethod(row.method);
       if (!kind) return null;
-      const startDate = String(row.startDate || row.date || "");
+      // Scheduled periods can carry the date they were registered in `date`.
+      // That is not an actual start, so never promote it to factual status.
+      const explicitStartDate = String(row.startDate || "");
       const actualEndDate = String(row.actualEndDate || "");
       const plannedEndDate = String(row.endDate || "");
-      const planned = !startDate && Boolean(row.plannedStartDate || plannedEndDate || /予定/.test(String(row.status || row.periodStatus || "")));
+      const planned = !explicitStartDate && Boolean(row.plannedStartDate || plannedEndDate || /予定/.test(String(row.status || row.periodStatus || "")));
+      const startDate = planned ? "" : String(explicitStartDate || row.date || "");
       return {
         periodId: `direct:${kind}:${row.dryPeriodId || row.irrigationId || row.date || ""}`,
         kind,
@@ -1351,6 +1354,7 @@
         fieldId,
         season: waterPeriodYear(row),
         startDate,
+        plannedStartDate: String(row.plannedStartDate || ""),
         plannedEndDate,
         actualEndDate,
         targetDays: String(row.targetDays || ""),
@@ -1620,7 +1624,7 @@
     // older work record stay separately actionable even when their dates match.
     const byBoundary = new Map();
     periods.forEach((period) => {
-      const key = [period.source, period.kind, period.startDate, period.actualEndDate, period.plannedEndDate].join("|");
+      const key = [period.source, period.kind, period.startDate, period.plannedStartDate, period.actualEndDate, period.plannedEndDate].join("|");
       const current = byBoundary.get(key);
       if (!current) {
         byBoundary.set(key, { ...period, displayRecordCount: 1 });

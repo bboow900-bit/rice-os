@@ -752,28 +752,44 @@
 
   function renderDecisionFieldCard(field) {
     const date = U.today();
-    const planting = plantingDateForYear(field.fieldId, cropYear(date));
-    const dap = planting ? U.daysBetween(planting, date) : "";
-    const need = dashboardNeed(field, date);
     const stage = seasonStageForField(field, date);
     const waterManagement = waterManagementForField(field, date);
     const stageImage = stage.current ? `assets/images/rice-stages/rice-stage-${String(stage.current.image).padStart(2, "0")}.png` : "assets/images/rice-stages/rice-stage-01.png";
-    const stageKey = stage.current ? stage.current.key : "waiting";
+    const candidateCount = candidatesForDate(date).filter((entry) => entryFieldIds(entry).includes(field.fieldId)).length;
     return `
-      <article class="home-decision-card ${U.attr(need.tone)} stage-${U.attr(stageKey)}">
+      <button type="button" class="home-decision-card" data-home-open-field="${U.attr(field.fieldId)}" aria-label="${U.attr(`${field.name}の圃場詳細を開く`)}">
         <div class="home-decision-card-head">
           <img class="stage" src="${U.attr(stageImage)}" alt="">
           <div><b>${U.escapeHTML(field.name)}</b><small>${U.escapeHTML(fieldVariety(field))} / ${U.escapeHTML(areaText(field))}</small></div>
-          <strong>${U.escapeHTML(dap === "" ? "田植え未登録" : `田植後 ${dap}日`)}</strong>
+          <i aria-hidden="true">›</i>
         </div>
-        <div class="home-season-focus stage-${U.attr(stageKey)}">
-          <img src="${U.attr(stageImage)}" alt="">
-          <div><small>現在の生育ステージ</small><b>${U.escapeHTML(stage.current ? stage.current.label : "記録待ち")}</b></div>
-          <span>${U.escapeHTML(stage.certainty || "記録待ち")}</span>
-        </div>
-        ${renderLinkedSeasonFlow(field, date, stage)}
-        <div class="home-decision-status"><span>${U.escapeHTML(need.label)}</span><small>${U.escapeHTML(waterManagement.label || need.detail)}</small></div>
-      </article>
+        <div class="home-decision-state growth"><span>🌾</span><b>${U.escapeHTML(stage.current ? stage.current.label : "生育記録待ち")}</b><small>${U.escapeHTML(stage.certainty || "記録待ち")}</small></div>
+        <div class="home-decision-state water"><span>💧</span><b>${U.escapeHTML(waterManagement.label || "水管理記録待ち")}</b><small>${U.escapeHTML(waterManagement.evidence || "記録待ち")}</small></div>
+        ${candidateCount ? `<div class="home-decision-alert">⚠ 確認候補 ${U.escapeHTML(String(candidateCount))}件</div>` : ""}
+      </button>
+    `;
+  }
+
+  function activeWaterCount(dateText) {
+    const activeKeys = new Set(["drying", "intermittent", "deepWater", "draining", "overlap"]);
+    return state.activeFields().filter((field) => activeKeys.has(String(waterManagementForField(field, dateText).key || ""))).length;
+  }
+
+  function renderTodayPlans(dateText) {
+    const plans = (state.data().schedules || []).filter((schedule) => String(schedule.date || "") === dateText && !scheduleDone(schedule));
+    if (!plans.length) return "";
+    return `
+      <section class="home-today-plans" aria-label="今日の予定">
+        <div><h3>今日の予定</h3><small>未実施の予定</small></div>
+        ${plans.slice(0, 2).map((schedule) => {
+          const fieldIds = (schedule.fieldIds || []).filter(Boolean);
+          const field = state.field(fieldIds[0] || "");
+          const title = schedule.title || schedule.scheduleType || "予定";
+          const target = fieldIds.length > 1 ? `対象圃場 ${fieldIds.length}圃場` : (field ? field.name : "対象圃場を確認");
+          return `<span><b>${U.escapeHTML(title)}</b><small>${U.escapeHTML(target)}</small></span>`;
+        }).join("")}
+        ${plans.length > 2 ? `<small class="home-today-plans-more">ほか${U.escapeHTML(String(plans.length - 2))}件</small>` : ""}
+      </section>
     `;
   }
 
@@ -811,23 +827,25 @@
     const todayEntries = actualEntriesForDate(U.today());
     const candidates = candidatesForDate(U.today());
     const overdue = overdueSchedules();
-    const rows = state.activeFields()
+    const rows = prioritizedDecisionFields(U.today(), candidates, overdue)
+      .map((row) => row.field)
       .filter((field) => homeGroupFilter === "all" || field.fieldGroupId === homeGroupFilter || (!field.fieldGroupId && homeGroupFilter === ""))
-      .sort((a, b) => homeGroupName(a).localeCompare(homeGroupName(b)) || String(a.name).localeCompare(String(b.name)));
+      ;
     const groupOptions = [`<option value="all">すべてのグループ（${state.activeFields().length}圃場）</option>`, ...homeGroups().map((group) => `<option value="${U.attr(group.fieldGroupId)}" ${group.fieldGroupId === homeGroupFilter ? "selected" : ""}>${U.escapeHTML(group.name)}（${group.count}圃場）</option>`)].join("");
     return `
       <section class="home-decision-hero">
-        <div><p>今日・今週の判断</p><h2>田んぼの今を、先に見る</h2><small>${U.escapeHTML(U.fd(U.today()))} / ${U.escapeHTML(todayEntries.length ? `今日の記録 ${todayEntries.length}件` : "今日の記録はありません")}</small></div>
+        <div><p>${U.escapeHTML(U.fd(U.today()))}</p><h2>おはようございます</h2><small>${U.escapeHTML(candidates.length ? `今日は${candidates.length}件の確認があります` : "今日は確認候補はありません")}</small></div>
         <button type="button" class="primary" data-home-quick-record>記録を追加</button>
       </section>
       <section class="home-decision-summary" aria-label="今日の状況">
         <div><b>${U.escapeHTML(String(candidates.length))}</b><span>確認候補</span></div>
         <div><b>${U.escapeHTML(String(overdue.length))}</b><span>期限超過</span></div>
         <div><b>${U.escapeHTML(String(todayEntries.length))}</b><span>今日の記録</span></div>
-        <div><b>${U.escapeHTML(String(state.activeFields().filter((field) => plantingDateForYear(field.fieldId, cropYear(U.today()))).length))}</b><span>田植え済み</span></div>
+        <div><b>${U.escapeHTML(String(activeWaterCount(U.today())))}</b><span>進行中の水管理</span></div>
       </section>
+      ${renderTodayPlans(U.today())}
       <section class="home-decision-section">
-        <div class="home-decision-section-head"><div><h3>圃場の現在地</h3><small>生育と水管理の進み具合を全圃場で確認します</small></div><select data-home-group-filter aria-label="圃場グループを絞り込む">${groupOptions}</select></div>
+        <div class="home-decision-section-head"><div><h3>全圃場</h3><small>今日の状況を優先順に表示</small></div><select data-home-group-filter aria-label="圃場グループを絞り込む">${groupOptions}</select></div>
         <div class="home-decision-list">${rows.length ? rows.map(renderDecisionFieldCard).join("") : '<div class="farm-empty">このグループには圃場がありません。</div>'}</div>
       </section>
     `;
@@ -1705,7 +1723,17 @@
         return;
       }
       if (event.target.closest("[data-home-quick-record]")) {
-        openDate(U.today(), filterFieldId === "all" ? "" : filterFieldId);
+        // Start from the shared target picker. A visual home filter must not
+        // silently turn a single record into a group record.
+        openDate(U.today(), "");
+        return;
+      }
+      const fieldCard = event.target.closest("[data-home-open-field]");
+      if (fieldCard) {
+        const fieldId = fieldCard.dataset.homeOpenField || "";
+        if (fieldId && RiceOS.navigation && RiceOS.navigation.openField) {
+          RiceOS.navigation.openField(fieldId, { originScreen: "home" });
+        }
         return;
       }
       if (event.target.closest("[data-home-dashboard-list]")) {
