@@ -242,8 +242,18 @@
       const seasonNotes = [...(field.seasonNotes || []), ...(source.seasonNotes || []).filter((note) => !existingIds.has(String(note.noteId || "")))];
       return { ...field, seasonNotes };
     });
+    // Derived outlook snapshots are not farm records, but keeping them when
+    // JSON data is merged lets next season compare an old forecast with its
+    // later actual result. Deduplicate without overwriting either history.
+    const snapshotKey = (row) => String(row && row.snapshotId || [row && row.fieldId, row && row.season, row && row.asOf, row && row.headingDate, row && row.harvestDate].join("|"));
+    const knownSnapshotKeys = new Set(((current.meta && current.meta.outlookSnapshots) || []).map(snapshotKey));
+    const outlookSnapshots = [
+      ...((current.meta && current.meta.outlookSnapshots) || []),
+      ...((incoming.meta && incoming.meta.outlookSnapshots) || []).filter((row) => !knownSnapshotKeys.has(snapshotKey(row)))
+    ];
     merged.meta = {
       ...(current.meta || {}),
+      outlookSnapshots,
       lastImportAt: U.now(),
       lastImportMode: "merge",
       lastImportSourceVersion: incoming.appVersion || incoming.meta && incoming.meta.appVersion || ""

@@ -1,5 +1,5 @@
-﻿const CACHE_NAME = "rice-karte-20260803-215";
-const APP_VERSION = "20260803_ver215";
+﻿const CACHE_NAME = "rice-karte-20260803-219";
+const APP_VERSION = "20260803_ver219";
 const CACHE_PREFIX = "rice-karte-";
 const RETAINED_APP_CACHES = 2;
 
@@ -64,6 +64,7 @@ const APP_SHELL = [
   `./assets/js/core/storage.js?v=${APP_VERSION}`,
   `./assets/js/core/state.js?v=${APP_VERSION}`,
   `./assets/js/core/agro.js?v=${APP_VERSION}`,
+  `./assets/js/core/outlook.js?v=${APP_VERSION}`,
   `./assets/js/core/record-actions.js?v=${APP_VERSION}`,
   `./assets/js/core/calendar.js?v=${APP_VERSION}`,
   `./assets/js/core/alerts.js?v=${APP_VERSION}`,
@@ -86,6 +87,7 @@ const APP_SHELL = [
   `./assets/js/screens/materials.js?v=${APP_VERSION}`,
   `./assets/js/screens/results.js?v=${APP_VERSION}`,
   `./assets/js/screens/notices.js?v=${APP_VERSION}`,
+  `./assets/js/screens/outlook.js?v=${APP_VERSION}`,
   `./assets/js/screens/data.js?v=${APP_VERSION}`,
   `./assets/js/app.js?v=${APP_VERSION}`,
   "./assets/icons/icon-192.png",

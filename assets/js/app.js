@@ -10,6 +10,7 @@
     "home",
     "fields",
     "annual",
+    "outlook",
     "notices",
     "data",
     "calendar",
@@ -115,6 +116,7 @@
       "field-work": "記録入力",
       fields: "圃場",
       annual: "振り返り",
+      outlook: "見通し",
       data: "管理"
     };
     Object.keys(primaryLabels).forEach((screenId) => {
@@ -134,6 +136,11 @@
           if (mod && typeof mod.resetNavigation === "function") mod.resetNavigation();
           window.scrollTo({ top: 0, behavior: "smooth" });
           return;
+        }
+        // Outlook detail is an in-screen view, not a navigation-stack route.
+        // Clear it explicitly before moving to another independent tab.
+        if (activeScreen === "outlook" && RiceOS.screens.outlook && RiceOS.screens.outlook.resetNavigation) {
+          RiceOS.screens.outlook.resetNavigation();
         }
         if (RiceOS.navigation && RiceOS.navigation.clear) RiceOS.navigation.clear();
         show(button.dataset.screen, { skipHistory: true });
@@ -232,7 +239,7 @@
   }
 
   function resetNestedScreens() {
-    ["annual", "fields"].forEach((screenId) => {
+    ["annual", "fields", "outlook"].forEach((screenId) => {
       const mod = screenModule(screenId);
       if (mod && typeof mod.resetNavigation === "function") mod.resetNavigation();
     });

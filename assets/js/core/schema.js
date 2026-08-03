@@ -862,7 +862,10 @@
         lastBackupAt: source.meta && source.meta.lastBackupAt || "",
         storagePersisted: source.meta && source.meta.storagePersisted,
         storagePersistCheckedAt: source.meta && source.meta.storagePersistCheckedAt || "",
-        lastExportId: source.meta && source.meta.lastExportId || source.exportId || ""
+        lastExportId: source.meta && source.meta.lastExportId || source.exportId || "",
+        // Derived forecast snapshots are metadata only. Source records remain
+        // authoritative and are never reconstructed from these rows.
+        outlookSnapshots: ensureArray(source.meta && source.meta.outlookSnapshots)
       }
     };
   }

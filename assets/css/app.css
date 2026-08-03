@@ -1544,6 +1544,70 @@
 .home-water-focus-main span { margin-top: 3px; color: #398251; font-size: 10px; font-weight: 900; }
 .home-water-focus-status { min-width: 86px; padding: 6px 7px; border-radius: 9px; background: #e8f5e8; text-align: right; }
 .home-water-focus-status b { color: #287744; font-size: 12px; }
+
+/* Outlook: an evidence-led view, intentionally separate from action prompts. */
+.outlook-head small { display: block; margin-top: 4px; color: #738075; font-size: 12px; font-weight: 700; }
+.outlook-toolbar { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: end; margin: 12px 0 8px; }
+.outlook-toolbar label { display: grid; gap: 4px; color: #687469; font-size: 11px; font-weight: 850; }
+.outlook-toolbar select { width: 100%; min-height: 40px; border: 1px solid #d7e0d0; border-radius: 11px; background: #fffefa; color: #27442e; font: inherit; font-size: 13px; font-weight: 800; }
+.outlook-toolbar .secondary { min-height: 40px; padding: 0 11px; white-space: nowrap; font-size: 12px; }
+.outlook-update-note { margin: 0 0 10px; color: #798477; font-size: 11px; font-weight: 700; }
+.outlook-actions { display: flex; align-items: center; justify-content: space-between; gap: 9px; margin-bottom: 10px; }
+.outlook-actions .outlook-update-note { flex: 1; margin: 0; }
+.outlook-actions .secondary { flex: 0 0 auto; min-height: 34px; padding: 0 10px; font-size: 11px; white-space: nowrap; }
+.outlook-list { display: grid; gap: 10px; padding-bottom: 80px; }
+.outlook-field-card { width: 100%; padding: 13px; border: 1px solid #d9e6d3; border-left: 5px solid #3ea65b; border-radius: 15px; background: linear-gradient(135deg, #fffefa, #f4fbf1); box-shadow: 0 5px 13px rgba(53, 91, 55, .07); color: #25362a; text-align: left; }
+.outlook-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.outlook-card-head h3, .outlook-card-head small { margin: 0; }
+.outlook-card-head h3 { margin-top: 2px; font-size: 18px; line-height: 1.2; }
+.outlook-card-head small { color: #708071; font-size: 11px; font-weight: 750; }
+.outlook-confidence { flex: 0 0 auto; padding: 4px 7px; border-radius: 8px; background: #e9f5e8; color: #2c8445; font-size: 10px; font-weight: 900; }
+.outlook-confidence.medium { background: #fff2ce; color: #a36d11; }
+.outlook-confidence.low, .outlook-confidence.missing { background: #f0f0ec; color: #6b716c; }
+.outlook-now { display: flex; align-items: baseline; gap: 7px; margin-top: 11px; padding: 8px 9px; border-radius: 10px; background: #eaf6e9; }
+.outlook-now span { color: #4d8057; font-size: 11px; font-weight: 850; }
+.outlook-now b { color: #22693a; font-size: 15px; }
+.outlook-estimates { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; margin: 9px 0 0; }
+.outlook-estimates > div { min-width: 0; padding: 8px 9px; border: 1px solid #e2e8dc; border-radius: 10px; background: rgba(255,255,255,.76); }
+.outlook-estimates dt { color: #758078; font-size: 10px; font-weight: 800; }
+.outlook-estimates dd { overflow: hidden; margin: 3px 0 0; color: #2c3e31; font-size: 12px; font-weight: 850; text-overflow: ellipsis; white-space: nowrap; }
+.outlook-card-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 10px; color: #5c7c67; font-size: 11px; font-weight: 800; }
+.outlook-card-foot span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.outlook-card-foot b { flex: 0 0 auto; color: #277843; }
+.outlook-detail { padding-bottom: 80px; }
+.outlook-detail-head { align-items: center; }
+.outlook-detail-head > div { flex: 1; }
+.outlook-detail-head .icon-button { width: 42px; height: 42px; font-size: 32px; line-height: 1; }
+.outlook-detail-hero { margin: 4px 0 12px; padding: 14px; border: 1px solid #cce3cf; border-radius: 15px; background: linear-gradient(135deg, #e7f6e6, #fffdf4); }
+.outlook-detail-hero small, .outlook-detail-hero b, .outlook-detail-hero span { display: block; }
+.outlook-detail-hero small { color: #5b8c65; font-size: 11px; font-weight: 850; }
+.outlook-detail-hero b { margin-top: 3px; color: #1d6c38; font-size: 20px; }
+.outlook-detail-hero span { margin-top: 5px; color: #438099; font-size: 12px; font-weight: 800; }
+.outlook-detail-section { margin: 11px 0; padding: 12px; border: 1px solid #e1e6dc; border-radius: 14px; background: #fffefa; }
+.outlook-detail-section h3 { margin: 0 0 9px; color: #2d4935; font-size: 14px; }
+.outlook-detail-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.outlook-detail-grid > div { min-width: 0; padding: 9px; border-radius: 10px; background: #f4f8ef; }
+.outlook-detail-grid small, .outlook-detail-grid b, .outlook-detail-grid span { display: block; }
+.outlook-detail-grid small { color: #6f7b70; font-size: 10px; font-weight: 800; }
+.outlook-detail-grid b { margin-top: 3px; color: #2a3e30; font-size: 13px; line-height: 1.35; }
+.outlook-detail-grid span { margin-top: 4px; color: #748076; font-size: 10px; line-height: 1.35; }
+.outlook-missing { margin: 10px 0 0; padding: 9px; border-radius: 9px; background: #fff3d8; color: #806122; font-size: 12px; font-weight: 750; }
+.outlook-source-list { display: grid; gap: 6px; }
+.outlook-source { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; padding: 8px 0; border-bottom: 1px solid #edf0e9; color: #798178; }
+.outlook-source:last-child { border-bottom: 0; }
+.outlook-source > span { color: #415244; font-size: 12px; font-weight: 850; }
+.outlook-source > b { color: #d2a53c; font-size: 11px; letter-spacing: 1px; }
+.outlook-source > small { grid-column: 1 / -1; font-size: 10px; font-weight: 650; }
+.outlook-source.available > span { color: #20723a; }
+.regional-reference { background: #fffaf0; }
+.regional-reference p { margin: 0 0 8px; color: #665634; font-size: 12px; line-height: 1.5; }
+.regional-reference div { display: grid; gap: 7px; }
+.regional-reference a { color: #297b48; font-size: 12px; font-weight: 850; text-decoration: none; }
+@media (max-width: 370px) {
+  .outlook-toolbar { grid-template-columns: 1fr; }
+  .outlook-toolbar .secondary { width: 100%; }
+  .outlook-card-head h3 { font-size: 17px; }
+}
 .home-water-focus-status em { display: block; margin-top: 2px; color: #54705a; font-size: 9px; font-style: normal; font-weight: 800; }
 .home-water-focus-status.water { background: #e2f4fb; }
 .home-water-focus-status.water b { color: #227b98; }

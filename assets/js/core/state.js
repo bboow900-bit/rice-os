@@ -1727,6 +1727,35 @@
     }, "今年の気づきを削除しました");
   }
 
+  // Derived outlook history is kept apart from farm records. It is append-only
+  // metadata, so saving a recalculation never alters works, growth, or water.
+  function saveOutlookSnapshots(rows) {
+    const incoming = (Array.isArray(rows) ? rows : []).filter((row) => row && row.fieldId && row.season && row.asOf);
+    if (!incoming.length) return data();
+    const existing = Array.isArray(data().meta && data().meta.outlookSnapshots) ? data().meta.outlookSnapshots : [];
+    const keyFor = (row) => [row.fieldId, row.season, row.asOf, row.headingDate || "", row.harvestDate || "", row.confidence || ""].join("|");
+    const known = new Set(existing.map(keyFor));
+    const additions = incoming.filter((row) => !known.has(keyFor(row))).map((row) => ({
+      ...row,
+      snapshotId: row.snapshotId || U.id("outlook", `${row.fieldId}-${row.season}-${row.asOf}`),
+      savedAt: U.now()
+    }));
+    if (!additions.length) return data();
+    const previousEstimated = (fieldId, season, type) => existing.slice().reverse().find((row) => row.fieldId === fieldId && row.season === season && row[type] && !/^actual$/.test(String(row[`${type.replace("Date", "")}Kind`] || "")));
+    return mutate((draft) => {
+      draft.meta = draft.meta || {};
+      const snapshots = Array.isArray(draft.meta.outlookSnapshots) ? draft.meta.outlookSnapshots.slice() : [];
+      additions.forEach((row) => {
+        const headingPrevious = row.actualHeadingDate ? previousEstimated(row.fieldId, row.season, "headingDate") : null;
+        const harvestPrevious = row.actualHarvestDate ? previousEstimated(row.fieldId, row.season, "harvestDate") : null;
+        if (headingPrevious && headingPrevious.headingDate) row.headingErrorDays = U.daysBetween(headingPrevious.headingDate, row.actualHeadingDate);
+        if (harvestPrevious && harvestPrevious.harvestDate) row.harvestErrorDays = U.daysBetween(harvestPrevious.harvestDate, row.actualHarvestDate);
+        snapshots.push(row);
+      });
+      draft.meta.outlookSnapshots = snapshots;
+    }, "見通しを更新しました");
+  }
+
   function lastFieldWork(fieldId) {
     return fieldWorksFor(fieldId).slice().sort((a, b) => String(b.date).localeCompare(String(a.date)))[0] || null;
   }
@@ -1804,6 +1833,7 @@
     seasonNotesForField,
     saveSeasonNote,
     deleteSeasonNote,
+    saveOutlookSnapshots,
     lastFieldWork,
     lastGrowthLog
   };
