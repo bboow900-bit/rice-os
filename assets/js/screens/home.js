@@ -9,6 +9,7 @@
   let anchorDate = U.today();
   let filterFieldId = "all";
   let homeGroupFilter = "all";
+  let expandedManagementFieldId = "";
   const heatCache = new Map();
   const heatProjectionCache = new Map();
   const waterForecastCache = new Map();
@@ -529,7 +530,7 @@
   }
 
   function isPlannedPeriod(row) {
-    return /予定|未開始/.test(String(row && (row.periodStatus || row.status) || ""));
+    return /予定|未開始|planned/i.test(String(row && (row.periodStatus || row.status) || ""));
   }
 
   function actualPeriodStart(row) {
@@ -756,18 +757,143 @@
     const waterManagement = waterManagementForField(field, date);
     const stageImage = stage.current ? `assets/images/rice-stages/rice-stage-${String(stage.current.image).padStart(2, "0")}.png` : "assets/images/rice-stages/rice-stage-01.png";
     const candidateCount = candidatesForDate(date).filter((entry) => entryFieldIds(entry).includes(field.fieldId)).length;
+    const isExpanded = expandedManagementFieldId === field.fieldId;
     return `
-      <button type="button" class="home-decision-card" data-home-open-field="${U.attr(field.fieldId)}" aria-label="${U.attr(`${field.name}の圃場詳細を開く`)}">
+      <article class="home-decision-card ${isExpanded ? "expanded" : ""}">
+        <button type="button" class="home-decision-card-toggle" data-home-toggle-field="${U.attr(field.fieldId)}" aria-expanded="${isExpanded ? "true" : "false"}" aria-controls="home-management-${U.attr(field.fieldId)}">
         <div class="home-decision-card-head">
           <img class="stage" src="${U.attr(stageImage)}" alt="">
-          <div><b>${U.escapeHTML(field.name)}</b><small>${U.escapeHTML(fieldVariety(field))} / ${U.escapeHTML(areaText(field))}</small></div>
-          <i aria-hidden="true">›</i>
+          <div><b>${U.escapeHTML(field.name)}</b><small>${U.escapeHTML(fieldVariety(field))} / ${U.escapeHTML(areaText(field))}${candidateCount ? ` ・ 確認${U.escapeHTML(String(candidateCount))}件` : ""}</small></div>
+          <i aria-hidden="true">${isExpanded ? "⌃" : "⌄"}</i>
         </div>
-        <div class="home-decision-state growth"><span>🌾</span><b>${U.escapeHTML(stage.current ? stage.current.label : "生育記録待ち")}</b><small>${U.escapeHTML(stage.certainty || "記録待ち")}</small></div>
-        <div class="home-decision-state water"><span>💧</span><b>${U.escapeHTML(waterManagement.label || "水管理記録待ち")}</b><small>${U.escapeHTML(waterManagement.evidence || "記録待ち")}</small></div>
-        ${candidateCount ? `<div class="home-decision-alert">⚠ 確認候補 ${U.escapeHTML(String(candidateCount))}件</div>` : ""}
-      </button>
+          <div class="home-decision-compact-state">
+            <span>🌾 ${U.escapeHTML(stage.current ? stage.current.label : "生育記録待ち")}</span>
+            <span>💧 ${U.escapeHTML(homeWaterCompactText(field, waterManagement, date))}</span>
+          </div>
+        </button>
+        <div id="home-management-${U.attr(field.fieldId)}" class="home-management-compare" ${isExpanded ? "" : "hidden"}>
+          ${renderManagementComparison(field, stage, date)}
+          <button type="button" class="home-management-detail" data-home-open-field="${U.attr(field.fieldId)}">圃場の詳細を見る <span>›</span></button>
+        </div>
+      </article>
     `;
+  }
+
+  function actualManagementWorks(fieldId, year, matcher, excludeMatcher) {
+    return state.fieldWorksFor(fieldId, year)
+      .filter((row) => !state.isActualFieldWork || state.isActualFieldWork(row))
+      .filter((row) => matcher.test(String(row.workName || "")))
+      .filter((row) => !excludeMatcher || !excludeMatcher.test(String(row.workName || "")))
+      .slice()
+      .sort((a, b) => String(a.date || "").localeCompare(String(b.date || "")));
+  }
+
+  function waterManagementHistory(fieldId, year, throughDate) {
+    const rows = ["dry", "intermittent", "deep", "drain"].flatMap((kind) => waterRows(resolvedWaterPeriods(fieldId, year, throughDate), kind)
+      .map((row) => ({ ...row, kind })))
+      .filter((row) => actualPeriodStart(row));
+    return rows.sort((a, b) => String(actualPeriodStart(a)).localeCompare(String(actualPeriodStart(b))));
+  }
+
+  function waterKindLabel(kind, row) {
+    if (kind === "dry") return "中干し";
+    if (kind === "intermittent") return "間断灌水";
+    if (kind === "deep") return "深水管理";
+    if (kind === "drain") return "稲刈り前の落水";
+    return row && row.method || "水管理";
+  }
+
+  function daysAfterPlanting(plantingDate, eventDate) {
+    const days = plantingDate && eventDate ? U.daysBetween(plantingDate, eventDate) : "";
+    return days === "" ? "" : `田植後${days}日`;
+  }
+
+  function waterPeriodText(row, dateText) {
+    if (!row) return "記録なし";
+    const start = actualPeriodStart(row);
+    if (!start) return "開始日未記録";
+    if (row.actualEndDate) return `${U.fd(start)}〜${U.fd(row.actualEndDate)} / 実績${U.daysBetween(start, row.actualEndDate)}日`;
+    return `${U.fd(start)}開始 / ${U.daysBetween(start, dateText)}日目`;
+  }
+
+  function waterReferenceText(field, currentRow, history, dateText) {
+    if (!currentRow) return { previousText: "前年同種の記録なし", comparison: "圃場目安未設定" };
+    const currentStart = actualPeriodStart(currentRow);
+    const sameKindRows = history.filter((row) => row.kind === currentRow.kind);
+    const occurrence = Math.max(0, sameKindRows.findIndex((row) => row === currentRow));
+    const previousYear = String(Number(cropYear(dateText)) - 1);
+    const previousPlanting = plantingDateForYear(field.fieldId, previousYear);
+    const previousRows = waterManagementHistory(field.fieldId, previousYear, addYears(dateText, -1)).filter((row) => row.kind === currentRow.kind);
+    const previous = previousRows[occurrence] || null;
+    const targetDays = U.number(currentRow.targetDays || (currentRow.kind === "dry" ? field.drainageTargetDays : currentRow.kind === "intermittent" ? field.intermittentIntervalDays : ""), 0);
+    const elapsed = currentStart ? U.daysBetween(currentStart, dateText) : "";
+    const referenceDays = targetDays || (previous && previous.actualEndDate ? U.daysBetween(actualPeriodStart(previous), previous.actualEndDate) : 0);
+    const remaining = !currentRow.actualEndDate && elapsed !== "" && referenceDays ? Math.max(0, referenceDays - elapsed) : "";
+    const previousText = previous
+      ? `前年 ${daysAfterPlanting(previousPlanting, actualPeriodStart(previous)) || U.fd(actualPeriodStart(previous))}${previous.actualEndDate ? ` / ${U.daysBetween(actualPeriodStart(previous), previous.actualEndDate)}日間` : " / 終了未記録"}`
+      : "前年同種の記録なし";
+    const referenceLabel = currentRow.kind === "dry"
+      ? "間断灌水の比較目安"
+      : currentRow.kind === "deep"
+        ? "深水の比較期間"
+        : "実施期間の比較目安";
+    const comparison = remaining === "" ? (targetDays ? `圃場目安 ${targetDays}日` : "圃場目安未設定") : `${referenceLabel}まで あと${remaining}日`;
+    return { previousText, comparison };
+  }
+
+  function latestManagementWork(fieldId, year, matcher, excludeMatcher) {
+    return actualManagementWorks(fieldId, year, matcher, excludeMatcher).at(-1) || null;
+  }
+
+  function managementWorkText(field, year, work, previousWork) {
+    if (!work) return { current: "今年の実績なし", previous: previousWork ? `前年 ${U.fd(previousWork.date)}` : "前年記録なし" };
+    const planting = plantingDateForYear(field.fieldId, year);
+    const previousYear = String(Number(year) - 1);
+    const previousPlanting = plantingDateForYear(field.fieldId, previousYear);
+    const current = `${U.fd(work.date)} / ${daysAfterPlanting(planting, work.date) || "田植日未登録"}`;
+    const previous = previousWork ? `前年 ${daysAfterPlanting(previousPlanting, previousWork.date) || U.fd(previousWork.date)}` : "前年記録なし";
+    return { current, previous };
+  }
+
+  function homeWaterCompactText(field, management, dateText) {
+    const history = waterManagementHistory(field.fieldId, cropYear(dateText), dateText);
+    const current = history.filter((row) => !row.actualEndDate).at(-1) || history.at(-1) || null;
+    if (!current) return management.label || "水管理記録待ち";
+    const start = actualPeriodStart(current);
+    return current.actualEndDate ? `${waterKindLabel(current.kind, current)} 完了` : `${waterKindLabel(current.kind, current)} ${U.daysBetween(start, dateText)}日目`;
+  }
+
+  function renderManagementComparison(field, stage, dateText) {
+    const year = cropYear(dateText);
+    const waterHistory = waterManagementHistory(field.fieldId, year, dateText);
+    const currentWater = waterHistory.filter((row) => !row.actualEndDate).at(-1) || waterHistory.at(-1) || null;
+    const waterReference = waterReferenceText(field, currentWater, waterHistory, dateText);
+    const managementTypes = [
+      { key: "fertilizer", label: "追肥", icon: "肥", tone: "fertilizer", matcher: /追肥|穂肥/ },
+      { key: "protection", label: "防除", icon: "防", tone: "protection", matcher: /防除|殺菌|殺虫/, exclude: /除草/ },
+      { key: "herbicide", label: "除草剤", icon: "除", tone: "herbicide", matcher: /除草|除草剤/ }
+    ];
+    const previousYear = String(Number(year) - 1);
+    const workRows = managementTypes.map((type) => {
+      const work = latestManagementWork(field.fieldId, year, type.matcher, type.exclude);
+      const previous = latestManagementWork(field.fieldId, previousYear, type.matcher, type.exclude);
+      const info = managementWorkText(field, year, work, previous);
+      return `<div class="home-management-row ${U.attr(type.tone)}"><span class="home-management-icon">${U.escapeHTML(type.icon)}</span><b>${U.escapeHTML(type.label)}</b><span>${U.escapeHTML(info.current)}</span><small>${U.escapeHTML(info.previous)}</small></div>`;
+    }).join("");
+    const stageLabel = stage.current ? stage.current.label : "生育記録待ち";
+    return `
+      <div class="home-management-head"><b>${U.escapeHTML(stageLabel)}の管理記録</b><small>今年実績を優先 / 比較は前年実績</small></div>
+      <div class="home-management-row water"><span class="home-management-icon">水</span><b>${U.escapeHTML(currentWater ? waterKindLabel(currentWater.kind, currentWater) : "水管理")}</b><span>${U.escapeHTML(waterPeriodText(currentWater, dateText))}</span><small>${U.escapeHTML(`${waterReference.previousText}・${waterReference.comparison}`)}</small></div>
+      ${workRows}
+      <p class="home-management-guidance">地域の参考: ${U.escapeHTML(homeWaterGuidance(stageLabel))}</p>
+    `;
+  }
+
+  function homeWaterGuidance(stageLabel) {
+    if (/中干し/.test(stageLabel)) return "中干し後の水管理を比較する時期";
+    if (/幼穂|減数|穂ばらみ/.test(stageLabel)) return "幼穂から出穂前後の水管理を比較する時期";
+    if (/出穂|登熟|黄熟/.test(stageLabel)) return "出穂後・登熟期の水管理を比較する時期";
+    return "生育段階に合わせて水管理の実績を残す時期";
   }
 
   function activeWaterCount(dateText) {
@@ -1726,6 +1852,13 @@
         // Start from the shared target picker. A visual home filter must not
         // silently turn a single record into a group record.
         openDate(U.today(), "");
+        return;
+      }
+      const managementToggle = event.target.closest("[data-home-toggle-field]");
+      if (managementToggle) {
+        const fieldId = managementToggle.dataset.homeToggleField || "";
+        expandedManagementFieldId = expandedManagementFieldId === fieldId ? "" : fieldId;
+        render();
         return;
       }
       const fieldCard = event.target.closest("[data-home-open-field]");

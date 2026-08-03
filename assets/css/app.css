@@ -14287,6 +14287,217 @@ label {
 .system-settings-head h3 { margin: 2px 0 0; color: #1d3b25; font-size: 19px; }
 .system-settings-note { margin: 0; color: #647366; font-size: 11px; line-height: 1.55; }
 .system-settings-panel .data-actions { margin: 0; }
+
+/* Home: one compact field summary, with a single expandable management comparison. */
+.home-decision-list { gap: 8px; }
+.home-decision-card {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  border-left-width: 4px;
+  text-align: left;
+}
+.home-decision-card-toggle {
+  display: grid;
+  width: 100%;
+  min-height: 76px;
+  padding: 9px 10px 8px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+.home-decision-card-toggle:active { background: #f4f9f1; }
+.home-decision-card-toggle:focus-visible { outline: 3px solid rgba(44, 145, 63, .32); outline-offset: -3px; }
+.home-decision-card .home-decision-card-head { grid-template-columns: 34px minmax(0, 1fr) 18px; }
+.home-decision-card .home-decision-card-head i { justify-self: end; color: #5d8061; font-size: 19px; font-style: normal; line-height: 1; }
+.home-decision-compact-state {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 7px;
+  margin-top: 7px;
+}
+.home-decision-compact-state span {
+  min-width: 0;
+  overflow: hidden;
+  padding: 4px 6px;
+  border-radius: 7px;
+  background: #f1f8ee;
+  color: #2a7840;
+  font-size: 10px;
+  font-weight: 850;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.home-decision-compact-state span:last-child { background: #edf8fc; color: #267a95; }
+.home-decision-card .home-decision-alert { margin: -2px 10px 8px; }
+.home-management-compare {
+  display: grid;
+  gap: 5px;
+  padding: 9px 10px 10px;
+  border-top: 1px dashed #d8e4d5;
+  background: linear-gradient(180deg, #fbfdf9, #f4faf1);
+}
+.home-management-compare[hidden] { display: none; }
+.home-management-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.home-management-head b { color: #275e33; font-size: 12px; }
+.home-management-head small { overflow: hidden; color: #778277; font-size: 9px; font-weight: 750; text-align: right; text-overflow: ellipsis; white-space: nowrap; }
+.home-management-row {
+  display: grid;
+  grid-template-columns: 22px 42px minmax(0, 1fr) minmax(0, .82fr);
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 4px 6px;
+  border: 1px solid #e0e8dd;
+  border-radius: 8px;
+  background: #fffefa;
+}
+.home-management-row .home-management-icon {
+  display: grid;
+  place-items: center;
+  width: 21px;
+  height: 21px;
+  border-radius: 7px;
+  background: #e5f3e2;
+  color: #287a3c;
+  font-size: 10px;
+  font-weight: 900;
+}
+.home-management-row b { color: #334638; font-size: 10px; }
+.home-management-row > span:not(.home-management-icon) { min-width: 0; overflow: hidden; color: #556258; font-size: 10px; font-weight: 720; text-overflow: ellipsis; white-space: nowrap; }
+.home-management-row small { min-width: 0; overflow: hidden; color: #7a8579; font-size: 9px; font-weight: 700; line-height: 1.2; text-align: right; text-overflow: ellipsis; white-space: nowrap; }
+.home-management-row.water { border-color: #c6e0e9; background: #f5fbfd; }
+.home-management-row.water .home-management-icon { background: #dceff6; color: #267a95; }
+.home-management-row.fertilizer { border-color: #eee0bd; background: #fffdf5; }
+.home-management-row.fertilizer .home-management-icon { background: #fff0c9; color: #9a6a1c; }
+.home-management-row.protection .home-management-icon { background: #efe6fb; color: #77519c; }
+.home-management-row.herbicide .home-management-icon { background: #e9f4e4; color: #3f853c; }
+.home-management-guidance { margin: 1px 2px 0; color: #788474; font-size: 9px; font-weight: 700; line-height: 1.35; }
+.home-management-detail {
+  width: 100%;
+  min-height: 34px;
+  margin-top: 2px;
+  padding: 6px 9px;
+  border: 1px solid #c9dfc5;
+  border-radius: 8px;
+  background: #fffefa;
+  color: #267b3b;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 900;
+  text-align: left;
+}
+.home-management-detail span { float: right; font-size: 16px; line-height: .8; }
+
+/* Bottom navigation is the application's fixed primary route map. */
+@media (max-width: 720px) {
+  body .app-shell .side-nav,
+  body:has(#screen-fields.active) .app-shell .side-nav {
+    display: grid !important;
+    grid-template-columns: repeat(6, minmax(0, 1fr)) !important;
+    grid-auto-flow: column !important;
+    align-items: stretch !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    height: calc(68px + env(safe-area-inset-bottom)) !important;
+    padding: 5px 6px calc(6px + env(safe-area-inset-bottom)) !important;
+    overflow: hidden !important;
+  }
+
+  body .app-shell .side-nav .nav-item,
+  body:has(#screen-fields.active) .app-shell .side-nav .nav-item {
+    display: none !important;
+    min-width: 0 !important;
+    width: auto !important;
+    height: 56px !important;
+    min-height: 56px !important;
+    margin: 0 !important;
+    padding: 2px 0 !important;
+    border: 0 !important;
+    border-radius: 10px !important;
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+
+  body .app-shell .side-nav .nav-item[data-screen="home"],
+  body .app-shell .side-nav .nav-item[data-screen="fields"],
+  body .app-shell .side-nav .nav-item[data-screen="calendar"],
+  body .app-shell .side-nav .nav-item[data-screen="annual"],
+  body .app-shell .side-nav .nav-item[data-screen="outlook"],
+  body .app-shell .side-nav .nav-item[data-screen="data"],
+  body:has(#screen-fields.active) .app-shell .side-nav .nav-item[data-screen="home"],
+  body:has(#screen-fields.active) .app-shell .side-nav .nav-item[data-screen="fields"],
+  body:has(#screen-fields.active) .app-shell .side-nav .nav-item[data-screen="calendar"],
+  body:has(#screen-fields.active) .app-shell .side-nav .nav-item[data-screen="annual"],
+  body:has(#screen-fields.active) .app-shell .side-nav .nav-item[data-screen="outlook"],
+  body:has(#screen-fields.active) .app-shell .side-nav .nav-item[data-screen="data"] {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-template-rows: 32px 14px !important;
+    place-items: center !important;
+    justify-self: stretch !important;
+    align-self: stretch !important;
+    gap: 1px !important;
+  }
+
+  body .app-shell .side-nav .nav-icon {
+    display: grid !important;
+    place-items: center !important;
+    width: 32px !important;
+    height: 32px !important;
+    border-radius: 10px !important;
+    color: #1b2a20 !important;
+    line-height: 1 !important;
+  }
+
+  body .app-shell .side-nav .nav-icon::before,
+  body .app-shell .side-nav .nav-icon::after { content: none !important; }
+
+  body .app-shell .side-nav .nav-icon img {
+    display: block !important;
+    width: 29px !important;
+    height: 29px !important;
+    object-fit: contain !important;
+  }
+
+  body .app-shell .side-nav .nav-icon svg {
+    display: block !important;
+    width: 24px !important;
+    height: 24px !important;
+    stroke-width: 2.3 !important;
+  }
+
+  body .app-shell .side-nav .nav-label {
+    display: block !important;
+    max-width: 100% !important;
+    overflow: hidden !important;
+    color: #263027 !important;
+    font-size: 9px !important;
+    font-weight: 800 !important;
+    line-height: 14px !important;
+    letter-spacing: 0 !important;
+    text-align: center !important;
+    text-overflow: clip !important;
+    white-space: nowrap !important;
+  }
+
+  body .app-shell .side-nav .nav-item.active {
+    color: #18883c !important;
+    background: #f0f8ed !important;
+  }
+
+  body .app-shell .side-nav .nav-item.active .nav-icon {
+    background: #dff2df !important;
+    box-shadow: inset 0 0 0 1px #c7e5c8 !important;
+  }
+
+  body .app-shell .side-nav .nav-item.active .nav-label { color: #16823a !important; }
+}
 @media (max-width: 380px) {
   .common-master-grid { gap: 8px; }
   .common-master-card { min-height: 132px; padding-inline: 6px; }

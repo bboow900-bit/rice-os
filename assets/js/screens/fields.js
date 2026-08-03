@@ -869,12 +869,11 @@
   function renderFieldListCard(field) {
     const variety = state.variety(field.varietyId);
     const stage = fieldStage(field);
-    const photo = latestPhotoForField(field);
     return `
       <button type="button" class="field-hub-card stage-${U.attr(String(stage.number).padStart(2, "0"))}" data-field-open="${U.attr(field.fieldId)}" data-field-search-text="${U.attr(`${field.name} ${variety && variety.name || ""} ${field.district || ""}`.toLowerCase())}">
-        ${photo && photo.photoData ? `<img class="field-hub-card-photo" src="${U.attr(photo.photoData)}" alt="">` : `<span class="field-hub-card-rice">${groupRiceImage(stage.number)}</span>`}
+        <span class="field-hub-card-rice">${groupRiceImage(stage.number)}</span>
         <span class="field-hub-card-main"><b>${U.escapeHTML(field.name)}</b><small>${U.escapeHTML(variety && variety.name || "品種未設定")} / ${U.escapeHTML(String(field.areaA || 0))}a</small><em>${U.escapeHTML(fieldStatusText(field))}</em></span>
-        <span class="field-hub-stage"><small>現在</small><b>${U.escapeHTML(stage.label)}</b></span>
+        <span class="field-hub-stage"><small>現在 / ${U.escapeHTML(stage.certainty || "記録待ち")}</small><b>${U.escapeHTML(stage.label)}</b></span>
       </button>
     `;
   }

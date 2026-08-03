@@ -160,7 +160,7 @@
   body:has(#screen-fields.active) .side-nav .nav-item[data-screen="fields"],
   body:has(#screen-fields.active) .side-nav .nav-item[data-screen="calendar"],
   body:has(#screen-fields.active) .side-nav .nav-item[data-screen="annual"],
-  body:has(#screen-fields.active) .side-nav .nav-item[data-screen="notices"],
+  body:has(#screen-fields.active) .side-nav .nav-item[data-screen="outlook"],
   body:has(#screen-fields.active) .side-nav .nav-item[data-screen="data"] {
     display: grid !important;
     grid-template-rows: 28px 17px !important;
