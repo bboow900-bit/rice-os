@@ -14302,8 +14302,8 @@ label {
 .home-decision-card-toggle {
   display: grid;
   width: 100%;
-  min-height: 76px;
-  padding: 9px 10px 8px;
+  min-height: 90px;
+  padding: 7px 10px;
   border: 0;
   background: transparent;
   color: inherit;
@@ -14314,26 +14314,55 @@ label {
 .home-decision-card-toggle:focus-visible { outline: 3px solid rgba(44, 145, 63, .32); outline-offset: -3px; }
 .home-decision-card .home-decision-card-head { grid-template-columns: 34px minmax(0, 1fr) 18px; }
 .home-decision-card .home-decision-card-head i { justify-self: end; color: #5d8061; font-size: 19px; font-style: normal; line-height: 1; }
-.home-decision-compact-state {
+.home-decision-progress-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 7px;
-  margin-top: 7px;
+  gap: 4px 7px;
+  margin-top: 5px;
 }
-.home-decision-compact-state span {
+.home-decision-progress-grid span {
+  display: flex;
+  align-items: center;
   min-width: 0;
+  min-height: 19px;
   overflow: hidden;
-  padding: 4px 6px;
+  padding: 2px 5px;
   border-radius: 7px;
   background: #f1f8ee;
   color: #2a7840;
+}
+.home-decision-progress-grid i {
+  flex: 0 0 auto;
+  margin-right: 4px;
+  font-size: 11px;
+  font-style: normal;
+  line-height: 1;
+}
+.home-decision-progress-grid b {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
   font-size: 10px;
   font-weight: 850;
   line-height: 1.2;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.home-decision-compact-state span:last-child { background: #edf8fc; color: #267a95; }
+.home-decision-progress-grid em {
+  flex: 0 0 auto;
+  margin-left: 3px;
+  padding: 1px 3px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .75);
+  color: inherit;
+  font-size: 8px;
+  font-style: normal;
+  font-weight: 900;
+  line-height: 1.15;
+}
+.home-decision-progress-grid .heading { background: #f7f1e6; color: #8a6a2a; }
+.home-decision-progress-grid .water { background: #edf8fc; color: #267a95; }
+.home-decision-progress-grid .next { background: #f7f6ef; color: #59695a; }
 .home-decision-card .home-decision-alert { margin: -2px 10px 8px; }
 .home-management-compare {
   display: grid;

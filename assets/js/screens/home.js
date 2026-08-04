@@ -767,10 +767,7 @@
           <div><b>${U.escapeHTML(field.name)}</b><small>${U.escapeHTML(fieldVariety(field))} / ${U.escapeHTML(areaText(field))}${candidateCount ? ` ・ 確認${U.escapeHTML(String(candidateCount))}件` : ""}</small></div>
           <i aria-hidden="true">${isExpanded ? "⌃" : "⌄"}</i>
         </div>
-          <div class="home-decision-compact-state">
-            <span>🌾 ${U.escapeHTML(criticalWater.active ? criticalWater.phase : (stage.current ? stage.current.label : "生育記録待ち"))}</span>
-            <span>💧 ${U.escapeHTML(homeWaterCompactText(field, waterManagement, date))}</span>
-          </div>
+          ${renderDecisionProgressGrid(field, stage, waterManagement, criticalWater, date)}
         </button>
         <div id="home-management-${U.attr(field.fieldId)}" class="home-management-compare" ${isExpanded ? "" : "hidden"}>
           ${renderManagementComparison(field, stage, date)}
@@ -778,6 +775,48 @@
         </div>
       </article>
     `;
+  }
+
+  // A home card is read-only: four short facts from existing records, not a new data source.
+  function renderDecisionProgressGrid(field, stage, management, focus, dateText) {
+    const headingRecorded = focus && focus.mode === "postHeading";
+    const panicleRecorded = focus && focus.mode === "panicle";
+    const stageText = focus && focus.active
+      ? focus.phase
+      : (stage.current ? `${stage.current.label}（${stage.certainty || "推定"}）` : "生育記録待ち");
+    const stageCertainty = focus && focus.active
+      ? (focus.mode === "panicle" ? "実測" : (focus.certainty || "推定"))
+      : "";
+    const headingText = headingRecorded
+      ? focus.anchorLabel
+      : (panicleRecorded && focus.observation ? homeHeadingCompactText(focus.observation) : "参考: 幼穂形成期の目安");
+    const cells = [
+      { tone: "growth", icon: "🌾", value: stageText, certainty: stageCertainty },
+      { tone: "heading", icon: "◌", value: headingText },
+      { tone: "water", icon: "💧", value: homeWaterCompactText(field, management, dateText) },
+      { tone: "next", icon: "›", value: homeNextMilestone(focus, stage) }
+    ];
+    return `<div class="home-decision-progress-grid">${cells.map((cell) => `<span class="${U.attr(cell.tone)}"><i aria-hidden="true">${cell.icon}</i><b>${U.escapeHTML(cell.value)}</b>${cell.certainty ? `<em>${U.escapeHTML(cell.certainty)}</em>` : ""}</span>`).join("")}</div>`;
+  }
+
+  function homeHeadingCompactText(text) {
+    const value = String(text || "");
+    const dates = Array.from(value.matchAll(/(?:\d{4}\/)?(\d{1,2}\/\d{1,2})/g)).map((match) => match[1]);
+    if (dates.length >= 2) return `出穂 ${dates[0]}〜${dates[1]}`;
+    return value;
+  }
+
+  function homeNextMilestone(focus, stage) {
+    if (focus && focus.mode === "postHeading") {
+      const elapsed = U.number(String(focus.anchorLabel || "").match(/(\d+)日目/)?.[1], -1);
+      if (elapsed >= 0 && elapsed < 5) return `目安: 穂揃い あと${5 - elapsed}日`;
+      if (elapsed >= 5 && elapsed < 8) return `目安: 登熟期 あと${8 - elapsed}日`;
+      if (elapsed >= 8 && elapsed < 26) return "目安: 登熟後期";
+      if (elapsed >= 26) return "参考: 収穫前の落水時期";
+    }
+    if (focus && focus.mode === "panicle" && focus.observation && !/未確認/.test(focus.observation)) return "目安: 出穂時期";
+    if (!stage.current) return "参考: 田植日を起点に表示";
+    return stage.certainty === "推定" ? "参考: 田植日からの目安" : "参考: 現地記録を基準";
   }
 
   function actualManagementWorks(fieldId, year, matcher, excludeMatcher) {
@@ -862,7 +901,8 @@
     const current = history.filter((row) => !row.actualEndDate).at(-1) || history.at(-1) || null;
     if (!current) return management.label || "水管理記録待ち";
     const start = actualPeriodStart(current);
-    return current.actualEndDate ? `${waterKindLabel(current.kind, current)} 完了` : `${waterKindLabel(current.kind, current)} ${U.daysBetween(start, dateText)}日目`;
+    const label = waterKindLabel(current.kind, current).replace("稲刈り前の落水", "落水");
+    return current.actualEndDate ? `${label} 完了` : `${label} ${U.daysBetween(start, dateText)}日目`;
   }
 
   function criticalWaterWindowFor(field, dateText) {
@@ -901,10 +941,12 @@
       const info = managementWorkText(field, year, work, previous);
       return `<div class="home-management-row ${U.attr(type.tone)}"><span class="home-management-icon">${U.escapeHTML(type.icon)}</span><b>${U.escapeHTML(type.label)}</b><span>${U.escapeHTML(info.current)}</span><small>${U.escapeHTML(info.previous)}</small></div>`;
     }).join("");
-    const stageLabel = stage.current ? stage.current.label : "生育記録待ち";
+    const focus = criticalWaterWindowFor(field, dateText);
+    const stageLabel = focus.active
+      ? `${focus.phase}（${focus.certainty || "推定"}）`
+      : (stage.current ? `${stage.current.label}（${stage.certainty || "推定"}）` : "生育記録待ち");
     return `
-      ${renderCriticalWaterWindow(field, dateText)}
-      <div class="home-management-head"><b>${U.escapeHTML(stageLabel)}の管理記録</b><small>今年実績を優先 / 比較は前年実績</small></div>
+      <div class="home-management-head"><b>${U.escapeHTML(stageLabel)}の管理記録</b><small>${U.escapeHTML(focus.active ? `${focus.anchorLabel} / ${focus.observation}` : "今年実績を優先 / 比較は前年実績")}</small></div>
       <div class="home-management-row water"><span class="home-management-icon">水</span><b>${U.escapeHTML(currentWater ? waterKindLabel(currentWater.kind, currentWater) : "水管理")}</b><span>${U.escapeHTML(waterPeriodText(currentWater, dateText))}</span><small>${U.escapeHTML(`${waterReference.previousText}・${waterReference.comparison}`)}</small></div>
       ${workRows}
       <p class="home-management-guidance">地域の参考: ${U.escapeHTML(homeWaterGuidance(stageLabel))}</p>
