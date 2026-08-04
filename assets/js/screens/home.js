@@ -755,6 +755,7 @@
     const date = U.today();
     const stage = seasonStageForField(field, date);
     const waterManagement = waterManagementForField(field, date);
+    const criticalWater = criticalWaterWindowFor(field, date);
     const stageImage = stage.current ? `assets/images/rice-stages/rice-stage-${String(stage.current.image).padStart(2, "0")}.png` : "assets/images/rice-stages/rice-stage-01.png";
     const candidateCount = candidatesForDate(date).filter((entry) => entryFieldIds(entry).includes(field.fieldId)).length;
     const isExpanded = expandedManagementFieldId === field.fieldId;
@@ -767,7 +768,7 @@
           <i aria-hidden="true">${isExpanded ? "⌃" : "⌄"}</i>
         </div>
           <div class="home-decision-compact-state">
-            <span>🌾 ${U.escapeHTML(stage.current ? stage.current.label : "生育記録待ち")}</span>
+            <span>🌾 ${U.escapeHTML(criticalWater.active ? criticalWater.phase : (stage.current ? stage.current.label : "生育記録待ち"))}</span>
             <span>💧 ${U.escapeHTML(homeWaterCompactText(field, waterManagement, date))}</span>
           </div>
         </button>
@@ -856,11 +857,31 @@
   }
 
   function homeWaterCompactText(field, management, dateText) {
+    if (management && management.key === "overlap") return management.label || "水管理の記録を確認";
     const history = waterManagementHistory(field.fieldId, cropYear(dateText), dateText);
     const current = history.filter((row) => !row.actualEndDate).at(-1) || history.at(-1) || null;
     if (!current) return management.label || "水管理記録待ち";
     const start = actualPeriodStart(current);
     return current.actualEndDate ? `${waterKindLabel(current.kind, current)} 完了` : `${waterKindLabel(current.kind, current)} ${U.daysBetween(start, dateText)}日目`;
+  }
+
+  function criticalWaterWindowFor(field, dateText) {
+    return RiceOS.agro && RiceOS.agro.criticalWaterWindow
+      ? RiceOS.agro.criticalWaterWindow(field, dateText)
+      : { active: false };
+  }
+
+  function renderCriticalWaterWindow(field, dateText) {
+    const focus = criticalWaterWindowFor(field, dateText);
+    if (!focus.active) return "";
+    return `
+      <section class="critical-water-window mode-${U.attr(focus.mode)}" aria-label="幼穂確認以降の生育と水管理">
+        <div class="critical-water-window-head"><span>幼穂確認からの見通し</span><b>${U.escapeHTML(focus.certainty)}</b></div>
+        <strong>${U.escapeHTML(focus.phase)}</strong>
+        <div class="critical-water-window-facts"><span>${U.escapeHTML(focus.anchorLabel)}</span><span>${U.escapeHTML(focus.observation)}</span></div>
+        <p>${U.escapeHTML(focus.note)}</p>
+      </section>
+    `;
   }
 
   function renderManagementComparison(field, stage, dateText) {
@@ -882,6 +903,7 @@
     }).join("");
     const stageLabel = stage.current ? stage.current.label : "生育記録待ち";
     return `
+      ${renderCriticalWaterWindow(field, dateText)}
       <div class="home-management-head"><b>${U.escapeHTML(stageLabel)}の管理記録</b><small>今年実績を優先 / 比較は前年実績</small></div>
       <div class="home-management-row water"><span class="home-management-icon">水</span><b>${U.escapeHTML(currentWater ? waterKindLabel(currentWater.kind, currentWater) : "水管理")}</b><span>${U.escapeHTML(waterPeriodText(currentWater, dateText))}</span><small>${U.escapeHTML(`${waterReference.previousText}・${waterReference.comparison}`)}</small></div>
       ${workRows}

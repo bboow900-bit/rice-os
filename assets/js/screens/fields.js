@@ -729,6 +729,21 @@
     return RiceOS.agro.managementStatus(field, U.today());
   }
 
+  function renderCriticalWaterWindow(field) {
+    const focus = RiceOS.agro && RiceOS.agro.criticalWaterWindow
+      ? RiceOS.agro.criticalWaterWindow(field, U.today())
+      : null;
+    if (!focus || !focus.active) return "";
+    return `
+      <section class="critical-water-window field-critical-water mode-${U.attr(focus.mode)}" aria-label="幼穂確認以降の生育と水管理">
+        <div class="critical-water-window-head"><span>幼穂確認からの見通し</span><b>${U.escapeHTML(focus.certainty)}</b></div>
+        <strong>${U.escapeHTML(focus.phase)}</strong>
+        <div class="critical-water-window-facts"><span>${U.escapeHTML(focus.anchorLabel)}</span><span>${U.escapeHTML(focus.observation)}</span></div>
+        <p>${U.escapeHTML(focus.note)}</p>
+      </section>
+    `;
+  }
+
   function latestSeasonNoteForField(fieldId) {
     if (!state.seasonNotesForField) return null;
     return (state.seasonNotesForField(fieldId, currentSeasonYear()) || []).slice()
@@ -910,6 +925,7 @@
           ${photo && photo.photoData ? `<img src="${U.attr(photo.photoData)}" alt="">` : `<span>${groupRiceImage(stage.number)}</span>`}
           <div><small>現在の生育ステージ / ${U.escapeHTML(stage.certainty)}</small><b>${U.escapeHTML(stage.label)}</b><p>${U.escapeHTML(stageDetail)}</p></div>
         </section>
+        ${renderCriticalWaterWindow(field)}
         <section class="field-hub-master-card">
           <div class="field-hub-master-card-head"><b>固定情報</b><span>圃場設定で編集</span></div>
           <div class="field-hub-master-grid">

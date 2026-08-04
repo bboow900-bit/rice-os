@@ -324,6 +324,88 @@
     return { key: "waterWaiting", label: "水管理未記録", tone: "waiting", date: "" };
   }
 
+  function latestPanicleLog(fieldId, year, dateText) {
+    const summary = state().growthSummaryFor && state().growthSummaryFor(fieldId, year, { asOfDate: dateText || U.today() });
+    if (summary && summary.panicleLog) return summary.panicleLog;
+    return state().growthLogsFor(fieldId, year)
+      .filter((row) => String(row.date || "") <= String(dateText || U.today()))
+      .filter((row) => Number(row.panicleLengthMm || 0) > 0)
+      .slice()
+      .sort((a, b) => String(a.date || "").localeCompare(String(b.date || "")))
+      .at(-1) || null;
+  }
+
+  // This is a reading aid, not a water-management instruction. It begins only
+  // after an actual panicle measurement and never creates or changes records.
+  function criticalWaterWindow(fieldOrId, dateText) {
+    const field = fieldOf(fieldOrId);
+    const date = dateText || U.today();
+    if (!field) return { active: false };
+    const year = U.dateYear(date);
+    const headingDate = headingDateInYear(field.fieldId, year, date);
+    const panicleLog = latestPanicleLog(field.fieldId, year, date);
+    const management = managementStatus(field, date);
+    const harvested = state().fieldWorksFor(field.fieldId, year)
+      .filter((row) => !state().isActualFieldWork || state().isActualFieldWork(row))
+      .some((row) => /稲刈り|収穫/.test(String(row.workName || "")) && String(row.date || "") <= String(date));
+    if (harvested) return { active: false };
+
+    if (headingDate) {
+      const elapsed = U.daysBetween(headingDate, date);
+      if (elapsed === "" || elapsed < 0) return { active: false };
+      let phase = "出穂・開花期の目安";
+      let note = "出穂日を基準にした一般的な見方です。現場の状態と合わせて確認します。";
+      if (elapsed >= 5 && elapsed <= 7) {
+        phase = "穂揃い期の目安";
+        note = "一般的には開花が終わり始める頃です。現在の水管理の実績を現場と合わせて確認します。";
+      } else if (elapsed >= 8 && elapsed <= 25) {
+        phase = "登熟期の目安";
+        note = "出穂後の一般的な目安です。水管理は記録済みの期間と圃場の状態を合わせて見ます。";
+      } else if (elapsed >= 26) {
+        phase = "登熟後期の目安";
+        note = "収穫前の落水記録・予定、土質、圃場の乾き方を比較表示します。";
+      }
+      return {
+        active: true,
+        mode: "postHeading",
+        phase,
+        certainty: "推定",
+        anchorLabel: `出穂から${elapsed}日目`,
+        observation: `出穂 ${U.fd(headingDate)}（実測）`,
+        note,
+        management
+      };
+    }
+
+    if (!panicleLog) return { active: false };
+    const length = Number(panicleLog.panicleLengthMm || 0);
+    let phase = "幼穂形成期";
+    let note = "幼穂確認を起点に、水管理の実績と気象を合わせて見る時期です。";
+    if (length >= 65 && length <= 95) {
+      phase = "減数分裂期の目安";
+      note = "幼穂長約8cmを基準にした一般的な目安です。低温時の深水管理実績を、地域の参考情報と照合します。";
+    } else if (length > 2) {
+      phase = "幼穂伸長中";
+      note = "幼穂長の実測を起点にした見通しです。節目を断定せず、現在の水管理の実績と現場の状態を合わせて見ます。";
+    } else {
+      phase = "幼穂形成期";
+      note = "幼穂確認を起点に、水管理の実績と気象を合わせて見る時期です。低温時の深水管理実績を、地域の参考情報と照合します。";
+    }
+    const estimate = panicleEstimate(field, length, panicleLog.date);
+    return {
+      active: true,
+      mode: "panicle",
+      phase,
+      certainty: "実測を起点",
+      anchorLabel: `幼穂 ${length}mm / ${U.fd(panicleLog.date)}`,
+      observation: estimate && estimate.supported && estimate.date
+        ? `出穂目安 ${U.fd(estimate.rangeStart)}〜${U.fd(estimate.rangeEnd)}`
+        : "出穂日は未確認",
+      note,
+      management
+    };
+  }
+
   // Every screen uses this service so confirmed facts and calendar estimates stay aligned.
   function seasonStageForField(fieldOrId, dateText) {
     const field = fieldOf(fieldOrId);
@@ -434,6 +516,7 @@
     latestPanicleEstimate,
     seasonStageForField,
     managementStatus,
+    criticalWaterWindow,
     SEASON_STAGES
   };
 })();
