@@ -11241,6 +11241,10 @@ label {
 #screen-annual .annual-year-flow-single-row.growth .annual-year-flow-rail i { background: #7b9f4d; box-shadow: 0 0 0 2px #d5e6be; }
 #screen-annual .annual-year-flow-single-row.growth .annual-year-flow-entry { border-color: #d8e8bd; border-left-color: #7b9f4d; background: linear-gradient(135deg, #fff 0%, #f3fae9 100%); }
 #screen-annual .annual-year-flow-single-row.growth .annual-year-flow-title em { background: #edf6df; color: #66863e; }
+#screen-annual .annual-year-flow-single-row.growth .annual-year-flow-entry.milestone { min-height: 78px; border-color: #b9d58b; border-left-width: 5px; background: linear-gradient(135deg, #fffef8 0%, #eef9dc 100%); box-shadow: 0 4px 0 rgba(90, 126, 45, .11); }
+#screen-annual .annual-year-flow-single-row.growth .annual-year-flow-entry.milestone .annual-year-flow-title em { background: #6f9d3d; color: #fff; }
+#screen-annual .annual-year-flow-stage-fact { display: block; margin-top: 5px; color: #4d7033; font-size: 10px; font-weight: 900; line-height: 1.35; }
+#screen-annual .annual-year-flow-single-row.growth:has(.annual-year-flow-entry.milestone) .annual-year-flow-rail i { top: 9px; width: 11px; height: 11px; background: #6f9d3d; box-shadow: 0 0 0 3px #d8e9bc; }
 #screen-annual .annual-year-flow-single-row.harvest .annual-year-flow-rail i { background: #b47732; box-shadow: 0 0 0 2px #e6c79f; }
 #screen-annual .annual-year-flow-single-row.harvest .annual-year-flow-entry { border-color: #ead2aa; border-left-color: #b47732; background: linear-gradient(135deg, #fff 0%, #fff6e6 100%); }
 #screen-annual .annual-year-flow-single-row.harvest .annual-year-flow-title em { background: #fff0dd; color: #a66a28; }

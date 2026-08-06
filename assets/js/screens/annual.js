@@ -807,9 +807,6 @@
     const panicleLog = latestPanicleLogForYear(field.fieldId, yearValue());
     const growthSummary = state.growthSummaryFor ? state.growthSummaryFor(field.fieldId, yearValue()) : null;
     const headingDate = growthSummary && growthSummary.headingDate || "";
-    const panicle = RiceOS.agro && RiceOS.agro.latestPanicleEstimate
-      ? RiceOS.agro.latestPanicleEstimate(field, yearValue())
-      : null;
     const dryCompleted = dryCompletionForYear(field.fieldId, yearValue());
     return `
       <div class="annual-field-detail-grid">
@@ -852,13 +849,12 @@
         </section>
         <section class="annual-field-detail-card annual-target-card annual-panicle-card">
           <div class="section-title compact">
-            <h3>幼穂・出穂予測</h3>
+            <h3>幼穂・出穂の実測</h3>
           </div>
           <div class="annual-kv-list">
-            ${targetLine("幼穂長", panicle ? `${panicle.lengthMm}mm (${U.fd(panicle.observedDate)})` : (panicleLog ? `${panicleLog.panicleLengthMm}mm (${U.fd(panicleLog.date)})` : "未入力"))}
-            ${targetLine("入力済み幼穂長", panicleLog ? `${panicleLog.panicleLengthMm}mm (${U.fd(panicleLog.date)})` : "未入力")}
-            ${targetLine("出穂", headingDate ? `実績 ${U.fd(headingDate)}` : (panicle ? `あと約${panicle.daysToHeading}日` : "幼穂長を記録してください"))}
-            ${targetLine("出穂目安", headingDate ? "出穂実績を記録済み" : (panicle ? `${U.fd(panicle.date)}ごろ` : "-"))}
+            ${targetLine("最新の幼穂確認", panicleLog ? `${panicleLog.panicleLengthMm}mm（${U.fd(panicleLog.date)} 実測）` : "未記録")}
+            ${targetLine("出穂日", headingDate ? `${U.fd(headingDate)}（実測）` : "未記録")}
+            ${targetLine("記録の扱い", "この画面では実測のみを表示")}
           </div>
         </section>
       </div>
@@ -1437,6 +1433,34 @@
     return ({ end: 0, "end-marker": 0, "orphan-end": 1, start: 2, current: 3 })[entry.periodRole] ?? 4;
   }
 
+  function isObservedHeading(row) {
+    return Boolean(row && (row.headingObserved || row.observedStage === "heading" && row.stageConfirmed));
+  }
+
+  function observedGrowthFact(row, fallbackHeading) {
+    const heading = Boolean(fallbackHeading || isObservedHeading(row));
+    const panicleLengthMm = U.number(row && row.panicleLengthMm, 0);
+    if (!heading && panicleLengthMm <= 0) return null;
+    if (heading) {
+      return {
+        date: String(row && row.date || ""),
+        kind: "heading",
+        label: "出穂確認",
+        detail: "出穂を確認（実測）",
+        stageFact: "記録時の段階: 出穂期"
+      };
+    }
+    return {
+      date: String(row && row.date || ""),
+      kind: "panicle",
+      label: "幼穂確認",
+      detail: `幼穂 ${panicleLengthMm}mm（実測）`,
+      // 1〜2mm は幼穂形成期の実測目安として扱い、それ以外は
+      // 観察値だけを残す。将来の生育を年表から推定しないための線引き。
+      stageFact: panicleLengthMm <= 2 ? "記録時の段階: 幼穂形成期" : "記録時の観察: 幼穂長を実測"
+    };
+  }
+
   function fieldYearTimeline(field, year) {
     const sources = state.timelineEntriesForField
       ? state.timelineEntriesForField(field.fieldId, { year, includePlanned: false })
@@ -1483,33 +1507,41 @@
         });
       }
     });
-    growth
-      .filter((row) => row.headingObserved || row.observedStage === "heading" && row.stageConfirmed || U.number(row.panicleLengthMm, 0) > 0)
-      .forEach((row) => entries.push({
-        id: row.logId,
-        editKind: "growth",
-        date: String(row.date || ""),
-        label: row.headingObserved || row.observedStage === "heading" && row.stageConfirmed ? "出穂" : "幼穂確認",
-        category: "生育",
-        tone: "growth",
-        lane: "growth",
-        detail: row.headingObserved || row.observedStage === "heading" && row.stageConfirmed ? "確認済み" : `幼穂 ${row.panicleLengthMm}mm`
-      }));
+    const growthFacts = growth
+      .map((row) => ({ row, fact: observedGrowthFact(row) }))
+      .filter((item) => item.fact);
+    growthFacts.forEach(({ row, fact }) => entries.push({
+      id: row.logId,
+      editKind: "growth",
+      date: fact.date,
+      label: fact.label,
+      category: "生育実測",
+      tone: "growth",
+      lane: "growth",
+      detail: fact.detail,
+      stageFact: fact.stageFact,
+      milestone: fact.kind
+    }));
     const headingGrowthDates = new Set(growth
-      .filter((row) => row.headingObserved || row.observedStage === "heading" && row.stageConfirmed)
+      .filter((row) => isObservedHeading(row))
       .map((row) => String(row.date || "")));
     headingWorks
       .filter((row) => !headingGrowthDates.has(String(row.date || "")))
-      .forEach((row) => entries.push({
-        id: row.workId,
-        editKind: "fieldWork",
-        date: String(row.date || ""),
-        label: "出穂",
-        category: "生育",
-        tone: "growth",
-        lane: "growth",
-        detail: "確認済み"
-      }));
+      .forEach((row) => {
+        const fact = observedGrowthFact(row, true);
+        entries.push({
+          id: row.workId,
+          editKind: "fieldWork",
+          date: fact.date,
+          label: fact.label,
+          category: "生育実測",
+          tone: "growth",
+          lane: "growth",
+          detail: fact.detail,
+          stageFact: fact.stageFact,
+          milestone: fact.kind
+        });
+      });
     others.forEach((row) => entries.push({
       id: row.otherWorkId,
       editKind: "other",
@@ -1526,7 +1558,7 @@
       .sort((a, b) => String(a.date).localeCompare(String(b.date)) || (a.lane === "water" && b.lane === "water" ? waterRoleRank(a) - waterRoleRank(b) : 0) || String(a.category).localeCompare(String(b.category)) || String(a.label).localeCompare(String(b.label)));
   }
 
-  function renderYearFlow(field, statusOverview) {
+  function renderYearFlow(field) {
     const year = reviewYearValue();
     const entries = fieldYearTimeline(field, year);
     const planting = entries.find((entry) => /田植/.test(entry.label))?.date || "";
@@ -1536,7 +1568,7 @@
       ? `${timelineDateParts(planting, true).text} → ${harvest ? `${timelineDateParts(harvest, true).text}${seasonLength !== "" ? ` / ${seasonLength}日` : ""}` : "収穫記録待ち"}`
       : "田植え記録待ち";
     const timelineEntries = entries.filter((entry) => !entry.isWaterMarker);
-    const flowCard = (entry) => `<button type="button" class="annual-year-flow-entry ${U.attr(entry.tone)}" data-annual-flow-open-kind="${U.attr(entry.editKind)}" data-annual-flow-open-id="${U.attr(entry.editId || entry.id)}"><span class="annual-year-flow-title"><em>${U.escapeHTML(entry.category || "記録")}</em><b>${U.escapeHTML(entry.label)}</b><strong aria-hidden="true">〉</strong></span><span class="annual-year-flow-detail">${U.escapeHTML(entry.detail)}</span>${entry.days !== "" && entry.days != null ? `<span class="annual-year-flow-days">${U.escapeHTML(String(entry.days))}日間</span>` : ""}</button>`;
+    const flowCard = (entry) => `<button type="button" class="annual-year-flow-entry ${U.attr(entry.tone)}${entry.milestone ? " milestone" : ""}" data-annual-flow-open-kind="${U.attr(entry.editKind)}" data-annual-flow-open-id="${U.attr(entry.editId || entry.id)}"><span class="annual-year-flow-title"><em>${U.escapeHTML(entry.milestone ? "実測" : entry.category || "記録")}</em><b>${U.escapeHTML(entry.label)}</b><strong aria-hidden="true">〉</strong></span><span class="annual-year-flow-detail">${U.escapeHTML(entry.detail)}</span>${entry.stageFact ? `<span class="annual-year-flow-stage-fact">${U.escapeHTML(entry.stageFact)}</span>` : ""}${entry.days !== "" && entry.days != null ? `<span class="annual-year-flow-days">${U.escapeHTML(String(entry.days))}日間</span>` : ""}</button>`;
     const items = timelineEntries.map((entry, index) => {
       const date = timelineDateParts(entry.date);
       const isRepeatedDate = index > 0 && timelineEntries[index - 1].date === entry.date;
@@ -1547,7 +1579,6 @@
       <section class="annual-year-flow" aria-label="${U.escapeHTML(year)}年の一年の流れ">
         <div class="annual-year-flow-head"><div><span>${U.escapeHTML(year)}年の記録</span><h3>一年の流れ</h3></div><small>実績のみ</small></div>
         <p class="annual-year-flow-season">${U.escapeHTML(seasonText)}</p>
-        ${statusOverview || ""}
         ${items ? `<ol class="annual-year-flow-single">${items}</ol>` : '<p class="annual-year-flow-empty">田植え・水管理・出穂・収穫などの実績を残すと、ここに一年の流れが並びます。</p>'}
       </section>
     `;
@@ -1603,13 +1634,13 @@
     return entries;
   }
 
-  function renderReviewOverview(field, statusOverview) {
+  function renderReviewOverview(field) {
     const year = reviewYearValue();
     const previousYear = String(Number(year) - 1);
     const snapshot = fieldYearSnapshot(field, year);
     return `
       <section class="annual-compare-launch"><div><span>振り返り</span><h3>今年と前年を比べる</h3><p>${U.escapeHTML(year)}年と${U.escapeHTML(previousYear)}年の節目・作業・水管理を、見やすく読み比べます。</p></div><button type="button" class="primary" data-annual-open-compare>比較を開く</button></section>
-      ${renderYearFlow(field, statusOverview)}
+      ${renderYearFlow(field)}
       ${renderEndSeasonReflection(field, snapshot)}
       ${renderSeasonNotes(field)}
       <label class="annual-carryover-note"><span>来年に引き継ぐメモ</span><textarea data-annual-field-edit="nextSeasonMemo" placeholder="例: この圃場は中干しを早めに始める。穂肥量は葉色を見て控えめに。">${U.escapeHTML(field.nextSeasonMemo || "")}</textarea><small>圃場マスターに保存され、年度をまたいで確認できます。</small></label>
@@ -1642,9 +1673,9 @@
     `;
   }
 
-  function renderYearCompare(field, statusOverview) {
+  function renderYearCompare(field) {
     if (reviewView === "compare") return renderComparisonExperience(field);
-    return renderReviewOverview(field, statusOverview);
+    return renderReviewOverview(field);
   }
 
   // Kept temporarily as an internal reference while the comparison surface
@@ -1679,7 +1710,7 @@
         <div class="annual-compare-head"><div><span>来年につなぐ比較</span><h3>${U.escapeHTML(currentYear)}年と${U.escapeHTML(previousYear)}年</h3></div><small>${U.escapeHTML(field.name)} / ${U.escapeHTML(varietyName(field))}</small></div>
         <div class="annual-compare-table"><div class="annual-compare-row annual-compare-label"><b>比較項目</b><b>${U.escapeHTML(currentYear)}年</b><b>${U.escapeHTML(previousYear)}年</b></div>${keyRows.map((row) => `<div class="annual-compare-row"><span>${U.escapeHTML(row[0])}</span><b class="${row[1] === "未記録" ? "missing" : ""}">${U.escapeHTML(row[1])}</b><b class="${row[2] === "未記録" ? "missing" : ""}">${U.escapeHTML(row[2])}</b></div>`).join("")}</div>
         <details class="annual-compare-details"><summary>すべての比較項目を見る (${detailRows.length})</summary><div class="annual-compare-table">${detailRows.map((row) => `<div class="annual-compare-row"><span>${U.escapeHTML(row[0])}</span><b class="${row[1] === "未記録" ? "missing" : ""}">${U.escapeHTML(row[1])}</b><b class="${row[2] === "未記録" ? "missing" : ""}">${U.escapeHTML(row[2])}</b></div>`).join("")}</div></details>
-        ${renderYearFlow(field, statusOverview)}
+        ${renderYearFlow(field)}
         ${renderEndSeasonReflection(field, current)}
         ${missing.length ? `<div class="annual-compare-check"><b>翌年比較のため、今年はここを残す</b><span>${U.escapeHTML(missing.join(" / "))}</span></div>` : '<div class="annual-compare-check complete"><b>比較に必要な基本記録がそろっています</b><span>来年の判断材料として使えます</span></div>'}
         ${renderSeasonNotes(field)}
@@ -1693,12 +1724,7 @@
     const planting = state.plantingDateForField
       ? state.plantingDateForField(field.fieldId, detailYear)
       : firstDate(fieldYearRows(field.fieldId, detailYear), (row) => row.kind === "fieldWork" && /^田植え$/.test(String(row.title || "")));
-    const stage = annualStageForField(field);
-    const stageImage = stage && stage.image || riceStageNumberForField(field);
     const asOfDate = stageAsOfDateForField(field.fieldId);
-    const management = stage && stage.management || null;
-    const growth = annualGrowthSummary(field, detailYear, stage, planting, asOfDate);
-    const water = annualWaterSummary(field, detailYear, asOfDate, management);
     const dap = planting ? U.daysBetween(planting, asOfDate) : "";
     return `
       <div class="annual-field-detail">
@@ -1710,7 +1736,7 @@
           </div>
           <button type="button" class="annual-detail-menu" aria-label="メニュー">…</button>
         </div>
-        ${renderYearCompare(field, renderYearFlowStatusOverview(stage, stageImage, growth, water))}
+        ${renderYearCompare(field)}
         ${renderTabs(field)}
         ${renderAnnualFab(field.fieldId)}
       </div>
