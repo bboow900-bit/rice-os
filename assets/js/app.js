@@ -75,6 +75,11 @@
   }
 
   function back() {
+    if (activeScreen === "annual" && RiceOS.screens.annual && RiceOS.screens.annual.isRecordDetailOpen && RiceOS.screens.annual.isRecordDetailOpen()) {
+      RiceOS.screens.annual.handleBack();
+      updateBackButton();
+      return;
+    }
     if (RiceOS.navigation && RiceOS.navigation.back && RiceOS.navigation.back()) {
       updateBackButton();
       return;
@@ -125,6 +130,9 @@
     });
     U.$$(".nav-item").forEach((button) => {
       button.addEventListener("click", () => {
+        if (activeScreen === "annual" && RiceOS.screens.annual && RiceOS.screens.annual.resetNavigation) {
+          RiceOS.screens.annual.resetNavigation();
+        }
         if (button.dataset.screen === "field-work" && RiceOS.bottomSheet) {
           window.scrollTo({ top: 0, behavior: "smooth" });
           RiceOS.bottomSheet.open(U.today());
