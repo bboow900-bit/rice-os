@@ -30,6 +30,8 @@
     U.$("owMemo").value = "";
     setSelected("owVarieties", []);
     setSelected("owFields", []);
+    const deleteButton = U.$("deleteOtherWorkButton");
+    if (deleteButton) deleteButton.classList.add("hidden");
   }
 
   function renderList() {
@@ -76,6 +78,8 @@
     U.$("owMemo").value = work.memo || "";
     setSelected("owVarieties", work.varietyIds || []);
     setSelected("owFields", work.relatedFieldIds || []);
+    const deleteButton = U.$("deleteOtherWorkButton");
+    if (deleteButton) deleteButton.classList.remove("hidden");
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
@@ -117,6 +121,15 @@
         return;
       }
       fillEdit(work);
+    });
+
+    if (U.$("deleteOtherWorkButton")) U.$("deleteOtherWorkButton").addEventListener("click", () => {
+      const otherWorkId = U.$("editOtherWorkId").value;
+      const work = state.data().otherWorks.find((item) => item.otherWorkId === otherWorkId);
+      if (!work || !confirm("このその他作業を削除しますか？")) return;
+      if (!state.deleteOtherWork(otherWorkId)) return;
+      resetForm();
+      if (RiceOS.navigation && RiceOS.navigation.current && RiceOS.navigation.current()?.type === "record" && RiceOS.app && RiceOS.app.back) RiceOS.app.back();
     });
 
     document.querySelector('[data-action="reset-other-work"]').addEventListener("click", resetForm);

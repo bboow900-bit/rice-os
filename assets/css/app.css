@@ -3982,6 +3982,64 @@ h3 {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
+  flex-wrap: wrap;
+}
+
+.annual-water-editor-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.annual-water-editor-actions .danger {
+  grid-column: 1 / -1;
+  width: 100%;
+  min-height: 48px;
+  margin-top: 16px;
+}
+
+.annual-record-action-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  align-items: end;
+  padding: 18px 16px calc(18px + env(safe-area-inset-bottom));
+  background: rgba(22, 35, 25, 0.34);
+}
+
+.annual-record-action-sheet {
+  display: grid;
+  gap: 10px;
+  width: min(100%, 420px);
+  margin: 0 auto;
+  padding: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.82);
+  border-radius: 18px;
+  background: #fffdf7;
+  box-shadow: 0 -10px 34px rgba(22, 45, 29, 0.22);
+}
+
+.annual-record-action-sheet p,
+.annual-record-action-sheet b {
+  margin: 0;
+}
+
+.annual-record-action-sheet p {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.annual-record-action-sheet b {
+  margin-bottom: 4px;
+  color: #193321;
+  font-size: 18px;
+}
+
+.annual-record-action-sheet button {
+  width: 100%;
+  min-height: 48px;
 }
 
 .select-grid {

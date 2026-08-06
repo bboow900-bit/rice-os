@@ -289,6 +289,8 @@
     }
     pendingScheduleId = "";
     setSelectedFieldIds([]);
+    const deleteButton = U.$("deleteFieldWorkButton");
+    if (deleteButton) deleteButton.classList.add("hidden");
   }
 
   function prefillField(fieldId) {
@@ -367,6 +369,8 @@
     U.$("fwWeatherStatus").textContent = work.weatherAuto ? `${work.weatherAuto.source || "自動取得"}: ${work.weatherAuto.summary || work.weather}` : "必要なら作業日の天気を取得してください。";
     U.$("fwMemo").value = work.memo || "";
     setSelectedFieldIds(work.fieldIds || []);
+    const deleteButton = U.$("deleteFieldWorkButton");
+    if (deleteButton) deleteButton.classList.remove("hidden");
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
@@ -675,7 +679,10 @@
       const work = state.data().fieldWorks.find((item) => item.workId === id);
       if (!work) return;
       if (button.dataset.workAction === "delete") {
-        if (confirm("この圃場作業を削除しますか？")) state.deleteFieldWork(id);
+        const fieldNames = (work.fieldIds || []).map((fieldId) => state.field(fieldId)?.name).filter(Boolean).join("・");
+        const fieldCount = (work.fieldIds || []).length;
+        const scope = fieldNames ? `\n対象: ${fieldNames}${fieldCount > 1 ? `（${fieldCount}圃場すべての履歴から削除されます）` : ""}` : "";
+        if (confirm(`${U.fd(work.date)} ${work.workName}を削除しますか？${scope}`)) state.deleteFieldWork(id);
         return;
       }
       if (button.dataset.workAction === "duplicate") {
@@ -722,7 +729,22 @@
       U.$("fwWeatherStatus").textContent = work.weatherAuto ? `${work.weatherAuto.source || "自動取得"}: ${work.weatherAuto.summary || work.weather}` : "必要なら作業日の天気を取得してください。";
       U.$("fwMemo").value = work.memo || "";
       setSelectedFieldIds(work.fieldIds || []);
+      const deleteButton = U.$("deleteFieldWorkButton");
+      if (deleteButton) deleteButton.classList.remove("hidden");
       window.scrollTo({ top: 0, behavior: "smooth" });
+    });
+
+    if (U.$("deleteFieldWorkButton")) U.$("deleteFieldWorkButton").addEventListener("click", () => {
+      const workId = U.$("editFieldWorkId").value;
+      const work = state.data().fieldWorks.find((item) => item.workId === workId);
+      if (!work) return;
+      const fieldCount = (work.fieldIds || []).length;
+      const fieldNames = (work.fieldIds || []).map((id) => state.field(id)?.name).filter(Boolean).join("・");
+      const scope = fieldCount > 1 ? `\n対象: ${fieldNames}（${fieldCount}圃場すべての履歴から削除されます）` : fieldNames ? `\n対象: ${fieldNames}` : "";
+      if (!confirm(`${U.fd(work.date)} ${work.workName}を削除しますか？${scope}`)) return;
+      if (!state.deleteFieldWork(workId)) return;
+      resetForm();
+      if (RiceOS.navigation && RiceOS.navigation.current && RiceOS.navigation.current()?.type === "record" && RiceOS.app && RiceOS.app.back) RiceOS.app.back();
     });
 
     document.querySelector('[data-action="reset-field-work"]').addEventListener("click", resetForm);

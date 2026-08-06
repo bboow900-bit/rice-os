@@ -808,7 +808,37 @@
 
   function deleteGrowthLog(logId) {
     return mutate((d) => {
+      const removed = d.growthLogs.find((g) => g.logId === logId);
       d.growthLogs = d.growthLogs.filter((g) => g.logId !== logId);
+      if (!removed || !Array.isArray(d.confirmationCandidates)) return;
+
+      // A panicle measurement is the evidence for its own prediction. Removing it
+      // must also remove that prediction, while a deleted heading confirmation can
+      // fall back to another confirmed heading record from the same field and year.
+      d.confirmationCandidates = d.confirmationCandidates
+        .filter((candidate) => !(candidate.basisData && candidate.basisData.recordId === logId))
+        .map((candidate) => {
+          if (candidate.actualRecordId !== logId) return candidate;
+          const replacement = d.growthLogs
+            .filter((log) => log.fieldId === candidate.fieldId
+              && String(log.season) === String(candidate.season)
+              && (log.headingObserved || log.stageConfirmed && log.observedStage === "heading"))
+            .sort((a, b) => String(b.date).localeCompare(String(a.date)))[0];
+          if (!replacement) return {
+            ...candidate,
+            status: "active",
+            actualRecordId: "",
+            actualDifferenceDays: "",
+            updatedAt: U.now()
+          };
+          return {
+            ...candidate,
+            status: "confirmed",
+            actualRecordId: replacement.logId,
+            actualDifferenceDays: candidate.periodStart ? U.daysBetween(candidate.periodStart, replacement.date) : "",
+            updatedAt: U.now()
+          };
+        });
     }, "生育ログを削除しました");
   }
 

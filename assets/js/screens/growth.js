@@ -316,6 +316,8 @@
     renderPanicleTargets();
     renderPaniclePanel();
     renderTargetPanel();
+    const deleteButton = U.$("deleteGrowthButton");
+    if (deleteButton) deleteButton.classList.add("hidden");
   }
 
   function prefillField(fieldId) {
@@ -530,6 +532,8 @@
   function fillEdit(log) {
     U.$("growthHeading").textContent = "生育ログを編集";
     U.$("editGrowthId").value = log.logId;
+    const deleteButton = U.$("deleteGrowthButton");
+    if (deleteButton) deleteButton.classList.remove("hidden");
     U.$("gDate").value = log.date;
     U.$("gField").value = log.fieldId;
     if (U.$("gLeafCount")) U.$("gLeafCount").value = log.leafCount || "";
@@ -727,6 +731,15 @@
         return;
       }
       fillEdit(log);
+    });
+
+    if (U.$("deleteGrowthButton")) U.$("deleteGrowthButton").addEventListener("click", () => {
+      const logId = U.$("editGrowthId").value;
+      const log = state.data().growthLogs.find((item) => item.logId === logId);
+      if (!log || !confirm("この生育記録を削除しますか？")) return;
+      if (!state.deleteGrowthLog(logId)) return;
+      resetForm();
+      if (RiceOS.navigation && RiceOS.navigation.current && RiceOS.navigation.current()?.type === "record" && RiceOS.app && RiceOS.app.back) RiceOS.app.back();
     });
 
     document.querySelector('[data-action="reset-growth"]').addEventListener("click", resetForm);

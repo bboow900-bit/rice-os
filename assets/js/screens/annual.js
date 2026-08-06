@@ -13,6 +13,10 @@
   let waterEditDraft = null;
   let reviewView = "overview";
   let compareFilter = "work";
+  let timelineActionRecord = null;
+  let timelineLongPressTimer = null;
+  let timelinePointerStart = null;
+  let suppressTimelineOpenUntil = 0;
 
   const KIND_META = {
     fieldWork: { label: "作業", className: "work", icon: "作" },
@@ -1174,7 +1178,7 @@
           <input type="hidden" name="kind" value="${U.attr(waterEditDraft.kind)}"><input type="hidden" name="id" value="${U.attr(waterEditDraft.id)}">
           <div class="form-grid dense"><label>開始日<input name="startDate" type="date" value="${U.attr(record.startDate || record.date || "")}" required></label><label>終了日<input name="actualEndDate" type="date" value="${U.attr(record.actualEndDate || "")}"></label></div>
           <label>メモ<textarea name="memo">${U.escapeHTML(record.memo || "")}</textarea></label>
-          <div><button type="button" class="secondary" data-annual-water-cancel>キャンセル</button><button type="submit" class="primary">変更を保存</button></div>
+          <div class="annual-water-editor-actions"><button type="button" class="secondary" data-annual-water-cancel>キャンセル</button><button type="submit" class="primary">変更を保存</button><button type="button" class="danger" data-annual-water-editor-delete="${U.attr(waterEditDraft.kind)}" data-id="${U.attr(waterEditDraft.id)}">この水管理記録を削除</button></div>
         </form>
       </section>
     `;
@@ -1410,10 +1414,10 @@
     return {
       id: period.directId || legacyIds[0] || period.periodId || "",
       editId: period.directId || legacyIds[0] || period.periodId || "",
-      // A legacy period can span multiple original work records. Keep those
-      // records intact and return to the water review tab instead of guessing
-      // which one the user intended to edit.
-      editKind: period.directId ? (period.kind === "dry" ? "dry" : "irrigation") : legacyIds.length === 1 ? "fieldWork" : "waterReview",
+      // Legacy water periods always return to the water review. Even a period
+      // made from a single original work must not bypass its dedicated warning
+      // and accidentally be treated like an ordinary farm-work deletion.
+      editKind: period.directId ? (period.kind === "dry" ? "dry" : "irrigation") : "waterReview",
       date,
       label: endOnly ? `${String(period.label || "水管理")} 終了記録` : sameDayCompletion ? `${String(period.label || "水管理")} 当日完了` : String(period.label || "水管理"),
       category: "水管理",
@@ -1568,7 +1572,7 @@
       ? `${timelineDateParts(planting, true).text} → ${harvest ? `${timelineDateParts(harvest, true).text}${seasonLength !== "" ? ` / ${seasonLength}日` : ""}` : "収穫記録待ち"}`
       : "田植え記録待ち";
     const timelineEntries = entries.filter((entry) => !entry.isWaterMarker);
-    const flowCard = (entry) => `<button type="button" class="annual-year-flow-entry ${U.attr(entry.tone)}${entry.milestone ? " milestone" : ""}" data-annual-flow-open-kind="${U.attr(entry.editKind)}" data-annual-flow-open-id="${U.attr(entry.editId || entry.id)}"><span class="annual-year-flow-title"><em>${U.escapeHTML(entry.milestone ? "実測" : entry.category || "記録")}</em><b>${U.escapeHTML(entry.label)}</b><strong aria-hidden="true">〉</strong></span><span class="annual-year-flow-detail">${U.escapeHTML(entry.detail)}</span>${entry.stageFact ? `<span class="annual-year-flow-stage-fact">${U.escapeHTML(entry.stageFact)}</span>` : ""}${entry.days !== "" && entry.days != null ? `<span class="annual-year-flow-days">${U.escapeHTML(String(entry.days))}日間</span>` : ""}</button>`;
+    const flowCard = (entry) => `<button type="button" class="annual-year-flow-entry ${U.attr(entry.tone)}${entry.milestone ? " milestone" : ""}" data-annual-flow-open-kind="${U.attr(entry.editKind)}" data-annual-flow-open-id="${U.attr(entry.editId || entry.id)}" data-annual-flow-label="${U.attr(entry.label)}"><span class="annual-year-flow-title"><em>${U.escapeHTML(entry.milestone ? "実測" : entry.category || "記録")}</em><b>${U.escapeHTML(entry.label)}</b><strong aria-hidden="true">〉</strong></span><span class="annual-year-flow-detail">${U.escapeHTML(entry.detail)}</span>${entry.stageFact ? `<span class="annual-year-flow-stage-fact">${U.escapeHTML(entry.stageFact)}</span>` : ""}${entry.days !== "" && entry.days != null ? `<span class="annual-year-flow-days">${U.escapeHTML(String(entry.days))}日間</span>` : ""}</button>`;
     const items = timelineEntries.map((entry, index) => {
       const date = timelineDateParts(entry.date);
       const isRepeatedDate = index > 0 && timelineEntries[index - 1].date === entry.date;
@@ -1774,7 +1778,7 @@
     const rows = rowsForYear(allRows());
     const screen = U.$("screen-annual");
     if (screen) screen.classList.toggle("annual-detail-mode", Boolean(field));
-    U.$("annualTimeline").innerHTML = field ? renderFieldDetail(field) : renderTop(rows);
+    U.$("annualTimeline").innerHTML = field ? `${renderFieldDetail(field)}${renderTimelineActionSheet()}` : renderTop(rows);
     renderSortOptions();
     if (RiceOS.app && RiceOS.app.syncBackButton) RiceOS.app.syncBackButton();
   }
@@ -1836,9 +1840,13 @@
     const legacyIds = legacyPeriod && legacyPeriod.sourceWorkIds.length ? legacyPeriod.sourceWorkIds : [id];
     const legacyWorks = legacy ? state.data().fieldWorks.filter((row) => legacyIds.includes(row.workId)) : [];
     const targetCount = legacyWorks.reduce((count, row) => Math.max(count, (row.fieldIds || []).length), 0);
+    const directRecord = legacy ? null : waterRecord(kind, id);
+    const directLabel = directRecord && (kind === "dry" ? "中干し" : directRecord.method || "水管理") || "水管理";
+    const directStart = directRecord && (directRecord.startDate || directRecord.date) || "";
+    const directEnd = directRecord && directRecord.actualEndDate || "";
     const message = legacy
       ? `この旧作業記録由来の水管理を削除しますか？\n\n開始・終了を含む${legacyIds.length}件の元作業記録も削除されます。${targetCount > 1 ? `対象の${targetCount}圃場にも反映されます。` : ""}`
-      : "この水管理記録を削除しますか？";
+      : `${directLabel}の記録を削除しますか？\n${directStart ? `開始: ${U.fd(directStart)}` : "開始日未登録"}${directEnd ? ` / 終了: ${U.fd(directEnd)}` : " / 継続中"}`;
     if (!confirm(message)) return false;
     const saved = legacy
       ? (state.deleteFieldWorks ? state.deleteFieldWorks(legacyIds, "旧作業由来の水管理を削除しました") : legacyIds.map((workId) => state.deleteFieldWork(workId)).every(Boolean))
@@ -1857,6 +1865,7 @@
     waterEditDraft = null;
     reviewView = "overview";
     compareFilter = "work";
+    timelineActionRecord = null;
     render();
     if (RiceOS.app && RiceOS.app.syncBackButton) RiceOS.app.syncBackButton();
     return true;
@@ -1877,14 +1886,59 @@
   }
 
   function deleteRow(kind, id) {
-    const ok = confirm("この記録を削除しますか？");
-    if (!ok) return;
-    if (kind === "fieldWork") state.deleteFieldWork(id);
-    if (kind === "growth") state.deleteGrowthLog(id);
-    if (kind === "dry") state.deleteDryPeriod(id);
-    if (kind === "irrigation") state.deleteIrrigation(id);
-    if (kind === "schedule") state.deleteSchedule(id);
-    if (kind === "other") state.deleteOtherWork(id);
+    const work = kind === "fieldWork" ? state.data().fieldWorks.find((item) => item.workId === id) : null;
+    const growth = kind === "growth" ? state.data().growthLogs.find((item) => item.logId === id) : null;
+    const other = kind === "other" ? state.data().otherWorks.find((item) => item.otherWorkId === id) : null;
+    const schedule = kind === "schedule" ? (state.data().schedules || []).find((item) => item.scheduleId === id) : null;
+    const fieldNames = work ? (work.fieldIds || []).map((fieldId) => state.field(fieldId)?.name).filter(Boolean).join("・") : "";
+    const fieldCount = work ? (work.fieldIds || []).length : 0;
+    const message = work
+      ? `${U.fd(work.date)} ${work.workName}を削除しますか？${fieldNames ? `\n対象: ${fieldNames}` : ""}${fieldCount > 1 ? `（${fieldCount}圃場すべての履歴から削除されます）` : ""}`
+      : growth
+        ? `${U.fd(growth.date)} 生育記録を削除しますか？\n圃場: ${state.field(growth.fieldId)?.name || "未設定"}`
+        : other
+          ? `${U.fd(other.date)} ${other.workName}を削除しますか？\n圃場: ${(other.relatedFieldIds || []).map((fieldId) => state.field(fieldId)?.name).filter(Boolean).join("・") || "未設定"}`
+          : schedule
+            ? `${U.fd(schedule.date)} ${schedule.title || schedule.scheduleType || "予定"}を削除しますか？\n圃場: ${(schedule.fieldIds || []).map((fieldId) => state.field(fieldId)?.name).filter(Boolean).join("・") || "未設定"}`
+            : "この記録を削除しますか？";
+    const ok = confirm(message);
+    if (!ok) return false;
+    const deleted = kind === "fieldWork" ? state.deleteFieldWork(id)
+      : kind === "growth" ? state.deleteGrowthLog(id)
+        : kind === "dry" ? state.deleteDryPeriod(id)
+          : kind === "irrigation" ? state.deleteIrrigation(id)
+            : kind === "schedule" ? state.deleteSchedule(id)
+              : kind === "other" ? state.deleteOtherWork(id) : false;
+    if (deleted) render();
+    return Boolean(deleted);
+  }
+
+  function renderTimelineActionSheet() {
+    if (!timelineActionRecord) return "";
+    const record = timelineActionRecord;
+    const isLegacyWater = record.kind === "waterReview";
+    return `
+      <div class="annual-record-action-backdrop" data-annual-record-action="cancel">
+        <section class="annual-record-action-sheet" role="dialog" aria-modal="true" aria-label="${U.attr(record.label)}の操作" onclick="event.stopPropagation()">
+          <p>記録の操作</p>
+          <b>${U.escapeHTML(record.label)}</b>
+          ${isLegacyWater
+            ? '<button type="button" class="primary" data-annual-record-action="open-water">水管理の記録を開く</button>'
+            : '<button type="button" class="primary" data-annual-record-action="edit">編集する</button><button type="button" class="danger" data-annual-record-action="delete">削除する</button>'}
+          <button type="button" class="secondary" data-annual-record-action="cancel">キャンセル</button>
+        </section>
+      </div>`;
+  }
+
+  function openTimelineAction(record) {
+    timelineActionRecord = record;
+    suppressTimelineOpenUntil = Date.now() + 800;
+    render();
+  }
+
+  function closeTimelineAction() {
+    timelineActionRecord = null;
+    render();
   }
 
   function openAdd(fieldId) {
@@ -1903,6 +1957,7 @@
     waterEditDraft = null;
     reviewView = "overview";
     compareFilter = "work";
+    timelineActionRecord = null;
     render();
     if (RiceOS.app && RiceOS.app.syncBackButton) RiceOS.app.syncBackButton();
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -1915,6 +1970,7 @@
     waterEditDraft = null;
     reviewView = "overview";
     compareFilter = "work";
+    timelineActionRecord = null;
     render();
   }
 
@@ -1963,8 +2019,38 @@
         render();
         return;
       }
+      const recordAction = event.target.closest("[data-annual-record-action]");
+      if (recordAction) {
+        const actionName = recordAction.dataset.annualRecordAction;
+        const record = timelineActionRecord;
+        if (actionName === "cancel" || !record) {
+          closeTimelineAction();
+          return;
+        }
+        if (actionName === "open-water") {
+          timelineActionRecord = null;
+          selectedTab = "water";
+          waterEditDraft = null;
+          render();
+          setTimeout(() => U.$("annualTimeline").querySelector(".annual-water-review-list, .annual-water-periods")?.scrollIntoView({ behavior: "smooth", block: "start" }), 30);
+          return;
+        }
+        timelineActionRecord = null;
+        if (actionName === "edit") {
+          render();
+          editRow(record.kind, record.id);
+          return;
+        }
+        if (actionName === "delete") {
+          render();
+          if (record.kind === "dry" || record.kind === "irrigation") deleteWaterPeriod(record.kind, record.id);
+          else deleteRow(record.kind, record.id);
+          return;
+        }
+      }
       const flowOpen = event.target.closest("[data-annual-flow-open-kind]");
       if (flowOpen) {
+        if (Date.now() < suppressTimelineOpenUntil) return;
         const kind = flowOpen.dataset.annualFlowOpenKind;
         if (kind === "waterReview") {
           reviewView = "overview";
@@ -2004,6 +2090,11 @@
       const waterDelete = event.target.closest("[data-annual-water-delete]");
       if (waterDelete) {
         deleteWaterPeriod(waterDelete.dataset.annualWaterDelete, waterDelete.dataset.id);
+        return;
+      }
+      const waterEditorDelete = event.target.closest("[data-annual-water-editor-delete]");
+      if (waterEditorDelete) {
+        deleteWaterPeriod(waterEditorDelete.dataset.annualWaterEditorDelete, waterEditorDelete.dataset.id);
         return;
       }
       const waterImport = event.target.closest("[data-annual-water-import]");
@@ -2107,6 +2198,35 @@
         if (action.dataset.annualAction === "delete") deleteRow(action.dataset.kind, action.dataset.id);
       }
     });
+    U.$("annualTimeline").addEventListener("pointerdown", (event) => {
+      const card = event.target.closest("[data-annual-flow-open-kind]");
+      if (!card || (event.pointerType === "mouse" && event.button !== 0)) return;
+      clearTimeout(timelineLongPressTimer);
+      const record = {
+        kind: card.dataset.annualFlowOpenKind,
+        id: card.dataset.annualFlowOpenId,
+        label: card.dataset.annualFlowLabel || "記録"
+      };
+      timelinePointerStart = { x: event.clientX, y: event.clientY };
+      timelineLongPressTimer = setTimeout(() => openTimelineAction(record), 550);
+    });
+    U.$("annualTimeline").addEventListener("pointermove", (event) => {
+      if (!timelinePointerStart) return;
+      const moved = Math.hypot(event.clientX - timelinePointerStart.x, event.clientY - timelinePointerStart.y);
+      if (moved > 8) clearTimeout(timelineLongPressTimer);
+    });
+    ["pointerup", "pointercancel", "pointerleave"].forEach((eventName) => {
+      U.$("annualTimeline").addEventListener(eventName, () => {
+        clearTimeout(timelineLongPressTimer);
+        timelinePointerStart = null;
+      });
+    });
+    U.$("annualTimeline").addEventListener("contextmenu", (event) => {
+      const card = event.target.closest("[data-annual-flow-open-kind]");
+      if (!card) return;
+      event.preventDefault();
+      openTimelineAction({ kind: card.dataset.annualFlowOpenKind, id: card.dataset.annualFlowOpenId, label: card.dataset.annualFlowLabel || "記録" });
+    });
     U.$("annualTimeline").addEventListener("input", (event) => {
       if (event.target && event.target.id === "annualSearch") {
         annualSearchValue = event.target.value;
@@ -2141,6 +2261,7 @@
         alert("終了日は開始日以降の日付にしてください。");
         return;
       }
+      if (record.actualEndDate && !actualEndDate && !confirm("この完了済み水管理を継続中に戻しますか？")) return;
       const next = { ...record, date: startDate, season: String(startDate).slice(0, 4), startDate, actualEndDate, status: actualEndDate ? "完了" : "実施中", periodStatus: actualEndDate ? "完了" : "実施中", memo: String(formData.get("memo") || "").trim() };
       const saved = kind === "dry" ? state.saveDryPeriod(next) : state.saveIrrigation(next);
       if (!saved) return;
