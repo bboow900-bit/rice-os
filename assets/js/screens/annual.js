@@ -1572,7 +1572,7 @@
       ? `${timelineDateParts(planting, true).text} → ${harvest ? `${timelineDateParts(harvest, true).text}${seasonLength !== "" ? ` / ${seasonLength}日` : ""}` : "収穫記録待ち"}`
       : "田植え記録待ち";
     const timelineEntries = entries.filter((entry) => !entry.isWaterMarker);
-    const flowCard = (entry) => `<button type="button" class="annual-year-flow-entry ${U.attr(entry.tone)}${entry.milestone ? " milestone" : ""}" data-annual-flow-open-kind="${U.attr(entry.editKind)}" data-annual-flow-open-id="${U.attr(entry.editId || entry.id)}" data-annual-flow-label="${U.attr(entry.label)}"><span class="annual-year-flow-title"><em>${U.escapeHTML(entry.milestone ? "実測" : entry.category || "記録")}</em><b>${U.escapeHTML(entry.label)}</b><strong aria-hidden="true">〉</strong></span><span class="annual-year-flow-detail">${U.escapeHTML(entry.detail)}</span>${entry.stageFact ? `<span class="annual-year-flow-stage-fact">${U.escapeHTML(entry.stageFact)}</span>` : ""}${entry.days !== "" && entry.days != null ? `<span class="annual-year-flow-days">${U.escapeHTML(String(entry.days))}日間</span>` : ""}</button>`;
+    const flowCard = (entry) => `<div class="annual-year-flow-entry ${U.attr(entry.tone)}${entry.milestone ? " milestone" : ""}"><button type="button" class="annual-year-flow-open" data-annual-flow-open-kind="${U.attr(entry.editKind)}" data-annual-flow-open-id="${U.attr(entry.editId || entry.id)}" data-annual-flow-label="${U.attr(entry.label)}"><span class="annual-year-flow-title"><em>${U.escapeHTML(entry.milestone ? "実測" : entry.category || "記録")}</em><b>${U.escapeHTML(entry.label)}</b><strong aria-hidden="true">〉</strong></span><span class="annual-year-flow-detail">${U.escapeHTML(entry.detail)}</span>${entry.stageFact ? `<span class="annual-year-flow-stage-fact">${U.escapeHTML(entry.stageFact)}</span>` : ""}${entry.days !== "" && entry.days != null ? `<span class="annual-year-flow-days">${U.escapeHTML(String(entry.days))}日間</span>` : ""}</button><button type="button" class="annual-year-flow-menu" aria-label="${U.escapeHTML(entry.label)}の操作" title="編集・削除" data-annual-flow-menu-kind="${U.attr(entry.editKind)}" data-annual-flow-menu-id="${U.attr(entry.editId || entry.id)}" data-annual-flow-menu-label="${U.attr(entry.label)}">⋮</button></div>`;
     const items = timelineEntries.map((entry, index) => {
       const date = timelineDateParts(entry.date);
       const isRepeatedDate = index > 0 && timelineEntries[index - 1].date === entry.date;
@@ -1919,7 +1919,7 @@
     const isLegacyWater = record.kind === "waterReview";
     return `
       <div class="annual-record-action-backdrop" data-annual-record-action="cancel">
-        <section class="annual-record-action-sheet" role="dialog" aria-modal="true" aria-label="${U.attr(record.label)}の操作" onclick="event.stopPropagation()">
+        <section class="annual-record-action-sheet" role="dialog" aria-modal="true" aria-label="${U.attr(record.label)}の操作">
           <p>記録の操作</p>
           <b>${U.escapeHTML(record.label)}</b>
           ${isLegacyWater
@@ -2022,6 +2022,7 @@
       const recordAction = event.target.closest("[data-annual-record-action]");
       if (recordAction) {
         const actionName = recordAction.dataset.annualRecordAction;
+        if (actionName === "cancel" && recordAction.classList.contains("annual-record-action-backdrop") && event.target !== recordAction) return;
         const record = timelineActionRecord;
         if (actionName === "cancel" || !record) {
           closeTimelineAction();
@@ -2047,6 +2048,15 @@
           else deleteRow(record.kind, record.id);
           return;
         }
+      }
+      const flowMenu = event.target.closest("[data-annual-flow-menu-kind]");
+      if (flowMenu) {
+        openTimelineAction({
+          kind: flowMenu.dataset.annualFlowMenuKind,
+          id: flowMenu.dataset.annualFlowMenuId,
+          label: flowMenu.dataset.annualFlowMenuLabel || "記録"
+        });
+        return;
       }
       const flowOpen = event.target.closest("[data-annual-flow-open-kind]");
       if (flowOpen) {
