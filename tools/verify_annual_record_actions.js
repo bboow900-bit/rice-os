@@ -35,8 +35,8 @@ assert(
   "Record detail must have an in-page return path to the annual flow"
 );
 assert(
-  /isRecordDetailOpen: \(\) => Boolean\(recordDetail\)/.test(annual) && /activeScreen === "annual"[\s\S]*isRecordDetailOpen\(\)/.test(app),
-  "The shared back button must close annual record detail before a prior route"
+  /hasTransientBackState: \(\) => Boolean\(recordDetail \|\| expandedFlowRecord \|\| reviewView === "compare"\)/.test(annual) && /activeScreen === "annual"[\s\S]*hasTransientBackState\(\)/.test(app),
+  "The shared back button must close annual detail and inline summaries before a prior route"
 );
 assert(
   /activeScreen === "annual"[\s\S]*annual\.resetNavigation\(\)[\s\S]*button\.dataset\.screen === "field-work"/.test(app),
@@ -69,6 +69,38 @@ assert(
 assert(
   /\.annual-record-detail-back \{[\s\S]*width: 42px[\s\S]*height: 42px/.test(css),
   "Record detail must keep a touch-sized return button"
+);
+assert(
+  /function renderAnnualFieldSwitcher\(field\)/.test(annual) && /\$\{renderAnnualFieldSwitcher\(field\)\}\$\{recordDetail \? renderAnnualRecordDetail/.test(annual) && /function switchFieldWithinAnnual\(fieldId\)/.test(annual),
+  "Annual review must expose the field switcher in both flow and read-only detail views"
+);
+assert(
+  /selectedTab = "karte";[\s\S]*timelineActionRecord = null;[\s\S]*recordDetail = null;/.test(annual),
+  "Switching annual fields must clear transient detail and action state"
+);
+assert(
+  /RiceOS\.navigation\.openField\(fieldId, \{[\s\S]*destination: "annual-history"/.test(annual),
+  "Switching fields inside review must create a return route for the selected field"
+);
+assert(
+  /originScreen: "annual",[\s\S]*tab: selectedTab\s*\n\s*\}\);/.test(annual),
+  "Editing a review record must push a return route instead of replacing it"
+);
+assert(
+  /\.annual-field-switcher \{[\s\S]*position: sticky/.test(css),
+  "Annual field switcher must stay reachable while reviewing a long record"
+);
+assert(
+  /data-annual-flow-summary=[\s\S]*要約を表示/.test(annual) && /const flowSummary = event\.target\.closest\("\[data-annual-flow-summary\]"\)/.test(annual),
+  "Annual flow must offer an explicit inline-summary control separate from the normal card tap"
+);
+assert(
+  /expandedFlowRecord = expandedFlowRecord === key \? "" : key;/.test(annual) && /if \(expandedFlowRecord\) \{[\s\S]*expandedFlowRecord = ""/.test(annual),
+  "Inline summaries must toggle independently and close through the shared back path"
+);
+assert(
+  /class="annual-year-flow-open"[\s\S]*data-annual-flow-summary/.test(annual),
+  "Opening the read-only record detail must remain distinct from opening its inline summary"
 );
 
 console.log("PASS annual record action contract");

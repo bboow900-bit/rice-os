@@ -403,15 +403,12 @@
 
   function headingDateForField(fieldId, year, asOfDate) {
     const onOrBefore = (row) => !asOfDate || String(row.date || "") <= asOfDate;
-    const dates = [
-      ...growthLogsFor(fieldId, year)
-        .filter((log) => onOrBefore(log) && (log.headingObserved || (log.stageConfirmed && log.observedStage === "heading")))
-        .map((log) => log.date),
-      ...fieldWorksByNameFor(fieldId, "出穂", year)
-        .filter(onOrBefore)
-        .filter((work) => isHeadingWorkName(work.workName))
-        .map((work) => work.date)
-    ];
+    // 出穂後日数の基準日は、専用の「出穂確認」だけに限定する。
+    // 現地で選んだ生育ステージや作業名の「出穂」は、判断・作業の記録であって
+    // 出穂日そのものとは限らない。
+    const dates = growthLogsFor(fieldId, year)
+      .filter((log) => onOrBefore(log) && log.headingObserved)
+      .map((log) => log.date);
     return dates.filter(Boolean).sort()[0] || "";
   }
 
@@ -424,9 +421,9 @@
       .slice()
       .sort((a, b) => String(a.date || "").localeCompare(String(b.date || "")));
     const panicleLog = logs.filter((log) => U.number(log.panicleLengthMm, 0) > 0).at(-1) || null;
-    const headingLog = logs.find((log) => log.headingObserved || (log.stageConfirmed && log.observedStage === "heading")) || null;
+    const headingLog = logs.find((log) => log.headingObserved) || null;
     const headingDate = headingDateForField(fieldId, targetYear, asOfDate);
-    const headingSource = headingLog ? "growthLog" : (headingDate ? "fieldWork" : "");
+    const headingSource = headingLog ? "growthLog" : "";
     const latestLog = logs.at(-1) || null;
     const copyEvidence = (log) => log ? {
       logId: String(log.logId || ""),
@@ -748,6 +745,7 @@
         headingObserved: Boolean(record.headingObserved),
         observedStage: record.observedStage || previous && previous.observedStage || "",
         stageConfirmed: record.stageConfirmed === undefined ? Boolean(previous && previous.stageConfirmed) : Boolean(record.stageConfirmed),
+        stageEvidenceType: record.stageEvidenceType || previous && previous.stageEvidenceType || (record.headingObserved ? "heading-observation" : (U.number(record.panicleLengthMm, 0) > 0 ? "panicle-measurement" : (record.stageConfirmed ? "manual-stage-observation" : ""))),
         measurementCount: record.measurementCount || previous && previous.measurementCount || "",
         measurementMethod: record.measurementMethod || previous && previous.measurementMethod || "",
         stageEvidenceId: record.stageEvidenceId || previous && previous.stageEvidenceId || logId,
@@ -795,7 +793,7 @@
           else d.confirmationCandidates.push(candidate);
         }
       }
-      if (normalized.headingObserved || normalized.stageConfirmed && normalized.observedStage === "heading") {
+      if (normalized.headingObserved) {
         d.confirmationCandidates.forEach((candidate) => {
           if (candidate.candidateType !== "heading" || candidate.fieldId !== normalized.fieldId || String(candidate.season) !== String(normalized.season)) return;
           candidate.status = "confirmed";
@@ -822,7 +820,9 @@
           const replacement = d.growthLogs
             .filter((log) => log.fieldId === candidate.fieldId
               && String(log.season) === String(candidate.season)
-              && (log.headingObserved || log.stageConfirmed && log.observedStage === "heading"))
+              // A manual "出穂期" judgement never replaces an explicit
+              // 出穂確認 that has been deleted.
+              && log.headingObserved)
             .sort((a, b) => String(b.date).localeCompare(String(a.date)))[0];
           if (!replacement) return {
             ...candidate,
@@ -1311,6 +1311,7 @@
   const WATER_PERIOD_TYPES = {
     dry: { label: "中干し", method: "中干し" },
     intermittent: { label: "間断灌水", method: "間断灌水" },
+    saturated: { label: "飽水管理", method: "飽水管理" },
     deep: { label: "深水管理", method: "深水管理" },
     drain: { label: "稲刈り前の落水", method: "稲刈り前の落水" }
   };
@@ -1324,6 +1325,7 @@
     const text = String(method || "");
     if (/中干し/.test(text)) return "dry";
     if (/間断灌水/.test(text)) return "intermittent";
+    if (/飽水管理/.test(text)) return "saturated";
     if (/深水/.test(text)) return "deep";
     if (/稲刈り前.*落水|^落水$/.test(text)) return "drain";
     return "";
@@ -1334,6 +1336,7 @@
     if (!text || /予定|確認/.test(text)) return null;
     const type = /中干し/.test(text) ? "dry"
       : /間断灌水/.test(text) ? "intermittent"
+      : /飽水管理/.test(text) ? "saturated"
       : /深水管理|深水/.test(text) ? "deep"
       : /稲刈り前.*落水/.test(text) ? "drain" : "";
     if (!type) return null;
@@ -1352,6 +1355,7 @@
     if (!text || /予定|確認/.test(text)) return null;
     if (/^中干し$/.test(text)) return { kind: "dry", phase: "legacy" };
     if (/^間断灌水$/.test(text)) return { kind: "intermittent", phase: "legacy" };
+    if (/^飽水管理$/.test(text)) return { kind: "saturated", phase: "legacy" };
     if (/^(深水管理|深水)$/.test(text)) return { kind: "deep", phase: "legacy" };
     if (/^(稲刈り前の落水|落水)$/.test(text)) return { kind: "drain", phase: "legacy" };
     return null;
@@ -1410,7 +1414,7 @@
       .filter((item) => item.event)
       .sort((a, b) => String(a.row.date || "").localeCompare(String(b.row.date || "")) || String(a.row.workId || "").localeCompare(String(b.row.workId || "")));
     const periods = [];
-    const open = { dry: [], intermittent: [], deep: [], drain: [] };
+    const open = { dry: [], intermittent: [], saturated: [], deep: [], drain: [] };
     works.forEach(({ row, event }) => {
       const type = WATER_PERIOD_TYPES[event.kind];
       if (event.phase === "start" || event.phase === "legacy") {
@@ -1688,7 +1692,6 @@
       .map(displayCopy);
     const headingWorks = allWorks.filter((row) => isHeadingWorkName(row.workName));
     const works = allWorks
-      .filter((row) => !isHeadingWorkName(row.workName))
       .filter((row) => !waterEventFromWorkName(row.workName))
       .filter((row) => !isMigratedWaterWork(row, id));
     const growth = growthLogsFor(id, year).map(displayCopy);

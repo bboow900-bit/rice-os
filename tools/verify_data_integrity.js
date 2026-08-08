@@ -301,6 +301,7 @@ state.saveFieldWork({
 state.saveGrowthLog({
   date: "2026-07-03",
   fieldId: "field_a",
+  headingObserved: true,
   observedStage: "heading",
   stageConfirmed: true
 });
@@ -329,7 +330,7 @@ const growth2025 = state.growthSummaryFor("field_a", 2025);
 const growth2026ThroughJune = state.growthSummaryFor("field_a", 2026, { asOfDate: "2026-06-30" });
 const growth2026 = state.growthSummaryFor("field_a", 2026);
 assert(growth2025.panicleLog && growth2025.panicleLog.date === "2025-06-20", "growth summary leaked a panicle record from another year");
-assert(growth2025.headingDate === "2025-07-15" && growth2025.headingSource === "fieldWork", "growth summary did not retain heading work fallback");
+assert(growth2025.headingDate === "" && growth2025.headingSource === "", "a work label became a biological heading-date anchor");
 assert(growth2026ThroughJune.panicleLog && growth2026ThroughJune.panicleLog.date === "2026-06-26", "growth summary did not use the latest panicle record in its year");
 assert(growth2026ThroughJune.headingDate === "", "growth summary included a future heading record");
 assert(growth2026.headingDate === "2026-07-03", "growth summary did not use the earliest confirmed heading evidence");
@@ -471,7 +472,7 @@ assert(state.plantingDateForField("field_a") === "2025-05-10", "yearless plantin
 assert(state.plantingDateForField("field_a", 2026) === "2026-05-15", "year-scoped planting lookup leaked another year");
 assert(global.RiceOS.utils.daysAfterPlanting(state.field("field_a"), "2026-05-25") === 10, "DAP used a planting date from another year");
 assert(state.workDateForField("field_a", "中干し開始", "last", 2025) === "2025-06-01", "year-scoped work lookup leaked another year");
-assert(state.headingDateForField("field_a", 2025) === "2025-07-15", "heading work was not found in its year");
+assert(state.headingDateForField("field_a", 2025) === "", "a heading work label was treated as an observation in its year");
 assert(state.headingDateForField("field_a", 2026) === "2026-07-03", "heading lookup did not include confirmed growth evidence");
 assert(state.dryPeriodsFor("field_a", 2025).every((row) => String(row.date).startsWith("2025-")), "year-scoped drying lookup leaked another year");
 assert(state.irrigationsFor("field_a", 2026).every((row) => String(row.date).startsWith("2026-")), "year-scoped intermittent irrigation lookup leaked another year");

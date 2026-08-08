@@ -49,9 +49,18 @@ load("assets/js/core/state.js");
 const state = global.RiceOS.state;
 
 assert(state.plantingDateForField(fieldId, 2026) === "2026-05-15", "A planting plan became the planting-date anchor");
-assert(state.headingDateForField(fieldId, 2026) === "2026-08-03", "A planned heading or an actual heading confirmation was resolved incorrectly");
+assert(state.headingDateForField(fieldId, 2026) === "", "A field-work label became a biological heading-date anchor");
 assert(!state.isActualFieldWork({ date: "2026-05-01", workName: "\u4e2d\u5e72\u3057\u78ba\u8a8d\u5019\u88dc" }), "A confirmation candidate was classified as actual");
 assert(state.isActualFieldWork({ date: "2026-08-03", workName: "\u51fa\u7a42\u78ba\u8a8d", sourceScheduleId: "schedule_heading" }), "A completed scheduled work was not classified as actual");
+state.saveGrowthLog({
+  logId: "heading-observed",
+  fieldId,
+  date: "2026-08-04",
+  headingObserved: true,
+  observedStage: "heading",
+  stageConfirmed: true
+});
+assert(state.headingDateForField(fieldId, 2026) === "2026-08-04", "Only an explicit heading observation may set the heading-date anchor");
 
 load("assets/js/core/agro.js");
 state.saveIrrigation({
@@ -63,6 +72,17 @@ state.saveIrrigation({
 });
 const invalidWaterStatus = global.RiceOS.agro.managementStatus(state.fields().find((field) => field.fieldId === fieldId), "2026-07-30");
 assert(!/\u5b8c\u4e86/.test(String(invalidWaterStatus.label || "")), "An invalid water period was treated as completed management");
+
+state.saveIrrigation({
+  irrigationId: "saturated-water-period",
+  fieldId,
+  method: "\u98fd\u6c34\u7ba1\u7406",
+  startDate: "2026-07-12",
+  actualEndDate: "2026-07-14"
+});
+const saturated = state.resolvedWaterPeriodsFor(fieldId, { year: 2026, includePlanned: false })
+  .find((row) => row.directId === "saturated-water-period");
+assert(saturated && saturated.kind === "saturated" && saturated.label === "\u98fd\u6c34\u7ba1\u7406", "Saturated-water records must remain their own factual water period");
 
 state.saveFieldWork({
   workId: "fertilizer-work",

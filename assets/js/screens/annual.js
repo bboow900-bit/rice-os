@@ -15,6 +15,7 @@
   let compareFilter = "work";
   let timelineActionRecord = null;
   let recordDetail = null;
+  let expandedFlowRecord = "";
   let timelineLongPressTimer = null;
   let timelinePointerStart = null;
   let suppressTimelineOpenUntil = 0;
@@ -69,7 +70,7 @@
     const text = String(name || "");
     if (/田植え|補植/.test(text)) return "planter";
     if (/除草|散布|防除/.test(text)) return "sprayer";
-    if (/溝切り|中干し|落水|入水|間断|湿潤/.test(text)) return "water";
+    if (/溝切り|中干し|落水|入水|間断|飽水|湿潤/.test(text)) return "water";
     if (/肥料|基肥|元肥|追肥/.test(text)) return "fertilizer";
     if (/稲刈り|収穫/.test(text)) return "harvest";
     if (/代かき|耕起|草刈り/.test(text)) return "tractor";
@@ -359,7 +360,7 @@
       ]
     }));
     const irrigation = (d.irrigations || [])
-      .filter((item) => /間断|深水|湿潤|稲刈り前の落水|^落水$/.test(String(item.method || "")))
+      .filter((item) => /間断|飽水|深水|湿潤|稲刈り前の落水|^落水$/.test(String(item.method || "")))
       .map((item) => makeRow("irrigation", item, {
       id: item.irrigationId,
       date: item.date,
@@ -950,7 +951,7 @@
             plantHeightCm: row.plantHeightCm || merged.plantHeightCm,
             leafColor: row.leafColor && row.leafColor !== "-" ? row.leafColor : merged.leafColor,
             panicleLengthMm: row.panicleLengthMm || merged.panicleLengthMm,
-            headingObserved: Boolean(merged.headingObserved || row.headingObserved || (row.observedStage === "heading" && row.stageConfirmed)),
+            headingObserved: Boolean(merged.headingObserved || row.headingObserved),
             photoData: row.photoData || merged.photoData
           }), {
             leafCount: "",
@@ -1049,6 +1050,7 @@
     const text = String(method || "");
     if (/中干し/.test(text)) return "中干し";
     if (/間断/.test(text)) return "間断灌水";
+    if (/飽水/.test(text)) return "飽水管理";
     if (/深水/.test(text)) return "深水管理";
     if (/稲刈り前.*落水|^落水$/.test(text)) return "稲刈り前の落水";
     if (/湿潤/.test(text)) return "湿潤灌漑（旧記録）";
@@ -1058,6 +1060,7 @@
   function waterPeriodTone(label) {
     if (/中干し/.test(label)) return "dry";
     if (/間断/.test(label)) return "intermittent";
+    if (/飽水/.test(label)) return "saturated";
     if (/深水/.test(label)) return "deep";
     if (/落水/.test(label)) return "drain";
     if (/湿潤/.test(label)) return "legacy";
@@ -1190,7 +1193,7 @@
     // legacy link. It remains an editable water record, never a hidden row.
     const directPeriods = waterPeriodsForField(field).filter((period) => period.sourceType !== "legacy-work");
     const legacyPeriods = legacyWaterReviewRowsForField(field).filter((period) => !period.migrated);
-    if (!directPeriods.length && !legacyPeriods.length) return '<div class="empty">中干し・間断灌水・深水管理・稲刈り前の落水を記録すると、期間をここで振り返れます。</div>';
+    if (!directPeriods.length && !legacyPeriods.length) return '<div class="empty">中干し・間断灌水・飽水管理・深水管理・稲刈り前の落水を記録すると、期間をここで振り返れます。</div>';
     return `${renderWaterEditor(field)}
       <section class="annual-water-periods"><div class="annual-water-periods-heading"><div><span>水管理として登録済み</span><h3>開始日と終了日を管理</h3></div><small>${directPeriods.length}件</small></div>${directPeriods.length ? directPeriods.map(renderWaterPeriod).join("") : '<div class="empty compact">水管理として登録済みの期間はありません。</div>'}</section>
       ${legacyPeriods.length ? `<section class="annual-water-review-list"><div class="annual-water-periods-heading"><div><span>照合待ち</span><h3>旧作業記録から見つかった水管理</h3></div><small>${legacyPeriods.length}件</small></div><p class="annual-water-review-note">元の作業記録は残したまま、水管理へ取り込めます。</p>${legacyPeriods.map(renderLegacyWaterReviewRow).join("")}</section>` : ""}`;
@@ -1285,8 +1288,7 @@
     const planting = firstDate(works, (row) => /田植/.test(String(row.title || "")));
     const growthSummary = state.growthSummaryFor ? state.growthSummaryFor(field.fieldId, year) : null;
     const heading = growthSummary && growthSummary.headingDate
-      || firstDate(growth, (row) => Boolean(row.raw && (row.raw.headingObserved || row.raw.observedStage === "heading" && row.raw.stageConfirmed)))
-      || firstDate(works, (row) => /出穂/.test(String(row.title || "")));
+      || firstDate(growth, (row) => Boolean(row.raw && row.raw.headingObserved));
     const harvest = firstDate(works, (row) => /収穫|稲刈/.test(String(row.title || "")));
     const materialRows = works.filter((row) => String(row.raw && row.raw.material || "").trim());
     const panicle = growthSummary && growthSummary.panicleLog
@@ -1439,13 +1441,14 @@
   }
 
   function isObservedHeading(row) {
-    return Boolean(row && (row.headingObserved || row.observedStage === "heading" && row.stageConfirmed));
+    return Boolean(row && row.headingObserved);
   }
 
   function observedGrowthFact(row, fallbackHeading) {
     const heading = Boolean(fallbackHeading || isObservedHeading(row));
     const panicleLengthMm = U.number(row && row.panicleLengthMm, 0);
-    if (!heading && panicleLengthMm <= 0) return null;
+    const manualStage = row && row.stageConfirmed && String(row.observedStage || "");
+    if (!heading && panicleLengthMm <= 0 && !manualStage) return null;
     if (heading) {
       return {
         date: String(row && row.date || ""),
@@ -1453,6 +1456,18 @@
         label: "出穂確認",
         detail: "出穂を確認（実測）",
         stageFact: "記録時の段階: 出穂期"
+      };
+    }
+    if (manualStage && panicleLengthMm <= 0) {
+      const stage = ((RiceOS.agro && RiceOS.agro.SEASON_STAGES) || [])
+        .find((item) => String(item.key || "") === manualStage);
+      const stageName = stage ? stage.label : String(manualStage);
+      return {
+        date: String(row && row.date || ""),
+        kind: "manual-stage",
+        label: "現場ステージ",
+        detail: `現地判断: ${stageName}`,
+        stageFact: "現地判断（実測ではありません）"
       };
     }
     return {
@@ -1464,6 +1479,33 @@
       // 観察値だけを残す。将来の生育を年表から推定しないための線引き。
       stageFact: panicleLengthMm <= 2 ? "記録時の段階: 幼穂形成期" : "記録時の観察: 幼穂長を実測"
     };
+  }
+
+  function renderExpandableFlowCard(field, entry) {
+    const id = String(entry.editId || entry.id || "");
+    const key = `${entry.editKind}:${id}`;
+    const expanded = expandedFlowRecord === key;
+    const target = annualRecordTarget(field, entry.editKind, id);
+    const row = target && target.row || {};
+    const facts = [];
+    if (entry.days !== "" && entry.days != null) facts.push(`期間 ${entry.days}日間`);
+    if (entry.editKind === "fieldWork") {
+      if (row.machine) facts.push(`機械 ${row.machine}`);
+      if (row.material) facts.push(`資材 ${row.material}`);
+      if (row.worker) facts.push(`作業者 ${row.worker}`);
+    } else if (entry.editKind === "growth") {
+      if (U.number(row.panicleLengthMm, 0) > 0) facts.push(`幼穂 ${row.panicleLengthMm}mm`);
+      else if (row.headingObserved) facts.push("出穂確認（現地観察）");
+      else if (row.stageConfirmed && row.observedStage) facts.push("現場ステージを記録");
+      if (row.leafColor && row.leafColor !== "-") facts.push(`葉色 ${row.leafColor}`);
+    } else if (entry.tone === "water") {
+      const start = row.startDate || row.date || "";
+      const end = row.actualEndDate || "";
+      if (start) facts.push(`開始 ${U.fd(start)}`);
+      if (end) facts.push(`完了 ${U.fd(end)}`);
+    }
+    const memo = String(row.memo || row.observationSummary || "").trim();
+    return `<article class="annual-year-flow-entry ${U.attr(entry.tone)}${entry.milestone ? " milestone" : ""}${expanded ? " expanded" : ""}"><div class="annual-year-flow-main"><button type="button" class="annual-year-flow-open" data-annual-record-open-kind="${U.attr(entry.editKind)}" data-annual-record-open-id="${U.attr(id)}" data-annual-record-open-label="${U.attr(entry.label)}"><span class="annual-year-flow-title"><em>${U.escapeHTML(entry.milestone ? "節目" : entry.category || "記録")}</em><b>${U.escapeHTML(entry.label)}</b><strong aria-hidden="true">›</strong></span><span class="annual-year-flow-detail">${U.escapeHTML(entry.detail)}</span>${entry.stageFact ? `<span class="annual-year-flow-stage-fact">${U.escapeHTML(entry.stageFact)}</span>` : ""}${entry.days !== "" && entry.days != null ? `<span class="annual-year-flow-days">${U.escapeHTML(String(entry.days))}日間</span>` : ""}</button><button type="button" class="annual-year-flow-menu" aria-label="${U.escapeHTML(entry.label)}の編集・削除" title="編集・削除" data-annual-flow-menu-kind="${U.attr(entry.editKind)}" data-annual-flow-menu-id="${U.attr(id)}" data-annual-flow-menu-label="${U.attr(entry.label)}">⋮</button></div><button type="button" class="annual-year-flow-summary-toggle" data-annual-flow-summary="${U.attr(key)}" aria-expanded="${expanded ? "true" : "false"}">${expanded ? "要約を閉じる" : "要約を表示"}</button>${expanded ? `<div class="annual-year-flow-summary"><div class="annual-year-flow-summary-metrics">${facts.slice(0, 4).map((fact) => `<span>${U.escapeHTML(fact)}</span>`).join("") || "<span>要約できる補足情報はありません</span>"}</div>${memo ? `<p>${U.escapeHTML(memo)}</p>` : ""}</div>` : ""}</article>`;
   }
 
   function fieldYearTimeline(field, year) {
@@ -1520,33 +1562,13 @@
       editKind: "growth",
       date: fact.date,
       label: fact.label,
-      category: "生育実測",
+      category: fact.kind === "manual-stage" ? "現場判定" : "生育実測",
       tone: "growth",
       lane: "growth",
       detail: fact.detail,
       stageFact: fact.stageFact,
       milestone: fact.kind
     }));
-    const headingGrowthDates = new Set(growth
-      .filter((row) => isObservedHeading(row))
-      .map((row) => String(row.date || "")));
-    headingWorks
-      .filter((row) => !headingGrowthDates.has(String(row.date || "")))
-      .forEach((row) => {
-        const fact = observedGrowthFact(row, true);
-        entries.push({
-          id: row.workId,
-          editKind: "fieldWork",
-          date: fact.date,
-          label: fact.label,
-          category: "生育実測",
-          tone: "growth",
-          lane: "growth",
-          detail: fact.detail,
-          stageFact: fact.stageFact,
-          milestone: fact.kind
-        });
-      });
     others.forEach((row) => entries.push({
       id: row.otherWorkId,
       editKind: "other",
@@ -1578,7 +1600,7 @@
       const date = timelineDateParts(entry.date);
       const isRepeatedDate = index > 0 && timelineEntries[index - 1].date === entry.date;
       const tone = entry.tone === "water" ? "water" : entry.tone === "growth" ? "growth" : entry.tone === "harvest" ? "harvest" : entry.tone === "other" ? "other" : "work";
-      return `<li class="annual-year-flow-single-row ${U.attr(tone)}${isRepeatedDate ? " repeat" : ""}"><time datetime="${U.attr(entry.date)}"${isRepeatedDate ? ' class="annual-year-flow-repeat" aria-hidden="true"' : ""}><span>${U.escapeHTML(date.day)}</span><small>${U.escapeHTML(date.weekday)}</small></time><span class="annual-year-flow-rail" aria-hidden="true"><i></i></span>${flowCard(entry)}</li>`;
+      return `<li class="annual-year-flow-single-row ${U.attr(tone)}${isRepeatedDate ? " repeat" : ""}"><time datetime="${U.attr(entry.date)}"${isRepeatedDate ? ' class="annual-year-flow-repeat" aria-hidden="true"' : ""}><span>${U.escapeHTML(date.day)}</span><small>${U.escapeHTML(date.weekday)}</small></time><span class="annual-year-flow-rail" aria-hidden="true"><i></i></span>${renderExpandableFlowCard(field, entry)}</li>`;
     }).join("");
     return `
       <section class="annual-year-flow" aria-label="${U.escapeHTML(year)}年の一年の流れ">
@@ -1724,6 +1746,15 @@
     `;
   }
 
+  function renderAnnualFieldSwitcher(field) {
+    const fieldOptions = state.activeFields()
+      .slice()
+      .sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""), "ja"))
+      .map((item) => `<option value="${U.attr(item.fieldId)}" ${item.fieldId === field.fieldId ? "selected" : ""}>${U.escapeHTML(item.name)}${item.areaA ? ` / ${U.escapeHTML(String(item.areaA))}a` : ""}</option>`)
+      .join("");
+    return `<label class="annual-field-switcher"><span>圃場を切替</span><select data-annual-field-switch aria-label="振り返る圃場を選択">${fieldOptions}</select></label>`;
+  }
+
   function renderFieldDetail(field) {
     const detailYear = reviewYearValue();
     const planting = state.plantingDateForField
@@ -1800,7 +1831,7 @@
     const isLegacyWater = kind === "waterReview";
     const isWater = kind === "dry" || kind === "irrigation" || isLegacyWater;
     const category = isLegacyWater ? "旧作業由来" : isWater ? "水管理" : kind === "growth" ? "生育記録" : kind === "other" ? "その他" : /収穫|稲刈り/.test(String(row.workName || "")) ? "収穫" : "農作業";
-    const title = isLegacyWater ? row.label : kind === "growth" ? (isObservedHeading(row) ? "出穂確認" : U.number(row.panicleLengthMm, 0) > 0 ? "幼穂確認" : "生育記録") : String(row.workName || row.method || "記録");
+    const title = isLegacyWater ? row.label : kind === "growth" ? (isObservedHeading(row) ? "出穂確認" : U.number(row.panicleLengthMm, 0) > 0 ? "幼穂確認" : row.stageConfirmed && row.observedStage ? "現場ステージ" : "生育記録") : String(row.workName || row.method || "記録");
     const date = isWater ? String(row.startDate || row.date || row.actualEndDate || "") : String(row.date || "");
     const fieldNames = kind === "fieldWork" ? (row.fieldIds || []).map((fieldId) => state.field(fieldId)?.name).filter(Boolean).join("・") : kind === "other" ? (row.relatedFieldIds || row.fieldIds || []).map((fieldId) => state.field(fieldId)?.name).filter(Boolean).join("・") : field.name;
     const info = [];
@@ -1844,6 +1875,7 @@
     const field = selectedFieldId && state.field(selectedFieldId);
     if (!field || !annualRecordTarget(field, kind, id)) return false;
     recordDetail = { kind, id, label: label || "記録" };
+    expandedFlowRecord = "";
     timelineActionRecord = null;
     waterEditDraft = null;
     render();
@@ -1882,7 +1914,7 @@
     const rows = rowsForYear(allRows());
     const screen = U.$("screen-annual");
     if (screen) screen.classList.toggle("annual-detail-mode", Boolean(field));
-    U.$("annualTimeline").innerHTML = field ? `${recordDetail ? renderAnnualRecordDetail(field, recordDetail) : renderFieldDetail(field)}${renderTimelineActionSheet()}` : renderTop(rows);
+    U.$("annualTimeline").innerHTML = field ? `${renderAnnualFieldSwitcher(field)}${recordDetail ? renderAnnualRecordDetail(field, recordDetail) : renderFieldDetail(field)}${renderTimelineActionSheet()}` : renderTop(rows);
     renderSortOptions();
     if (RiceOS.app && RiceOS.app.syncBackButton) RiceOS.app.syncBackButton();
   }
@@ -1971,13 +2003,14 @@
     compareFilter = "work";
     timelineActionRecord = null;
     recordDetail = null;
+    expandedFlowRecord = "";
     render();
     if (RiceOS.app && RiceOS.app.syncBackButton) RiceOS.app.syncBackButton();
     return true;
   }
 
   function canHandleBack() {
-    return Boolean(recordDetail || selectedFieldId || reviewView === "compare");
+    return Boolean(recordDetail || expandedFlowRecord || selectedFieldId || reviewView === "compare");
   }
 
   function handleBack() {
@@ -1985,6 +2018,11 @@
       recordDetail = null;
       render();
       window.scrollTo({ top: 0, behavior: "smooth" });
+      return true;
+    }
+    if (expandedFlowRecord) {
+      expandedFlowRecord = "";
+      render();
       return true;
     }
     if (reviewView === "compare") {
@@ -2070,9 +2108,36 @@
     compareFilter = "work";
     timelineActionRecord = null;
     recordDetail = null;
+    expandedFlowRecord = "";
     render();
     if (RiceOS.app && RiceOS.app.syncBackButton) RiceOS.app.syncBackButton();
     window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function switchFieldWithinAnnual(fieldId) {
+    if (!fieldId || fieldId === selectedFieldId || !state.field(fieldId)) return false;
+    // Keep a real review route for the newly selected field. This preserves a
+    // sensible return chain: edit B -> review B -> review A -> field A.
+    if (RiceOS.navigation && RiceOS.navigation.openField) {
+      const opened = RiceOS.navigation.openField(fieldId, {
+        destination: "annual-history",
+        tab: "karte"
+      });
+      if (opened) return true;
+    }
+    selectedFieldId = fieldId;
+    selectedTab = "karte";
+    seasonNoteDraft = null;
+    waterEditDraft = null;
+    reviewView = "overview";
+    compareFilter = "work";
+    timelineActionRecord = null;
+    recordDetail = null;
+    expandedFlowRecord = "";
+    render();
+    if (RiceOS.app && RiceOS.app.syncBackButton) RiceOS.app.syncBackButton();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    return true;
   }
 
   function resetNavigation() {
@@ -2084,6 +2149,7 @@
     compareFilter = "work";
     timelineActionRecord = null;
     recordDetail = null;
+    expandedFlowRecord = "";
     render();
   }
 
@@ -2174,6 +2240,13 @@
           return;
         }
       }
+      const flowSummary = event.target.closest("[data-annual-flow-summary]");
+      if (flowSummary) {
+        const key = flowSummary.dataset.annualFlowSummary || "";
+        expandedFlowRecord = expandedFlowRecord === key ? "" : key;
+        render();
+        return;
+      }
       const flowMenu = event.target.closest("[data-annual-flow-menu-kind]");
       if (flowMenu) {
         openTimelineAction({
@@ -2205,8 +2278,7 @@
           const record = rows.find((row) => String(kind === "dry" ? row.dryPeriodId : row.irrigationId) === String(waterEdit.dataset.id));
           if (record && RiceOS.recordActions && RiceOS.recordActions.edit && RiceOS.recordActions.edit(kind, record, {
             originScreen: "annual",
-            tab: "water",
-            replace: true
+            tab: "water"
           })) return;
           openWaterEditor(kind, waterEdit.dataset.id);
         }
@@ -2359,6 +2431,10 @@
       }
     });
     U.$("annualTimeline").addEventListener("change", (event) => {
+      if (event.target && event.target.matches("[data-annual-field-switch]")) {
+        switchFieldWithinAnnual(event.target.value);
+        return;
+      }
       if (event.target && event.target.id === "annualSort") {
         annualSortValue = event.target.value || "updated";
         render();
@@ -2400,5 +2476,15 @@
   if (window.__RICEOS_TEST__) RiceOS.annualTest = { waterRoleRank, fieldYearTimeline };
 
   RiceOS.screens = RiceOS.screens || {};
-  RiceOS.screens.annual = { render, bind, openField, openWaterEditor, handleBack, canHandleBack, resetNavigation, isRecordDetailOpen: () => Boolean(recordDetail) };
+  RiceOS.screens.annual = {
+    render,
+    bind,
+    openField,
+    openWaterEditor,
+    handleBack,
+    canHandleBack,
+    resetNavigation,
+    isRecordDetailOpen: () => Boolean(recordDetail),
+    hasTransientBackState: () => Boolean(recordDetail || expandedFlowRecord || reviewView === "compare")
+  };
 })();

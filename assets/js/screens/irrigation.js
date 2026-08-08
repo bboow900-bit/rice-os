@@ -21,6 +21,7 @@
   const WATER_TYPES = [
     { key: "dry", label: "中干し", source: "dry", tone: "dry", icon: "☀", target: (field) => field.drainageTargetDays || "" },
     { key: "intermittent", label: "間断灌水", source: "irrigation", method: "間断灌水", tone: "intermittent", icon: "〰", target: (field) => field.intermittentIntervalDays || "" },
+    { key: "saturated", label: "飽水管理", source: "irrigation", method: "飽水管理", tone: "saturated", icon: "◒", target: () => "" },
     { key: "deep", label: "深水管理", source: "irrigation", method: "深水管理", tone: "deep", icon: "≋", target: () => "" },
     { key: "drain", label: "稲刈り前の落水", source: "irrigation", method: "稲刈り前の落水", tone: "drain", icon: "⌇", target: () => "" }
   ];
@@ -64,7 +65,7 @@
   }
 
   function irrigationRows(fieldId, date) {
-    return resolvedRows(fieldId, date).filter((item) => ["intermittent", "deep", "drain"].includes(item.kind));
+    return resolvedRows(fieldId, date).filter((item) => ["intermittent", "saturated", "deep", "drain"].includes(item.kind));
   }
 
   function dryRows(fieldId, date) {
@@ -108,6 +109,8 @@
       const type = typeForKey({
         drying: "dry", dryCompleted: "dry",
         intermittentCompleted: "intermittent",
+        saturatedCompleted: "saturated",
+        saturated: "saturated",
         deepWater: "deep", deepCompleted: "deep",
         draining: "drain", drainCompleted: "drain"
       }[current.key] || current.key);
@@ -160,6 +163,7 @@
 
   function currentWaterRoadIndex(stageIndex, waterKey) {
     if (waterKey === "dry") return 2;
+    if (waterKey === "saturated") return stageIndex >= 5 ? 5 : 4;
     if (waterKey === "deep") return stageIndex >= 5 ? 5 : 4;
     if (waterKey === "intermittent") return stageIndex >= 6 ? 6 : 3;
     if (waterKey === "drain") return 6;
@@ -428,7 +432,7 @@
       ...period,
       date: period.startDate || period.actualEndDate || "",
       label: period.label || "水管理",
-      tone: period.kind === "dry" ? "dry" : period.kind === "deep" ? "deep" : period.kind === "drain" ? "drain" : "intermittent",
+      tone: period.kind === "dry" ? "dry" : period.kind === "saturated" ? "saturated" : period.kind === "deep" ? "deep" : period.kind === "drain" ? "drain" : "intermittent",
       editType: period.source === "direct" ? (period.kind === "dry" ? "dry" : "irrigation") : "legacy",
       editId: period.directId || ""
     }))).sort((a, b) => String(b.startDate || b.actualEndDate || "").localeCompare(String(a.startDate || a.actualEndDate || "")));

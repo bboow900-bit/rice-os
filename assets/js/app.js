@@ -75,7 +75,8 @@
   }
 
   function back() {
-    if (activeScreen === "annual" && RiceOS.screens.annual && RiceOS.screens.annual.isRecordDetailOpen && RiceOS.screens.annual.isRecordDetailOpen()) {
+    // Close temporary review layers before walking back through selected fields.
+    if (activeScreen === "annual" && RiceOS.screens.annual && RiceOS.screens.annual.hasTransientBackState && RiceOS.screens.annual.hasTransientBackState()) {
       RiceOS.screens.annual.handleBack();
       updateBackButton();
       return;

@@ -232,7 +232,7 @@
   const DRY_GAS_LEVELS = ["-", "多い", "少しあり", "ほとんど無し", "無し"];
   const IRRIGATION_STATUS = ["入水中", "落水中"];
   const WATER_PERIOD_STATUS = ["予定中", "実施中", "完了"];
-  const IRRIGATION_TYPES = ["間断灌水", "深水管理", "湿潤灌漑"];
+  const IRRIGATION_TYPES = ["間断灌水", "飽水管理", "深水管理", "湿潤灌漑"];
 
   function canonicalId(prefix, value, fallbackName) {
     const raw = String(value || fallbackName || "").trim();
@@ -433,9 +433,14 @@
       weed: String(g.weed || "-"),
       gas: String(g.gas || "-"),
       water: String(g.water || "-"),
-      headingObserved: Boolean(g.headingObserved || g.headingDate || String(g.memo || "").includes("出穂")),
+      // 出穂日は専用の現地確認だけを根拠にする。メモや手動ステージから
+      // 推測すると、実測日と現場判断が混ざってしまうため読み取らない。
+      headingObserved: Boolean(g.headingObserved || g.headingDate),
       observedStage: String(inferredStage || ""),
       stageConfirmed: g.stageConfirmed === undefined ? Boolean(g.headingObserved || g.headingDate) : Boolean(g.stageConfirmed),
+      // Old records remain unchanged until their own explicit edit. Their
+      // meaning is inferred for display rather than backfilled on any save.
+      stageEvidenceType: String(g.stageEvidenceType || ""),
       measurementCount: String(g.measurementCount || ""),
       measurementMethod: String(g.measurementMethod || ""),
       stageEvidenceId: String(g.stageEvidenceId || g.logId || g.id || ""),

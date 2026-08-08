@@ -315,6 +315,7 @@
     const title = String(record && (record.title || record.scheduleType) || "");
     if (/中干し/.test(title)) return { kind: "water", waterType: "dry" };
     if (/間断|かんだん/.test(title)) return { kind: "water", waterType: "intermittent" };
+    if (/飽水/.test(title)) return { kind: "water", waterType: "saturated" };
     if (/深水/.test(title)) return { kind: "water", waterType: "deep" };
     if (/落水/.test(title)) return { kind: "water", waterType: "drain" };
     if (/幼穂|出穂/.test(title)) return { kind: "stage", waterType: "" };

@@ -314,8 +314,8 @@
     }
     if (active.length) {
       const current = active[0];
-      const labels = { dry: "中干し中", intermittent: "間断灌水中", deep: "深水管理中", drain: "落水中" };
-      const keys = { dry: "drying", intermittent: "intermittent", deep: "deepWater", drain: "draining" };
+      const labels = { dry: "中干し中", intermittent: "間断灌水中", saturated: "飽水管理中", deep: "深水管理中", drain: "落水中" };
+      const keys = { dry: "drying", intermittent: "intermittent", saturated: "saturated", deep: "deepWater", drain: "draining" };
       return { key: keys[current.kind] || current.kind, label: labels[current.kind] || `${current.label}中`, tone: current.kind === "dry" ? "warn" : "water", date: current.startDate || "" };
     }
     const completed = factual.filter((row) => hasValidEnd(row) && row.actualEndDate <= targetDate)
@@ -431,16 +431,14 @@
     plantingRows.forEach((row) => evidence.push({ date: row.date, key: "establishment", source: "work", recordId: row.workId || "" }));
     growth.forEach((row) => {
       const observed = LEGACY_STAGE[String(row.observedStage || "")] || String(row.observedStage || "");
-      if (row.stageConfirmed && STAGE_INDEX[observed]) {
-        evidence.push({ date: row.date, key: observed, source: "confirmed", kind: "confirmed", recordId: row.logId || "", correctionReason: row.correctionReason || "" });
-        return;
-      }
+      // 数値測定・出穂確認は、手動ステージ選択より先に実測根拠として扱う。
       if (row.headingObserved) evidence.push({ date: row.date, key: "heading", source: "measured", kind: "heading", recordId: row.logId || "" });
       else if (Number(row.panicleLengthMm || 0) > 0) evidence.push({ date: row.date, key: panicleStageKey(row.panicleLengthMm), source: "measured", kind: "panicle", recordId: row.logId || "" });
+      else if (row.stageConfirmed && STAGE_INDEX[observed]) {
+        evidence.push({ date: row.date, key: observed, source: "confirmed", kind: "manual-stage-observation", recordId: row.logId || "", correctionReason: row.correctionReason || "" });
+      }
       else if (row.tillerCount !== undefined && String(row.tillerCount) !== "") evidence.push({ date: row.date, key: "peakTillering", source: "measured", kind: "tiller", recordId: row.logId || "" });
     });
-    works.filter((row) => /出穂/.test(String(row.workName || "")))
-      .forEach((row) => evidence.push({ date: row.date, key: "heading", source: "work", kind: "heading", recordId: row.workId || "" }));
     works.filter((row) => /稲刈り|収穫/.test(String(row.workName || "")))
       .forEach((row) => evidence.push({ date: row.date, key: "maturity", source: "work", kind: "harvest", recordId: row.workId || "" }));
     const explicitCorrection = evidence.filter((item) => item.source === "confirmed" && item.correctionReason)
@@ -453,7 +451,7 @@
     const panicleHasLaterConfirmation = latestPanicleEvidence && evidence.some((item) =>
       item !== latestPanicleEvidence
       && String(item.date || "") >= String(latestPanicleEvidence.date || "")
-      && ["confirmed", "heading", "harvest"].includes(item.kind)
+      && ["manual-stage-observation", "heading", "harvest"].includes(item.kind)
     );
     // A panicle-length measurement remains the confirmed field stage until a
     // later explicit confirmation, heading observation, or harvest supersedes it.

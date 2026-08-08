@@ -218,7 +218,7 @@
       .filter((log) => String(log.date || "").startsWith(`${year}-`))
       .slice()
       .sort((a, b) => String(a.date).localeCompare(String(b.date)))
-      .find((log) => log.headingObserved || (log.stageConfirmed && log.observedStage === "heading"))?.date || "";
+      .find((log) => log.headingObserved)?.date || "";
   }
 
   function renderPaniclePanel() {
@@ -591,6 +591,7 @@
         headingObserved: true,
         observedStage: "heading",
         stageConfirmed: true,
+        stageEvidenceType: "heading-observation",
         recordedBy: U.$("gRecordedBy") ? U.$("gRecordedBy").value : "",
         memo: U.$("gMemo").value || "出穂確認"
       }));
@@ -682,6 +683,7 @@
         headingObserved,
         observedStage: inferredStage,
         stageConfirmed: headingObserved || Boolean(U.$("gStageConfirmed") && U.$("gStageConfirmed").checked),
+        stageEvidenceType: headingObserved ? "heading-observation" : (U.number(U.$("gPanicleLengthMm") && U.$("gPanicleLengthMm").value, 0) > 0 ? "panicle-measurement" : (Boolean(U.$("gStageConfirmed") && U.$("gStageConfirmed").checked) ? "manual-stage-observation" : "")),
         measurementCount: U.$("gMeasurementCount") ? U.$("gMeasurementCount").value : "",
         measurementMethod: U.$("gMeasurementMethod") ? U.$("gMeasurementMethod").value : "",
         stageEvidenceId: existing && existing.stageEvidenceId || "",
