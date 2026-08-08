@@ -1924,7 +1924,9 @@
       const opened = RiceOS.navigation.openRecord(kind, id, {
         fieldId: selectedFieldId,
         originScreen: "annual",
-        tab: selectedTab
+        tab: selectedTab,
+        returnToAnnualFieldId: selectedFieldId,
+        returnToAnnualTab: selectedTab
       });
       if (opened) return;
     }
@@ -2116,15 +2118,8 @@
 
   function switchFieldWithinAnnual(fieldId) {
     if (!fieldId || fieldId === selectedFieldId || !state.field(fieldId)) return false;
-    // Keep a real review route for the newly selected field. This preserves a
-    // sensible return chain: edit B -> review B -> review A -> field A.
-    if (RiceOS.navigation && RiceOS.navigation.openField) {
-      const opened = RiceOS.navigation.openField(fieldId, {
-        destination: "annual-history",
-        tab: "karte"
-      });
-      if (opened) return true;
-    }
+    // The selector is a review filter, not a new navigation destination.
+    // Editing still receives the selected field as its explicit return target.
     selectedFieldId = fieldId;
     selectedTab = "karte";
     seasonNoteDraft = null;
@@ -2159,7 +2154,13 @@
     U.$("annualTimeline").addEventListener("click", (event) => {
       const open = event.target.closest("[data-annual-open-field]");
       if (open) {
-        if (RiceOS.navigation && RiceOS.navigation.openField && RiceOS.navigation.openField(open.dataset.annualOpenField, { originScreen: "annual" })) return;
+        // A card on the review top opens the same review detail, never the
+        // fixed-information field screen. The label and destination match.
+        if (RiceOS.navigation && RiceOS.navigation.openField && RiceOS.navigation.openField(open.dataset.annualOpenField, {
+          originScreen: "annual",
+          destination: "annual-history",
+          tab: "karte"
+        })) return;
         selectedFieldId = open.dataset.annualOpenField;
         selectedTab = "karte";
         waterEditDraft = null;
@@ -2278,7 +2279,9 @@
           const record = rows.find((row) => String(kind === "dry" ? row.dryPeriodId : row.irrigationId) === String(waterEdit.dataset.id));
           if (record && RiceOS.recordActions && RiceOS.recordActions.edit && RiceOS.recordActions.edit(kind, record, {
             originScreen: "annual",
-            tab: "water"
+            tab: "water",
+            returnToAnnualFieldId: selectedFieldId,
+            returnToAnnualTab: "water"
           })) return;
           openWaterEditor(kind, waterEdit.dataset.id);
         }

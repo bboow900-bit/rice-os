@@ -43,6 +43,8 @@
         fieldId,
         originScreen: routeOptions.originScreen || (RiceOS.app && RiceOS.app.currentScreen ? RiceOS.app.currentScreen() : "calendar"),
         tab: routeOptions.tab || "",
+        returnToAnnualFieldId: routeOptions.returnToAnnualFieldId || "",
+        returnToAnnualTab: routeOptions.returnToAnnualTab || "",
         replace: Boolean(routeOptions.replace)
       });
       if (opened) return true;

@@ -13,6 +13,7 @@ const state = read("assets/js/core/state.js");
 const agro = read("assets/js/core/agro.js");
 const growth = read("assets/js/screens/growth.js");
 const annual = read("assets/js/screens/annual.js");
+const home = read("assets/js/screens/home.js");
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -30,5 +31,12 @@ assert(/find\(\(log\) => log\.headingObserved\)/.test(growth), "The growth scree
 assert(/function isObservedHeading\(row\) \{\s*return Boolean\(row && row\.headingObserved\);/.test(annual), "Annual history must not call a manual stage selection an observed heading");
 assert(/label: "現場ステージ"/.test(annual) && /category: fact\.kind === "manual-stage" \? "現場判定" : "生育実測"/.test(annual), "Annual history must visibly distinguish field judgement from measurement");
 assert(!/headingObserved \|\| log\.stageConfirmed && log\.observedStage === "heading"/.test(state), "Deleting a heading record must not promote a manual heading stage into a factual observation");
+
+assert(/evidenceKind: usePrediction \? "prediction" : displayedEvidence && displayedEvidence\.kind \|\| ""/.test(agro), "Stage service must expose display evidence kind without changing records");
+assert(/function homeStageEvidenceLabel\(stage\)/.test(home), "Home must translate stage evidence into an explicit display label");
+assert(/manual-stage-observation"\) return "現地判断"/.test(home), "Manual field stage must not be displayed as confirmed measurement on Home");
+assert(/\["panicle", "tiller"\]\.includes\(stage\.evidenceKind\)\) return "実測"/.test(home), "Measured growth records must remain visibly measured on Home");
+assert(/\["dry", "intermittent", "saturated", "deep", "drain"\]/.test(home), "Home water history must include saturated management");
+assert(/"saturated", "deepWater"/.test(home), "Active saturated management must be counted in Home status cards");
 
 console.log("PASS growth evidence semantics");

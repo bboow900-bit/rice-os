@@ -9,6 +9,8 @@ const root = path.resolve(__dirname, "..");
 const annual = fs.readFileSync(path.join(root, "assets/js/screens/annual.js"), "utf8");
 const css = fs.readFileSync(path.join(root, "assets/css/app.css"), "utf8");
 const app = fs.readFileSync(path.join(root, "assets/js/app.js"), "utf8");
+const recordActions = fs.readFileSync(path.join(root, "assets/js/core/record-actions.js"), "utf8");
+const switchSection = annual.match(/function switchFieldWithinAnnual\(fieldId\) \{[\s\S]*?\n  \}\n\n  function resetNavigation/)?.[0] || "";
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -79,12 +81,16 @@ assert(
   "Switching annual fields must clear transient detail and action state"
 );
 assert(
-  /RiceOS\.navigation\.openField\(fieldId, \{[\s\S]*destination: "annual-history"/.test(annual),
-  "Switching fields inside review must create a return route for the selected field"
+  /The selector is a review filter, not a new navigation destination/.test(switchSection) && !/RiceOS\.navigation\.openField/.test(switchSection),
+  "Switching fields inside review must change the visible review without adding a route"
 );
 assert(
-  /originScreen: "annual",[\s\S]*tab: selectedTab\s*\n\s*\}\);/.test(annual),
-  "Editing a review record must push a return route instead of replacing it"
+  /open\.dataset\.annualOpenField, \{[\s\S]*destination: "annual-history"[\s\S]*tab: "karte"/.test(annual),
+  "Review-top field cards must open the review detail rather than the field settings screen"
+);
+assert(
+  /returnToAnnualFieldId: selectedFieldId,[\s\S]*returnToAnnualTab: selectedTab/.test(annual) && /returnToAnnualFieldId: routeOptions\.returnToAnnualFieldId/.test(recordActions),
+  "Editing a selected review field must carry an explicit return target"
 );
 assert(
   /\.annual-field-switcher \{[\s\S]*position: sticky/.test(css),

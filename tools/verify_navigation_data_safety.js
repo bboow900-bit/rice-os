@@ -158,11 +158,18 @@ assert(memory.get(S.STORE_KEY) === rawBeforeSelectors, "Navigation selectors wro
 // The application router is deliberately presentation-only. A navigation
 // change must not introduce direct record mutation APIs into app.js.
 const appSource = fs.readFileSync(path.join(root, "assets/js/app.js"), "utf8");
+const bottomSheetSource = fs.readFileSync(path.join(root, "assets/js/screens/bottom-sheet.js"), "utf8");
 const navStart = appSource.indexOf("function bindNav()");
 const navEnd = appSource.indexOf("function bindGlobalActions()", navStart);
 const navSource = appSource.slice(navStart, navEnd);
 assert(navStart >= 0 && navEnd > navStart, "Could not isolate the bottom-navigation handler");
 assert(!/RiceOS\.state\.(save|replace|mutate|update|delete|add)[A-Za-z]*/.test(navSource), "Bottom navigation directly calls a persisted-record mutation API");
+assert(/function isOpen\(\)/.test(bottomSheetSource) && /RiceOS\.bottomSheet = \{ open, close, isOpen/.test(bottomSheetSource), "Record sheet must expose its temporary open state");
+assert(/const sheetOpen = Boolean\(RiceOS\.bottomSheet/.test(appSource) && /RiceOS\.bottomSheet\.close\(\);[\s\S]*return;/.test(appSource), "Shared back must close the record sheet before any old route");
+assert(/function openInput\(screenId, originScreen\)/.test(appSource) && /inputOriginScreen = originScreen \|\| activeScreen \|\| "home"/.test(appSource), "A new record input must remember its source tab");
+assert(/if \(inputOriginScreen\) \{[\s\S]*show\(origin, \{ skipHistory: true \}\);/.test(appSource), "Shared back must return a cancelled input to its source tab");
+assert(/RiceOS\.app\.openInput\(screen, originScreen\)/.test(bottomSheetSource), "Date-sheet record entry must use the source-aware input route");
+assert(/button\.dataset\.screen === "field-work"[\s\S]*RiceOS\.navigation\.clear\(\);[\s\S]*RiceOS\.bottomSheet\.open\(U\.today\(\)\)/.test(navSource), "Opening record input from bottom navigation must clear stale detail routes before the sheet opens");
 
 console.log("PASS navigation data safety");
 console.log(JSON.stringify({

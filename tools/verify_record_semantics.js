@@ -84,6 +84,15 @@ const saturated = state.resolvedWaterPeriodsFor(fieldId, { year: 2026, includePl
   .find((row) => row.directId === "saturated-water-period");
 assert(saturated && saturated.kind === "saturated" && saturated.label === "\u98fd\u6c34\u7ba1\u7406", "Saturated-water records must remain their own factual water period");
 
+state.saveIrrigation({
+  irrigationId: "saturated-water-active",
+  fieldId,
+  method: "\u98fd\u6c34\u7ba1\u7406",
+  startDate: "2026-07-16"
+});
+const activeSaturatedStatus = global.RiceOS.agro.managementStatus(state.fields().find((field) => field.fieldId === fieldId), "2026-07-20");
+assert(activeSaturatedStatus.key === "saturated" && /\u98fd\u6c34\u7ba1\u7406\u4e2d/.test(String(activeSaturatedStatus.label || "")), "An active saturated-water record must be available to Home as factual active management");
+
 state.saveFieldWork({
   workId: "fertilizer-work",
   date: "2026-07-10",

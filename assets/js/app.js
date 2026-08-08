@@ -5,6 +5,7 @@
   const U = RiceOS.utils;
 
   let activeScreen = "home";
+  let inputOriginScreen = "";
   let bound = false;
   const initialScreens = new Set([
     "home",
@@ -52,7 +53,8 @@
     if (!button) return;
     const mod = screenModule(activeScreen);
     const hasRoute = Boolean(RiceOS.navigation && RiceOS.navigation.current && RiceOS.navigation.current());
-    const canGoBack = hasRoute || Boolean(mod && typeof mod.canHandleBack === "function" && mod.canHandleBack());
+    const sheetOpen = Boolean(RiceOS.bottomSheet && RiceOS.bottomSheet.isOpen && RiceOS.bottomSheet.isOpen());
+    const canGoBack = sheetOpen || hasRoute || Boolean(inputOriginScreen) || Boolean(mod && typeof mod.canHandleBack === "function" && mod.canHandleBack());
     button.classList.toggle("hidden", !canGoBack);
   }
 
@@ -75,6 +77,13 @@
   }
 
   function back() {
+    // The record sheet is a temporary layer over its origin screen. Close it
+    // first so Home/Calendar state and any selected calendar date remain.
+    if (RiceOS.bottomSheet && RiceOS.bottomSheet.isOpen && RiceOS.bottomSheet.isOpen()) {
+      RiceOS.bottomSheet.close();
+      updateBackButton();
+      return;
+    }
     // Close temporary review layers before walking back through selected fields.
     if (activeScreen === "annual" && RiceOS.screens.annual && RiceOS.screens.annual.hasTransientBackState && RiceOS.screens.annual.hasTransientBackState()) {
       RiceOS.screens.annual.handleBack();
@@ -83,6 +92,14 @@
     }
     if (RiceOS.navigation && RiceOS.navigation.back && RiceOS.navigation.back()) {
       updateBackButton();
+      return;
+    }
+    // New records opened from the date sheet are not routes yet. Keep their
+    // source tab so cancelling an input never strands the user on a form.
+    if (inputOriginScreen) {
+      const origin = inputOriginScreen;
+      inputOriginScreen = "";
+      show(origin, { skipHistory: true });
       return;
     }
     const mod = screenModule(activeScreen);
@@ -104,6 +121,17 @@
         status.dataset.saveState = "idle";
       }, 1800);
     }
+  }
+
+  function openInput(screenId, originScreen) {
+    inputOriginScreen = originScreen || activeScreen || "home";
+    show(screenId, { skipHistory: true });
+    updateBackButton();
+  }
+
+  function clearInputOrigin() {
+    inputOriginScreen = "";
+    updateBackButton();
   }
 
   function bindScreens() {
@@ -131,10 +159,15 @@
     });
     U.$$(".nav-item").forEach((button) => {
       button.addEventListener("click", () => {
+        clearInputOrigin();
         if (activeScreen === "annual" && RiceOS.screens.annual && RiceOS.screens.annual.resetNavigation) {
           RiceOS.screens.annual.resetNavigation();
         }
         if (button.dataset.screen === "field-work" && RiceOS.bottomSheet) {
+          // Record input starts a new task. Do not leave an old field-detail
+          // route behind the temporary sheet, or the next back press can jump
+          // to an unrelated screen after the sheet is dismissed.
+          if (RiceOS.navigation && RiceOS.navigation.clear) RiceOS.navigation.clear();
           window.scrollTo({ top: 0, behavior: "smooth" });
           RiceOS.bottomSheet.open(U.today());
           return;
@@ -298,9 +331,16 @@
   }
 
   function routeBack(destination, leaving) {
+    const options = leaving && leaving.options || {};
+    // A review field switch is a filter, so an edited B record returns to B
+    // even when the underlying navigation route originated from field A.
+    if (leaving && leaving.type === "record" && options.originScreen === "annual" && options.returnToAnnualFieldId && RiceOS.screens.annual && RiceOS.screens.annual.openField) {
+      show("annual", { skipHistory: true });
+      RiceOS.screens.annual.openField(options.returnToAnnualFieldId, options.returnToAnnualTab || options.tab || "karte");
+      return true;
+    }
     if (destination && destination.type === "field") return routeToField(destination);
     if (destination && destination.type === "record") return routeToRecord(destination);
-    const options = leaving && leaving.options || {};
     // Annual history can be opened from a field detail even when that detail
     // was reached without a navigation-stack entry. Keep the return target
     // deterministic instead of reopening the annual history view.
@@ -379,7 +419,9 @@
   RiceOS.app = {
     init,
     show,
+    openInput,
     back,
+    clearInputOrigin,
     syncBackButton: updateBackButton,
     currentScreen: () => activeScreen,
     renderAll,

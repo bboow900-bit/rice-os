@@ -498,6 +498,7 @@
       dap,
       image: current ? current.image : 1,
       evidenceSource: displayedEvidence && displayedEvidence.source || "",
+      evidenceKind: usePrediction ? "prediction" : displayedEvidence && displayedEvidence.kind || "",
       evidenceRecordId: displayedEvidence && displayedEvidence.recordId || "",
       certainty: usePrediction ? "推定" : (current ? "確定" : "記録待ち"),
       basis: usePrediction && prediction ? `${prediction.basis}・田植日` : (displayedEvidence ? "現地記録" : ""),

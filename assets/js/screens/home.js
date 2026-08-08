@@ -642,6 +642,18 @@
     `;
   }
 
+  // The stage service keeps facts and estimates separate. Home only translates
+  // that evidence into a short, human-readable label; it never changes a stage.
+  function homeStageEvidenceLabel(stage) {
+    if (!stage || !stage.current) return "記録待ち";
+    if (stage.certainty === "推定" || stage.evidenceKind === "prediction") return "推定";
+    if (stage.evidenceKind === "manual-stage-observation") return "現地判断";
+    if (stage.evidenceKind === "heading") return "現地観察";
+    if (["panicle", "tiller"].includes(stage.evidenceKind)) return "実測";
+    if (stage.evidenceKind === "harvest" || stage.evidenceSource === "work") return "作業記録";
+    return stage.certainty || "記録待ち";
+  }
+
   function annualStageIndex(stage) {
     const key = String(stage && stage.current && stage.current.key || "");
     if (["establishment", "planting"].includes(key)) return 0;
@@ -743,7 +755,7 @@
       <section class="home-linked-flow" aria-label="生育と水管理の今期工程">
         <div class="home-linked-flow-head"><span>今期の成長マップ</span><small>縦線は今日 / 点は実績、白点は推定</small></div>
         ${renderAnnualStageRuler(stage)}
-        ${renderLinkedLane("growth", "生育", stage.current ? stage.current.label : "記録待ち", stage.certainty || "記録待ち", growthMarkers, planting, flowEnd, todayPercent)}
+        ${renderLinkedLane("growth", "生育", stage.current ? stage.current.label : "記録待ち", homeStageEvidenceLabel(stage), growthMarkers, planting, flowEnd, todayPercent)}
         ${renderFlowChips(growthMarkers)}
         ${renderLinkedLane("water", "水管理", management.label || "記録待ち", management.evidence || "記録待ち", waterMarkers, planting, flowEnd, todayPercent)}
         ${renderFlowChips(waterMarkers)}
@@ -783,10 +795,10 @@
     const panicleRecorded = focus && focus.mode === "panicle";
     const stageText = focus && focus.active
       ? focus.phase
-      : (stage.current ? `${stage.current.label}（${stage.certainty || "推定"}）` : "生育記録待ち");
+      : (stage.current ? stage.current.label : "生育記録待ち");
     const stageCertainty = focus && focus.active
       ? (focus.mode === "panicle" ? "実測" : (focus.certainty || "推定"))
-      : "";
+      : (stage.current ? homeStageEvidenceLabel(stage) : "");
     const headingText = headingRecorded
       ? focus.anchorLabel
       : (panicleRecorded && focus.observation ? homeHeadingCompactText(focus.observation) : "参考: 幼穂形成期の目安");
@@ -829,7 +841,7 @@
   }
 
   function waterManagementHistory(fieldId, year, throughDate) {
-    const rows = ["dry", "intermittent", "deep", "drain"].flatMap((kind) => waterRows(resolvedWaterPeriods(fieldId, year, throughDate), kind)
+    const rows = ["dry", "intermittent", "saturated", "deep", "drain"].flatMap((kind) => waterRows(resolvedWaterPeriods(fieldId, year, throughDate), kind)
       .map((row) => ({ ...row, kind })))
       .filter((row) => actualPeriodStart(row));
     return rows.sort((a, b) => String(actualPeriodStart(a)).localeCompare(String(actualPeriodStart(b))));
@@ -838,6 +850,7 @@
   function waterKindLabel(kind, row) {
     if (kind === "dry") return "中干し";
     if (kind === "intermittent") return "間断灌水";
+    if (kind === "saturated") return "飽水管理";
     if (kind === "deep") return "深水管理";
     if (kind === "drain") return "稲刈り前の落水";
     return row && row.method || "水管理";
@@ -944,7 +957,7 @@
     const focus = criticalWaterWindowFor(field, dateText);
     const stageLabel = focus.active
       ? `${focus.phase}（${focus.certainty || "推定"}）`
-      : (stage.current ? `${stage.current.label}（${stage.certainty || "推定"}）` : "生育記録待ち");
+      : (stage.current ? `${stage.current.label}（${homeStageEvidenceLabel(stage)}）` : "生育記録待ち");
     return `
       <div class="home-management-head"><b>${U.escapeHTML(stageLabel)}の管理記録</b><small>${U.escapeHTML(focus.active ? `${focus.anchorLabel} / ${focus.observation}` : "今年実績を優先 / 比較は前年実績")}</small></div>
       <div class="home-management-row water"><span class="home-management-icon">水</span><b>${U.escapeHTML(currentWater ? waterKindLabel(currentWater.kind, currentWater) : "水管理")}</b><span>${U.escapeHTML(waterPeriodText(currentWater, dateText))}</span><small>${U.escapeHTML(`${waterReference.previousText}・${waterReference.comparison}`)}</small></div>
@@ -961,7 +974,7 @@
   }
 
   function activeWaterCount(dateText) {
-    const activeKeys = new Set(["drying", "intermittent", "deepWater", "draining", "overlap"]);
+    const activeKeys = new Set(["drying", "intermittent", "saturated", "deepWater", "draining", "overlap"]);
     return state.activeFields().filter((field) => activeKeys.has(String(waterManagementForField(field, dateText).key || ""))).length;
   }
 
@@ -1496,6 +1509,7 @@
 
   function latestWaterPeriod(fieldId, year, throughDate) {
     return waterRows(resolvedWaterPeriods(fieldId, year, throughDate), "intermittent")
+      .concat(waterRows(resolvedWaterPeriods(fieldId, year, throughDate), "saturated"))
       .concat(waterRows(resolvedWaterPeriods(fieldId, year, throughDate), "deep"))
       .concat(waterRows(resolvedWaterPeriods(fieldId, year, throughDate), "drain"))
       .filter((row) => row.startDate)
@@ -1522,7 +1536,7 @@
     if (latestIsIrrigation) {
       const irrigationEnd = irrigation.actualEndDate || irrigation.endDate || "";
       const irrigationState = irrigation.actualEndDate ? "完了" : (irrigation.periodStatus || irrigation.status || "実施中");
-      const key = /深水/.test(String(irrigation.method || "")) ? "deep" : (/落水/.test(String(irrigation.method || "")) ? "drainage" : "intermittent");
+      const key = /深水/.test(String(irrigation.method || "")) ? "deep" : (/飽水/.test(String(irrigation.method || "")) ? "saturated" : (/落水/.test(String(irrigation.method || "")) ? "drainage" : "intermittent"));
       return { key, label: irrigation.method || "水管理", value: irrigationState, percent: irrigation.actualEndDate ? 100 : 50, detail: irrigationEnd ? `期間 ${U.fd(irrigation.startDate)} - ${U.fd(irrigationEnd)}` : `開始 ${U.fd(irrigation.startDate)} / 終了未登録` };
     }
     if (dryIsCurrent) {

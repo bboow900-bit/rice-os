@@ -646,7 +646,7 @@
       }
       const waterEvent = state.waterEventForWorkName && state.waterEventForWorkName(U.$("fwName").value);
       if (waterEvent) {
-        RiceOS.app.show("irrigation", { skipHistory: true });
+        RiceOS.app.show("irrigation", { skipHistory: true, preserveInputOrigin: true });
         RiceOS.screens.irrigation.prefillFields(U.$("fwDate").value || U.today(), ids, waterEvent.kind);
         U.toast("水管理として入力します。開始または終了を記録してください。");
         return;

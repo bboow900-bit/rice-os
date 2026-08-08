@@ -85,12 +85,19 @@
     const sheet = U.$("dateSheet");
     sheet.classList.remove("hidden");
     sheet.setAttribute("aria-hidden", "false");
+    if (RiceOS.app && RiceOS.app.syncBackButton) RiceOS.app.syncBackButton();
   }
 
   function close() {
     const sheet = U.$("dateSheet");
     sheet.classList.add("hidden");
     sheet.setAttribute("aria-hidden", "true");
+    if (RiceOS.app && RiceOS.app.syncBackButton) RiceOS.app.syncBackButton();
+  }
+
+  function isOpen() {
+    const sheet = U.$("dateSheet");
+    return Boolean(sheet && !sheet.classList.contains("hidden"));
   }
 
   function firstFieldId() {
@@ -304,9 +311,11 @@
       U.toast("記録する圃場またはグループを選択してください");
       return;
     }
+    const originScreen = RiceOS.app && RiceOS.app.currentScreen ? RiceOS.app.currentScreen() : "home";
     close();
     if (RiceOS.navigation && RiceOS.navigation.clear) RiceOS.navigation.clear();
-    RiceOS.app.show(screen);
+    if (RiceOS.app && RiceOS.app.openInput) RiceOS.app.openInput(screen, originScreen);
+    else RiceOS.app.show(screen);
     if (typeof callback === "function") callback(fieldIds);
   }
 
@@ -326,19 +335,23 @@
     const target = scheduleRecordKind(record);
     const fieldIds = (record.fieldIds || []).filter((id) => state.field(id));
     if (!fieldIds.length) return;
+    const originScreen = RiceOS.app && RiceOS.app.currentScreen ? RiceOS.app.currentScreen() : "home";
     close();
     if (RiceOS.navigation && RiceOS.navigation.clear) RiceOS.navigation.clear();
     if (target.kind === "water") {
-      RiceOS.app.show("irrigation");
+      if (RiceOS.app && RiceOS.app.openInput) RiceOS.app.openInput("irrigation", originScreen);
+      else RiceOS.app.show("irrigation");
       RiceOS.screens.irrigation.prefillSchedule(record);
       return;
     }
     if (target.kind === "stage") {
-      RiceOS.app.show("growth");
+      if (RiceOS.app && RiceOS.app.openInput) RiceOS.app.openInput("growth", originScreen);
+      else RiceOS.app.show("growth");
       RiceOS.screens.growth.prefillStageRecord(U.today(), fieldIds);
       return;
     }
-    RiceOS.app.show("field-work");
+    if (RiceOS.app && RiceOS.app.openInput) RiceOS.app.openInput("field-work", originScreen);
+    else RiceOS.app.show("field-work");
     RiceOS.screens.fieldWork.prefillSchedule(record);
   }
 
@@ -436,7 +449,7 @@
     }
   }
 
-  RiceOS.bottomSheet = { open, close, render, openScheduleCompletion };
+  RiceOS.bottomSheet = { open, close, isOpen, render, openScheduleCompletion };
   RiceOS.screens = RiceOS.screens || {};
   RiceOS.screens.bottomSheet = { bind };
 })();
