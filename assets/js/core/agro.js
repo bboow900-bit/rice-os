@@ -316,7 +316,15 @@
       const current = active[0];
       const labels = { dry: "中干し中", intermittent: "間断灌水中", saturated: "飽水管理中", deep: "深水管理中", drain: "落水中" };
       const keys = { dry: "drying", intermittent: "intermittent", saturated: "saturated", deep: "deepWater", drain: "draining" };
-      return { key: keys[current.kind] || current.kind, label: labels[current.kind] || `${current.label}中`, tone: current.kind === "dry" ? "warn" : "water", date: current.startDate || "" };
+      const movements = Array.isArray(current.raw && current.raw.waterMovements) ? current.raw.waterMovements : [];
+      const currentMovement = movements.filter((item) => item && item.startDate && !item.endDate)
+        .sort((a, b) => String(b.startDate).localeCompare(String(a.startDate)))[0] || null;
+      const movementLabel = currentMovement && current.kind === "intermittent"
+        ? (currentMovement.phase === "drain" ? "間断灌水・落水中" : "間断灌水・入水中")
+        : currentMovement && current.kind === "saturated"
+          ? (currentMovement.phase === "drain" ? "飽水管理・自然落水中" : "飽水管理・給水中")
+          : labels[current.kind] || `${current.label}中`;
+      return { key: keys[current.kind] || current.kind, label: movementLabel, tone: current.kind === "dry" ? "warn" : "water", date: currentMovement?.startDate || current.startDate || "" };
     }
     const completed = factual.filter((row) => hasValidEnd(row) && row.actualEndDate <= targetDate)
       .slice().sort((a, b) => String(b.actualEndDate || "").localeCompare(String(a.actualEndDate || "")))[0] || null;
@@ -458,9 +466,30 @@
     const displayedEvidence = latestPanicleEvidence && !panicleHasLaterConfirmation && !explicitCorrection
       ? latestPanicleEvidence
       : latestEvidence;
-    const historicalHeading = !headingDate ? estimatedHeading(field, planting, year) : null;
-    const headingReference = headingDate ? { date: headingDate, basis: "今年の出穂日" }
-      : (historicalHeading ? { date: historicalHeading.date, basis: historicalHeading.basis } : null);
+    // Keep the factual field stage and the calendar outlook as two separate
+    // layers. A grower's stage selection must remain readable on Home even
+    // when an estimate has moved ahead on the calendar.
+    const latestManualEvidence = evidence.filter((item) => item.kind === "manual-stage-observation").at(-1) || null;
+    const latestMeasuredEvidence = evidence.filter((item) => ["heading", "panicle", "tiller", "harvest"].includes(item.kind)).at(-1) || null;
+    const latestFieldEvidence = latestManualEvidence && (!latestMeasuredEvidence || String(latestManualEvidence.date || "") >= String(latestMeasuredEvidence.date || ""))
+      ? latestManualEvidence
+      : (latestMeasuredEvidence || evidence[evidence.length - 1] || null);
+    const fieldStage = stageFromKey(latestFieldEvidence && latestFieldEvidence.key || "");
+    const fieldStageEvidence = latestFieldEvidence && latestFieldEvidence.kind === "manual-stage-observation"
+      ? "現地判断"
+      : latestFieldEvidence && latestFieldEvidence.kind === "heading"
+        ? "現地観察"
+        : latestFieldEvidence && ["panicle", "tiller"].includes(latestFieldEvidence.kind)
+          ? "実測"
+          : latestFieldEvidence && latestFieldEvidence.kind === "harvest"
+            ? "作業記録"
+            : latestFieldEvidence ? "記録" : "記録待ち";
+    // An explicit heading observation remains a factual anchor even when it
+    // falls outside the usual planting-to-heading range.
+    const factualHeadingReference = recordedHeadingDate ? { date: recordedHeadingDate, basis: "今年の出穂日" } : null;
+    const historicalHeading = !factualHeadingReference && !headingDate ? estimatedHeading(field, planting, year) : null;
+    const headingReference = factualHeadingReference || (headingDate ? { date: headingDate, basis: "今年の出穂日" }
+      : (historicalHeading ? { date: historicalHeading.date, basis: historicalHeading.basis } : null));
     const prediction = headingReference ? {
       key: estimatedStageKey(U.daysBetween(headingReference.date, date)),
       date: headingReference.date,
@@ -503,6 +532,23 @@
       certainty: usePrediction ? "推定" : (current ? "確定" : "記録待ち"),
       basis: usePrediction && prediction ? `${prediction.basis}・田植日` : (displayedEvidence ? "現地記録" : ""),
       predictedHeadingDate: headingReference && headingReference.date || historicalHeading && historicalHeading.date || "",
+      // Read-only layers for compact dashboards. They intentionally reuse
+      // existing records and never write a stage back to growthLogs.
+      fieldStage: {
+        index: fieldStage.index,
+        current: fieldStage.current,
+        evidence: fieldStageEvidence,
+        evidenceKind: latestFieldEvidence && latestFieldEvidence.kind || "",
+        evidenceDate: latestFieldEvidence && latestFieldEvidence.date || "",
+        recordId: latestFieldEvidence && latestFieldEvidence.recordId || ""
+      },
+      outlookStage: {
+        index: predicted.index,
+        current: predicted.current,
+        basis: prediction && prediction.basis || "",
+        anchorDate: prediction && prediction.date || "",
+        certainty: prediction ? "推定" : "記録待ち"
+      },
       management: managementStatus(field, date),
       suggested
     };

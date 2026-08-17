@@ -125,6 +125,8 @@
     schedules: "scheduleId",
     dryPeriods: "dryPeriodId",
     irrigations: "irrigationId",
+    machines: "machineId",
+    maintenanceRecords: "maintenanceId",
     confirmationCandidates: "candidateId"
   };
 
@@ -185,6 +187,12 @@
     });
     const rawBroken = rawBrokenFieldIds(parsed);
     if (rawBroken.length) warnings.push(`元JSONに参照先のない圃場IDが${rawBroken.length}件あります。復元前に内容を確認してください。`);
+    const machineIds = new Set((Array.isArray(parsed.machines) ? parsed.machines : []).map((row) => String(row && (row.machineId || row.id) || "")).filter(Boolean));
+    const brokenMachineIds = [
+      ...(Array.isArray(parsed.fieldWorks) ? parsed.fieldWorks.map((row) => row && row.machineId) : []),
+      ...(Array.isArray(parsed.maintenanceRecords) ? parsed.maintenanceRecords.map((row) => row && row.machineId) : [])
+    ].map(String).filter((id) => id && !machineIds.has(id));
+    if (brokenMachineIds.length) warnings.push(`元JSONに参照先のない機械IDが${new Set(brokenMachineIds).size}件あります。機械台帳で照合してください。`);
     let normalized = null;
     try {
       normalized = S.normalize({ ...parsed, importedFrom: "json" });
@@ -320,6 +328,8 @@
       irrigations: (d.irrigations || []).length,
       schedules: (d.schedules || []).length,
       otherWorks: d.otherWorks.length,
+      machines: (d.machines || []).length,
+      maintenanceRecords: (d.maintenanceRecords || []).length,
       materials: d.materials.length,
       varietyResults: d.varietyResults.length,
       updatedAt: d.meta && d.meta.updatedAt || "",

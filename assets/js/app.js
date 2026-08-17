@@ -14,6 +14,7 @@
     "outlook",
     "notices",
     "data",
+    "machines",
     "calendar",
     "field-work",
     "materials",
@@ -65,8 +66,9 @@
     U.$$(".screen").forEach((section) => {
       section.classList.toggle("active", section.id === `screen-${screenId}`);
     });
+    const navScreen = screenId === "machines" ? "data" : screenId;
     U.$$(".nav-item").forEach((button) => {
-      button.classList.toggle("active", button.dataset.screen === screenId);
+      button.classList.toggle("active", button.dataset.screen === navScreen);
     });
     const section = U.$(`screen-${screenId}`);
     if (section) document.title = `${section.dataset.title || "稲作カルテ"} - 稲作カルテ`;
@@ -181,9 +183,8 @@
         }
         // Outlook detail is an in-screen view, not a navigation-stack route.
         // Clear it explicitly before moving to another independent tab.
-        if (activeScreen === "outlook" && RiceOS.screens.outlook && RiceOS.screens.outlook.resetNavigation) {
-          RiceOS.screens.outlook.resetNavigation();
-        }
+        if (activeScreen === "outlook" && RiceOS.screens.outlook && RiceOS.screens.outlook.resetNavigation) RiceOS.screens.outlook.resetNavigation();
+        if (activeScreen === "machines" && RiceOS.screens.machines && RiceOS.screens.machines.resetNavigation) RiceOS.screens.machines.resetNavigation();
         if (RiceOS.navigation && RiceOS.navigation.clear) RiceOS.navigation.clear();
         show(button.dataset.screen, { skipHistory: true });
       });
@@ -254,6 +255,7 @@
       }
       event.preventDefault();
       show(target);
+      if (target === "machines" && RiceOS.screens.machines && RiceOS.screens.machines.enter) RiceOS.screens.machines.enter("data");
       if (target === "irrigation" && jump.dataset.waterType && RiceOS.screens.irrigation) {
         const firstField = RiceOS.state.activeFields()[0];
         RiceOS.screens.irrigation.prefillDate(U.today(), firstField && firstField.fieldId, jump.dataset.waterType);
@@ -281,7 +283,7 @@
   }
 
   function resetNestedScreens() {
-    ["annual", "fields", "outlook"].forEach((screenId) => {
+    ["annual", "fields", "outlook", "machines"].forEach((screenId) => {
       const mod = screenModule(screenId);
       if (mod && typeof mod.resetNavigation === "function") mod.resetNavigation();
     });

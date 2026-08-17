@@ -33,7 +33,12 @@ assert(/label: "現場ステージ"/.test(annual) && /category: fact\.kind === "
 assert(!/headingObserved \|\| log\.stageConfirmed && log\.observedStage === "heading"/.test(state), "Deleting a heading record must not promote a manual heading stage into a factual observation");
 
 assert(/evidenceKind: usePrediction \? "prediction" : displayedEvidence && displayedEvidence\.kind \|\| ""/.test(agro), "Stage service must expose display evidence kind without changing records");
+assert(/fieldStage:\s*\{[\s\S]*outlookStage:\s*\{/.test(agro), "Stage service must expose separate factual and forecast layers for Home");
+assert(/latestManualEvidence[\s\S]*latestMeasuredEvidence[\s\S]*latestFieldEvidence/.test(agro), "Manual field-stage judgement must remain separate from measured evidence");
 assert(/function homeStageEvidenceLabel\(stage\)/.test(home), "Home must translate stage evidence into an explicit display label");
+assert(/function homeStageOutlook\(field, stage, focus, dateText\)/.test(home), "Home must render the forecast layer separately from the field stage");
+assert(/function homeStageHeat\(field, dateText\)/.test(home), "Home must render accumulated temperature from read-only weather data");
+assert(/data-home-stage-card/.test(home), "Home heat hydration must refresh only its own field card");
 assert(/manual-stage-observation"\) return "現地判断"/.test(home), "Manual field stage must not be displayed as confirmed measurement on Home");
 assert(/\["panicle", "tiller"\]\.includes\(stage\.evidenceKind\)\) return "実測"/.test(home), "Measured growth records must remain visibly measured on Home");
 assert(/\["dry", "intermittent", "saturated", "deep", "drain"\]/.test(home), "Home water history must include saturated management");

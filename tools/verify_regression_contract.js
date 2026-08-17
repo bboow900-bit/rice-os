@@ -29,10 +29,11 @@ function main() {
   const state = read("assets/js/core/state.js");
   const home = read("assets/js/screens/home.js");
   const annual = read("assets/js/screens/annual.js");
+  const machines = read("assets/js/screens/machines.js");
   const pwa = read("assets/js/core/pwa.js");
   const worker = read("service-worker.js");
 
-  ["home", "fields", "calendar", "annual", "field-work", "growth", "irrigation", "data"].forEach((screen) => {
+  ["home", "fields", "calendar", "annual", "field-work", "growth", "irrigation", "data", "machines"].forEach((screen) => {
     assert(index.includes(`id=\"screen-${screen}\"`), `Baseline screen is missing: ${screen}`);
     assert(app.includes(`\"${screen}\"`), `App route is missing: ${screen}`);
   });
@@ -47,6 +48,10 @@ function main() {
   assert(annual.includes("annual-year-flow-single"), "Annual one-column flow is missing");
   assert(annual.includes("annual-year-flow-rail"), "Annual timeline rail is missing");
   assert(index.includes('id="appBackButton"'), "Global back button is missing");
+  assert(index.includes('id="machineMaintenanceRoot"'), "Machine maintenance root is missing");
+  assert(index.includes('data-jump-screen="machines"'), "Machine maintenance menu entry is missing");
+  assert(machines.includes('RiceOS.screens.machines'), "Machine maintenance screen module is missing");
+  assert(worker.includes('assets/js/screens/machines.js'), "Machine maintenance module is missing from the service-worker cache");
 
   const pwaVersion = (pwa.match(/APP_VERSION\s*=\s*"([^"]+)"/) || [])[1];
   const workerVersion = (worker.match(/APP_VERSION\s*=\s*"([^"]+)"/) || [])[1];

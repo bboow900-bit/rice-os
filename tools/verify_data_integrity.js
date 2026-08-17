@@ -233,6 +233,11 @@ state.saveGrowthLog({
 const panicleObserved = agro.seasonStageForField("field_a", "2026-06-25");
 assert(panicleObserved.current && panicleObserved.current.key === "panicleInitiation", "幼穂長から幼穂形成期を導出できない");
 assert(panicleObserved.certainty === "確定", "幼穂長の記録日が確定ステージとして扱われていない");
+const panicleLayerBefore = JSON.stringify(state.data().growthLogs);
+assert(panicleObserved.fieldStage && panicleObserved.fieldStage.current && panicleObserved.fieldStage.current.key === "panicleInitiation", "現場ステージ層が幼穂の実測を保持できない");
+assert(panicleObserved.fieldStage.evidence === "実測", "幼穂実測を現地判断や推定として混同している");
+assert(panicleObserved.outlookStage && panicleObserved.outlookStage.certainty === "推定", "見通しステージ層が分離されていない");
+assert(JSON.stringify(state.data().growthLogs) === panicleLayerBefore, "ホーム用ステージ層の導出が生育記録を変更した");
 const panicleStage = agro.seasonStageForField("field_a", "2026-08-05");
 assert(panicleStage.current && panicleStage.index >= panicleObserved.index, "幼穂長後の推定ステージが後退した");
 assert(panicleStage.certainty === "推定", "幼穂長後の日数推定が表示されていない");
@@ -560,6 +565,18 @@ assert(!state.isMigratedWaterWork(groupLegacyWork, "field_b"), "unadopted group 
 assert(!state.isMigratedWaterWork(groupLegacyWork), "partially adopted group work must remain visible outside a field-specific view");
 state.saveFieldWork({ workId: "work_legacy_drain", date: "2026-09-10", fieldIds: ["field_a"], workName: "\u843d\u6c34", legacyWaterRecord: true });
 assert(state.legacyWaterReviewFor("field_a", { year: "2026" }).some((row) => row.kind === "drain" && row.sourceWorkIds.includes("work_legacy_drain")), "legacy drainage work must remain available for reconciliation");
+
+const machineId = state.saveMachine({ name: "SR75", category: "\u30b3\u30f3\u30d0\u30a4\u30f3", maker: "\u30af\u30dc\u30bf", model: "SR75", meterHours: "812" });
+assert(machineId && state.machine(machineId).name === "SR75", "machine master could not be saved");
+const maintenanceId = state.saveMaintenanceRecord({ machineId, date: "2026-08-17", item: "\u30a8\u30f3\u30b8\u30f3\u30aa\u30a4\u30eb", meterHours: "812", parts: "\u30aa\u30a4\u30eb" });
+assert(maintenanceId && state.maintenanceRecordsFor(machineId).length === 1, "maintenance record could not be saved");
+state.saveMaintenanceRecord({ machineId, date: "2026-07-01", item: "\u904e\u53bb\u70b9\u691c", meterHours: "700" });
+assert(state.machine(machineId).meterHours === "812", "older maintenance input rolled back the current meter hours");
+assert(state.retireMachine(machineId), "machine could not be retired");
+const maintenanceCountBeforeRetiredAdd = state.maintenanceRecordsFor(machineId).length;
+assert(state.saveMaintenanceRecord({ machineId, date: "2026-08-18", item: "\u8aa4\u5165\u529b" }) === "", "a retired machine accepted a new maintenance record");
+assert(state.maintenanceRecordsFor(machineId).length === maintenanceCountBeforeRetiredAdd, "retired machine changed maintenance history");
+assert(S.normalize(JSON.parse(JSON.stringify(state.data()))).maintenanceRecords.length === state.data().maintenanceRecords.length, "maintenance history was lost during JSON normalization");
 
 const failureEvents = [];
 const failureAlerts = [];

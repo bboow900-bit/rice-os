@@ -1046,6 +1046,14 @@
     return days === "" || days < 0 ? "" : days;
   }
 
+  function periodCoversWaterMovements(record, startDate, endDate) {
+    const movements = Array.isArray(record && record.waterMovements) ? record.waterMovements : [];
+    return movements.filter((movement) => movement && movement.startDate).every((movement) => {
+      if (String(movement.startDate) < String(startDate)) return false;
+      return !endDate || !movement.endDate || String(movement.endDate) <= String(endDate);
+    });
+  }
+
   function waterPeriodLabel(method) {
     const text = String(method || "");
     if (/中干し/.test(text)) return "中干し";
@@ -1083,6 +1091,7 @@
         actualEndDate: period.actualEndDate || "",
         targetDays: period.targetDays || "",
         status: period.status || "",
+        waterMovements: Array.isArray(period.raw && period.raw.waterMovements) ? period.raw.waterMovements.slice() : [],
         memo: period.raw && period.raw.memo || "",
         sourceType: period.source || "",
         editKind: period.source === "legacy-work" ? "fieldWork" : (period.kind === "dry" ? "dry" : "irrigation"),
@@ -1130,6 +1139,21 @@
     const subtitle = dateOrderInvalid ? "日付要確認" : completed ? "完了" : (period.startDate > U.today() ? "開始前" : (active ? "継続中" : (period.startDate ? "終了日未記録" : "開始日を記録してください")));
     const heading = `${period.label}${period.sequence > 1 ? ` ${period.sequence}回目` : ""}`;
     const actionLabel = "編集";
+    const supportsMovements = period.tone === "intermittent" || period.tone === "saturated";
+    const movementLabel = (movement) => {
+      if (period.tone === "saturated") return movement.phase === "drain" ? "自然落水" : "給水・飽水";
+      return movement.phase === "drain" ? "落水" : "入水";
+    };
+    const movements = (period.waterMovements || []).filter((movement) => movement && movement.startDate)
+      .slice().sort((a, b) => String(a.startDate).localeCompare(String(b.startDate)) || String(a.createdAt || "").localeCompare(String(b.createdAt || "")));
+    const movementHistory = supportsMovements && movements.length ? `<details class="annual-water-movements">
+      <summary>期間内の水の動き <b>${movements.length}区間</b></summary>
+      <div>${movements.map((movement) => {
+        const rawDays = movement.endDate ? waterPeriodDays(movement.startDate, movement.endDate) : "";
+        const days = rawDays === "" ? "" : Number(rawDays) + 1;
+        return `<p><b>${U.escapeHTML(movementLabel(movement))}</b><span>${U.escapeHTML(U.fd(movement.startDate))} ${movement.endDate ? `- ${U.escapeHTML(U.fd(movement.endDate))}` : "- 継続中"}${days !== "" ? ` / ${days}日` : ""}</span></p>`;
+      }).join("")}</div>
+    </details>` : "";
     return `
       <article class="annual-water-period annual-water-period-${U.attr(period.tone)}">
         <div class="annual-water-period-head">
@@ -1143,6 +1167,7 @@
           <span><small>実績終了</small><b>${U.escapeHTML(completed ? U.fd(period.actualEndDate) : (dateOrderInvalid ? "日付要確認" : (period.actualEndDate ? "日付要確認" : (active ? "継続中" : "未記録"))))}</b></span>
         </div>
         ${plannedDays ? `<div class="annual-water-period-progress"><i><em style="width:${progress}%"></em></i><span>予定 ${plannedDays}日${progressDays !== "" ? ` / ${completed ? "実績" : "経過"} ${progressDays}日` : ""}</span></div>` : ""}
+        ${movementHistory}
         ${period.memo ? `<p class="annual-water-period-memo">${U.escapeHTML(period.memo)}</p>` : ""}
         ${period.editId ? `<div class="annual-water-period-actions"><button type="button" class="secondary" data-annual-water-edit="${U.attr(period.editKind)}" data-id="${U.attr(period.editId)}">${actionLabel}</button><button type="button" class="danger" data-annual-water-delete="${U.attr(period.editKind)}" data-id="${U.attr(period.editId)}">削除</button></div>` : ""}
       </article>
@@ -2463,6 +2488,10 @@
       if (!record || !startDate) return;
       if (actualEndDate && actualEndDate < startDate) {
         alert("終了日は開始日以降の日付にしてください。");
+        return;
+      }
+      if (kind === "irrigation" && !periodCoversWaterMovements(record, startDate, actualEndDate)) {
+        alert("親期間の日付は、期間内の入水・落水の記録を含む範囲にしてください。");
         return;
       }
       if (record.actualEndDate && !actualEndDate && !confirm("この完了済み水管理を継続中に戻しますか？")) return;

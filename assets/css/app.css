@@ -6997,6 +6997,14 @@ label {
 .water-period-actions button { min-height: 44px; padding: 7px; border-radius: 10px; font-size: 12px; font-weight: 900; }
 .water-period-actions button:disabled { opacity: .38; }
 .water-period-history-note { color: #788477; font-size: 10px; text-align: right; }
+.water-movement-controls { display: grid; gap: 7px; padding: 8px; border: 1px solid rgba(69, 145, 174, .22); border-radius: 10px; background: rgba(255,255,255,.65); }
+.water-movement-controls > div:first-child { display: grid; gap: 2px; }
+.water-movement-controls span { color: #50717b; font-size: 10px; font-weight: 800; }
+.water-movement-controls b { color: #225f72; font-size: 12px; line-height: 1.3; }
+.water-movement-buttons { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
+.water-movement-button { min-height: 40px; padding: 6px; border: 1px solid #a8d7e7; border-radius: 9px; background: #fff; color: #226a84; font-size: 11px; font-weight: 900; line-height: 1.2; }
+.water-movement-button.current { border-color: #61b5d2; background: #dff4fb; color: #1f6b86; }
+.water-movement-button:disabled { opacity: .72; }
 .water-edit-section { background: #fffefa; }
 .water-history-head { margin: 4px 2px 8px; }
 .water-history-head h3 { margin: 0; color: #263c2a; font-size: 16px; }
@@ -7042,6 +7050,42 @@ label {
   .water-stage-road span, .water-flow-road.image-style span { font-size: 8px; }
   .water-road-caption small { display: none; }
 }
+
+/* Machine maintenance: independent asset records, kept compact for phone use. */
+.machine-head { align-items: center; }
+.machine-head > div { min-width: 0; }
+.machine-head small { display: block; color: var(--muted); font-size: 12px; margin-top: 2px; }
+.machine-list, .machine-history { display: grid; gap: 10px; }
+.machine-card, .machine-history-row { width: 100%; border: 1px solid #d9e6d6; background: #fffefa; border-radius: 14px; min-height: 82px; padding: 12px; display: grid; align-items: center; text-align: left; color: inherit; box-shadow: 0 5px 14px rgba(48, 87, 46, .08); }
+.machine-card { grid-template-columns: 48px minmax(0, 1fr) auto; gap: 10px; }
+.machine-card.retired { opacity: .62; background: #f4f4f1; }
+.machine-card-icon { width: 42px; height: 42px; border-radius: 12px; display: grid; place-items: center; color: #197a3b; background: #e8f5e6; overflow: hidden; }
+.machine-card-icon img { width: 38px; height: 38px; object-fit: contain; }
+.machine-card-main, .machine-card-side { min-width: 0; display: grid; gap: 3px; }
+.machine-card-main b { font-size: 16px; line-height: 1.2; }
+.machine-card-main small, .machine-card-main em { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-style: normal; color: #647265; font-size: 12px; }
+.machine-card-main em { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; white-space: normal; line-height: 1.25; }
+.machine-card-main em { color: #7a887b; }
+.machine-card-side { text-align: right; justify-items: end; color: #277a45; }
+.machine-card-side strong { font-size: 12px; }
+.machine-card-side i, .machine-history-row i { font-size: 23px; font-style: normal; line-height: 1; }
+.machine-summary-card { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; padding: 10px; border-radius: 14px; background: #edf7e9; margin-bottom: 14px; }
+.machine-summary-card div { min-width: 0; padding: 8px; background: #fffef9; border-radius: 10px; text-align: center; }
+.machine-summary-card span { display: block; color: #637863; font-size: 10px; }
+.machine-summary-card b { display: block; margin-top: 3px; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.machine-items { margin: 14px 0; }
+.machine-item-chips { display: flex; flex-wrap: wrap; gap: 7px; }
+.machine-item-chips button { min-height: 44px; border: 1px solid #cde1ca; border-radius: 10px; padding: 9px 10px; background: #f8fcf5; color: #2d6037; font-weight: 800; font-size: 12px; }
+.machine-add-custom { margin-top: 9px; width: 100%; }
+.machine-history-row { grid-template-columns: 62px minmax(0, 1fr) auto; gap: 8px; min-height: 66px; padding-block: 9px; }
+.machine-history-row time { color: #347847; font-weight: 900; font-size: 12px; }
+.machine-history-row span { min-width: 0; display: grid; gap: 3px; }
+.machine-history-row b { font-size: 14px; }
+.machine-history-row small { color: #677568; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: normal; line-height: 1.3; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.machine-form { margin-top: 8px; }
+.machine-retire { width: 100%; margin: 18px 0 30px; border: 0; background: transparent; padding: 12px; }
+.machine-empty { display: grid; gap: 10px; text-align: center; padding: 28px 18px; }
+@media (max-width: 380px) { .machine-head h2 { font-size: 20px; } .machine-card-main b { font-size: 15px; } .machine-item-chips button { font-size: 11px; padding: 8px; } }
 
 .growth-compare-panel {
   display: grid;
@@ -12323,6 +12367,17 @@ label {
   font-weight: 700;
   line-height: 1.45;
 }
+.annual-water-movements { margin: 0 10px 10px; border: 1px solid color-mix(in srgb, var(--water-line) 72%, white); border-radius: 9px; background: rgba(255,255,255,.68); }
+.annual-water-movements summary { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px; color: #496872; font-size: 11px; font-weight: 850; cursor: pointer; }
+.annual-water-movements summary b { color: var(--water-accent); white-space: nowrap; }
+.annual-water-movements > div { display: grid; gap: 0; padding: 0 8px 7px; }
+.annual-water-movements p { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin: 0; padding: 7px 0; border-top: 1px dashed color-mix(in srgb, var(--water-line) 68%, white); }
+.annual-water-movements p b { color: #285d6c; font-size: 11px; }
+.annual-water-movements p span { color: #63757a; font-size: 10px; text-align: right; }
+@media (max-width: 390px) {
+  .annual-water-movements p { display: grid; gap: 2px; }
+  .annual-water-movements p span { text-align: left; }
+}
 
 .annual-water-review-list {
   display: grid;
@@ -14515,7 +14570,7 @@ label {
 .home-decision-card-toggle {
   display: grid;
   width: 100%;
-  min-height: 90px;
+  min-height: 146px;
   padding: 7px 10px;
   border: 0;
   background: transparent;
@@ -14527,55 +14582,26 @@ label {
 .home-decision-card-toggle:focus-visible { outline: 3px solid rgba(44, 145, 63, .32); outline-offset: -3px; }
 .home-decision-card .home-decision-card-head { grid-template-columns: 34px minmax(0, 1fr) 18px; }
 .home-decision-card .home-decision-card-head i { justify-self: end; color: #5d8061; font-size: 19px; font-style: normal; line-height: 1; }
-.home-decision-progress-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 4px 7px;
-  margin-top: 5px;
-}
-.home-decision-progress-grid span {
-  display: flex;
-  align-items: center;
-  min-width: 0;
-  min-height: 19px;
-  overflow: hidden;
-  padding: 2px 5px;
-  border-radius: 7px;
-  background: #f1f8ee;
-  color: #2a7840;
-}
-.home-decision-progress-grid i {
-  flex: 0 0 auto;
-  margin-right: 4px;
-  font-size: 11px;
-  font-style: normal;
-  line-height: 1;
-}
-.home-decision-progress-grid b {
-  flex: 1 1 auto;
-  min-width: 0;
-  overflow: hidden;
-  font-size: 10px;
-  font-weight: 850;
-  line-height: 1.2;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.home-decision-progress-grid em {
-  flex: 0 0 auto;
-  margin-left: 3px;
-  padding: 1px 3px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, .75);
-  color: inherit;
-  font-size: 8px;
-  font-style: normal;
-  font-weight: 900;
-  line-height: 1.15;
-}
-.home-decision-progress-grid .heading { background: #f7f1e6; color: #8a6a2a; }
-.home-decision-progress-grid .water { background: #edf8fc; color: #267a95; }
-.home-decision-progress-grid .next { background: #f7f6ef; color: #59695a; }
+.home-stage-summary { display: grid; gap: 5px; margin-top: 7px; }
+.home-stage-observed { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 7px; min-height: 32px; padding: 5px 7px; border: 1px solid #cde4c9; border-radius: 9px; background: #f2faed; }
+.home-stage-observed-label { color: #527452; font-size: 9px; font-weight: 900; white-space: nowrap; }
+.home-stage-observed b { min-width: 0; overflow: hidden; color: #25713a; font-size: 16px; font-weight: 950; line-height: 1.2; text-overflow: ellipsis; white-space: nowrap; }
+.home-stage-observed em { padding: 3px 5px; border: 1px solid #b8d7b3; border-radius: 999px; background: #fffefa; color: #347a3d; font-size: 9px; font-style: normal; font-weight: 900; white-space: nowrap; }
+.home-stage-outlook { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 5px 7px; margin: 0; padding: 1px 3px; color: #766d53; }
+.home-stage-outlook > span { align-self: center; padding: 2px 5px; border-radius: 5px; background: #f8f1de; color: #91713a; font-size: 9px; font-weight: 900; }
+.home-stage-outlook b { min-width: 0; overflow: hidden; font-size: 11px; line-height: 1.25; text-overflow: ellipsis; white-space: nowrap; }
+.home-stage-outlook small { grid-column: 2; min-width: 0; overflow: hidden; color: #817965; font-size: 9px; font-weight: 700; line-height: 1.2; text-overflow: ellipsis; white-space: nowrap; }
+.home-stage-heat { display: grid; gap: 3px; padding: 4px 5px 2px; border-radius: 8px; background: #fffaf0; }
+.home-stage-heat > div { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
+.home-stage-heat span { color: #8b7137; font-size: 9px; font-weight: 900; white-space: nowrap; }
+.home-stage-heat b { color: #5f552d; font-size: 13px; font-weight: 950; white-space: nowrap; }
+.home-stage-heat small { min-width: 0; overflow: hidden; color: #857c67; font-size: 9px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+.home-stage-heat > i { display: block; height: 4px; overflow: hidden; border-radius: 999px; background: #eee6d4; }
+.home-stage-heat > i em { display: block; height: 100%; border-radius: inherit; background: #c8a146; }
+.home-stage-water { display: grid; grid-template-columns: 16px minmax(0, 1fr) auto; align-items: center; gap: 5px; min-height: 27px; padding: 4px 6px; border: 1px solid #cbe5ed; border-radius: 8px; background: #eff9fc; color: #287b98; }
+.home-stage-water > span { font-size: 13px; }
+.home-stage-water b { min-width: 0; overflow: hidden; font-size: 11px; font-weight: 900; line-height: 1.2; text-overflow: ellipsis; white-space: nowrap; }
+.home-stage-water small { color: #4d8192; font-size: 10px; font-weight: 900; white-space: nowrap; }
 .home-decision-card .home-decision-alert { margin: -2px 10px 8px; }
 .home-management-compare {
   display: grid;

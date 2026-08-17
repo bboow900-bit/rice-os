@@ -92,6 +92,30 @@ state.saveIrrigation({
 });
 const activeSaturatedStatus = global.RiceOS.agro.managementStatus(state.fields().find((field) => field.fieldId === fieldId), "2026-07-20");
 assert(activeSaturatedStatus.key === "saturated" && /\u98fd\u6c34\u7ba1\u7406\u4e2d/.test(String(activeSaturatedStatus.label || "")), "An active saturated-water record must be available to Home as factual active management");
+state.saveIrrigation({ irrigationId: "saturated-water-active", fieldId, method: "\u98fd\u6c34\u7ba1\u7406", startDate: "2026-07-16", actualEndDate: "2026-07-20", status: "\u5b8c\u4e86", periodStatus: "\u5b8c\u4e86" });
+
+state.saveIrrigation({
+  irrigationId: "intermittent-movements",
+  fieldId,
+  method: "\u9593\u65ad\u704c\u6c34",
+  date: "2026-07-21",
+  startDate: "2026-07-21",
+  waterMovements: [
+    { movementId: "movement_flood", phase: "flood", startDate: "2026-07-21", endDate: "2026-07-23" },
+    { movementId: "movement_drain", phase: "drain", startDate: "2026-07-24", endDate: "" }
+  ]
+});
+const intermittentMovements = state.data().irrigations.find((row) => row.irrigationId === "intermittent-movements");
+assert(intermittentMovements.waterMovements.length === 2 && intermittentMovements.waterMovements[1].phase === "drain", "Within-period water movements were not saved");
+const movementParentInTimeline = state.timelineEntriesForField(fieldId, { year: 2026 }).waterPeriods
+  .filter((row) => row.directId === "intermittent-movements");
+assert(movementParentInTimeline.length === 1, "Within-period water movements must remain one parent period in annual history");
+const roundTripMovements = S.normalize(state.data()).irrigations.find((row) => row.irrigationId === "intermittent-movements");
+assert(roundTripMovements.waterMovements.length === 2 && roundTripMovements.waterMovements[0].endDate === "2026-07-23", "Within-period water movements were not JSON-safe");
+const unknownMovement = S.normalize({ irrigations: [{ irrigationId: "unknown-movement", fieldId, method: "\u9593\u65ad\u704c\u6c34", startDate: "2026-07-21", waterMovements: [{ movementId: "legacy-movement", phase: "legacy", startDate: "2026-07-21" }] }] }).irrigations[0].waterMovements[0];
+assert(unknownMovement.phase === "unknown", "Unknown water-movement phases must not be silently reclassified on restore");
+const intermittentMovementStatus = global.RiceOS.agro.managementStatus(state.fields().find((field) => field.fieldId === fieldId), "2026-07-25");
+assert(intermittentMovementStatus.label === "\u9593\u65ad\u704c\u6c34\u30fb\u843d\u6c34\u4e2d", "Current water movement was not reflected in the management summary");
 
 state.saveFieldWork({
   workId: "fertilizer-work",

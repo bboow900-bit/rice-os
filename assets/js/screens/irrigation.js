@@ -26,6 +26,17 @@
     { key: "drain", label: "稲刈り前の落水", source: "irrigation", method: "稲刈り前の落水", tone: "drain", icon: "⌇", target: () => "" }
   ];
 
+  const WATER_MOVEMENT_TYPES = {
+    intermittent: {
+      flood: { label: "入水", activeLabel: "入水中", actionLabel: "入水スタート" },
+      drain: { label: "落水", activeLabel: "落水中", actionLabel: "落水スタート" }
+    },
+    saturated: {
+      flood: { label: "給水・飽水", activeLabel: "飽水中", actionLabel: "給水・飽水を開始" },
+      drain: { label: "自然落水", activeLabel: "自然落水中", actionLabel: "自然落水へ" }
+    }
+  };
+
   function cropYear(date) {
     return String(date || U.today()).slice(0, 4);
   }
@@ -272,6 +283,81 @@
     return days === "" ? "" : `${days}日`;
   }
 
+  function supportsMovement(type) {
+    return type && (type.key === "intermittent" || type.key === "saturated");
+  }
+
+  function movementDefinition(type, phase) {
+    return supportsMovement(type) ? WATER_MOVEMENT_TYPES[type.key][phase] || null : null;
+  }
+
+  function movementLabel(type, phase) {
+    return movementDefinition(type, phase)?.label || "水の動き";
+  }
+
+  function movementStatus(type, phase) {
+    return movementDefinition(type, phase)?.activeLabel || "水の動きを記録";
+  }
+
+  function movementRows(record) {
+    return Array.isArray(record && record.waterMovements) ? record.waterMovements.slice()
+      .filter((item) => item && item.startDate)
+      .sort((a, b) => String(a.startDate).localeCompare(String(b.startDate)) || String(a.createdAt || "").localeCompare(String(b.createdAt || ""))) : [];
+  }
+
+  function openMovement(record) {
+    return movementRows(record).filter((item) => !item.endDate).at(-1) || null;
+  }
+
+  function initialMovements(type, date) {
+    return supportsMovement(type) ? [{ movementId: U.id("water-movement", date), phase: "flood", startDate: date, endDate: "", createdAt: U.now(), updatedAt: U.now() }] : [];
+  }
+
+  function movementSummary(type, record, date) {
+    const movements = movementRows(record);
+    const active = openMovement(record);
+    if (!movements.length) return "水の動きは未記録";
+    const elapsed = active ? U.daysBetween(active.startDate, date) : "";
+    return `${movementLabel(type, active ? active.phase : movements.at(-1).phase)}${active ? `中${elapsed === "" ? "" : ` ${Math.max(0, Number(elapsed)) + 1}日目`}` : "を記録済み"} / ${movements.length}区間`;
+  }
+
+  function switchMovement(record, type, phase, date) {
+    const current = openMovement(record);
+    if (current && current.phase === phase) return { ok: false, reason: `すでに${movementStatus(type, phase)}です。` };
+    if (current && String(date) <= String(current.startDate)) {
+      return { ok: false, reason: "切替日は、現在の区間を始めた翌日以降にしてください。" };
+    }
+    const movements = movementRows(record);
+    if (current) {
+      const index = movements.findIndex((item) => item.movementId === current.movementId);
+      if (index >= 0) movements[index] = { ...movements[index], endDate: U.dateAddDays(date, -1), updatedAt: U.now() };
+    }
+    movements.push({ movementId: U.id("water-movement", date), phase, startDate: date, endDate: "", createdAt: U.now(), updatedAt: U.now() });
+    return { ok: true, record: { ...record, waterMovements: movements, status: movementStatus(type, phase), periodStatus: "実施中" } };
+  }
+
+  function closeOpenMovement(record, date) {
+    const current = openMovement(record);
+    if (!current) return { ok: true, record };
+    if (String(date) < String(current.startDate)) return { ok: false, reason: "終了日は現在の区間の開始日以降にしてください。" };
+    return {
+      ok: true,
+      record: {
+        ...record,
+        waterMovements: movementRows(record).map((item) => item.movementId === current.movementId
+          ? { ...item, endDate: date, updatedAt: U.now() }
+          : item)
+      }
+    };
+  }
+
+  function periodCoversMovements(record, startDate, endDate) {
+    return movementRows(record).every((movement) => {
+      if (String(movement.startDate) < String(startDate)) return false;
+      return !endDate || !movement.endDate || String(movement.endDate) <= String(endDate);
+    });
+  }
+
   function renderTypeCard(type) {
     const date = U.$("waterDate").value || U.today();
     const summary = typePeriodSummary(type, date);
@@ -295,6 +381,19 @@
     const planLabel = unscheduled.length ? `${phase === "end" ? "終了予定を入れる" : "開始予定を入れる"}${isGroup && unscheduled.length !== actionable.length ? ` (${unscheduled.length}圃場)` : ""}` : "予定済み";
     const actualLabel = phase === "end" ? `終了を記録${countSuffix}` : `${finished ? "もう一度開始" : "開始を記録"}${countSuffix}`;
     const countNote = isGroup ? `${activeCount}/${summary.fields.length}圃場が実施中` : "";
+    // Rendering must never adopt or mutate a legacy record. Direct records
+    // expose their raw parent period here; legacy records simply have no
+    // within-period movement controls until explicitly edited.
+    const activeRecord = activeItem && activeItem.source === "direct" ? activeItem.raw : null;
+    const currentMovement = activeRecord && openMovement(activeRecord);
+    const movementControls = activeItem && activeRecord && supportsMovement(type) ? `
+      <div class="water-movement-controls">
+        <div><span>期間内の水の動き</span><b>${U.escapeHTML(movementSummary(type, activeRecord, date))}</b></div>
+        <div class="water-movement-buttons">
+          <button type="button" class="water-movement-button ${currentMovement?.phase === "flood" ? "current" : ""}" data-water-movement="${U.attr(`${type.key}-flood`)}" ${currentMovement?.phase === "flood" ? "disabled" : ""}>${U.escapeHTML(type.key === "saturated" ? "給水・飽水を開始" : "入水スタート")}</button>
+          <button type="button" class="water-movement-button ${currentMovement?.phase === "drain" ? "current" : ""}" data-water-movement="${U.attr(`${type.key}-drain`)}" ${currentMovement?.phase === "drain" ? "disabled" : ""}>${U.escapeHTML(type.key === "saturated" ? "自然落水へ" : "落水スタート")}</button>
+        </div>
+      </div>` : "";
     return `
       <article class="water-period-card ${U.attr(type.tone)} ${focusedTypeKey === type.key ? "focus" : ""}" data-water-type-card="${U.attr(type.key)}">
         <div class="water-period-card-head"><span class="water-period-icon" aria-hidden="true">${U.escapeHTML(type.icon)}</span><div><b>${U.escapeHTML(type.label)}</b><small>${U.escapeHTML(countNote || (activeCount ? `開始 ${startLabel}` : (finished ? `完了 ${U.fd(latestItem.actualEndDate)}` : "期間を記録")))}</small></div><strong class="water-period-status ${activeCount ? "active" : (finished ? "done" : "waiting")}">${U.escapeHTML(status)}</strong></div>
@@ -304,6 +403,7 @@
           ${targetDays ? `<span>目安 ${U.escapeHTML(String(targetDays))}日</span>` : ""}
         </div>
         ${stage ? `<p class="water-period-stage"><span>${isGroup ? `代表: ${stageField.name}` : "生育との重なり"}</span><b>${U.escapeHTML(stage)}</b></p>` : ""}
+        ${movementControls}
         <div class="water-period-actions">
           <button type="button" class="secondary" data-water-plan="${U.attr(`${type.key}-${phase}`)}" ${unscheduled.length ? "" : "disabled"}>${U.escapeHTML(planLabel)}</button>
           <button type="button" class="primary" data-water-action="${U.attr(`${type.key}-${phase}`)}" ${activeCount ? (endEnabled ? "" : "disabled") : (startEnabled ? "" : "disabled")}>${U.escapeHTML(actualLabel)}</button>
@@ -328,7 +428,8 @@
       actualEndDate: "",
       targetDays,
       periodStatus: "実施中",
-      status: method === "稲刈り前の落水" ? "落水中" : "入水中",
+      status: method === "稲刈り前の落水" ? "落水中" : (type?.key === "saturated" ? "飽水中" : "入水中"),
+      waterMovements: initialMovements(type, startDate),
       memo: memo || ""
     };
   }
@@ -415,14 +516,55 @@
         const active = activePeriod(field, type, date);
         const editable = editableRecordForPeriod(field, active);
         const linkedSchedule = matchingWaterSchedule(field.fieldId, type, "end", date);
-        return editable ? { ...editable, date: editable.date || editable.startDate, actualEndDate: date, status: "完了", periodStatus: "完了", sourceScheduleId: linkedSchedule?.scheduleId || editable.sourceScheduleId || "", sourceSchedulePhase: linkedSchedule ? "end" : editable.sourceSchedulePhase || "" } : null;
+        if (!editable) return null;
+        const closed = supportsMovement(type) ? closeOpenMovement(editable, date) : { ok: true, record: editable };
+        if (!closed.ok) return { invalid: true, field };
+        return { ...closed.record, date: closed.record.date || closed.record.startDate, actualEndDate: date, status: "完了", periodStatus: "完了", sourceScheduleId: linkedSchedule?.scheduleId || closed.record.sourceScheduleId || "", sourceSchedulePhase: linkedSchedule ? "end" : closed.record.sourceSchedulePhase || "" };
       }).filter(Boolean);
+      const invalid = records.find((item) => item.invalid);
+      if (invalid) {
+        U.toast(`${invalid.field.name}は、現在の水の動きより前の日付で終了できません。変更は保存していません。`);
+        return;
+      }
       if (!records.length) return;
       const saved = type.source === "dry" ? state.saveDryPeriodsBatch(records, `${targetLabel()}の中干しを終了しました`) : state.saveIrrigationsBatch(records, `${targetLabel()}の${type.label}を終了しました`);
       if (saved === null) return;
     }
     resetEdit();
     pendingWaterSchedule = null;
+    render();
+  }
+
+  function recordMovement(action) {
+    const date = U.$("waterDate").value || U.today();
+    const [key, nextPhase] = String(action || "").split("-");
+    const type = typeForKey(key);
+    if (!supportsMovement(type) || !["flood", "drain"].includes(nextPhase)) return;
+    const fields = targetFields().filter((field) => Boolean(activePeriod(field, type, date)));
+    if (!fields.length) {
+      U.toast(`${type.label}を開始してから、水の動きを記録してください。`);
+      return;
+    }
+    const changes = fields.map((field) => {
+      const period = activePeriod(field, type, date);
+      const editable = editableRecordForPeriod(field, period);
+      if (!editable) return null;
+      const changed = switchMovement(editable, type, nextPhase, date);
+      return changed.ok ? changed.record : { skip: /すでに/.test(changed.reason), invalid: !/すでに/.test(changed.reason), field, reason: changed.reason };
+    });
+    const invalid = changes.find((item) => item && item.invalid);
+    if (invalid) {
+      U.toast(`${invalid.field.name}: ${invalid.reason} 変更は保存していません。`);
+      return;
+    }
+    const records = changes.filter((item) => item && !item.skip);
+    if (!records.length) {
+      U.toast(`すでに${movementStatus(type, nextPhase)}です。`);
+      return;
+    }
+    if (!confirm(`${targetLabel()}の${records.length}圃場で、${U.fd(date)}から${movementLabel(type, nextPhase)}を記録します。`)) return;
+    const saved = state.saveIrrigationsBatch(records, `${targetLabel()}の${movementLabel(type, nextPhase)}を記録しました`);
+    if (saved === null) return;
     render();
   }
 
@@ -565,6 +707,8 @@
       if (button && !button.disabled) recordAction(button.dataset.waterAction);
       const planButton = event.target.closest("[data-water-plan]");
       if (planButton) saveWaterSchedule(planButton.dataset.waterPlan);
+      const movementButton = event.target.closest("[data-water-movement]");
+      if (movementButton && !movementButton.disabled) recordMovement(movementButton.dataset.waterMovement);
     });
     U.$("waterHistory").addEventListener("click", (event) => {
       const button = event.target.closest("[data-water-edit]");
@@ -595,7 +739,13 @@
       }
       const item = type === "dry" ? state.data().dryPeriods.find((row) => row.dryPeriodId === id) : state.data().irrigations.find((row) => row.irrigationId === id);
       if (!item) return;
-      const record = { ...item, date: item.date || U.$("waterEditStart").value, startDate: U.$("waterEditStart").value, actualEndDate: U.$("waterEditEnd").value, status: U.$("waterEditEnd").value ? "完了" : "実施中", periodStatus: U.$("waterEditEnd").value ? "完了" : "実施中", memo: U.$("waterEditMemo").value };
+      const startDate = U.$("waterEditStart").value;
+      const endDate = U.$("waterEditEnd").value;
+      if (type === "irrigation" && !periodCoversMovements(item, startDate, endDate)) {
+        alert("親期間の日付は、期間内の入水・落水の記録を含む範囲にしてください。");
+        return;
+      }
+      const record = { ...item, date: item.date || startDate, startDate, actualEndDate: endDate, status: endDate ? "完了" : "実施中", periodStatus: endDate ? "完了" : "実施中", memo: U.$("waterEditMemo").value };
       const saved = type === "dry" ? state.saveDryPeriod(record) : state.saveIrrigation(record);
       if (saved !== null) { resetEdit(); render(); }
     });

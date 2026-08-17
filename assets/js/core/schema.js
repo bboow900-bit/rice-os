@@ -4,8 +4,8 @@
   const RiceOS = window.RiceOS = window.RiceOS || {};
   const U = RiceOS.utils;
 
-  const SCHEMA_VERSION = 16;
-  const APP_VERSION = "20260730_ver180";
+  const SCHEMA_VERSION = 17;
+  const APP_VERSION = "20260817_ver252";
   const STORE_KEY = "rice_os_v8_stable";
   const BACKUP_KEY = "rice_os_v8_stable_backup";
   const LEGACY_STORES = [
@@ -233,6 +233,7 @@
   const IRRIGATION_STATUS = ["入水中", "落水中"];
   const WATER_PERIOD_STATUS = ["予定中", "実施中", "完了"];
   const IRRIGATION_TYPES = ["間断灌水", "飽水管理", "深水管理", "湿潤灌漑"];
+  const MACHINE_CATEGORIES = ["コンバイン", "トラクター", "田植機", "草刈機", "スパイダーモア", "乾燥機", "籾摺機", "その他"];
 
   function canonicalId(prefix, value, fallbackName) {
     const raw = String(value || fallbackName || "").trim();
@@ -390,7 +391,8 @@
       workName: String(w.workName || w.name || "その他"),
       worker: String(w.worker || ""),
       hours: String(w.hours || ""),
-      machine: String(w.machine || ""),
+      machine: String(w.machine || w.machineName || ""),
+      machineId: String(w.machineId || ""),
       material: String(w.material || ""),
       amount: String(w.amount || ""),
       fertilizerRateKg10a: String(w.fertilizerRateKg10a || ""),
@@ -595,6 +597,20 @@
   function normalizeIrrigation(input) {
     const i = input || {};
     const date = String(i.startDate || i.date || U.today());
+    const waterMovements = ensureArray(i.waterMovements).map((movement, index) => {
+      const row = movement || {};
+      // Preserve an unknown legacy value rather than silently reclassifying
+      // it as an irrigation event during JSON restore.
+      const phase = ["flood", "drain"].includes(row.phase) ? row.phase : "unknown";
+      return {
+        movementId: String(row.movementId || row.id || `movement_${index + 1}`),
+        phase,
+        startDate: String(row.startDate || ""),
+        endDate: String(row.endDate || ""),
+        createdAt: String(row.createdAt || i.createdAt || U.now()),
+        updatedAt: String(row.updatedAt || i.updatedAt || U.now())
+      };
+    }).filter((movement) => movement.startDate);
     return {
       irrigationId: String(i.irrigationId || i.id || U.id("irrigation", date)),
       type: "irrigation",
@@ -626,6 +642,7 @@
       autoStartedFromDrySource: String(i.autoStartedFromDrySource || ""),
       targetDepthCm: String(i.targetDepthCm || ""),
       observedDepthCm: String(i.observedDepthCm || ""),
+      waterMovements,
       photo: String(i.photo || ""),
       photoData: String(i.photoData || ""),
       memo: String(i.memo || ""),
@@ -672,6 +689,49 @@
       actualDifferenceDays: c.actualDifferenceDays === "" || c.actualDifferenceDays === undefined ? "" : U.number(c.actualDifferenceDays, 0),
       createdAt,
       updatedAt: String(c.updatedAt || createdAt)
+    };
+  }
+
+  function normalizeMachine(input, index) {
+    const row = input || {};
+    const createdAt = String(row.createdAt || U.now());
+    return {
+      machineId: String(row.machineId || row.id || U.id("machine", String(index + 1))),
+      name: String(row.name || row.machineName || `機械${index + 1}`),
+      category: MACHINE_CATEGORIES.includes(String(row.category || row.type)) ? String(row.category || row.type) : "その他",
+      maker: String(row.maker || row.manufacturer || ""),
+      model: String(row.model || row.modelNumber || ""),
+      meterHours: String(row.meterHours || row.hourMeter || ""),
+      purchasedAt: String(row.purchasedAt || ""),
+      status: ["使用中", "使用停止"].includes(String(row.status)) ? String(row.status) : (row.retiredAt ? "使用停止" : "使用中"),
+      retiredAt: String(row.retiredAt || ""),
+      memo: String(row.memo || ""),
+      customItems: ensureArray(row.customItems).map(String).map((item) => item.trim()).filter(Boolean),
+      createdAt,
+      updatedAt: String(row.updatedAt || createdAt)
+    };
+  }
+
+  function normalizeMaintenanceRecord(input, index) {
+    const row = input || {};
+    const date = String(row.date || U.today());
+    const createdAt = String(row.createdAt || U.now());
+    return {
+      maintenanceId: String(row.maintenanceId || row.id || U.id("maintenance", `${date}-${index + 1}`)),
+      machineId: String(row.machineId || ""),
+      date,
+      kind: String(row.kind || "点検"),
+      item: String(row.item || row.title || "整備記録"),
+      meterHours: String(row.meterHours || ""),
+      parts: String(row.parts || ""),
+      cost: String(row.cost || ""),
+      vendor: String(row.vendor || ""),
+      nextDueDate: String(row.nextDueDate || ""),
+      nextDueHours: String(row.nextDueHours || ""),
+      photoData: String(row.photoData || ""),
+      memo: String(row.memo || ""),
+      createdAt,
+      updatedAt: String(row.updatedAt || createdAt)
     };
   }
 
@@ -831,6 +891,12 @@
       batchFieldIds: ensureArray(i.batchFieldIds).filter((id) => fieldIds.has(id))
     }));
     const shipments = dedupeBy(ensureArray(source.shipments).map(normalizeShipment), "shipmentId");
+    const machines = dedupeBy(ensureArray(source.machines).map(normalizeMachine), "machineId");
+    const machineIds = new Set(machines.map((row) => row.machineId));
+    // Preserve a record even if its old machine master is missing. The
+    // orphan marker lets a future UI guide relinking without erasing history.
+    const maintenanceRecords = dedupeBy(ensureArray(source.maintenanceRecords).map(normalizeMaintenanceRecord), "maintenanceId")
+      .map((row) => ({ ...row, orphanedMachineId: row.machineId && !machineIds.has(row.machineId) ? row.machineId : "" }));
     const confirmationCandidates = dedupeBy(ensureArray(source.confirmationCandidates).map(normalizeConfirmationCandidate), "candidateId")
       .filter((candidate) => !candidate.fieldId || fieldIds.has(candidate.fieldId));
     const workers = Array.from(new Set([...WORKERS, ...ensureArray(source.workers).map(String), ...fieldWorks.map((w) => w.worker).filter(Boolean)]));
@@ -851,6 +917,8 @@
       varietyResults,
       shipments,
       confirmationCandidates,
+      machines,
+      maintenanceRecords,
       photos: ensureArray(source.photos),
       workers,
       meta: {
@@ -890,6 +958,8 @@
       varietyResults: [],
       shipments: [],
       confirmationCandidates: [],
+      machines: [],
+      maintenanceRecords: [],
       workers: U.clone(WORKERS)
     });
   }
@@ -927,9 +997,12 @@
     IRRIGATION_STATUS,
     WATER_PERIOD_STATUS,
     IRRIGATION_TYPES,
+    MACHINE_CATEGORIES,
     leafColorLabel,
     leafColorScoreFromText,
     normalize,
+    normalizeMachine,
+    normalizeMaintenanceRecord,
     normalizeGroupLabel,
     normalizeSeasonNote,
     emptyData,

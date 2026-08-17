@@ -14,6 +14,8 @@
     dryPeriods: "中干し",
     irrigations: "水管理",
     schedules: "予定",
+    machines: "機械",
+    maintenanceRecords: "整備履歴",
     materials: "資材",
     varietyResults: "結果",
     confirmationCandidates: "確認候補"
@@ -35,7 +37,8 @@
       irrigations: (data.irrigations || []).length,
       materials: (data.materials || []).length,
       photos: (data.photos || []).length,
-      results: (data.varietyResults || []).length
+      results: (data.varietyResults || []).length,
+      machines: (data.machines || []).filter((item) => item.status !== "使用停止").length
     };
     Object.entries(values).forEach(([key, value]) => {
       U.$$(`[data-master-count="${key}"]`).forEach((el) => {
@@ -67,6 +70,7 @@
       ["圃場作業", `${info.fieldWorks}件`],
       ["生育ログ", `${info.growthLogs}件`],
       ["水管理", `${info.dryPeriods || 0}/${info.irrigations || 0}`],
+      ["機械/整備", `${info.machines || 0}/${info.maintenanceRecords || 0}`],
       ["予定", `${info.schedules || 0}件`],
       ["資材/結果", `${info.materials}/${info.varietyResults}`],
       ["最終JSON保存", info.lastJsonExportAt ? U.fd(String(info.lastJsonExportAt).slice(0, 10)) : "記録なし"],

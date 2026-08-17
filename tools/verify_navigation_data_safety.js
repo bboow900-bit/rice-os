@@ -88,6 +88,8 @@ function navigationSafetySnapshot(data) {
       growthLogs: recordIds(data.growthLogs, "logId"),
       dryPeriods: recordIds(data.dryPeriods, "dryPeriodId"),
       irrigations: recordIds(data.irrigations, "irrigationId"),
+      machines: recordIds(data.machines, "machineId"),
+      maintenanceRecords: recordIds(data.maintenanceRecords, "maintenanceId"),
       schedules: recordIds(data.schedules, "scheduleId"),
       results: recordIds(data.varietyResults, "resultId"),
       shipments: recordIds(data.shipments, "shipmentId")
@@ -116,6 +118,8 @@ const fixture = S.normalize({
   growthLogs: [{ logId: "growth_a", date: "2026-06-10", fieldId: "field_a", panicleLengthMm: "8", photoData: "data:image/png;base64,growth" }],
   dryPeriods: [{ dryPeriodId: "dry_a", fieldId: "field_a", date: "2026-06-20", startDate: "2026-06-20", actualEndDate: "2026-06-27", photoData: "data:image/png;base64,dry" }],
   irrigations: [{ irrigationId: "water_b", fieldId: "field_b", date: "2026-07-01", startDate: "2026-07-01", method: "間断灌水", photoData: "data:image/png;base64,water" }],
+  machines: [{ machineId: "machine_sr75", name: "SR75", category: "コンバイン", meterHours: "812" }],
+  maintenanceRecords: [{ maintenanceId: "maintenance_oil", machineId: "machine_sr75", date: "2026-08-17", item: "エンジンオイル", meterHours: "812" }],
   schedules: [{ scheduleId: "schedule_a", date: "2026-07-15", fieldIds: ["field_a", "field_b"], title: "追肥予定" }],
   otherWorks: [{ otherWorkId: "other_a", date: "2026-03-20", season: "2026", relatedFieldIds: ["field_a"], workName: "機械整備", memo: "tractor" }],
   varietyResults: [{ resultId: "result_a", season: 2026, fieldId: "field_a", varietyId: "variety_main", yield: "600" }],
@@ -178,6 +182,8 @@ console.log(JSON.stringify({
   growthLogs: before.ids.growthLogs.length,
   dryPeriods: before.ids.dryPeriods.length,
   irrigations: before.ids.irrigations.length,
+  machines: before.ids.machines.length,
+  maintenanceRecords: before.ids.maintenanceRecords.length,
   schedules: before.ids.schedules.length,
   photos: before.photos.length
 }, null, 2));

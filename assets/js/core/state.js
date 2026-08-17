@@ -546,6 +546,10 @@
         worker: record.worker || "",
         hours: record.hours || "",
         machine: record.machine || "",
+        // The visible machine name remains the established record field.
+        // Keep an optional master reference for a later picker without
+        // rewriting historical work records.
+        machineId: record.machineId === undefined ? (previous && previous.machineId || "") : String(record.machineId || ""),
         material: record.material || "",
         amount: record.amount || "",
         fertilizerRateKg10a: record.fertilizerRateKg10a || "",
@@ -1225,6 +1229,11 @@
         autoStartedFromDrySource: record.autoStartedFromDrySource === undefined ? String(previous && previous.autoStartedFromDrySource || "") : String(record.autoStartedFromDrySource || ""),
         targetDepthCm: record.targetDepthCm || previous && previous.targetDepthCm || "",
         observedDepthCm: record.observedDepthCm || previous && previous.observedDepthCm || "",
+        // Optional within-period movements keep a single irrigation period as
+        // the canonical record while preserving each refill / drainage change.
+        waterMovements: Array.isArray(record.waterMovements)
+          ? record.waterMovements.map((item) => ({ ...item }))
+          : Array.isArray(previous && previous.waterMovements) ? previous.waterMovements.map((item) => ({ ...item })) : [],
         photo: record.photo || "",
         photoData: record.photoData || "",
         memo: record.memo || "",
@@ -1797,6 +1806,81 @@
     return growthLogsFor(fieldId).slice().sort((a, b) => String(b.date).localeCompare(String(a.date)))[0] || null;
   }
 
+  function machines(options) {
+    const opts = options || {};
+    return (data().machines || []).filter((row) => opts.includeRetired || row.status !== "使用停止")
+      .slice().sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""), "ja"));
+  }
+
+  function machine(machineId) {
+    return (data().machines || []).find((row) => row.machineId === machineId) || null;
+  }
+
+  function maintenanceRecordsFor(machineId) {
+    return (data().maintenanceRecords || []).filter((row) => row.machineId === machineId)
+      .slice().sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")) || String(b.updatedAt || "").localeCompare(String(a.updatedAt || "")));
+  }
+
+  function saveMachine(record) {
+    const input = record || {};
+    const name = String(input.name || "").trim();
+    if (!name) { lastError = new Error("機械名を入力してください。"); return ""; }
+    let machineId = String(input.machineId || "");
+    const saved = mutate((d) => {
+      machineId = machineId || U.id("machine", U.today());
+      const index = (d.machines || []).findIndex((row) => row.machineId === machineId);
+      const existing = index >= 0 ? d.machines[index] : null;
+      const normalized = S.normalizeMachine({ ...existing, ...input, machineId, name, createdAt: input.createdAt || existing && existing.createdAt || U.now(), updatedAt: U.now() }, index >= 0 ? index : (d.machines || []).length);
+      d.machines = d.machines || [];
+      if (index >= 0) d.machines[index] = normalized;
+      else d.machines.push(normalized);
+    }, input.machineId ? "機械情報を更新しました" : "機械を登録しました");
+    return saved ? machineId : "";
+  }
+
+  function retireMachine(machineId) {
+    if (!machine(machineId)) return null;
+    return mutate((d) => {
+      const index = (d.machines || []).findIndex((row) => row.machineId === machineId);
+      if (index < 0) return;
+      d.machines[index] = { ...d.machines[index], status: "使用停止", retiredAt: U.today(), updatedAt: U.now() };
+    }, "機械を使用停止にしました。整備履歴は残ります");
+  }
+
+  function saveMaintenanceRecord(record) {
+    const input = record || {};
+    const targetMachine = machine(input.machineId);
+    if (!input.machineId || !targetMachine) { lastError = new Error("対象の機械が見つかりません。"); return ""; }
+    if (targetMachine.status === "使用停止" && !input.maintenanceId) { lastError = new Error("使用停止中の機械には新しい整備記録を追加できません。"); return ""; }
+    const date = String(input.date || U.today());
+    let maintenanceId = String(input.maintenanceId || "");
+    const saved = mutate((d) => {
+      maintenanceId = maintenanceId || U.id("maintenance", date);
+      const index = (d.maintenanceRecords || []).findIndex((row) => row.maintenanceId === maintenanceId);
+      const existing = index >= 0 ? d.maintenanceRecords[index] : null;
+      const normalized = S.normalizeMaintenanceRecord({ ...existing, ...input, maintenanceId, date, createdAt: input.createdAt || existing && existing.createdAt || U.now(), updatedAt: U.now() }, index >= 0 ? index : (d.maintenanceRecords || []).length);
+      d.maintenanceRecords = d.maintenanceRecords || [];
+      if (index >= 0) d.maintenanceRecords[index] = normalized;
+      else d.maintenanceRecords.push(normalized);
+      if (normalized.meterHours) {
+        const machineIndex = (d.machines || []).findIndex((row) => row.machineId === normalized.machineId);
+        if (machineIndex >= 0) {
+          const currentHours = U.number(d.machines[machineIndex].meterHours, NaN);
+          const recordedHours = U.number(normalized.meterHours, NaN);
+          const meterHours = Number.isFinite(currentHours) && Number.isFinite(recordedHours) && recordedHours < currentHours
+            ? d.machines[machineIndex].meterHours : normalized.meterHours;
+          d.machines[machineIndex] = { ...d.machines[machineIndex], meterHours, updatedAt: U.now() };
+        }
+      }
+    }, input.maintenanceId ? "整備記録を更新しました" : "整備記録を追加しました");
+    return saved ? maintenanceId : "";
+  }
+
+  function deleteMaintenanceRecord(maintenanceId) {
+    if (!(data().maintenanceRecords || []).some((row) => row.maintenanceId === maintenanceId)) return null;
+    return mutate((d) => { d.maintenanceRecords = (d.maintenanceRecords || []).filter((row) => row.maintenanceId !== maintenanceId); }, "整備記録を削除しました");
+  }
+
   RiceOS.state = {
     data,
     lastSaveError,
@@ -1868,6 +1952,13 @@
     deleteSeasonNote,
     saveOutlookSnapshots,
     lastFieldWork,
-    lastGrowthLog
+    lastGrowthLog,
+    machines,
+    machine,
+    maintenanceRecordsFor,
+    saveMachine,
+    retireMachine,
+    saveMaintenanceRecord,
+    deleteMaintenanceRecord
   };
 })();
