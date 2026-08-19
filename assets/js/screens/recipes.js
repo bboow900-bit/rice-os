@@ -56,6 +56,15 @@
         ["headingAccumulatedTempTarget", "出穂 積算℃"],
         ["ripeningAccumulatedTempTarget", "出穂後 収穫目安℃"]
       ]
+    },
+    {
+      title: "収穫目安の補正",
+      fields: [
+        ["ripeningAccumulatedTempMin", "出穂後積算℃ 下限"],
+        ["ripeningAccumulatedTempMax", "出穂後積算℃ 上限"],
+        ["harvestDaysAfterHeadingMin", "出穂後 日数目安（最短）"],
+        ["harvestDaysAfterHeadingMax", "出穂後 日数目安（最長）"]
+      ]
     }
   ];
 

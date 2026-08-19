@@ -15,6 +15,7 @@ function main() {
   const app = read("assets/js/app.js");
   const screen = read("assets/js/screens/outlook.js");
   const engine = read("assets/js/core/outlook.js");
+  const agro = read("assets/js/core/agro.js");
   const state = read("assets/js/core/state.js");
   const worker = read("service-worker.js");
   assert(index.includes('data-screen="outlook"'), "Outlook bottom navigation is missing");
@@ -26,6 +27,9 @@ function main() {
   assert(!screen.includes("persist(all);"), "Viewing outlook must not save a derived snapshot");
   assert(screen.includes("data-outlook-save"), "Explicit snapshot save is missing");
   assert(state.includes("saveOutlookSnapshots"), "Snapshot persistence API is missing");
+  assert(agro.includes("HARVEST_REFERENCES") && agro.includes("harvestReferenceFor"), "Harvest references must be shared through the agronomy service");
+  assert(engine.includes("agro().harvestReferenceFor"), "Outlook must use the shared harvest reference");
+  assert(engine.includes("reference.daysMin") && engine.includes("reference.daysMax"), "Harvest outlook must use the configured post-heading day range");
   console.log("PASS outlook contract");
 }
 

@@ -14,6 +14,7 @@ const agro = read("assets/js/core/agro.js");
 const growth = read("assets/js/screens/growth.js");
 const annual = read("assets/js/screens/annual.js");
 const home = read("assets/js/screens/home.js");
+const fields = read("assets/js/screens/fields.js");
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -43,5 +44,15 @@ assert(/manual-stage-observation"\) return "現地判断"/.test(home), "Manual f
 assert(/\["panicle", "tiller"\]\.includes\(stage\.evidenceKind\)\) return "実測"/.test(home), "Measured growth records must remain visibly measured on Home");
 assert(/\["dry", "intermittent", "saturated", "deep", "drain"\]/.test(home), "Home water history must include saturated management");
 assert(/"saturated", "deepWater"/.test(home), "Active saturated management must be counted in Home status cards");
+assert(/function postHeadingThermalStart\(headingDate\)/.test(agro), "Post-heading thermal accumulation must use a shared start-date helper");
+assert(/return addDays\(headingDate, 1\);/.test(agro), "Post-heading thermal accumulation must start the day after heading");
+assert(/function waterStageContext\(fieldOrId, dateText, anchor\)/.test(agro), "Water reference context must be independent from UI rendering");
+assert(/water: waterStageContext\(field, date, \{ mode: "postHeading", elapsed \}\)/.test(agro), "Post-heading water reference must preserve the actual management status");
+assert(/const start = heading \? postHeadingThermalStart\(heading\) : planting;/.test(home), "Home stage heat must start after observed heading");
+assert(/出穂翌日から/.test(home), "Home must state the official post-heading accumulation anchor");
+assert(/取得済み日別気温 \+ 7日予報 \+ 前年同時期/.test(home), "Home must not label mixed forecast data as actual measurements");
+assert(/fetchDailyRange\(planting, addDays\(U\.today\(\), -1\), location\)/.test(home), "Confirmed heat data must end yesterday, leaving today in the forecast layer");
+assert(/\$\{renderCriticalWaterWindow\(field, dateText\)\}/.test(home), "Home expanded cards must render the water reference beside management records");
+assert(/現在の実績/.test(fields) && /照合の目安/.test(fields), "Field detail must show actual water records separately from the reference");
 
 console.log("PASS growth evidence semantics");

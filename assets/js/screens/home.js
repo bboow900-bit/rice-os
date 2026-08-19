@@ -834,15 +834,16 @@
     const key = heatCacheKey(field, planting, dateText);
     const cached = heatCache.get(key);
     const heading = actualHeadingDate(field, dateText);
-    const target = heading ? ripeningTempTarget(field) : accumulatedTempTarget(field);
+    const reference = harvestReferenceFor(field);
+    const target = heading ? reference.target : accumulatedTempTarget(field);
     const rows = validTempRows(cached && cached.rows);
-    const start = heading || planting;
+    const start = heading ? postHeadingThermalStart(heading) : planting;
     const accumulated = cached && !cached.error ? accumulatedFromRows(rows, start, dateText) : { total: "", count: 0 };
     if (!cached) return { title: "取得中", note: heading ? "出穂後の登熟を計算中" : "田植えからの生育を計算中", percent: 0 };
     if (cached.error || accumulated.total === "") return { title: "記録待ち", note: "気温データを取得できません", percent: 0 };
     return {
       title: `${Math.round(accumulated.total)}℃`,
-      note: heading ? `出穂後 ${U.daysBetween(heading, dateText)}日 / 目安 ${target}℃` : `田植後 ${U.daysBetween(planting, dateText)}日 / 出穂目安 ${target}℃`,
+      note: heading ? `出穂翌日から ${accumulated.count}日分 / 目安 ${reference.label}` : `田植後 ${U.daysBetween(planting, dateText)}日 / 出穂目安 ${target}℃`,
       percent: progressPercent(accumulated.total, target)
     };
   }
@@ -970,12 +971,20 @@
   function renderCriticalWaterWindow(field, dateText) {
     const focus = criticalWaterWindowFor(field, dateText);
     if (!focus.active) return "";
+    const water = focus.water || {};
+    const headingMode = focus.mode === "postHeading";
     return `
       <section class="critical-water-window mode-${U.attr(focus.mode)}" aria-label="幼穂確認以降の生育と水管理">
-        <div class="critical-water-window-head"><span>幼穂確認からの見通し</span><b>${U.escapeHTML(focus.certainty)}</b></div>
+        <div class="critical-water-window-head"><span>${headingMode ? "出穂後の生育と水管理" : "幼穂確認からの生育と水管理"}</span><b>${U.escapeHTML(focus.certainty)}</b></div>
         <strong>${U.escapeHTML(focus.phase)}</strong>
         <div class="critical-water-window-facts"><span>${U.escapeHTML(focus.anchorLabel)}</span><span>${U.escapeHTML(focus.observation)}</span></div>
+        <div class="critical-water-window-water">
+          <span>現在の実績</span><b>${U.escapeHTML(water.management && water.management.label || focus.management && focus.management.label || "水管理未記録")}</b>
+          <small>${U.escapeHTML(water.actualDetail || "実績の水管理期間は未登録")}</small>
+        </div>
+        <div class="critical-water-window-reference"><span>照合の目安</span><b>${U.escapeHTML(water.referenceLabel || "現場と記録を確認")}</b></div>
         <p>${U.escapeHTML(focus.note)}</p>
+        ${water.referenceNote ? `<p class="critical-water-window-note">${U.escapeHTML(water.referenceNote)}</p>` : ""}
       </section>
     `;
   }
@@ -1003,6 +1012,7 @@
       : (stage.current ? `${stage.current.label}（${homeStageEvidenceLabel(stage)}）` : "生育記録待ち");
     return `
       <div class="home-management-head"><b>${U.escapeHTML(stageLabel)}の管理記録</b><small>${U.escapeHTML(focus.active ? `${focus.anchorLabel} / ${focus.observation}` : "今年実績を優先 / 比較は前年実績")}</small></div>
+      ${renderCriticalWaterWindow(field, dateText)}
       <div class="home-management-row water"><span class="home-management-icon">水</span><b>${U.escapeHTML(currentWater ? waterKindLabel(currentWater.kind, currentWater) : "水管理")}</b><span>${U.escapeHTML(waterPeriodText(currentWater, dateText))}</span><small>${U.escapeHTML(`${waterReference.previousText}・${waterReference.comparison}`)}</small></div>
       ${workRows}
       <p class="home-management-guidance">地域の参考: ${U.escapeHTML(homeWaterGuidance(stageLabel))}</p>
@@ -1292,8 +1302,17 @@
   }
 
   function ripeningTempTarget(field) {
-    const variety = field ? state.variety(field.varietyId) : null;
-    return U.number(variety && variety.ripeningAccumulatedTempTarget, 1000) || 1000;
+    return harvestReferenceFor(field).target;
+  }
+
+  function harvestReferenceFor(field) {
+    if (RiceOS.agro && RiceOS.agro.harvestReferenceFor) return RiceOS.agro.harvestReferenceFor(field);
+    return { target: 1000, label: "1,000℃前後", daysMin: 40, daysMax: 50, source: "一般的な目安" };
+  }
+
+  function postHeadingThermalStart(headingDate) {
+    if (RiceOS.agro && RiceOS.agro.postHeadingThermalStart) return RiceOS.agro.postHeadingThermalStart(headingDate);
+    return addDays(headingDate, 1);
   }
 
   function heatCacheKey(field, planting, date) {
@@ -1338,7 +1357,7 @@
     const pace = heatPace(cached);
     if (!cached || cached.error) return "";
     const projectionRows = cached.projectionRows || [];
-    const basis = projectionRows.length ? "今年実測 + 7日予報 + 昨年同時期" : (pace ? `直近ペース ${pace}℃/日` : "気温データ確認中");
+    const basis = projectionRows.length ? "取得済み日別気温 + 7日予報 + 前年同時期" : (pace ? `直近ペース ${pace}℃/日` : "気温データ確認中");
     return `
       <div class="farm-heat-forecast">
         <span>${U.escapeHTML(`予測: ${basis}`)}</span>
@@ -1422,15 +1441,17 @@
 
   function renderRipeningHeatMeter(field, cached, planting, headingTarget) {
     const date = U.today();
-    const target = ripeningTempTarget(field);
+    const reference = harvestReferenceFor(field);
+    const target = reference.target;
     const heading = headingDateInfo(field, cached, planting, headingTarget, date);
+    const thermalStart = heading.date ? postHeadingThermalStart(heading.date) : "";
     const availableRows = validTempRows(cached && cached.rows);
     const projectionRows = validTempRows(cached && cached.projectionRows);
     const canUseRows = heading.date && cached && !cached.error;
     const today = date;
-    const actual = canUseRows && heading.date <= today ? accumulatedFromRows(availableRows, heading.date, today) : { count: 0, total: "" };
+    const actual = canUseRows && thermalStart <= today ? accumulatedFromRows(availableRows, thermalStart, today) : { count: 0, total: "" };
     const futureRows = canUseRows && Number(actual.total || 0) < target
-      ? projectionRows.filter((row) => row.date > today && row.date >= heading.date)
+      ? projectionRows.filter((row) => row.date >= today && row.date >= thermalStart)
       : [];
     const percent = actual.total === "" ? 0 : progressPercent(actual.total, target);
     const status = ripeningStatus(actual.total, target, heading);
@@ -1448,7 +1469,7 @@
       ? "田植え作業を登録すると計算します"
       : !heading.date
         ? "出穂確認か出穂目安が必要です"
-        : `${U.fd(heading.date)}から${actual.count}日分 / ${heading.source}`;
+        : `${U.fd(thermalStart)}からの確定 ${actual.count}日分 / ${heading.source}`;
     return `
       <section class="farm-heat-meter farm-heat-meter-ripening">
         <div class="farm-heat-meter-head">
@@ -1463,14 +1484,14 @@
           <em style="width:${U.attr(String(percent))}%"></em>
         </div>
         <div class="farm-heat-forecast">
-          <span>${U.escapeHTML(heading.actual ? "実測の出穂確認日を起点に計算" : "出穂日は推定です。実測を記録すると置き換わります")}</span>
+          <span>${U.escapeHTML(heading.actual ? `実測の出穂翌日から計算 / ${reference.source}` : "出穂日は推定です。実測を記録すると置き換わります")}</span>
           <mark class="farm-harvest-status ${U.attr(status.tone)}">${U.escapeHTML(status.label)}<small>${U.escapeHTML(status.note)}</small></mark>
           <b>${U.escapeHTML(projectedEta)}</b>
         </div>
         <div class="farm-heat-scale farm-heat-scale-two">
           <span>出穂</span>
           <span>登熟</span>
-          <span>収穫目安 ${U.escapeHTML(String(target))}℃</span>
+          <span>収穫目安 ${U.escapeHTML(reference.label)} / ${reference.daysMin}〜${reference.daysMax}日</span>
         </div>
       </section>
     `;
@@ -1493,7 +1514,7 @@
       : cached && cached.error
         ? cached.error
         : count
-          ? `${U.fd(planting)}から${count}日分 / 出穂目安 ${target}℃`
+          ? `${U.fd(planting)}から確定 ${count}日分 / 出穂目安 ${target}℃`
           : "圃場付近の天気データを確認中";
     return `
       <div class="farm-heat-stack" data-heat-field="${U.attr(field.fieldId)}">
@@ -1844,7 +1865,7 @@
       const today = U.today();
       const rows = [];
       try {
-        const forecast = await RiceOS.weather.fetchDailyRange(addDays(today, 1), addDays(today, 7), location);
+        const forecast = await RiceOS.weather.fetchDailyRange(today, addDays(today, 7), location);
         rows.push(...(forecast.rows || []).map((row) => ({ ...row, basis: "forecast" })));
       } catch (error) {
         // Forecast horizons can vary. Last year's archive still gives a seasonal estimate.
@@ -1910,7 +1931,9 @@
       if (!heatCache.has(key)) {
         try {
           location = location || await RiceOS.weather.ensureLocation();
-          const result = await RiceOS.weather.fetchDailyRange(planting, U.today(), location);
+          // Keep the confirmed accumulation separate from the current day's
+          // forecast. Today and later remain in projectionRows only.
+          const result = await RiceOS.weather.fetchDailyRange(planting, addDays(U.today(), -1), location);
           projectionRows = projectionRows.length ? projectionRows : await fetchHeatProjection(location);
           result.projectionRows = projectionRows;
           heatCache.set(key, result);

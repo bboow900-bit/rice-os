@@ -5,7 +5,7 @@
   const U = RiceOS.utils;
 
   const SCHEMA_VERSION = 17;
-  const APP_VERSION = "20260817_ver252";
+  const APP_VERSION = "20260819_ver253";
   const STORE_KEY = "rice_os_v8_stable";
   const BACKUP_KEY = "rice_os_v8_stable_backup";
   const LEGACY_STORES = [
@@ -49,6 +49,10 @@
     headingAccumulatedTempTarget: "",
     panicleAccumulatedTempTarget: "",
     ripeningAccumulatedTempTarget: "",
+    ripeningAccumulatedTempMin: "",
+    ripeningAccumulatedTempMax: "",
+    harvestDaysAfterHeadingMin: "",
+    harvestDaysAfterHeadingMax: "",
     memo: ""
   };
 

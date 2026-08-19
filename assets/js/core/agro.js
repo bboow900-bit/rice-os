@@ -24,6 +24,17 @@
     { mm: 80, days: 12 }
   ];
 
+  // Regional harvest references are intentionally data, not UI text. Recipe
+  // overrides take precedence so a grower can tune a variety without forking
+  // the calculation used by Home and Outlook.
+  const HARVEST_REFERENCES = [
+    { pattern: /天のつぶ/, target: 1000, minimum: 1000, maximum: 1000, daysMin: 40, daysMax: 50, label: "1,000℃前後" },
+    { pattern: /コシヒカリ/, target: 1025, minimum: 1000, maximum: 1050, daysMin: 40, daysMax: 50, label: "1,000〜1,050℃" },
+    { pattern: /ひとめぼれ|夢の香|福乃香/, target: 950, minimum: 950, maximum: 950, daysMin: 40, daysMax: 50, label: "950℃前後" },
+    { pattern: /福笑い/, target: 1050, minimum: 1050, maximum: 1050, daysMin: 40, daysMax: 50, label: "1,050℃前後" }
+  ];
+  const DEFAULT_HARVEST_REFERENCE = { target: 1000, minimum: 1000, maximum: 1000, daysMin: 40, daysMax: 50, label: "1,000℃前後" };
+
   function addDays(dateText, days) {
     const d = U.localDate ? U.localDate(dateText) : new Date(`${dateText}T00:00:00`);
     if (!d || Number.isNaN(d.getTime())) return "";
@@ -34,6 +45,40 @@
   function isKoshihikari(field) {
     const variety = field && field.varietyId ? state().variety(field.varietyId) : null;
     return /コシヒカリ/.test(String(variety && variety.name || ""));
+  }
+
+  function harvestReferenceFor(fieldOrId) {
+    const field = fieldOf(fieldOrId);
+    const variety = field && field.varietyId ? state().variety(field.varietyId) : null;
+    const matched = HARVEST_REFERENCES.find((item) => item.pattern.test(String(variety && variety.name || ""))) || DEFAULT_HARVEST_REFERENCE;
+    const numberOr = (value, fallback) => {
+      const valueNumber = Number(value);
+      return Number.isFinite(valueNumber) && valueNumber > 0 ? valueNumber : fallback;
+    };
+    const minimum = numberOr(variety && variety.ripeningAccumulatedTempMin, matched.minimum);
+    const maximum = Math.max(minimum, numberOr(variety && variety.ripeningAccumulatedTempMax, matched.maximum));
+    const target = numberOr(variety && variety.ripeningAccumulatedTempTarget, matched.target);
+    const daysMin = numberOr(variety && variety.harvestDaysAfterHeadingMin, matched.daysMin);
+    const daysMax = Math.max(daysMin, numberOr(variety && variety.harvestDaysAfterHeadingMax, matched.daysMax));
+    const hasRecipeOverride = Boolean(variety && [
+      "ripeningAccumulatedTempTarget", "ripeningAccumulatedTempMin", "ripeningAccumulatedTempMax",
+      "harvestDaysAfterHeadingMin", "harvestDaysAfterHeadingMax"
+    ].some((key) => String(variety[key] || "").trim()));
+    return {
+      target,
+      minimum,
+      maximum,
+      daysMin,
+      daysMax,
+      label: hasRecipeOverride
+        ? (minimum === maximum ? `${minimum}℃` : `${minimum}〜${maximum}℃`)
+        : matched.label,
+      source: hasRecipeOverride ? "栽培レシピの収穫目安" : "福島県の品種別目安"
+    };
+  }
+
+  function postHeadingThermalStart(headingDate) {
+    return addDays(headingDate, 1);
   }
 
   function panicleStage(lengthMm) {
@@ -332,6 +377,46 @@
     return { key: "waterWaiting", label: "水管理未記録", tone: "waiting", date: "" };
   }
 
+  // Keep the field record authoritative. This helper adds only a compact
+  // reading reference for the current growth window; it never changes water
+  // periods or creates a planned operation.
+  function waterStageContext(fieldOrId, dateText, anchor) {
+    const field = fieldOf(fieldOrId);
+    const date = dateText || U.today();
+    const management = field ? managementStatus(field, date) : { label: "水管理未記録", date: "" };
+    const started = String(management.date || "");
+    const actualDetail = started
+      ? `${U.fd(started)}から ${Math.max(0, U.daysBetween(started, date))}日目`
+      : "実績の水管理期間は未登録";
+    let referenceLabel = "生育記録を起点に水管理の実績を確認";
+    let referenceNote = "一般的な目安です。田面と圃場の状態を見て判断します。";
+    if (anchor && anchor.mode === "postHeading") {
+      const elapsed = Number(anchor.elapsed || 0);
+      if (elapsed <= 4) {
+        referenceLabel = "開花期の水管理記録を確認";
+        referenceNote = "出穂後の一般的な目安です。田面が長く露出していないか、実績と現場を照合します。";
+      } else if (elapsed <= 7) {
+        referenceLabel = "間断灌水への移行時期を確認";
+        referenceNote = "一般的には開花が終わり始める頃です。現在の水管理期間を現場と照合します。";
+      } else if (elapsed <= 25) {
+        referenceLabel = "間断灌水の期間と水の動きを確認";
+        referenceNote = "出穂後の一般的な登熟期の見方です。登録済みの入水・落水と現場を照合します。";
+      } else {
+        referenceLabel = "落水開始日と収穫見込みを比較";
+        referenceNote = "一般的な登熟後期の目安です。早期落水を避けるかどうかは圃場の状態と収穫予定で判断します。";
+      }
+    } else if (anchor && anchor.mode === "panicle") {
+      if (Number(anchor.length || 0) >= 65 && Number(anchor.length || 0) <= 95) {
+        referenceLabel = "低温時の深水管理実績を確認";
+        referenceNote = "幼穂長約8cmを基準にした一般的な目安です。地域情報と現場の状態を照合します。";
+      } else {
+        referenceLabel = "深水・間断の実績を確認";
+        referenceNote = "幼穂確認を起点にした一般的な見方です。推定が実際の水管理を上書きすることはありません。";
+      }
+    }
+    return { management, actualDetail, referenceLabel, referenceNote };
+  }
+
   function latestPanicleLog(fieldId, year, dateText) {
     const summary = state().growthSummaryFor && state().growthSummaryFor(fieldId, year, { asOfDate: dateText || U.today() });
     if (summary && summary.panicleLog) return summary.panicleLog;
@@ -381,7 +466,8 @@
         anchorLabel: `出穂から${elapsed}日目`,
         observation: `出穂 ${U.fd(headingDate)}（実測）`,
         note,
-        management
+        management,
+        water: waterStageContext(field, date, { mode: "postHeading", elapsed })
       };
     }
 
@@ -400,7 +486,7 @@
       note = "幼穂確認を起点に、水管理の実績と気象を合わせて見る時期です。低温時の深水管理実績を、地域の参考情報と照合します。";
     }
     const estimate = panicleEstimate(field, length, panicleLog.date);
-    return {
+      return {
       active: true,
       mode: "panicle",
       phase,
@@ -409,8 +495,9 @@
       observation: estimate && estimate.supported && estimate.date
         ? `出穂目安 ${U.fd(estimate.rangeStart)}〜${U.fd(estimate.rangeEnd)}`
         : "出穂日は未確認",
-      note,
-      management
+        note,
+        management,
+        water: waterStageContext(field, date, { mode: "panicle", length })
     };
   }
 
@@ -561,7 +648,10 @@
     latestPanicleEstimate,
     seasonStageForField,
     managementStatus,
+    waterStageContext,
     criticalWaterWindow,
+    harvestReferenceFor,
+    postHeadingThermalStart,
     SEASON_STAGES
   };
 })();

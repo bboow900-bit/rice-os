@@ -12,12 +12,6 @@
     { id: "pest", label: "福島県 病害虫情報", url: "https://www.pref.fukushima.lg.jp/sec/37200b/", role: "病害虫発生予察" }
   ];
 
-  const HARVEST_HEAT_TARGETS = [
-    { pattern: /天のつぶ/, target: 1000, label: "1,000℃前後" },
-    { pattern: /コシヒカリ/, target: 1025, label: "1,000〜1,050℃" },
-    { pattern: /ひとめぼれ/, target: 975, label: "950〜1,000℃" }
-  ];
-
   function state() { return RiceOS.state; }
   function agro() { return RiceOS.agro || {}; }
   function yearOf(date) { return String(date || U.today()).slice(0, 4); }
@@ -70,8 +64,8 @@
   }
 
   function heatTarget(field) {
-    const name = varietyName(field);
-    return HARVEST_HEAT_TARGETS.find((item) => item.pattern.test(name)) || { target: 1000, label: "1,000℃前後" };
+    if (agro().harvestReferenceFor) return agro().harvestReferenceFor(field);
+    return { target: 1000, minimum: 1000, maximum: 1000, daysMin: 40, daysMax: 50, label: "1,000℃前後", source: "一般的な目安" };
   }
 
   function dateRange(date, padding) {
@@ -129,8 +123,15 @@
     let harvest = { kind: "missing", date: "", range: dateRange(""), label: "記録不足", source: "" };
     if (harvestActual) harvest = { kind: "actual", date: harvestActual, range: dateRange(harvestActual), label: "実測済", source: "今年の収穫日" };
     else if (heading.date) {
-      const date = dateAdd(heading.date, 45);
-      harvest = { kind: heading.kind === "actual" ? "heading" : "estimatedHeading", date, range: dateRange(date, 5), label: "出穂日を基準にした参考", source: "出穂後45日を中心とした仮の幅" };
+      const reference = heatTarget(field);
+      const date = dateAdd(heading.date, Math.round((reference.daysMin + reference.daysMax) / 2));
+      harvest = {
+        kind: heading.kind === "actual" ? "heading" : "estimatedHeading",
+        date,
+        range: { start: dateAdd(heading.date, reference.daysMin), end: dateAdd(heading.date, reference.daysMax), label: `${U.fd(dateAdd(heading.date, reference.daysMin))}〜${U.fd(dateAdd(heading.date, reference.daysMax))}` },
+        label: "出穂日を基準にした参考",
+        source: `出穂後${reference.daysMin}〜${reference.daysMax}日 / ${reference.label}`
+      };
     }
     // A heading observation confirms heading, not the later harvest window.
     // Keep the card confidence conservative until harvest itself is recorded.

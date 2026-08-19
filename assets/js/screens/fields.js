@@ -734,12 +734,20 @@
       ? RiceOS.agro.criticalWaterWindow(field, U.today())
       : null;
     if (!focus || !focus.active) return "";
+    const water = focus.water || {};
+    const headingMode = focus.mode === "postHeading";
     return `
       <section class="critical-water-window field-critical-water mode-${U.attr(focus.mode)}" aria-label="幼穂確認以降の生育と水管理">
-        <div class="critical-water-window-head"><span>幼穂確認からの見通し</span><b>${U.escapeHTML(focus.certainty)}</b></div>
+        <div class="critical-water-window-head"><span>${headingMode ? "出穂後の生育と水管理" : "幼穂確認からの生育と水管理"}</span><b>${U.escapeHTML(focus.certainty)}</b></div>
         <strong>${U.escapeHTML(focus.phase)}</strong>
         <div class="critical-water-window-facts"><span>${U.escapeHTML(focus.anchorLabel)}</span><span>${U.escapeHTML(focus.observation)}</span></div>
+        <div class="critical-water-window-water">
+          <span>現在の実績</span><b>${U.escapeHTML(water.management && water.management.label || focus.management && focus.management.label || "水管理未記録")}</b>
+          <small>${U.escapeHTML(water.actualDetail || "実績の水管理期間は未登録")}</small>
+        </div>
+        <div class="critical-water-window-reference"><span>照合の目安</span><b>${U.escapeHTML(water.referenceLabel || "現場と記録を確認")}</b></div>
         <p>${U.escapeHTML(focus.note)}</p>
+        ${water.referenceNote ? `<p class="critical-water-window-note">${U.escapeHTML(water.referenceNote)}</p>` : ""}
       </section>
     `;
   }
