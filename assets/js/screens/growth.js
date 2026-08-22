@@ -7,6 +7,8 @@
   const state = RiceOS.state;
   let bulkFieldIds = [];
   let inputMode = localStorage.getItem("riceGrowthInputMode") || "simple";
+  let headingSaveApproved = false;
+  let pendingHeadingSave = null;
   // 履歴は入力の邪魔にならないよう、画面を開くたび閉じた状態から始める。
   let timelineOpen = false;
 
@@ -46,7 +48,10 @@
     const mode = U.$("gPanicleTargetMode");
     const groupSelect = U.$("gPanicleGroup");
     if (!selectedField) return { name: "", fields: [], skipped: [] };
-    if (!mode || mode.value !== "group") return { name: selectedField.name, fields: [selectedField], skipped: [] };
+    if (!mode || mode.value !== "group") {
+      const alreadyRecorded = kind === "heading" && observedHeadingDate(selectedField.fieldId, U.$("gDate").value || U.today());
+      return { name: selectedField.name, fields: alreadyRecorded ? [] : [selectedField], skipped: alreadyRecorded ? [selectedField] : [] };
+    }
     const group = fieldGroups().find((item) => item.fieldGroupId === groupSelect.value);
     if (!group) return { name: "", fields: [], skipped: [] };
     const date = U.$("gDate").value || U.today();
@@ -213,7 +218,9 @@
 
   function observedHeadingDate(fieldId, dateText) {
     const year = cropYear(dateText);
-    if (state.growthSummaryFor) return state.growthSummaryFor(fieldId, year, { asOfDate: dateText }).headingDate;
+    // 同じ年の出穂確認は一件だけにする。後日入力や過去日入力でも
+    // 既存の実測日を見逃して、積算温度の基準を二重に作らない。
+    if (state.growthSummaryFor) return state.growthSummaryFor(fieldId, year).headingDate;
     return state.growthLogsFor(fieldId)
       .filter((log) => String(log.date || "").startsWith(`${year}-`))
       .slice()
@@ -569,6 +576,50 @@
     if (log) fillEdit(log);
   }
 
+  function headingLogForField(fieldId, dateText) {
+    const year = cropYear(dateText);
+    return state.growthLogsFor(fieldId, year)
+      .filter((log) => log.headingObserved)
+      .slice()
+      .sort((a, b) => String(a.date || "").localeCompare(String(b.date || "")))[0] || null;
+  }
+
+  function closeHeadingConfirm() {
+    const sheet = U.$("headingConfirmSheet");
+    if (!sheet) return;
+    sheet.classList.add("hidden");
+    sheet.setAttribute("aria-hidden", "true");
+    pendingHeadingSave = null;
+    if (RiceOS.app && RiceOS.app.syncBackButton) RiceOS.app.syncBackButton();
+  }
+
+  function openExistingHeadingRecord(targets) {
+    const existing = (targets.skipped || []).map((field) => headingLogForField(field.fieldId, U.$("gDate").value || U.today())).find(Boolean);
+    if (!existing) return;
+    closeHeadingConfirm();
+    fillEdit(existing);
+    U.toast("登録済みの出穂確認を編集します");
+  }
+
+  function requestHeadingConfirmation(targets, onApprove) {
+    const sheet = U.$("headingConfirmSheet");
+    if (!sheet) {
+      if (confirm("圃場全体で、4〜5割ほどの穂が止葉から出ていますか？\nこの日付を出穂後の積算温度・水管理・収穫目安の基準にします。")) onApprove();
+      return;
+    }
+    const date = U.$("gDate").value || U.today();
+    U.$("headingConfirmDate").textContent = U.fd(date);
+    U.$("headingConfirmTarget").textContent = `${targets.name || "選択した圃場"}${targets.fields.length > 1 ? ` ${targets.fields.length}圃場` : ""}`;
+    const existing = U.$("headingConfirmExisting");
+    const skipped = targets.skipped || [];
+    existing.classList.toggle("hidden", !skipped.length);
+    existing.textContent = skipped.length ? `${skipped.map((field) => field.name).join("・")} は出穂確認済みです。新規追加せず、必要なら登録済みの記録を編集します。` : "";
+    pendingHeadingSave = { targets, onApprove };
+    sheet.classList.remove("hidden");
+    sheet.setAttribute("aria-hidden", "false");
+    if (RiceOS.app && RiceOS.app.syncBackButton) RiceOS.app.syncBackButton();
+  }
+
   function saveHeadingObservedOnly() {
     if (!U.$("gField").value) {
       alert("圃場を選んでください。");
@@ -576,10 +627,13 @@
     }
     const targets = targetFieldsForStageRecord("heading");
     if (!targets.fields.length) {
-      alert("出穂を登録できる未確認の圃場がありません。");
+      openExistingHeadingRecord(targets);
       return;
     }
-    if (targets.fields.length > 1 && !confirm(`${targets.name}の${targets.fields.length}圃場へ、${U.fd(U.$("gDate").value || U.today())}を出穂日として登録します。`)) return;
+    requestHeadingConfirmation(targets, () => saveHeadingObservedRecords(targets));
+  }
+
+  function saveHeadingObservedRecords(targets) {
     const records = targets.fields.map((field) => ({
         date: U.$("gDate").value || U.today(),
         fieldId: field.fieldId,
@@ -664,6 +718,20 @@
       }
       const existing = state.data().growthLogs.find((log) => log.logId === U.$("editGrowthId").value);
       const headingObserved = U.$("gHeadingObserved") ? U.$("gHeadingObserved").checked : false;
+      const approvedHeadingSave = headingSaveApproved;
+      headingSaveApproved = false;
+      if (headingObserved && !approvedHeadingSave && !(existing && existing.headingObserved)) {
+        const headingTargets = targetFieldsForStageRecord("heading");
+        if (!headingTargets.fields.length) {
+          openExistingHeadingRecord(headingTargets);
+          return;
+        }
+        requestHeadingConfirmation(headingTargets, () => {
+          headingSaveApproved = true;
+          U.$("growthForm").requestSubmit();
+        });
+        return;
+      }
       const selectedStage = U.$("gObservedStage") ? U.$("gObservedStage").value : "";
       const inferredStage = headingObserved
         ? "heading"
@@ -706,7 +774,7 @@
         ? groupedStageTargets.fields.map((field) => field.fieldId)
         : (!common.logId && bulkFieldIds.length > 1 ? bulkFieldIds : [U.$("gField").value]);
       const stageLabel = headingObserved ? "出穂" : `幼穂長 ${common.panicleLengthMm}mm`;
-      if (targets.length > 1 && (common.panicleLengthMm || headingObserved) && !confirm(`${groupedStageTargets.name || "選択した圃場"}の${targets.length}圃場へ、${stageLabel}を同じ日付で登録します。`)) return;
+      if (targets.length > 1 && common.panicleLengthMm && !confirm(`${groupedStageTargets.name || "選択した圃場"}の${targets.length}圃場へ、${stageLabel}を同じ日付で登録します。`)) return;
       const records = targets.map((fieldId) => ({
         ...common,
         logId: targets.length > 1 ? "" : common.logId,
@@ -745,6 +813,21 @@
     });
 
     document.querySelector('[data-action="reset-growth"]').addEventListener("click", resetForm);
+    U.$$('[data-heading-confirm-close]').forEach((button) => button.addEventListener("click", closeHeadingConfirm));
+    U.$("headingConfirmSheet").addEventListener("click", (event) => {
+      const action = event.target.closest("[data-heading-confirm]");
+      if (!action || !pendingHeadingSave) return;
+      const pending = pendingHeadingSave;
+      if (action.dataset.headingConfirm === "early") {
+        closeHeadingConfirm();
+        U.toast("出穂日は保存しませんでした。圃場全体で穂がそろった日に登録できます。");
+        return;
+      }
+      if (action.dataset.headingConfirm === "approve") {
+        closeHeadingConfirm();
+        pending.onApprove();
+      }
+    });
     if (U.$("growthFilterField")) U.$("growthFilterField").addEventListener("change", renderTimeline);
     if (U.$("growthRange")) U.$("growthRange").addEventListener("change", renderTimeline);
     if (U.$("gPanicleTargetMode")) U.$("gPanicleTargetMode").addEventListener("change", () => {

@@ -303,13 +303,15 @@ state.saveFieldWork({
   workName: "出穂確認",
   hours: "1"
 });
-state.saveGrowthLog({
+const headingCountBeforeDuplicate = state.growthLogsFor("field_a", 2026).filter((row) => row.headingObserved).length;
+assert(state.saveGrowthLog({
   date: "2026-07-03",
   fieldId: "field_a",
   headingObserved: true,
   observedStage: "heading",
   stageConfirmed: true
-});
+}) === null, "同年の出穂確認を重複保存できてしまう");
+assert(state.growthLogsFor("field_a", 2026).filter((row) => row.headingObserved).length === headingCountBeforeDuplicate, "重複出穂確認の拒否で既存記録が変化した");
 state.saveGrowthLog({
   date: "2025-06-20",
   fieldId: "field_a",
@@ -338,7 +340,7 @@ assert(growth2025.panicleLog && growth2025.panicleLog.date === "2025-06-20", "gr
 assert(growth2025.headingDate === "" && growth2025.headingSource === "", "a work label became a biological heading-date anchor");
 assert(growth2026ThroughJune.panicleLog && growth2026ThroughJune.panicleLog.date === "2026-06-26", "growth summary did not use the latest panicle record in its year");
 assert(growth2026ThroughJune.headingDate === "", "growth summary included a future heading record");
-assert(growth2026.headingDate === "2026-07-03", "growth summary did not use the earliest confirmed heading evidence");
+assert(growth2026.headingDate === "2026-07-06", "growth summary did not keep the existing confirmed heading evidence after rejecting a duplicate");
 growth2026.panicleLog.panicleLengthMm = "999";
 assert(state.growthLogsFor("field_a", 2026).some((row) => row.date === "2026-06-26" && row.panicleLengthMm === "8"), "growth summary exposed a mutable saved growth log");
 assert(JSON.stringify(state.data().growthLogs) === growthBeforeSummary, "growth summary mutated saved growth logs");
@@ -478,7 +480,7 @@ assert(state.plantingDateForField("field_a", 2026) === "2026-05-15", "year-scope
 assert(global.RiceOS.utils.daysAfterPlanting(state.field("field_a"), "2026-05-25") === 10, "DAP used a planting date from another year");
 assert(state.workDateForField("field_a", "中干し開始", "last", 2025) === "2025-06-01", "year-scoped work lookup leaked another year");
 assert(state.headingDateForField("field_a", 2025) === "", "a heading work label was treated as an observation in its year");
-assert(state.headingDateForField("field_a", 2026) === "2026-07-03", "heading lookup did not include confirmed growth evidence");
+assert(state.headingDateForField("field_a", 2026) === "2026-07-06", "heading lookup did not retain the edited confirmed growth evidence");
 assert(state.dryPeriodsFor("field_a", 2025).every((row) => String(row.date).startsWith("2025-")), "year-scoped drying lookup leaked another year");
 assert(state.irrigationsFor("field_a", 2026).every((row) => String(row.date).startsWith("2026-")), "year-scoped intermittent irrigation lookup leaked another year");
 assert(agro.managementStatus(state.field("field_a"), "2025-06-10").key === "overlap", "重なった水管理記録を一方的に現在地へ決めている");

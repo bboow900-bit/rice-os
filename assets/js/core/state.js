@@ -717,6 +717,16 @@
       lastError = new Error("同じ圃場が一括生育記録に重複しています。保存は行いませんでした。");
       return null;
     }
+    const duplicateHeading = rows.find((record) => record.headingObserved && data().growthLogs.some((existing) => (
+      existing.logId !== record.logId
+      && existing.headingObserved
+      && existing.fieldId === record.fieldId
+      && String(existing.date || "").slice(0, 4) === String(record.date || U.today()).slice(0, 4)
+    )));
+    if (duplicateHeading) {
+      lastError = new Error("この圃場には同じ年の出穂確認が登録済みです。既存の生育記録を編集してください。保存は行いませんでした。");
+      return null;
+    }
     return mutate((d) => {
       rows.forEach((record) => saveGrowthLogToDraft(d, record));
     }, message || `生育ログを${rows.length}件保存しました`);

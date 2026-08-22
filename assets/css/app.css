@@ -7051,6 +7051,59 @@ label {
   .water-road-caption small { display: none; }
 }
 
+.heading-confirm-panel {
+  gap: 12px;
+  max-width: 480px;
+}
+
+.heading-confirm-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  align-items: center;
+  padding: 9px 11px;
+  border: 1px solid #d8e8ce;
+  border-radius: 12px;
+  background: #f7fbf3;
+  color: #45634a;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.heading-confirm-summary b {
+  color: #173f20;
+  font-size: 13px;
+}
+
+.heading-confirm-question {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr);
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #e6d9a6;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #fffbe9, #f8fbf1);
+}
+
+.heading-confirm-question > span {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: #edf6df;
+  font-size: 21px;
+}
+
+.heading-confirm-question div { display: grid; gap: 5px; }
+.heading-confirm-question b { color: #23422a; font-size: 14px; line-height: 1.45; }
+.heading-confirm-question small { color: #627164; font-size: 11px; font-weight: 700; line-height: 1.55; }
+.heading-confirm-existing { margin: 0; padding: 9px 11px; border-radius: 10px; background: #eef6eb; color: #45634a; font-size: 11px; font-weight: 750; line-height: 1.45; }
+.heading-confirm-existing.hidden { display: none; }
+.heading-confirm-actions { display: grid; gap: 8px; }
+.heading-confirm-actions .primary, .heading-confirm-actions .secondary { min-height: 46px; }
+.heading-confirm-actions .text-button { min-height: 38px; border: 0; background: transparent; color: #617263; font: inherit; font-size: 12px; font-weight: 800; }
+
 /* Machine maintenance: independent asset records, kept compact for phone use. */
 .machine-head { align-items: center; }
 .machine-head > div { min-width: 0; }

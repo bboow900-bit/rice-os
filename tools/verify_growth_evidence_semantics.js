@@ -29,6 +29,11 @@ assert(/if \(row\.headingObserved\)[\s\S]*else if \(Number\(row\.panicleLengthMm
 assert(/manual-stage-observation", "heading", "harvest/.test(agro), "A later manual stage judgement must update the current stage without becoming a heading fact");
 assert(!/works\.filter\(\(row\) => \/出穂\//.test(agro), "Work labels must not create heading-stage evidence");
 assert(/find\(\(log\) => log\.headingObserved\)/.test(growth), "The growth screen must use only explicit heading observation as its anchor");
+assert(/4〜5割ほどの穂が止葉から出ていますか？/.test(read("index.html")), "Heading registration must ask for field-wide 40-50% emergence before saving");
+assert(/data-heading-confirm="approve"/.test(read("index.html")) && /data-heading-confirm="early"/.test(read("index.html")), "Heading confirmation must provide approve and not-yet actions");
+assert(/headingSaveApproved/.test(growth) && /requestHeadingConfirmation/.test(growth), "Both direct and normal growth saves must pass through the shared heading confirmation flow");
+assert(/出穂日は保存しませんでした/.test(growth), "The not-yet action must be a no-op for the heading anchor");
+assert(/同じ年の出穂確認が登録済み/.test(state), "State must reject same-year duplicate heading observations even when UI is bypassed");
 assert(/function isObservedHeading\(row\) \{\s*return Boolean\(row && row\.headingObserved\);/.test(annual), "Annual history must not call a manual stage selection an observed heading");
 assert(/label: "現場ステージ"/.test(annual) && /category: fact\.kind === "manual-stage" \? "現場判定" : "生育実測"/.test(annual), "Annual history must visibly distinguish field judgement from measurement");
 assert(!/headingObserved \|\| log\.stageConfirmed && log\.observedStage === "heading"/.test(state), "Deleting a heading record must not promote a manual heading stage into a factual observation");
