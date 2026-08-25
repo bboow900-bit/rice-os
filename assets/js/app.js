@@ -239,12 +239,13 @@
     const updateButton = document.querySelector('[data-action="force-update"]');
     if (updateButton) {
       updateButton.addEventListener("click", () => {
-        if (!confirm("最新版を読み込みます。保存していない入力内容は失われるため、必要な記録は先に保存してください。")) return;
+        if (!confirm("現在の保存済みデータを更新前バックアップへ自動保存してから、最新版を読み込みます。\n\n入力途中で未保存の内容だけは残らないため、先に保存してください。")) return;
         const backedUp = !RiceOS.storage || !RiceOS.storage.backupBeforeAppUpdate || RiceOS.storage.backupBeforeAppUpdate();
         if (!backedUp) {
           alert("更新前の自動保存に失敗したため、更新を中止しました。JSON保存を行ってから再度お試しください。");
           return;
         }
+        alert("更新前データを自動保存しました。\nこれから最新版を読み込みます。");
         if (RiceOS.pwa) RiceOS.pwa.forceUpdate();
         else location.reload();
       });
