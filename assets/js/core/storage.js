@@ -26,6 +26,54 @@
     localStorage.setItem(key, raw);
   }
 
+  function releaseBackups() {
+    const entries = safeParse(readRaw(S.RELEASE_BACKUPS_KEY));
+    return Array.isArray(entries) ? entries.filter((entry) => entry && typeof entry.raw === "string") : [];
+  }
+
+  // Keep the pre-update payload exactly as it was, before normalization can
+  // change its shape. A small rolling set protects against a bad release
+  // without replacing the user's current data or the normal undo snapshot.
+  function createReleaseBackup(raw, sourceVersion) {
+    if (!raw) return false;
+    const current = releaseBackups();
+    if (current.some((entry) => entry.sourceVersion === sourceVersion && entry.raw === raw)) return true;
+    const entry = {
+      backupId: U.id("release_backup", U.today()),
+      sourceVersion: sourceVersion || "更新前バージョン不明",
+      capturedAt: U.now(),
+      bytes: byteSize(raw),
+      raw
+    };
+    let next = [entry, ...current].slice(0, Number(S.RELEASE_BACKUP_LIMIT || 3));
+    while (next.length) {
+      try {
+        writeRaw(S.RELEASE_BACKUPS_KEY, JSON.stringify(next));
+        return true;
+      } catch (error) {
+        // Prefer a newer, smaller protection set when localStorage is tight.
+        next = next.slice(0, -1);
+      }
+    }
+    return false;
+  }
+
+  function stampAppVersion(data) {
+    const normalized = S.normalize(data);
+    normalized.appVersion = S.APP_VERSION;
+    normalized.meta = normalized.meta || {};
+    normalized.meta.appVersion = S.APP_VERSION;
+    return normalized;
+  }
+
+  function releaseBackupBeforeOverwrite(raw) {
+    const source = safeParse(raw);
+    if (!source) return true;
+    const sourceVersion = String(source.appVersion || source.meta && source.meta.appVersion || "");
+    if (sourceVersion === S.APP_VERSION) return true;
+    return createReleaseBackup(raw, sourceVersion);
+  }
+
   function findLegacy() {
     for (const key of S.LEGACY_STORES) {
       const parsed = safeParse(readRaw(key));
@@ -41,13 +89,21 @@
     const currentRaw = readRaw(S.STORE_KEY);
     const current = safeParse(currentRaw);
     if (current) {
-      const normalized = S.normalize(current);
+      const sourceVersion = String(current.appVersion || current.meta && current.meta.appVersion || "");
+      const appUpdated = sourceVersion !== S.APP_VERSION;
+      const releaseBackedUp = !appUpdated || createReleaseBackup(currentRaw, sourceVersion);
+      if (!releaseBackedUp) return S.normalize(current);
+      const normalized = stampAppVersion(current);
       const previousVersion = Number(current.schemaVersion || 0);
-      if (previousVersion < S.SCHEMA_VERSION) {
+      if (previousVersion < S.SCHEMA_VERSION || appUpdated) {
         try {
           if (currentRaw) writeRaw(S.BACKUP_KEY, currentRaw);
           normalized.meta = normalized.meta || {};
           normalized.meta.lastBackupAt = U.now();
+          if (appUpdated) {
+            normalized.meta.lastReleaseBackupAt = U.now();
+            normalized.meta.lastReleaseBackupSourceVersion = sourceVersion || "更新前バージョン不明";
+          }
           normalized.meta.migratedFromSchemaVersion = previousVersion;
           normalized.meta.migratedAt = U.now();
           writeRaw(S.STORE_KEY, JSON.stringify(normalized));
@@ -82,8 +138,11 @@
   }
 
   function saveData(data) {
-    const normalized = S.normalize(data);
+    const normalized = stampAppVersion(data);
     const currentRaw = readRaw(S.STORE_KEY);
+    if (currentRaw && !releaseBackupBeforeOverwrite(currentRaw)) {
+      throw new Error("更新前の自動保存に失敗しました。JSON保存を行ってから、もう一度お試しください。");
+    }
     try {
       if (currentRaw) {
         writeRaw(S.BACKUP_KEY, currentRaw);
@@ -286,6 +345,15 @@
     return backup ? S.normalize(backup) : null;
   }
 
+  function releaseBackupInfo() {
+    return releaseBackups().map((entry) => ({
+      backupId: String(entry.backupId || ""),
+      sourceVersion: String(entry.sourceVersion || "更新前バージョン不明"),
+      capturedAt: String(entry.capturedAt || ""),
+      bytes: Number(entry.bytes || byteSize(entry.raw || ""))
+    }));
+  }
+
   function exportJson(data) {
     const normalized = S.normalize(data);
     const exportId = U.id("export", U.today());
@@ -315,11 +383,14 @@
     const raw = readRaw(S.STORE_KEY) || JSON.stringify(data || {});
     const backupRaw = readRaw(S.BACKUP_KEY) || "";
     const d = S.normalize(data || loadData());
+    const releases = releaseBackupInfo();
     return {
       storeKey: S.STORE_KEY,
       backupKey: S.BACKUP_KEY,
       bytes: byteSize(raw),
       backupBytes: byteSize(backupRaw),
+      releaseBackupCount: releases.length,
+      latestReleaseBackup: releases[0] || null,
       varieties: d.varieties.length,
       fields: d.fields.length,
       fieldWorks: d.fieldWorks.length,
@@ -517,6 +588,7 @@
     importLegacyNow,
     restoreBackup,
     backupData,
+    releaseBackupInfo,
     exportJson,
     exportCsv,
     findLegacy,

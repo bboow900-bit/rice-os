@@ -5,9 +5,11 @@
   const U = RiceOS.utils;
 
   const SCHEMA_VERSION = 17;
-  const APP_VERSION = "20260820_ver254";
+  const APP_VERSION = "20260825_ver259";
   const STORE_KEY = "rice_os_v8_stable";
   const BACKUP_KEY = "rice_os_v8_stable_backup";
+  const RELEASE_BACKUPS_KEY = "rice_os_v8_stable_release_backups";
+  const RELEASE_BACKUP_LIMIT = 3;
   const LEGACY_STORES = [
     "rice_os_v7_rescue",
     "rice_os_v7_stable",
@@ -984,6 +986,8 @@
     APP_VERSION,
     STORE_KEY,
     BACKUP_KEY,
+    RELEASE_BACKUPS_KEY,
+    RELEASE_BACKUP_LIMIT,
     LEGACY_STORES,
     DEFAULT_VARIETIES,
     DEFAULT_FIELD_GROUPS,

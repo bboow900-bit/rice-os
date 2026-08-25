@@ -55,6 +55,10 @@
     const exportStatus = exportDate
       ? `最終JSON出力を開始: ${U.fd(exportDate)} / ${exportDays}日前`
       : "JSON出力: 未実施";
+    const releaseBackup = info.latestReleaseBackup;
+    const releaseBackupLabel = info.releaseBackupCount
+      ? `${info.releaseBackupCount}世代 / ${releaseBackup && releaseBackup.sourceVersion || "更新前バージョン不明"}`
+      : "次回更新時に自動保存";
     U.$("dataStatus").innerHTML = `
       <div class="data-storage-status" style="grid-column: 1 / -1">
         <b>バックアップ状況</b>
@@ -66,6 +70,7 @@
       ["保存キー", info.storeKey],
       ["使用量", sizeLabel(info.bytes)],
       ["直前バックアップ", info.backupBytes ? sizeLabel(info.backupBytes) : "なし"],
+      ["更新前自動保存", releaseBackupLabel],
       ["レシピ/圃場", `${info.varieties}/${info.fields}`],
       ["圃場作業", `${info.fieldWorks}件`],
       ["生育ログ", `${info.growthLogs}件`],

@@ -44,6 +44,7 @@ load("assets/js/core/schema.js");
 const S = global.RiceOS.schema;
 const oldData = {
   schemaVersion: 7,
+  appVersion: "20260820_ver254",
   varieties: [{ varietyId: "variety_test", name: "試験品種" }],
   fields: [
     { fieldId: "field_a", name: "旧名A", varietyId: "variety_test", areaA: 20, fieldGroupId: "旧グループ" },
@@ -130,6 +131,10 @@ const agro = global.RiceOS.agro;
 
 assert(state.field("field_a"), "旧JSONの圃場を読み込めない");
 assert(memory.get(S.BACKUP_KEY), "スキーマ移行前の自動退避が作成されていない");
+const releaseBackups = storage.releaseBackupInfo();
+assert(releaseBackups.length === 1, "更新前の世代バックアップが作成されていない");
+assert(releaseBackups[0].sourceVersion === "20260820_ver254", "世代バックアップの更新前バージョンが正しくない");
+assert(state.data().appVersion === S.APP_VERSION, "更新後データにアプリバージョンが記録されていない");
 assert(state.fieldWorksFor("field_a").some((row) => row.workId === "work_planting"), "旧作業と圃場IDの関連が消えた");
 
 state.updateField("field_a", { name: "新名A" });
