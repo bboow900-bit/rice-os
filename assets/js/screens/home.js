@@ -10,6 +10,7 @@
   let filterFieldId = "all";
   let homeGroupFilter = "all";
   let expandedManagementFieldId = "";
+  let homeCandidatesExpanded = false;
   const heatCache = new Map();
   const heatProjectionCache = new Map();
   const waterForecastCache = new Map();
@@ -1137,11 +1138,12 @@
         <button type="button" class="primary" data-home-quick-record>記録を追加</button>
       </section>
       <section class="home-decision-summary" aria-label="今日の状況">
-        <div><b>${U.escapeHTML(String(candidates.length))}</b><span>確認候補</span></div>
-        <div><b>${U.escapeHTML(String(overdue.length))}</b><span>期限超過</span></div>
-        <div><b>${U.escapeHTML(String(todayEntries.length))}</b><span>今日の記録</span></div>
-        <div><b>${U.escapeHTML(String(activeWaterCount(U.today())))}</b><span>進行中の水管理</span></div>
+        <button type="button" data-home-summary-action="candidate" ${candidates.length ? "" : "disabled"}><b>${U.escapeHTML(String(candidates.length))}</b><span>確認候補</span><small>${candidates.length ? "入力を選ぶ" : "候補なし"}</small></button>
+        <button type="button" data-home-summary-action="overdue" ${overdue.length ? "" : "disabled"}><b>${U.escapeHTML(String(overdue.length))}</b><span>期限超過</span><small>${overdue.length ? "予定を確認" : "遅れなし"}</small></button>
+        <button type="button" data-home-summary-action="today"><b>${U.escapeHTML(String(todayEntries.length))}</b><span>今日の記録</span><small>記録を追加</small></button>
+        <button type="button" data-home-summary-action="water" ${activeWaterCount(U.today()) ? "" : "disabled"}><b>${U.escapeHTML(String(activeWaterCount(U.today())))}</b><span>進行中の水管理</span><small>${activeWaterCount(U.today()) ? "水管理を開く" : "進行中なし"}</small></button>
       </section>
+      ${homeCandidatesExpanded ? renderCandidateCard() : ""}
       ${renderTodayPlans(U.today())}
       <section class="home-decision-section">
         <div class="home-decision-section-head"><div><h3>全圃場</h3><small>今日の状況を優先順に表示</small></div><select data-home-group-filter aria-label="圃場グループを絞り込む">${groupOptions}</select></div>
@@ -1837,31 +1839,47 @@
   }
 
   function renderCandidateCard() {
-    const rows = candidateGroupsForDate(U.today()).slice(0, 3);
+    const rows = candidateGroupsForDate(U.today());
     return `
-      <section class="farm-candidate-card">
+      <section class="farm-candidate-card" data-home-candidate-panel>
         <div>
           <h3>今日の確認候補</h3>
-          <button type="button" data-home-view="list">すべて見る ›</button>
+          <button type="button" data-home-candidates-toggle>閉じる</button>
         </div>
         ${rows.length ? rows.map((group) => {
           const field = group.field;
           const planting = field ? plantingDateForYear(field.fieldId, cropYear(U.today())) : "";
           const dap = planting ? U.daysBetween(planting, U.today()) : "";
           return `
-            <button type="button" class="farm-candidate-row" data-home-date="${U.attr(U.today())}" data-home-field="${U.attr(field && field.fieldId || "")}">
+            <article class="farm-candidate-row">
               <img src="assets/images/light-icons/rice-panicle.png" alt="">
               <span>
                 <b>${U.escapeHTML(field && field.name || "圃場")}</b>
                 <em>${U.escapeHTML(group.entries.map((entry) => entry.title.replace("確認候補", "")).join("・"))}確認候補</em>
                 <small>${dap !== "" ? `田植え後${dap}日` : "田植日未登録"}・${U.escapeHTML(String(group.entries.length))}件を現場確認</small>
               </span>
-              <i>›</i>
-            </button>
+              <div class="farm-candidate-actions">${group.entries.map((entry) => renderCandidateAction(entry, field)).join("")}</div>
+            </article>
           `;
         }).join("") : '<div class="farm-empty">今日の確認候補はありません</div>'}
       </section>
     `;
+  }
+
+  function candidateAction(entry, field) {
+    const title = String(entry && entry.title || "");
+    if (/中干し/.test(title)) return { kind: "water", typeKey: "dry", label: "中干しを記録" };
+    if (/水管理/.test(title)) {
+      const period = field ? activeHomeWaterPeriod(field, U.today()) : null;
+      return { kind: "water", typeKey: period && period.kind || "", label: "水管理を開く" };
+    }
+    return { kind: "growth", typeKey: "", label: "生育を記録" };
+  }
+
+  function renderCandidateAction(entry, field) {
+    const action = candidateAction(entry, field);
+    const fieldId = field && field.fieldId || entryFieldIds(entry)[0] || "";
+    return `<button type="button" class="farm-candidate-action ${U.attr(action.kind)}" data-home-candidate-input="${U.attr(action.kind)}" data-home-candidate-field="${U.attr(fieldId)}" data-home-candidate-water-type="${U.attr(action.typeKey)}">${U.escapeHTML(action.label)}</button>`;
   }
 
   function renderTodaySchedule(date) {
@@ -2049,6 +2067,36 @@
         openDate(U.today(), "");
         return;
       }
+      const summaryAction = event.target.closest("[data-home-summary-action]");
+      if (summaryAction && !summaryAction.disabled) {
+        const action = summaryAction.dataset.homeSummaryAction || "";
+        if (action === "candidate") {
+          homeCandidatesExpanded = !homeCandidatesExpanded;
+          render();
+          if (homeCandidatesExpanded) setTimeout(() => document.querySelector("[data-home-candidate-panel]")?.scrollIntoView({ behavior: "smooth", block: "start" }), 20);
+          return;
+        }
+        if (action === "overdue") {
+          const first = overdueSchedules()[0];
+          if (RiceOS.app) RiceOS.app.show("calendar");
+          if (first && RiceOS.screens.calendar && RiceOS.screens.calendar.focusDate) RiceOS.screens.calendar.focusDate(first.date);
+          return;
+        }
+        if (action === "today") {
+          openDate(U.today(), "");
+          return;
+        }
+        if (action === "water" && RiceOS.app && RiceOS.screens.irrigation) {
+          RiceOS.app.openInput("irrigation", "home");
+          RiceOS.screens.irrigation.resetForm();
+          return;
+        }
+      }
+      if (event.target.closest("[data-home-candidates-toggle]")) {
+        homeCandidatesExpanded = false;
+        render();
+        return;
+      }
       const waterShortcut = event.target.closest("[data-home-water-input], [data-home-water-open]");
       if (waterShortcut) {
         const fieldId = waterShortcut.dataset.homeWaterField || "";
@@ -2056,6 +2104,23 @@
         if (!fieldId || !RiceOS.app || !RiceOS.app.openInput || !RiceOS.screens.irrigation) return;
         RiceOS.app.openInput("irrigation", "home");
         RiceOS.screens.irrigation.prefillDate(U.today(), fieldId, typeKey);
+        return;
+      }
+      const candidateInput = event.target.closest("[data-home-candidate-input]");
+      if (candidateInput) {
+        const fieldId = candidateInput.dataset.homeCandidateField || "";
+        const kind = candidateInput.dataset.homeCandidateInput || "";
+        const typeKey = candidateInput.dataset.homeCandidateWaterType || "";
+        if (!fieldId || !RiceOS.app || !RiceOS.app.openInput) return;
+        if (kind === "water" && RiceOS.screens.irrigation) {
+          RiceOS.app.openInput("irrigation", "home");
+          RiceOS.screens.irrigation.prefillDate(U.today(), fieldId, typeKey);
+          return;
+        }
+        if (kind === "growth" && RiceOS.screens.growth) {
+          RiceOS.app.openInput("growth", "home");
+          RiceOS.screens.growth.prefillDate(U.today(), fieldId);
+        }
         return;
       }
       const managementToggle = event.target.closest("[data-home-toggle-field]");

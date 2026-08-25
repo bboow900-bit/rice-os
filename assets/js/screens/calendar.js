@@ -117,6 +117,13 @@
     renderSelected();
   }
 
+  function focusDate(date) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(date || ""))) return;
+    currentMonth = RiceOS.calendar.monthStart(date);
+    selectedDate = date;
+    render();
+  }
+
   function bind() {
     U.$("calendarGrid").addEventListener("click", (event) => {
       const day = event.target.closest("[data-date]");
@@ -176,5 +183,5 @@
   }
 
   RiceOS.screens = RiceOS.screens || {};
-  RiceOS.screens.calendar = { render, bind };
+  RiceOS.screens.calendar = { render, bind, focusDate };
 })();

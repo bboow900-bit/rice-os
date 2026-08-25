@@ -720,7 +720,7 @@
   margin-bottom: 8px;
 }
 
-.farm-candidate-card button:not(.farm-candidate-row) {
+.farm-candidate-card > div:first-child button {
   border: 0;
   background: transparent;
   color: #176e25;
@@ -730,7 +730,7 @@
 
 .farm-candidate-row {
   display: grid;
-  grid-template-columns: 56px minmax(0, 1fr) 20px;
+  grid-template-columns: 56px minmax(0, 1fr);
   align-items: center;
   gap: 10px;
   width: 100%;
@@ -774,6 +774,31 @@
   font-size: 10px;
   font-weight: 750;
 }
+
+.farm-candidate-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  padding-top: 1px;
+}
+
+.farm-candidate-action {
+  min-height: 29px;
+  padding: 5px 8px;
+  border: 1px solid #d5e3cd;
+  border-radius: 7px;
+  background: #ffffff;
+  color: #2d7438;
+  font: inherit;
+  font-size: 10px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.farm-candidate-action.water { border-color: #b9dce7; color: #237793; }
+.farm-candidate-action:active { transform: translateY(1px); }
+.farm-candidate-action:focus-visible { outline: 3px solid rgba(45, 132, 74, .32); outline-offset: 2px; }
 
 .farm-list-panel .farm-panel-title {
   grid-template-columns: minmax(0, 1fr) 150px;
@@ -1521,6 +1546,11 @@
 .home-decision-summary > * { min-height: 66px; padding: 8px 5px; border: 1px solid #dfe5d6; border-radius: 13px; background: #fffefa; color: #26322a; text-align: center; }
 .home-decision-summary > * b { display: block; color: #24833a; font-size: 21px; line-height: 1.05; }
 .home-decision-summary > * span { display: block; margin-top: 4px; font-size: 11px; font-weight: 700; }
+.home-decision-summary button { font: inherit; cursor: pointer; }
+.home-decision-summary button small { display: block; min-height: 11px; margin-top: 2px; color: #758176; font-size: 9px; font-weight: 800; }
+.home-decision-summary button:not(:disabled):active { transform: translateY(1px); background: #f3f9ef; }
+.home-decision-summary button:not(:disabled):focus-visible { outline: 3px solid rgba(44, 145, 63, .32); outline-offset: 2px; }
+.home-decision-summary button:disabled { cursor: default; opacity: .62; }
 .home-today-plans { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 10px; margin: 12px 0 0; padding: 10px 11px; border: 1px solid #f0d6a2; border-radius: 12px; background: #fffaf0; }
 .home-today-plans > div { display: contents; }
 .home-today-plans h3, .home-today-plans small { margin: 0; }
