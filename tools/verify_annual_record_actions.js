@@ -108,5 +108,21 @@ assert(
   /class="annual-year-flow-open"[\s\S]*data-annual-flow-summary/.test(annual),
   "Opening the read-only record detail must remain distinct from opening its inline summary"
 );
+assert(
+  /label: "記録更新", tone: "warn", action: "growth"/.test(annual),
+  "Review status must open growth input when the record needs updating"
+);
+assert(
+  /label: "中干し候補", tone: "warn", action: "dry"/.test(annual),
+  "Midseason candidate status must open dry-period input"
+);
+assert(
+  /const actualRows = rows\.filter\(\(row\) => row\.kind !== "schedule"/.test(annual),
+  "Review status must derive recency from actual records rather than schedules"
+);
+assert(
+  /data-annual-status-action=[\s\S]*data-annual-status-field/.test(annual) && /function openStatusInput\(action, fieldId\)/.test(annual),
+  "Review status badges must route to the relevant prefilled input"
+);
 
 console.log("PASS annual record action contract");

@@ -782,6 +782,7 @@
         </div>
           ${renderDecisionProgressGrid(field, stage, waterManagement, criticalWater, date)}
         </button>
+        ${renderHomeWaterShortcut(field, date)}
         <div id="home-management-${U.attr(field.fieldId)}" class="home-management-compare" ${isExpanded ? "" : "hidden"}>
           ${renderManagementComparison(field, stage, date)}
           <button type="button" class="home-management-detail" data-home-open-field="${U.attr(field.fieldId)}">圃場の詳細を見る <span>›</span></button>
@@ -813,6 +814,48 @@
         </div>
         <div class="home-stage-water"><span aria-hidden="true">💧</span><b>${U.escapeHTML(waterText)}</b><small>${U.escapeHTML(waterDay)}</small></div>
       </div>
+    `;
+  }
+
+  // The home screen is a shortcut into the existing water-management form.
+  // It never writes a water record itself, so movement changes and completion
+  // continue to use the single established record flow.
+  function activeHomeWaterPeriod(field, dateText) {
+    const year = cropYear(dateText);
+    return resolvedWaterPeriods(field.fieldId, year, dateText)
+      .filter((row) => ["intermittent", "saturated"].includes(String(row.kind || "")))
+      .filter((row) => !row.planned && row.startDate && String(row.startDate) <= String(dateText))
+      .filter((row) => !row.actualEndDate || String(row.actualEndDate) > String(dateText))
+      .slice()
+      .sort((a, b) => String(a.startDate || "").localeCompare(String(b.startDate || ""))).at(-1) || null;
+  }
+
+  function activeHomeWaterMovement(period) {
+    const movements = Array.isArray(period && period.raw && period.raw.waterMovements) ? period.raw.waterMovements : [];
+    return movements.filter((row) => row && row.startDate && !row.endDate)
+      .slice().sort((a, b) => String(a.startDate).localeCompare(String(b.startDate))).at(-1) || null;
+  }
+
+  function renderHomeWaterShortcut(field, dateText) {
+    const period = activeHomeWaterPeriod(field, dateText);
+    if (!period) return "";
+    const movement = activeHomeWaterMovement(period);
+    const isSaturated = period.kind === "saturated";
+    const isDrain = movement && movement.phase === "drain";
+    const kindLabel = isSaturated ? "飽水管理" : "間断灌水";
+    const currentLabel = movement
+      ? (isDrain ? (isSaturated ? "自然落水中" : "落水中") : (isSaturated ? "飽水中" : "入水中"))
+      : `${kindLabel}中`;
+    const nextLabel = isDrain ? (isSaturated ? "給水を入力" : "入水を入力") : (isSaturated ? "自然落水を入力" : "落水を入力");
+    const elapsed = movement && movement.startDate ? U.daysBetween(movement.startDate, dateText) : U.daysBetween(period.startDate, dateText);
+    const dayText = elapsed === "" ? "日数未確認" : `${Math.max(0, Number(elapsed)) + 1}日目`;
+    return `
+      <section class="home-water-quick" aria-label="${U.attr(`${field.name}の${kindLabel}`)}">
+        <span class="home-water-quick-icon" aria-hidden="true">💧</span>
+        <div class="home-water-quick-copy"><span>${U.escapeHTML(kindLabel)}</span><b>${U.escapeHTML(currentLabel)}</b><small>${U.escapeHTML(dayText)}</small></div>
+        <button type="button" class="home-water-quick-action" data-home-water-input data-home-water-field="${U.attr(field.fieldId)}" data-home-water-type="${U.attr(period.kind)}">${U.escapeHTML(nextLabel)}</button>
+        <button type="button" class="home-water-quick-open" data-home-water-open data-home-water-field="${U.attr(field.fieldId)}" data-home-water-type="${U.attr(period.kind)}" aria-label="${U.attr(`${kindLabel}を開く`)}">›</button>
+      </section>
     `;
   }
 
@@ -2004,6 +2047,15 @@
         // Start from the shared target picker. A visual home filter must not
         // silently turn a single record into a group record.
         openDate(U.today(), "");
+        return;
+      }
+      const waterShortcut = event.target.closest("[data-home-water-input], [data-home-water-open]");
+      if (waterShortcut) {
+        const fieldId = waterShortcut.dataset.homeWaterField || "";
+        const typeKey = waterShortcut.dataset.homeWaterType || "";
+        if (!fieldId || !RiceOS.app || !RiceOS.app.openInput || !RiceOS.screens.irrigation) return;
+        RiceOS.app.openInput("irrigation", "home");
+        RiceOS.screens.irrigation.prefillDate(U.today(), fieldId, typeKey);
         return;
       }
       const managementToggle = event.target.closest("[data-home-toggle-field]");

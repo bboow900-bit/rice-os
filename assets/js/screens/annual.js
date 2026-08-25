@@ -498,7 +498,7 @@
   }
 
   function fieldStatus(field, stats) {
-    if (!stats.total) return { label: "記録なし", tone: "muted" };
+    if (!stats.total) return { label: "記録なし", tone: "muted", action: "work" };
     const planting = firstDate(fieldYearRows(field.fieldId, yearValue()), (row) => row.kind === "fieldWork" && /田植/.test(String(row.title || "")));
     const asOfDate = stageAsOfDateForField(field.fieldId);
     const dap = planting ? U.daysBetween(planting, asOfDate) : "";
@@ -506,26 +506,31 @@
       ? state.resolvedWaterPeriodsFor(field.fieldId, { year: yearValue() === "all" ? undefined : yearValue(), throughDate: asOfDate, forDisplay: true })
         .filter((row) => row.kind === "dry").map((row) => row.startDate).filter(Boolean).sort()[0] || ""
       : "";
-    if (dap !== "" && dap >= 30 && dap <= 50 && !dryStart) return { label: "中干し候補", tone: "warn" };
-    if (!stats.growth) return { label: "生育記録未入力", tone: "warn" };
+    if (dap !== "" && dap >= 30 && dap <= 50 && !dryStart) {
+      return { label: "中干し候補", tone: "warn", action: "dry" };
+    }
+    if (!stats.growth) return { label: "生育未入力", tone: "warn", action: "growth" };
     const lastDays = stats.lastDate ? U.daysBetween(stats.lastDate, asOfDate) : "";
-    if (lastDays !== "" && lastDays <= 14) return { label: "順調", tone: "ok" };
-    return { label: "要確認", tone: "warn" };
+    if (lastDays !== "" && lastDays <= 14) {
+      return { label: "順調", tone: "ok" };
+    }
+    return { label: "記録更新", tone: "warn", action: "growth" };
   }
 
   function fieldStats(field) {
     const rows = fieldRows(field.fieldId);
+    const actualRows = rows.filter((row) => row.kind !== "schedule" && !/(?:予定|確認候補)/.test(String(row.title || "")));
     const resolvedWater = state.resolvedWaterPeriodsFor
       ? state.resolvedWaterPeriodsFor(field.fieldId, { year: yearValue() === "all" ? undefined : yearValue(), includePlanned: true, forDisplay: true })
       : [];
     return {
       rows,
-      total: rows.length,
-      work: rows.filter((row) => row.kind === "fieldWork").length,
-      growth: rows.filter((row) => row.kind === "growth").length,
+      total: actualRows.length,
+      work: actualRows.filter((row) => row.kind === "fieldWork").length,
+      growth: actualRows.filter((row) => row.kind === "growth").length,
       water: resolvedWater.length,
       photos: rows.filter((row) => row.photoData || row.photo).length,
-      lastDate: maxDate(rows.map((row) => row.date))
+      lastDate: maxDate(actualRows.map((row) => row.date))
     };
   }
 
@@ -680,10 +685,14 @@
     const stage = annualStageForField(field);
     const riceStage = riceStageNumberForField(field);
     const district = field.district ? ` / ${U.escapeHTML(field.district)}` : "";
+    const statusBadge = status.action
+      ? `<button type="button" class="annual-status-badge ${U.attr(status.tone)} action" data-annual-status-action="${U.attr(status.action)}" data-annual-status-field="${U.attr(field.fieldId)}"><b>${U.escapeHTML(status.label)}</b><small>入力へ</small></button>`
+      : `<span class="annual-status-badge ${U.attr(status.tone)}">${U.escapeHTML(status.label)}</span>`;
     return `
-      <button type="button" class="annual-field-pick-card status-${U.attr(status.tone)}" data-annual-open-field="${U.attr(field.fieldId)}">
-        <span class="annual-field-plant stage-${U.attr(String(riceStage).padStart(2, "0"))}" aria-hidden="true">${annualPickerRiceImage(riceStage)}</span>
-        <div class="annual-field-pick-main">
+      <article class="annual-field-pick-card status-${U.attr(status.tone)}">
+        <button type="button" class="annual-field-pick-open" data-annual-open-field="${U.attr(field.fieldId)}" aria-label="${U.attr(field.name)}の圃場履歴を開く">
+          <span class="annual-field-plant stage-${U.attr(String(riceStage).padStart(2, "0"))}" aria-hidden="true">${annualPickerRiceImage(riceStage)}</span>
+          <div class="annual-field-pick-main">
           <div class="annual-field-pick-head">
             <div>
               <b>${U.escapeHTML(field.name)}</b>
@@ -698,9 +707,10 @@
             <span class="water"><i aria-hidden="true"></i>水管理 ${U.escapeHTML(String(stats.water))}件</span>
             <span class="work"><i aria-hidden="true"></i>作業 ${U.escapeHTML(String(stats.work))}件</span>
           </div>
-        </div>
-        <span class="annual-status-badge ${U.attr(status.tone)}">${U.escapeHTML(status.label)}</span>
-      </button>
+          </div>
+        </button>
+        ${statusBadge}
+      </article>
     `;
   }
 
@@ -2127,6 +2137,26 @@
     if (targetFieldId && RiceOS.screens.fieldWork) RiceOS.screens.fieldWork.prefillDate(U.today(), targetFieldId);
   }
 
+  function openStatusInput(action, fieldId) {
+    if (!fieldId || !state.field(fieldId) || !RiceOS.app || !RiceOS.app.openInput) return;
+    if (action === "dry" && RiceOS.screens.dryPeriod) {
+      RiceOS.app.openInput("dry-period", "annual");
+      RiceOS.screens.dryPeriod.prefillDate(U.today(), fieldId);
+      return;
+    }
+    if (action === "growth" && RiceOS.screens.growth) {
+      RiceOS.app.openInput("growth", "annual");
+      RiceOS.screens.growth.prefillDate(U.today(), fieldId);
+      if (U.$("growthBasicSection")) U.$("growthBasicSection").open = true;
+      U.$("growthForm")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      return;
+    }
+    if (action === "work" && RiceOS.screens.fieldWork) {
+      RiceOS.app.openInput("field-work", "annual");
+      RiceOS.screens.fieldWork.prefillDate(U.today(), fieldId);
+    }
+  }
+
   function openField(fieldId, tab) {
     selectedFieldId = fieldId || "";
     selectedTab = tab || "karte";
@@ -2177,6 +2207,13 @@
     const year = U.$("annualYear");
     if (year) year.addEventListener("change", render);
     U.$("annualTimeline").addEventListener("click", (event) => {
+      const statusAction = event.target.closest("[data-annual-status-action]");
+      if (statusAction) {
+        event.preventDefault();
+        event.stopPropagation();
+        openStatusInput(statusAction.dataset.annualStatusAction, statusAction.dataset.annualStatusField);
+        return;
+      }
       const open = event.target.closest("[data-annual-open-field]");
       if (open) {
         // A card on the review top opens the same review detail, never the

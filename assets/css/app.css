@@ -10150,7 +10150,7 @@ label {
 .annual-field-pick-card {
   position: relative;
   display: grid;
-  grid-template-columns: 58px minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 10px;
   min-height: 106px;
@@ -11182,6 +11182,25 @@ label {
   cursor: pointer;
   font: inherit;
   text-align: left;
+}
+
+.annual-field-pick-open {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+}
+
+.annual-field-pick-open:focus-visible {
+  outline: 3px solid rgba(35, 140, 76, 0.45);
+  outline-offset: 3px;
+  border-radius: 7px;
 }
 
 #screen-annual .annual-year-flow-lane.water { padding-left: var(--water-gutter, 25px); gap: 8px; }
@@ -14565,6 +14584,33 @@ label {
   font: inherit;
   text-align: center;
 }
+
+.annual-status-badge.action {
+  display: grid;
+  gap: 2px;
+  min-width: 64px;
+  border: 0;
+  cursor: pointer;
+}
+
+.annual-status-badge.action b,
+.annual-status-badge.action small {
+  display: block;
+  color: inherit;
+  font: inherit;
+  line-height: 1.15;
+}
+
+.annual-status-badge.action small {
+  font-size: 9px;
+  font-weight: 850;
+  opacity: 0.86;
+}
+
+.annual-status-badge.action:focus-visible {
+  outline: 3px solid rgba(35, 140, 76, 0.45);
+  outline-offset: 3px;
+}
 .common-master-card.green { border-color: #c9e3c3; background: #f4fbf0; }
 .common-master-card.amber { border-color: #ead8a9; background: #fffaf0; }
 .common-master-card.water { border-color: #c7e1ea; background: #f1fbfd; }
@@ -14655,6 +14701,37 @@ label {
 .home-stage-water > span { font-size: 13px; }
 .home-stage-water b { min-width: 0; overflow: hidden; font-size: 11px; font-weight: 900; line-height: 1.2; text-overflow: ellipsis; white-space: nowrap; }
 .home-stage-water small { color: #4d8192; font-size: 10px; font-weight: 900; white-space: nowrap; }
+.home-water-quick {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) auto 25px;
+  align-items: center;
+  gap: 6px;
+  margin: -1px 9px 7px;
+  padding: 6px 7px;
+  border: 1px solid #bfe0ea;
+  border-radius: 10px;
+  background: #f0f9fc;
+}
+.home-water-quick-icon { font-size: 15px; text-align: center; }
+.home-water-quick-copy { display: grid; min-width: 0; grid-template-columns: auto minmax(0, 1fr); align-items: baseline; gap: 2px 5px; }
+.home-water-quick-copy span { color: #4a8092; font-size: 9px; font-weight: 900; white-space: nowrap; }
+.home-water-quick-copy b { min-width: 0; overflow: hidden; color: #237895; font-size: 12px; line-height: 1.2; text-overflow: ellipsis; white-space: nowrap; }
+.home-water-quick-copy small { grid-column: 1 / -1; color: #6391a0; font-size: 9px; font-weight: 800; line-height: 1; }
+.home-water-quick-action {
+  min-height: 28px;
+  padding: 4px 7px;
+  border: 1px solid #78b7cb;
+  border-radius: 7px;
+  background: #ffffff;
+  color: #167193;
+  font: inherit;
+  font-size: 10px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+.home-water-quick-open { width: 25px; height: 28px; padding: 0; border: 0; background: transparent; color: #418ca4; font: inherit; font-size: 24px; line-height: 1; }
+.home-water-quick-action:active, .home-water-quick-open:active { transform: translateY(1px); }
+.home-water-quick-action:focus-visible, .home-water-quick-open:focus-visible { outline: 3px solid rgba(34, 130, 160, .34); outline-offset: 2px; }
 .home-decision-card .home-decision-alert { margin: -2px 10px 8px; }
 .home-management-compare {
   display: grid;
@@ -14853,4 +14930,9 @@ label {
   .common-master-card { min-height: 132px; padding-inline: 6px; }
   .common-master-card img { width: 56px; height: 56px; }
   .common-master-card b { font-size: 13px; }
+}
+
+/* Review cards: the status is a direct route to the missing record input. */
+#screen-annual .annual-field-pick-card {
+  grid-template-columns: minmax(0, 1fr) auto !important;
 }
