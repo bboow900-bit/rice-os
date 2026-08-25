@@ -135,6 +135,8 @@ const releaseBackups = storage.releaseBackupInfo();
 assert(releaseBackups.length === 1, "更新前の世代バックアップが作成されていない");
 assert(releaseBackups[0].sourceVersion === "20260820_ver254", "世代バックアップの更新前バージョンが正しくない");
 assert(state.data().appVersion === S.APP_VERSION, "更新後データにアプリバージョンが記録されていない");
+assert(storage.backupBeforeAppUpdate(), "更新ボタン用の自動保存に失敗した");
+assert(storage.releaseBackupInfo().length === 2, "更新ボタン用の世代バックアップが作成されていない");
 assert(state.fieldWorksFor("field_a").some((row) => row.workId === "work_planting"), "旧作業と圃場IDの関連が消えた");
 
 state.updateField("field_a", { name: "新名A" });

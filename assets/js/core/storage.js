@@ -354,6 +354,15 @@
     }));
   }
 
+  function backupBeforeAppUpdate() {
+    const raw = readRaw(S.STORE_KEY);
+    if (!raw) return true;
+    const current = safeParse(raw);
+    if (!current) return false;
+    const sourceVersion = String(current.appVersion || current.meta && current.meta.appVersion || S.APP_VERSION);
+    return createReleaseBackup(raw, sourceVersion);
+  }
+
   function exportJson(data) {
     const normalized = S.normalize(data);
     const exportId = U.id("export", U.today());
@@ -589,6 +598,7 @@
     restoreBackup,
     backupData,
     releaseBackupInfo,
+    backupBeforeAppUpdate,
     exportJson,
     exportCsv,
     findLegacy,
