@@ -143,8 +143,8 @@
       source("fieldPrevious", "前年圃場実績", sameField ? 3 : 0, sameField ? `前年品種は当時の記録で未確認 / 田植え後 ${sameField.days}日で出穂` : "前年実績なし", sameField),
       source("varietyPrevious", "現在の同品種の前年実績", sameVariety ? 2 : 0, sameVariety ? `${sameVariety.count}圃場の中央値: 田植え後 ${sameVariety.days}日` : "同品種実績なし", sameVariety),
       source("fukushima", "福島県情報", 2, `${heatTarget(field).label}を収穫目安の参考に表示`, true),
-      source("weather", "気象データ", weather && weather.detail ? 2 : 0, weather && weather.detail || "未反映", Boolean(weather && weather.detail)),
-      source("normal", "平年気温", weather && weather.normalAvailable ? 1 : 0, weather && weather.normalAvailable ? "平年値を参照" : "未反映", Boolean(weather && weather.normalAvailable))
+      source("weather", "気象データ", weather && weather.available ? 2 : 0, weather && weather.detail || "未取得", Boolean(weather && weather.available)),
+      source("normal", "同時期の平均気温", weather && weather.normalAvailable ? 1 : 0, weather && weather.normalDetail || "未取得", Boolean(weather && weather.normalAvailable))
     ];
     return {
       field, asOf, planting, stage, water, heading, harvest, sources, confidence: confidence(confidenceKey),

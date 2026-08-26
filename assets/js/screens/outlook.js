@@ -7,6 +7,8 @@
   let selectedFieldId = "";
   let selectedGroupId = "all";
   let weatherContext = null;
+  let weatherContextKey = "";
+  let weatherLoading = false;
   let persistedKeys = new Set();
   let bound = false;
 
@@ -98,6 +100,8 @@
   function render() {
     const root = U.$("outlookDashboard");
     if (!root || !RiceOS.outlook) return;
+    const weatherLocation = state.data().meta && state.data().meta.weatherLocation;
+    const hasWeatherLocation = weatherLocation && weatherLocation.latitude !== undefined && weatherLocation.longitude !== undefined;
     const all = RiceOS.outlook.all({ weather: weatherContext });
     const groups = state.fieldGroups();
     const rows = selectedGroupId === "all" ? all : all.filter((item) => item.field.fieldGroupId === selectedGroupId);
@@ -109,25 +113,66 @@
     }
     root.innerHTML = `
       <div class="screen-head outlook-head"><div><p class="eyebrow">記録と地域情報を読む</p><h2>見通し</h2><small>実測を最優先に、予測の根拠を表示します。</small></div></div>
-      <div class="outlook-toolbar"><label>対象圃場<select data-outlook-group><option value="all">全圃場</option>${groups.map((group) => `<option value="${U.attr(group.fieldGroupId)}" ${group.fieldGroupId === selectedGroupId ? "selected" : ""}>${U.escapeHTML(group.name)}</option>`).join("")}</select></label><button class="secondary" type="button" data-outlook-weather>参考気象を表示</button></div>
+      <div class="outlook-toolbar"><label>対象圃場<select data-outlook-group><option value="all">全圃場</option>${groups.map((group) => `<option value="${U.attr(group.fieldGroupId)}" ${group.fieldGroupId === selectedGroupId ? "selected" : ""}>${U.escapeHTML(group.name)}</option>`).join("")}</select></label><button class="secondary" type="button" data-outlook-weather>${hasWeatherLocation ? "気象を再取得" : "現在地から気象を取得"}</button></div>
       <div class="outlook-actions"><p class="outlook-update-note">見通しを保存すると、予測と実績との差を翌年の補正に残せます。</p><button class="secondary" type="button" data-outlook-save>見通しを保存</button></div>
       <div class="outlook-list">${rows.length ? rows.map(fieldCard).join("") : '<div class="empty-state">このグループに表示できる圃場がありません。</div>'}</div>`;
+    loadWeather({ silent: true });
   }
 
-  async function loadWeather() {
-    const location = state.data().meta && state.data().meta.weatherLocation;
+  function weatherKey(location, today) {
+    return [today, location && location.latitude, location && location.longitude].join("|");
+  }
+
+  async function loadWeather(options) {
+    const opts = options || {};
+    let location = state.data().meta && state.data().meta.weatherLocation;
     if (!location || location.latitude === undefined) {
-      U.toast("気象データは位置情報を設定した後に反映できます。");
+      if (opts.requestLocation && RiceOS.weather && RiceOS.weather.ensureLocation) {
+        try {
+          location = await RiceOS.weather.ensureLocation();
+        } catch (error) {
+          weatherContext = { available: false, detail: "位置情報を取得できませんでした", normalAvailable: false, normalDetail: "ブラウザの位置情報許可を確認してください", missingLocation: true };
+          U.toast(error && error.message || "現在地を取得できませんでした。");
+          render();
+          return;
+        }
+      }
+    }
+    if (!location || location.latitude === undefined) {
+      if (weatherContext && weatherContext.missingLocation) return;
+      weatherContext = { available: false, detail: "位置情報未設定", normalAvailable: false, normalDetail: "位置情報を設定すると取得できます", missingLocation: true };
+      if (!opts.silent) U.toast("気象データは位置情報を設定した後に反映できます。");
+      render();
       return;
     }
     const today = U.today();
+    const key = weatherKey(location, today);
+    if (weatherLoading || !opts.force && weatherContextKey === key && weatherContext) return;
+    weatherLoading = true;
+    weatherContextKey = key;
     try {
-      const rows = await RiceOS.weather.fetchDailyRange(today, U.dateAddDays(today, 6), location);
-      const means = rows.map((row) => Number(row.tempMean)).filter(Number.isFinite);
-      weatherContext = means.length ? { detail: `直近7日 平均 ${Math.round(means.reduce((sum, value) => sum + value, 0) / means.length * 10) / 10}℃`, normalAvailable: false } : null;
+      const endDate = U.dateAddDays(today, 6);
+      const [forecast, historical] = await Promise.all([
+        RiceOS.weather.fetchDailyRange(today, endDate, location),
+        RiceOS.weather.fetchSamePeriodAverage(today, endDate, location, 3)
+      ]);
+      const means = forecast.rows.map((row) => Number(row.tempMean)).filter(Number.isFinite);
+      const forecastMean = means.length ? Math.round(means.reduce((sum, value) => sum + value, 0) / means.length * 10) / 10 : "";
+      weatherContext = {
+        available: forecastMean !== "",
+        detail: forecastMean === "" ? "直近7日の平均気温を取得できませんでした" : `直近7日 平均 ${forecastMean}℃`,
+        normalAvailable: Boolean(historical && historical.days),
+        normalDetail: historical && historical.label || "過去同時期の平均は未取得",
+        asOf: today,
+        location: RiceOS.weather.locationText(location)
+      };
       render();
     } catch (error) {
-      U.toast("気象データを取得できませんでした。");
+      weatherContext = { available: false, detail: "気象データを取得できませんでした", normalAvailable: false, normalDetail: "過去同時期の平均は未取得", asOf: today };
+      if (!opts.silent) U.toast("気象データを取得できませんでした。");
+      render();
+    } finally {
+      weatherLoading = false;
     }
   }
 
@@ -137,7 +182,7 @@
     document.addEventListener("click", (event) => {
       const fieldButton = event.target.closest("[data-outlook-field]");
       if (fieldButton) { selectedFieldId = fieldButton.dataset.outlookField; render(); RiceOS.app.syncBackButton(); return; }
-      if (event.target.closest("[data-outlook-weather]")) loadWeather();
+      if (event.target.closest("[data-outlook-weather]")) loadWeather({ force: true, requestLocation: true });
       if (event.target.closest("[data-outlook-save]")) {
         const rows = selectedGroupId === "all" ? RiceOS.outlook.all({ weather: weatherContext }) : RiceOS.outlook.all({ weather: weatherContext }).filter((item) => item.field.fieldGroupId === selectedGroupId);
         persist(rows);

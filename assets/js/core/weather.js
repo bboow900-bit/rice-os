@@ -266,6 +266,41 @@
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   }
 
+  function dateInYear(dateText, year) {
+    const source = String(dateText || "");
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(source)) return "";
+    const candidate = `${year}-${source.slice(5)}`;
+    const date = U.localDate ? U.localDate(candidate) : new Date(`${candidate}T00:00:00`);
+    if (!Number.isNaN(date.getTime()) && String(date.getMonth() + 1).padStart(2, "0") === source.slice(5, 7)) return candidate;
+    // Feb 29 has no corresponding date in most years. Feb 28 keeps the
+    // comparison within the same seasonal window without inventing a value.
+    return source.slice(5) === "02-29" ? `${year}-02-28` : "";
+  }
+
+  async function fetchSamePeriodAverage(startDate, endDate, location, years) {
+    const count = Math.max(1, Math.min(5, Number(years) || 3));
+    const currentYear = Number(String(startDate || "").slice(0, 4));
+    if (!Number.isInteger(currentYear)) throw new Error("比較期間を指定してください。");
+    const targets = Array.from({ length: count }, (_, index) => currentYear - index - 1)
+      .map((year) => ({ year, startDate: dateInYear(startDate, year), endDate: dateInYear(endDate, year) }))
+      .filter((item) => item.startDate && item.endDate);
+    const results = await Promise.allSettled(targets.map((item) => fetchDailyRange(item.startDate, item.endDate, location)));
+    const values = results.flatMap((result) => result.status === "fulfilled"
+      ? result.value.rows.map((row) => Number(row.tempMean)).filter(Number.isFinite)
+      : []);
+    if (!values.length) throw new Error("同時期の平均気温を取得できませんでした。");
+    const mean = Math.round(values.reduce((sum, value) => sum + value, 0) / values.length * 10) / 10;
+    return {
+      mean,
+      years: results.filter((result) => result.status === "fulfilled").length,
+      requestedYears: targets.length,
+      days: values.length,
+      label: `過去${results.filter((result) => result.status === "fulfilled").length}年同時期 平均 ${mean}℃`,
+      source: "Open-Meteo Historical Weather API",
+      retrievedAt: U.now()
+    };
+  }
+
   function formatSummary(weather) {
     if (!weather) return "";
     const temp = weather.tempMean !== ""
@@ -364,6 +399,7 @@
     ensureLocation,
     locationText,
     fetchDailyRange,
+    fetchSamePeriodAverage,
     repairStoredWeatherLabels
   };
 })();
