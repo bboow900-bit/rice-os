@@ -201,6 +201,16 @@ assert(Number(batchWork.fieldAllocatedHours.field_a) === 1 && Number(batchWork.f
 const frozenTargets = JSON.stringify(batchWork.batchFieldIds);
 state.updateField("field_b", { fieldGroupId: "別グループ" });
 assert(JSON.stringify(batchWork.batchFieldIds) === frozenTargets, "グループ変更で過去の一括対象が変わった");
+const waterBatchId = "water_batch_frozen_targets";
+assert(state.saveDryPeriodsBatch([
+  { dryPeriodId: "dry_batch_field_a", fieldId: "field_a", batchId: waterBatchId, batchFieldIds: ["field_a", "field_b"], date: "2026-06-18", startDate: "2026-06-18" },
+  { dryPeriodId: "dry_batch_field_b", fieldId: "field_b", batchId: waterBatchId, batchFieldIds: ["field_a", "field_b"], date: "2026-06-18", startDate: "2026-06-18" }
+], "group water seed") !== null, "グループ水管理を圃場別に保存できない");
+const groupedWaterRows = state.data().dryPeriods.filter((row) => row.batchId === waterBatchId);
+assert(groupedWaterRows.length === 2 && groupedWaterRows.every((row) => ["field_a", "field_b"].includes(row.fieldId)), "グループ水管理の圃場別実績が保存されていない");
+assert(groupedWaterRows.every((row) => JSON.stringify(row.batchFieldIds) === JSON.stringify(["field_a", "field_b"])), "グループ水管理の記録時対象が固定されていない");
+state.updateField("field_b", { fieldGroupId: "さらに別グループ" });
+assert(state.resolvedWaterPeriodsFor("field_b", { year: 2026 }).some((row) => row.directId === "dry_batch_field_b"), "グループ変更後に圃場別水管理実績を参照できない");
 
 state.saveGrowthLog({
   date: "2026-06-10",

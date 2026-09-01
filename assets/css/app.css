@@ -7054,6 +7054,7 @@ label {
 .annual-water-movement-timeline .water-movement-timeline-bar .flood { background: color-mix(in srgb, var(--water-accent) 78%, #399bc5); }
 .annual-water-movement-timeline .water-movement-timeline-bar .drain { background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--water-accent) 52%, #87adbc) 0 5px, color-mix(in srgb, var(--water-soft) 45%, #86b0bd) 5px 10px); }
 .water-edit-section { background: #fffefa; }
+.water-edit-guide { margin: 0; padding: 9px 10px; border: 1px solid #f0dca6; border-radius: 9px; background: #fff8e7; color: #766239; font-size: 11px; font-weight: 700; line-height: 1.55; }
 .water-history-head { margin: 4px 2px 8px; }
 .water-history-head h3 { margin: 0; color: #263c2a; font-size: 16px; }
 .water-history-head > span { padding: 4px 7px; border-radius: 999px; background: #edf6e9; color: #277740; font-size: 10px; font-weight: 850; }
@@ -7067,6 +7068,12 @@ label {
 .water-history-card small { color: #68766a; font-size: 10px; }
 .water-history-card em { color: #6b7a6d; font-size: 9px; font-style: normal; line-height: 1.35; }
 .water-history-card button { flex: 0 0 auto; min-height: 34px; padding: 0 9px; border: 1px solid #d5e2d6; border-radius: 8px; background: #fff; color: #2c7540; font-size: 11px; font-weight: 850; }
+.legacy-water-history-head { margin-top: 18px; padding-top: 13px; border-top: 1px solid #e5e2d7; }
+.legacy-water-history-head h3 { color: #665c44; }
+.legacy-water-history-head > span { background: #f5eedc; color: #8a6c24; }
+.water-history-card.legacy { border-left-color: #c4a85d; background: #fffdf7; }
+.water-history-card.legacy span { color: #8a6c24; }
+.water-history-card.legacy button { border-color: #e6d7ad; color: #826724; }
 
 /* 水管理工程: 生育の段階と水管理を同じ横軸で見せる。 */
 .water-flow-card { padding: 12px; border-radius: 16px; }

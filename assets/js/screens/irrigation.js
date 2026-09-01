@@ -585,31 +585,55 @@
 
   function allHistory() {
     const year = cropYear(U.$("waterDate").value || U.today());
-    return targetFields().flatMap((field) => resolvedRows(field.fieldId, `${year}-12-31`).map((period) => ({
+    // Dedicated records are the authoritative, editable history. Older work
+    // records are shown below in their own read-only section until adopted.
+    return targetFields().flatMap((field) => resolvedRows(field.fieldId, `${year}-12-31`)
+      .filter((period) => period.source === "direct")
+      .map((period) => ({
       ...period,
       date: period.startDate || period.actualEndDate || "",
       label: period.label || "水管理",
       tone: period.kind === "dry" ? "dry" : period.kind === "saturated" ? "saturated" : period.kind === "deep" ? "deep" : period.kind === "drain" ? "drain" : "intermittent",
-      editType: period.source === "direct" ? (period.kind === "dry" ? "dry" : "irrigation") : "legacy",
+      editType: period.kind === "dry" ? "dry" : "irrigation",
       editId: period.directId || ""
     }))).sort((a, b) => String(b.startDate || b.actualEndDate || "").localeCompare(String(a.startDate || a.actualEndDate || "")));
   }
 
+  function legacyHistory() {
+    const year = cropYear(U.$("waterDate").value || U.today());
+    if (!state.legacyWaterReviewFor) return [];
+    return targetFields().flatMap((field) => state.legacyWaterReviewFor(field.fieldId, { year })
+      .filter((period) => !period.migrated)
+      .map((period) => ({
+        ...period,
+        fieldId: field.fieldId,
+        date: period.startDate || period.actualEndDate || "",
+        label: period.label || "水管理",
+        tone: period.kind === "dry" ? "dry" : period.kind === "saturated" ? "saturated" : period.kind === "deep" ? "deep" : period.kind === "drain" ? "drain" : "intermittent"
+      })))
+      .sort((a, b) => String(b.startDate || b.actualEndDate || "").localeCompare(String(a.startDate || a.actualEndDate || "")));
+  }
+
   function renderHistory() {
     const rows = allHistory();
+    const legacyRows = legacyHistory();
+    const renderPeriod = (item, legacy) => {
+      const field = state.field(item.fieldId);
+      const end = item.actualEndDate || "";
+      const days = item.startDate && end ? U.daysBetween(item.startDate, end) : "";
+      const start = item.startDate || item.date || "";
+      const startStage = stageText(field, start);
+      const endStage = end ? stageText(field, end) : "";
+      const note = legacy
+        ? item.requiresDateReview ? "開始・終了日を確認してから引き継げます" : "旧作業記録。内容を確認してから引き継げます"
+        : `開始時: ${startStage}${endStage ? ` → 完了時: ${endStage}` : ""}`;
+      return `<article class="water-history-card ${U.attr(item.tone)}${legacy ? " legacy" : ""}"><div><span>${U.escapeHTML(item.label)}</span><b>${U.escapeHTML(field?.name || "圃場")}</b><small>${U.escapeHTML(U.fd(start))} - ${U.escapeHTML(end ? U.fd(end) : "終了日未記録")}${days !== "" ? ` / ${days}日` : ""}</small><em>${U.escapeHTML(note)}</em></div><button type="button" data-water-edit="${legacy ? "legacy" : U.attr(item.editType)}" data-id="${legacy ? "" : U.attr(item.editId)}" data-water-field="${U.attr(item.fieldId)}" data-water-legacy-key="${U.attr(item.legacyKey || "")}">${legacy ? "日付を確認" : "編集"}</button></article>`;
+    };
     U.$("waterHistory").innerHTML = `
-      <section class="water-history-head"><div><h3>水管理の履歴</h3><small>開始日と終了日を編集できます</small></div><span>${rows.length}件</span></section>
-      <div class="water-history-list">${rows.length ? rows.map((item) => {
-        const field = state.field(item.fieldId);
-        const end = item.actualEndDate || "";
-        const days = item.startDate && end ? U.daysBetween(item.startDate, end) : "";
-        const start = item.startDate || item.date || "";
-        const startStage = stageText(field, start);
-        const endStage = end ? stageText(field, end) : "";
-        const actionLabel = item.editType === "legacy" ? "整える" : "編集";
-        const note = item.source === "legacy-work" ? "旧作業記録から表示" : `開始時: ${startStage}${endStage ? ` → 完了時: ${endStage}` : ""}`;
-        return `<article class="water-history-card ${U.attr(item.tone)}"><div><span>${U.escapeHTML(item.label)}</span><b>${U.escapeHTML(field?.name || "圃場")}</b><small>${U.escapeHTML(U.fd(start))} - ${U.escapeHTML(end ? U.fd(end) : "実施中")}${days !== "" ? ` / ${days}日` : ""}</small><em>${U.escapeHTML(note)}</em></div><button type="button" data-water-edit="${U.attr(item.editType)}" data-id="${U.attr(item.editId)}" data-water-field="${U.attr(item.fieldId)}" data-water-legacy-key="${U.attr(item.legacyKey || "")}">${actionLabel}</button></article>`;
-      }).join("") : '<div class="empty">今年の水管理はまだありません。</div>'}</div>
+      <section class="water-history-head"><div><h3>水管理の履歴</h3><small>この画面で入力した専用履歴です</small></div><span>${rows.length}件</span></section>
+      <div class="water-history-list">${rows.length ? rows.map((item) => renderPeriod(item, false)).join("") : '<div class="empty">専用の水管理履歴はまだありません。</div>'}</div>
+      <section class="water-history-head legacy-water-history-head"><div><h3>以前の水管理</h3><small>元の作業記録は残したまま、確認したものだけ引き継げます</small></div><span>${legacyRows.length}件</span></section>
+      <div class="water-history-list legacy-water-history-list">${legacyRows.length ? legacyRows.map((item) => renderPeriod(item, true)).join("") : '<div class="empty">引き継ぎ待ちの以前の水管理はありません。</div>'}</div>
     `;
   }
 
@@ -620,6 +644,9 @@
     U.$("waterEditStart").value = "";
     U.$("waterEditEnd").value = "";
     U.$("waterEditMemo").value = "";
+    U.$("waterEditGuide").textContent = "";
+    U.$("waterEditGuide").classList.add("hidden");
+    U.$("waterEditSubmit").textContent = "変更を保存";
     U.$("waterEditSection").open = false;
   }
 
@@ -635,6 +662,9 @@
       U.$("waterEditStart").value = legacy.startDate || "";
       U.$("waterEditEnd").value = legacy.actualEndDate || "";
       U.$("waterEditMemo").value = legacy.raw && legacy.raw.memo || "";
+      U.$("waterEditGuide").textContent = "元の作業記録は変更しません。日付を確認して保存すると、この圃場だけの専用水管理履歴を作成します。";
+      U.$("waterEditGuide").classList.remove("hidden");
+      U.$("waterEditSubmit").textContent = "確認して専用履歴へ引き継ぐ";
       U.$("waterEditSection").open = true;
       U.$("waterEditSection").scrollIntoView({ behavior: "smooth", block: "center" });
       return;
@@ -647,6 +677,9 @@
     U.$("waterEditStart").value = item.startDate || item.date || "";
     U.$("waterEditEnd").value = item.actualEndDate || "";
     U.$("waterEditMemo").value = item.memo || "";
+    U.$("waterEditGuide").textContent = "";
+    U.$("waterEditGuide").classList.add("hidden");
+    U.$("waterEditSubmit").textContent = "変更を保存";
     U.$("waterEditSection").open = true;
     U.$("waterEditSection").scrollIntoView({ behavior: "smooth", block: "center" });
   }
@@ -736,6 +769,7 @@
       if (type === "legacy") {
         const fieldId = U.$("waterEditField").value;
         if (!fieldId || !state.adoptLegacyWaterPeriod) return;
+        if (!confirm("開始日と終了日を確認しましたか？ 元の作業記録は残したまま、この圃場の専用水管理履歴へ引き継ぎます。")) return;
         const adopted = state.adoptLegacyWaterPeriod(fieldId, id);
         if (!adopted) return;
         const item = adopted.kind === "dry"
