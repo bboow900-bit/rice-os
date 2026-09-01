@@ -575,6 +575,64 @@ assert(!state.isMigratedWaterWork(groupLegacyWork), "partially adopted group wor
 state.saveFieldWork({ workId: "work_legacy_drain", date: "2026-09-10", fieldIds: ["field_a"], workName: "\u843d\u6c34", legacyWaterRecord: true });
 assert(state.legacyWaterReviewFor("field_a", { year: "2026" }).some((row) => row.kind === "drain" && row.sourceWorkIds.includes("work_legacy_drain")), "legacy drainage work must remain available for reconciliation");
 
+const harvestFieldId = state.addField("収穫スナップショット田");
+assert(harvestFieldId, "収穫スナップショット用の圃場を作成できない");
+state.saveIrrigation({
+  irrigationId: "harvest_snapshot_intermittent",
+  fieldId: harvestFieldId,
+  method: "間断灌水",
+  startDate: "2026-08-20",
+  waterMovements: [
+    { movementId: "harvest_snapshot_flood", phase: "flood", startDate: "2026-09-12", endDate: "2026-09-14" },
+    { movementId: "harvest_snapshot_drain", phase: "drain", startDate: "2026-09-15", endDate: "" }
+  ]
+});
+state.saveIrrigation({
+  irrigationId: "harvest_snapshot_final_drain",
+  fieldId: harvestFieldId,
+  method: "稲刈り前の落水",
+  startDate: "2026-09-16"
+});
+state.saveOutlookSnapshots([{
+  fieldId: harvestFieldId,
+  season: "2026",
+  asOf: "2026-09-10",
+  headingDate: "2026-08-05",
+  headingKind: "actual",
+  harvestDate: "2026-09-18",
+  harvestKind: "heading",
+  confidence: "medium"
+}]);
+state.saveFieldWork({ workId: "work_harvest_snapshot", date: "2026-09-20", fieldIds: [harvestFieldId], workName: "稲刈り" });
+const harvestSnapshotWork = state.data().fieldWorks.find((row) => row.workId === "work_harvest_snapshot");
+const harvestSnapshot = harvestSnapshotWork && harvestSnapshotWork.harvestSnapshots[0];
+assert(harvestSnapshot && harvestSnapshot.water.lastWateringDate === "2026-09-12", "収穫時の最終入水日を保存できない");
+assert(harvestSnapshot.water.daysFromLastWatering === "9", "最終入水から収穫までの日数が正しくない");
+assert(harvestSnapshot.water.finalDrainDate === "2026-09-16" && harvestSnapshot.water.daysFromFinalDrain === "5", "落水開始から収穫までの日数が正しくない");
+assert(harvestSnapshot.outlook.predictedHarvestDate === "2026-09-18" && harvestSnapshot.outlook.errorDays === 2, "収穫見通しとの差を保存できない");
+assert(harvestSnapshot.thermal.status === "気象実績を取得中", "積算温度の初期状態を保存できない");
+assert(harvestSnapshot.thermal.total === "", "未取得の積算温度を0℃として保存してはいけない");
+assert(state.saveHarvestThermalSnapshots("work_harvest_snapshot", [{
+  fieldId: harvestFieldId,
+  status: "確定",
+  headingDate: "2026-08-05",
+  startDate: "2026-08-06",
+  endDate: "2026-09-20",
+  total: 1012.4,
+  target: 1000,
+  difference: 12.4,
+  count: "46",
+  expectedDays: "46",
+  plantingDate: "2026-05-15",
+  daysFromPlanting: "129",
+  source: "Open-Meteo Archive",
+  locationLabel: "試験地点",
+  retrievedAt: "2026-09-21T00:00:00"
+}]), "収穫時の積算温度を保存できない");
+const thermalSnapshot = state.data().fieldWorks.find((row) => row.workId === "work_harvest_snapshot").harvestSnapshots[0].thermal;
+assert(thermalSnapshot.status === "確定" && thermalSnapshot.total === 1012.4 && thermalSnapshot.difference === 12.4, "収穫時の積算温度が保持されない");
+assert(S.normalize(JSON.parse(JSON.stringify(state.data()))).fieldWorks.find((row) => row.workId === "work_harvest_snapshot").harvestSnapshots[0].thermal.total === 1012.4, "収穫スナップショットがJSON正規化で失われた");
+
 const machineId = state.saveMachine({ name: "SR75", category: "\u30b3\u30f3\u30d0\u30a4\u30f3", maker: "\u30af\u30dc\u30bf", model: "SR75", meterHours: "812" });
 assert(machineId && state.machine(machineId).name === "SR75", "machine master could not be saved");
 const maintenanceId = state.saveMaintenanceRecord({ machineId, date: "2026-08-17", item: "\u30a8\u30f3\u30b8\u30f3\u30aa\u30a4\u30eb", meterHours: "812", parts: "\u30aa\u30a4\u30eb" });

@@ -515,6 +515,75 @@
     return `${place}に生育を残しました。次も葉色か分げつをひとつ残すと比較しやすくなります。`;
   }
 
+  function daysThrough(startDate, endDate) {
+    const days = U.daysBetween(startDate, endDate);
+    return days === "" || Number(days) < 0 ? "" : String(Number(days) + 1);
+  }
+
+  function harvestWaterSnapshot(draft, fieldId, harvestDate) {
+    const season = String(U.season(harvestDate));
+    const waterRows = [...(draft.dryPeriods || []), ...(draft.irrigations || [])]
+      .filter((row) => String(row.fieldId || "") === String(fieldId))
+      .filter((row) => String(waterPeriodYear(row)) === season);
+    const candidates = [];
+    waterRows.forEach((row) => {
+      const kind = row.type === "dryPeriod" ? "dry" : waterKindFromMethod(row.method);
+      const fallbackDate = String(row.startDate || row.date || "");
+      if (kind !== "drain" && fallbackDate && fallbackDate <= harvestDate) {
+        candidates.push({ date: fallbackDate, label: `${row.method || "水管理"}開始` });
+      }
+      (row.waterMovements || []).forEach((movement) => {
+        const date = String(movement && movement.startDate || "");
+        if (movement && movement.phase === "flood" && date && date <= harvestDate) {
+          candidates.push({ date, label: kind === "saturated" ? "給水・飽水" : "入水" });
+        }
+      });
+    });
+    const lastWatering = candidates.sort((a, b) => String(a.date).localeCompare(String(b.date))).at(-1) || null;
+    const finalDrain = waterRows
+      .filter((row) => waterKindFromMethod(row.method) === "drain")
+      .map((row) => String(row.startDate || row.date || ""))
+      .filter((date) => date && date <= harvestDate)
+      .sort()
+      .at(-1) || "";
+    return {
+      lastWateringDate: lastWatering ? lastWatering.date : "",
+      lastWateringLabel: lastWatering ? lastWatering.label : "",
+      daysFromLastWatering: lastWatering ? daysThrough(lastWatering.date, harvestDate) : "",
+      finalDrainDate: finalDrain,
+      daysFromFinalDrain: finalDrain ? daysThrough(finalDrain, harvestDate) : ""
+    };
+  }
+
+  function harvestOutlookSnapshot(draft, fieldId, harvestDate) {
+    const season = String(U.season(harvestDate));
+    const forecast = ((draft.meta && draft.meta.outlookSnapshots) || [])
+      .filter((row) => String(row.fieldId || "") === String(fieldId) && String(row.season || "") === season)
+      .filter((row) => row && row.harvestDate && row.harvestKind !== "actual" && String(row.asOf || "") <= harvestDate)
+      .slice()
+      .sort((a, b) => String(a.asOf || "").localeCompare(String(b.asOf || "")))
+      .at(-1);
+    if (!forecast) return { status: "見通し記録なし", predictedHarvestDate: "", predictedAsOf: "", errorDays: "" };
+    return {
+      status: "比較済み",
+      predictedHarvestDate: String(forecast.harvestDate),
+      predictedAsOf: String(forecast.asOf || ""),
+      errorDays: U.daysBetween(String(forecast.harvestDate), harvestDate)
+    };
+  }
+
+  function harvestSnapshotsForWork(draft, work) {
+    return (work.fieldIds || []).map((fieldId) => ({
+      fieldId: String(fieldId),
+      season: U.season(work.date),
+      harvestDate: String(work.date),
+      savedAt: U.now(),
+      water: harvestWaterSnapshot(draft, fieldId, work.date),
+      outlook: harvestOutlookSnapshot(draft, fieldId, work.date),
+      thermal: { status: "気象実績を取得中" }
+    }));
+  }
+
   function saveFieldWork(record) {
     if (waterEventFromWorkName(record && record.workName) && !(record && record.legacyWaterRecord)) {
       if (typeof alert === "function") alert("中干し・間断灌水・深水・落水は、水管理として記録してください。");
@@ -561,6 +630,9 @@
         growthSnapshots: record.growthSnapshots === undefined
           ? (previous && previous.growthSnapshots || {})
           : record.growthSnapshots,
+        harvestSnapshots: record.harvestSnapshots === undefined
+          ? (previous && previous.harvestSnapshots || [])
+          : record.harvestSnapshots,
         weather: record.weather || "",
         weatherAuto: record.weatherAuto || null,
         photo: record.photo || "",
@@ -572,6 +644,11 @@
       const index = d.fieldWorks.findIndex((w) => w.workId === normalized.workId);
       if (index >= 0) d.fieldWorks[index] = { ...d.fieldWorks[index], ...normalized };
       else d.fieldWorks.push(normalized);
+      if (/稲刈り|収穫/.test(String(normalized.workName || ""))) {
+        normalized.harvestSnapshots = harvestSnapshotsForWork(d, normalized);
+        const savedIndex = d.fieldWorks.findIndex((work) => work.workId === normalized.workId);
+        if (savedIndex >= 0) d.fieldWorks[savedIndex] = { ...d.fieldWorks[savedIndex], harvestSnapshots: normalized.harvestSnapshots };
+      }
       // An edited work may no longer satisfy the schedule it previously
       // completed. Re-open it first, then let the current record re-match.
       if (previous) {
@@ -670,6 +747,23 @@
         });
       }
     }, workSaveFeedback(record));
+  }
+
+  function saveHarvestThermalSnapshots(workId, snapshots) {
+    const id = String(workId || "");
+    const incoming = (Array.isArray(snapshots) ? snapshots : []).filter((item) => item && item.fieldId);
+    if (!id || !incoming.length) return null;
+    return mutate((draft) => {
+      const workIndex = (draft.fieldWorks || []).findIndex((work) => work.workId === id);
+      if (workIndex < 0 || !/稲刈り|収穫/.test(String(draft.fieldWorks[workIndex].workName || ""))) return;
+      const work = draft.fieldWorks[workIndex];
+      const byField = new Map(incoming.map((item) => [String(item.fieldId), item]));
+      work.harvestSnapshots = (work.harvestSnapshots || []).map((snapshot) => {
+        const thermal = byField.get(String(snapshot.fieldId || ""));
+        return thermal ? { ...snapshot, thermal, savedAt: U.now() } : snapshot;
+      });
+      draft.fieldWorks[workIndex] = work;
+    }, "収穫時の積算気温を保存しました");
   }
 
   function deleteFieldWorks(workIds, message) {
@@ -1922,6 +2016,7 @@
     isActualFieldWork,
     isHeadingWorkName,
     saveFieldWork,
+    saveHarvestThermalSnapshots,
     deleteFieldWork,
     deleteFieldWorks,
     saveGrowthLog,

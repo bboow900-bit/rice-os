@@ -533,6 +533,60 @@
     }
   }
 
+  function isHarvestWork(workName) {
+    return /稲刈り|収穫/.test(String(workName || ""));
+  }
+
+  function inclusiveDays(startDate, endDate) {
+    const days = U.daysBetween(startDate, endDate);
+    return days === "" || Number(days) < 0 ? "" : String(Number(days) + 1);
+  }
+
+  async function saveHarvestThermalSnapshots(workId, fieldIds, harvestDate) {
+    if (!state.saveHarvestThermalSnapshots) return;
+    const location = state.data().meta && state.data().meta.weatherLocation;
+    const rows = await Promise.all((fieldIds || []).map(async (fieldId) => {
+      const field = state.field(fieldId);
+      const headingDate = state.headingDateForField && state.headingDateForField(fieldId, U.season(harvestDate), harvestDate);
+      const plantingDate = state.plantingDateForField && state.plantingDateForField(fieldId, U.season(harvestDate));
+      if (!headingDate) return { fieldId, status: "出穂日待ち", plantingDate: plantingDate || "" };
+      if (!location || location.latitude === undefined || location.longitude === undefined) {
+        return { fieldId, status: "天気の地点待ち", headingDate, plantingDate: plantingDate || "" };
+      }
+      const startDate = RiceOS.agro && RiceOS.agro.postHeadingThermalStart
+        ? RiceOS.agro.postHeadingThermalStart(headingDate)
+        : headingDate;
+      try {
+        const weather = await RiceOS.weather.fetchDailyRange(startDate, harvestDate, location);
+        const reference = RiceOS.agro && RiceOS.agro.harvestReferenceFor ? RiceOS.agro.harvestReferenceFor(field) : null;
+        const expectedDays = inclusiveDays(startDate, harvestDate);
+        const total = weather.count ? weather.total : "";
+        const target = reference && reference.target || "";
+        const isSameDay = harvestDate >= U.today();
+        return {
+          fieldId,
+          status: weather.count === Number(expectedDays) ? (isSameDay ? "当日速報" : "確定") : "一部欠測",
+          headingDate,
+          startDate,
+          endDate: harvestDate,
+          total,
+          target,
+          difference: total === "" || target === "" ? "" : Math.round((Number(total) - Number(target)) * 10) / 10,
+          count: String(weather.count || 0),
+          expectedDays,
+          plantingDate: plantingDate || "",
+          daysFromPlanting: plantingDate ? inclusiveDays(plantingDate, harvestDate) : "",
+          source: Array.from(new Set((weather.rows || []).map((item) => item.dataset || item.source).filter(Boolean))).join(" / "),
+          locationLabel: location.label || "取得位置",
+          retrievedAt: weather.retrievedAt || U.now()
+        };
+      } catch (error) {
+        return { fieldId, status: "気温取得失敗", headingDate, plantingDate: plantingDate || "", source: error.message || "気温を取得できませんでした" };
+      }
+    }));
+    state.saveHarvestThermalSnapshots(workId, rows);
+  }
+
   function bind() {
     U.$("fwFields").addEventListener("click", (event) => {
       const card = event.target.closest(".select-card");
@@ -637,7 +691,7 @@
       if (location && location.latitude !== undefined) fetchWorkWeather(false);
     });
 
-    U.$("fieldWorkForm").addEventListener("submit", (event) => {
+    U.$("fieldWorkForm").addEventListener("submit", async (event) => {
       event.preventDefault();
       const ids = selectedFieldIds();
       if (!ids.length) {
@@ -651,10 +705,13 @@
         U.toast("水管理として入力します。開始または終了を記録してください。");
         return;
       }
+      const date = U.$("fwDate").value || U.today();
+      const workName = U.$("fwName").value;
+      const workId = U.$("editFieldWorkId").value || U.id("work", date);
       const saved = state.saveFieldWork({
-        workId: U.$("editFieldWorkId").value,
-        date: U.$("fwDate").value,
-        workName: U.$("fwName").value,
+        workId,
+        date,
+        workName,
         fieldIds: ids,
         worker: U.$("fwWorker") ? U.$("fwWorker").value : "",
         hours: U.$("fwHours").value,
@@ -669,6 +726,7 @@
         memo: U.$("fwMemo").value
       });
       if (saved === null) return;
+      if (isHarvestWork(workName)) await saveHarvestThermalSnapshots(workId, ids, date);
       resetForm();
     });
 

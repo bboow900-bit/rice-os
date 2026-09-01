@@ -5,7 +5,7 @@
   const U = RiceOS.utils;
 
   const SCHEMA_VERSION = 17;
-  const APP_VERSION = "20260901_ver263";
+  const APP_VERSION = "20260901_ver264";
   const STORE_KEY = "rice_os_v8_stable";
   const BACKUP_KEY = "rice_os_v8_stable_backup";
   const RELEASE_BACKUPS_KEY = "rice_os_v8_stable_release_backups";
@@ -375,6 +375,52 @@
   function normalizeFieldWork(input) {
     const w = input || {};
     const date = String(w.date || U.today());
+    const harvestSnapshots = ensureArray(w.harvestSnapshots).map((snapshot) => {
+      const row = snapshot || {};
+      const water = row.water && typeof row.water === "object" ? row.water : {};
+      const outlook = row.outlook && typeof row.outlook === "object" ? row.outlook : {};
+      const thermal = row.thermal && typeof row.thermal === "object" ? row.thermal : {};
+      const optionalNumber = (value) => String(value ?? "").trim() === "" ? NaN : Number(value);
+      const errorDays = optionalNumber(outlook.errorDays);
+      const thermalTotal = optionalNumber(thermal.total);
+      const thermalTarget = optionalNumber(thermal.target);
+      const thermalDifference = optionalNumber(thermal.difference);
+      return {
+        fieldId: String(row.fieldId || ""),
+        season: U.number(row.season, U.season(date)),
+        harvestDate: String(row.harvestDate || date),
+        savedAt: String(row.savedAt || w.updatedAt || w.createdAt || U.now()),
+        water: {
+          lastWateringDate: String(water.lastWateringDate || ""),
+          lastWateringLabel: String(water.lastWateringLabel || ""),
+          daysFromLastWatering: String(water.daysFromLastWatering || ""),
+          finalDrainDate: String(water.finalDrainDate || ""),
+          daysFromFinalDrain: String(water.daysFromFinalDrain || "")
+        },
+        outlook: {
+          status: String(outlook.status || "記録なし"),
+          predictedHarvestDate: String(outlook.predictedHarvestDate || ""),
+          predictedAsOf: String(outlook.predictedAsOf || ""),
+          errorDays: Number.isFinite(errorDays) ? errorDays : ""
+        },
+        thermal: {
+          status: String(thermal.status || "未保存"),
+          headingDate: String(thermal.headingDate || ""),
+          startDate: String(thermal.startDate || ""),
+          endDate: String(thermal.endDate || ""),
+          total: Number.isFinite(thermalTotal) ? thermalTotal : "",
+          target: Number.isFinite(thermalTarget) ? thermalTarget : "",
+          difference: Number.isFinite(thermalDifference) ? thermalDifference : "",
+          count: String(thermal.count || ""),
+          expectedDays: String(thermal.expectedDays || ""),
+          plantingDate: String(thermal.plantingDate || ""),
+          daysFromPlanting: String(thermal.daysFromPlanting || ""),
+          source: String(thermal.source || ""),
+          locationLabel: String(thermal.locationLabel || ""),
+          retrievedAt: String(thermal.retrievedAt || "")
+        }
+      };
+    }).filter((snapshot) => snapshot.fieldId);
     return {
       workId: String(w.workId || w.id || U.id("work", date)),
       type: "fieldWork",
@@ -406,6 +452,10 @@
       fertilizerBagCount: String(w.fertilizerBagCount || ""),
       sourceScheduleId: String(w.sourceScheduleId || ""),
       growthSnapshots: w.growthSnapshots && typeof w.growthSnapshots === "object" ? w.growthSnapshots : {},
+      // A harvest work can hold one factual close-out snapshot per field.
+      // This remains attached to the work so a JSON export keeps the original
+      // water timing and forecast comparison even after screens are revised.
+      harvestSnapshots,
       weather: String(w.weather || ""),
       weatherAuto: w.weatherAuto && typeof w.weatherAuto === "object" ? w.weatherAuto : null,
       photo: String(w.photo || ""),

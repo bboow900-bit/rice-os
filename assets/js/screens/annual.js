@@ -1873,6 +1873,40 @@
     return `<div class="annual-record-detail-row"><span>${U.escapeHTML(label)}</span><b>${U.escapeHTML(String(value))}</b></div>`;
   }
 
+  function renderHarvestSnapshot(row, fieldId) {
+    const snapshot = (row.harvestSnapshots || []).find((item) => String(item.fieldId || "") === String(fieldId));
+    if (!snapshot) return "";
+    const water = snapshot.water || {};
+    const outlook = snapshot.outlook || {};
+    const thermal = snapshot.thermal || {};
+    const waterRows = [
+      annualRecordInfoRow("最終の入水", water.lastWateringDate ? `${U.fd(water.lastWateringDate)} ${water.lastWateringLabel || ""}` : "記録なし"),
+      annualRecordInfoRow("入水から収穫", water.daysFromLastWatering ? `${water.daysFromLastWatering}日` : "記録なし"),
+      annualRecordInfoRow("落水開始", water.finalDrainDate ? U.fd(water.finalDrainDate) : "記録なし"),
+      annualRecordInfoRow("落水から収穫", water.daysFromFinalDrain ? `${water.daysFromFinalDrain}日` : "記録なし")
+    ].filter(Boolean).join("");
+    const error = outlook.errorDays === "" || outlook.errorDays === undefined || outlook.errorDays === null
+      ? ""
+      : Number(outlook.errorDays) === 0 ? "見通しどおり"
+        : Number(outlook.errorDays) > 0 ? `見通しより${outlook.errorDays}日遅い` : `見通しより${Math.abs(Number(outlook.errorDays))}日早い`;
+    const outlookRows = outlook.predictedHarvestDate ? [
+      annualRecordInfoRow("直前の収穫目安", `${U.fd(outlook.predictedHarvestDate)}${outlook.predictedAsOf ? `（${U.fd(outlook.predictedAsOf)}時点）` : ""}`),
+      annualRecordInfoRow("実績との差", error || "比較できません")
+    ].filter(Boolean).join("") : annualRecordInfoRow("見通しとの比較", outlook.status || "見通し記録なし");
+    const thermalRows = thermal.total !== "" && thermal.total !== undefined && thermal.total !== null ? [
+      annualRecordInfoRow("出穂後積算", `${Math.round(Number(thermal.total))}℃${thermal.target !== "" && thermal.target !== undefined && thermal.target !== null ? ` / 目安 ${Math.round(Number(thermal.target))}℃` : ""}`),
+      annualRecordInfoRow("目安との差", thermal.difference === "" || thermal.difference === undefined || thermal.difference === null ? "-" : `${Number(thermal.difference) >= 0 ? "+" : ""}${thermal.difference}℃`),
+      annualRecordInfoRow("計算期間", thermal.startDate && thermal.endDate ? `${U.fd(thermal.startDate)} - ${U.fd(thermal.endDate)} / ${thermal.count || "-"}日分` : "-"),
+      annualRecordInfoRow("田植えから収穫", thermal.daysFromPlanting ? `${thermal.daysFromPlanting}日` : "田植え日未記録"),
+      annualRecordInfoRow("気象データ", `${thermal.status || "保存済み"}${thermal.source ? ` / ${thermal.source}` : ""}`)
+    ].filter(Boolean).join("") : annualRecordInfoRow("出穂後積算", thermal.status || "未保存");
+    return `
+      <section class="annual-record-detail-section annual-harvest-snapshot"><h3>収穫時の水管理実績</h3><div class="annual-record-detail-rows">${waterRows}</div></section>
+      <section class="annual-record-detail-section annual-harvest-snapshot"><h3>見通しとの比較</h3><div class="annual-record-detail-rows">${outlookRows}</div></section>
+      <section class="annual-record-detail-section annual-harvest-snapshot"><h3>収穫時の積算温度</h3><div class="annual-record-detail-rows">${thermalRows}</div></section>
+    `;
+  }
+
   function renderAnnualRecordDetail(field, detail) {
     const target = annualRecordTarget(field, detail.kind, detail.id);
     if (!target) {
@@ -1909,12 +1943,14 @@
     }
     const memo = String(row.memo || row.note || "").trim();
     const photos = annualRecordPhotos(row);
+    const harvestSnapshot = category === "収穫" ? renderHarvestSnapshot(row, field.fieldId) : "";
     return `
       <section class="annual-record-detail" aria-label="${U.attr(title)}の実績詳細">
         <button type="button" class="annual-record-detail-back" data-annual-record-detail-back aria-label="一年の流れへ戻る">‹</button>
         <header class="annual-record-detail-head"><span>${U.escapeHTML(category)}</span><h2>${U.escapeHTML(title)}</h2><p>${U.escapeHTML(fieldNames || field.name)} / ${U.escapeHTML(annualRecordDate(date))}</p></header>
         <section class="annual-record-detail-summary ${U.attr(isWater ? "water" : kind === "growth" ? "growth" : category === "収穫" ? "harvest" : "work")}" ><b>${U.escapeHTML(title)}</b><span>${U.escapeHTML(isLegacyWater ? "旧作業記録からの照合候補。水管理としては未確定です" : `${category}として登録された実績です`)}</span></section>
         <section class="annual-record-detail-section"><h3>記録内容</h3><div class="annual-record-detail-rows">${info.filter(Boolean).join("") || '<p class="annual-record-detail-empty">記録内容はありません。</p>'}</div></section>
+        ${harvestSnapshot}
         ${memo ? `<section class="annual-record-detail-section"><h3>メモ</h3><p class="annual-record-detail-memo">${U.escapeHTML(memo)}</p></section>` : ""}
         ${photos.length ? `<section class="annual-record-detail-section"><h3>写真</h3><div class="annual-record-detail-photos">${photos.map((photo) => `<img src="${U.attr(photo)}" alt="${U.escapeHTML(title)}の記録写真">`).join("")}</div></section>` : ""}
         ${isLegacyWater ? '<p class="annual-record-detail-legacy">旧作業記録から確認できる水管理候補です。元作業の実績は変更していません。</p><button type="button" class="secondary annual-record-detail-water" data-annual-record-detail-open-water>水管理の記録を開く</button>' : ""}
