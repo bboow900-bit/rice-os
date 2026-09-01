@@ -321,6 +321,20 @@
     return `${movementLabel(type, active ? active.phase : movements.at(-1).phase)}${active ? `中${elapsed === "" ? "" : ` ${Math.max(0, Number(elapsed)) + 1}日目`}` : "を記録済み"} / ${movements.length}区間`;
   }
 
+  function renderMovementTimeline(type, record, date) {
+    const timeline = RiceOS.agro && RiceOS.agro.waterMovementTimeline
+      ? RiceOS.agro.waterMovementTimeline(record, { asOf: date })
+      : null;
+    if (!timeline || !timeline.segments.length) return "";
+    const label = (phase) => movementLabel(type, phase);
+    const summary = `${label("flood")} ${timeline.flood.count}回・計${timeline.flood.days}日 / ${label("drain")} ${timeline.drain.count}回・計${timeline.drain.days}日`;
+    return `<section class="water-movement-timeline" aria-label="${U.attr(`${type.label}の期間内の水の動き`)}">
+      <div class="water-movement-timeline-head"><b>水の動き</b><small>${U.escapeHTML(summary)}</small></div>
+      <div class="water-movement-timeline-bar">${timeline.segments.map((item) => `<span class="${U.attr(item.phase)} ${item.active ? "active" : ""}" style="--movement-days:${U.attr(String(item.days))}"><b>${U.escapeHTML(label(item.phase))}</b><em>${U.escapeHTML(`${item.days}日`)}</em></span>`).join("")}</div>
+      <div class="water-movement-timeline-dates"><span>${U.escapeHTML(U.fd(timeline.segments[0].startDate))}</span><span>${U.escapeHTML(timeline.active ? "継続中" : U.fd(timeline.segments.at(-1).displayEndDate))}</span></div>
+    </section>`;
+  }
+
   function switchMovement(record, type, phase, date) {
     const current = openMovement(record);
     if (current && current.phase === phase) return { ok: false, reason: `すでに${movementStatus(type, phase)}です。` };
@@ -404,6 +418,7 @@
         </div>
         ${stage ? `<p class="water-period-stage"><span>${isGroup ? `代表: ${stageField.name}` : "生育との重なり"}</span><b>${U.escapeHTML(stage)}</b></p>` : ""}
         ${movementControls}
+        ${activeRecord && supportsMovement(type) ? renderMovementTimeline(type, activeRecord, date) : ""}
         <div class="water-period-actions">
           <button type="button" class="secondary" data-water-plan="${U.attr(`${type.key}-${phase}`)}" ${unscheduled.length ? "" : "disabled"}>${U.escapeHTML(planLabel)}</button>
           <button type="button" class="primary" data-water-action="${U.attr(`${type.key}-${phase}`)}" ${activeCount ? (endEnabled ? "" : "disabled") : (startEnabled ? "" : "disabled")}>${U.escapeHTML(actualLabel)}</button>

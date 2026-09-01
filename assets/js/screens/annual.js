@@ -1085,6 +1085,25 @@
     return "water";
   }
 
+  function waterMovementLabel(period, phase) {
+    if (period.tone === "saturated") return phase === "drain" ? "自然落水" : "給水・飽水";
+    return phase === "drain" ? "落水" : "入水";
+  }
+
+  function renderWaterMovementTimeline(period, asOf) {
+    const timeline = RiceOS.agro && RiceOS.agro.waterMovementTimeline
+      ? RiceOS.agro.waterMovementTimeline({ waterMovements: period.waterMovements, actualEndDate: period.actualEndDate }, { asOf })
+      : null;
+    if (!timeline || !timeline.segments.length) return "";
+    const label = (phase) => waterMovementLabel(period, phase);
+    const summary = `${label("flood")} ${timeline.flood.count}回・計${timeline.flood.days}日 / ${label("drain")} ${timeline.drain.count}回・計${timeline.drain.days}日`;
+    return `<section class="water-movement-timeline annual-water-movement-timeline" aria-label="${U.attr(`${period.label}の期間内の水の動き`)}">
+      <div class="water-movement-timeline-head"><b>水の動き</b><small>${U.escapeHTML(summary)}</small></div>
+      <div class="water-movement-timeline-bar">${timeline.segments.map((item) => `<span class="${U.attr(item.phase)} ${item.active ? "active" : ""}" style="--movement-days:${U.attr(String(item.days))}"><b>${U.escapeHTML(label(item.phase))}</b><em>${U.escapeHTML(`${item.days}日`)}</em></span>`).join("")}</div>
+      <div class="water-movement-timeline-dates"><span>${U.escapeHTML(U.fd(timeline.segments[0].startDate))}</span><span>${U.escapeHTML(timeline.active ? "継続中" : U.fd(timeline.segments.at(-1).displayEndDate))}</span></div>
+    </section>`;
+  }
+
   function waterPeriodsForField(field) {
     const selectedYear = yearValue();
     const year = selectedYear === "all" ? undefined : String(selectedYear);
@@ -1150,10 +1169,6 @@
     const heading = `${period.label}${period.sequence > 1 ? ` ${period.sequence}回目` : ""}`;
     const actionLabel = "編集";
     const supportsMovements = period.tone === "intermittent" || period.tone === "saturated";
-    const movementLabel = (movement) => {
-      if (period.tone === "saturated") return movement.phase === "drain" ? "自然落水" : "給水・飽水";
-      return movement.phase === "drain" ? "落水" : "入水";
-    };
     const movements = (period.waterMovements || []).filter((movement) => movement && movement.startDate)
       .slice().sort((a, b) => String(a.startDate).localeCompare(String(b.startDate)) || String(a.createdAt || "").localeCompare(String(b.createdAt || "")));
     const movementHistory = supportsMovements && movements.length ? `<details class="annual-water-movements">
@@ -1161,7 +1176,7 @@
       <div>${movements.map((movement) => {
         const rawDays = movement.endDate ? waterPeriodDays(movement.startDate, movement.endDate) : "";
         const days = rawDays === "" ? "" : Number(rawDays) + 1;
-        return `<p><b>${U.escapeHTML(movementLabel(movement))}</b><span>${U.escapeHTML(U.fd(movement.startDate))} ${movement.endDate ? `- ${U.escapeHTML(U.fd(movement.endDate))}` : "- 継続中"}${days !== "" ? ` / ${days}日` : ""}</span></p>`;
+        return `<p><b>${U.escapeHTML(waterMovementLabel(period, movement.phase))}</b><span>${U.escapeHTML(U.fd(movement.startDate))} ${movement.endDate ? `- ${U.escapeHTML(U.fd(movement.endDate))}` : "- 継続中"}${days !== "" ? ` / ${days}日` : ""}</span></p>`;
       }).join("")}</div>
     </details>` : "";
     return `
@@ -1177,6 +1192,7 @@
           <span><small>実績終了</small><b>${U.escapeHTML(completed ? U.fd(period.actualEndDate) : (dateOrderInvalid ? "日付要確認" : (period.actualEndDate ? "日付要確認" : (active ? "継続中" : "未記録"))))}</b></span>
         </div>
         ${plannedDays ? `<div class="annual-water-period-progress"><i><em style="width:${progress}%"></em></i><span>予定 ${plannedDays}日${progressDays !== "" ? ` / ${completed ? "実績" : "経過"} ${progressDays}日` : ""}</span></div>` : ""}
+        ${supportsMovements ? renderWaterMovementTimeline(period, displayEnd) : ""}
         ${movementHistory}
         ${period.memo ? `<p class="annual-water-period-memo">${U.escapeHTML(period.memo)}</p>` : ""}
         ${period.editId ? `<div class="annual-water-period-actions"><button type="button" class="secondary" data-annual-water-edit="${U.attr(period.editKind)}" data-id="${U.attr(period.editId)}">${actionLabel}</button><button type="button" class="danger" data-annual-water-delete="${U.attr(period.editKind)}" data-id="${U.attr(period.editId)}">削除</button></div>` : ""}

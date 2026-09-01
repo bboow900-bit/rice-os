@@ -7035,6 +7035,24 @@ label {
 .water-movement-button { min-height: 40px; padding: 6px; border: 1px solid #a8d7e7; border-radius: 9px; background: #fff; color: #226a84; font-size: 11px; font-weight: 900; line-height: 1.2; }
 .water-movement-button.current { border-color: #61b5d2; background: #dff4fb; color: #1f6b86; }
 .water-movement-button:disabled { opacity: .72; }
+.water-movement-timeline { display: grid; gap: 6px; padding: 8px; border: 1px solid rgba(69, 145, 174, .24); border-radius: 10px; background: rgba(255,255,255,.72); }
+.water-movement-timeline-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.water-movement-timeline-head b { color: #225f72; font-size: 11px; font-weight: 900; }
+.water-movement-timeline-head small { color: #55727b; font-size: 9px; font-weight: 800; text-align: right; }
+.water-movement-timeline-bar { display: flex; min-width: 0; height: 31px; overflow: hidden; border-radius: 8px; background: #e7f2f5; box-shadow: inset 0 0 0 1px rgba(80, 141, 158, .12); }
+.water-movement-timeline-bar span { display: grid; flex: var(--movement-days) 1 0; min-width: 0; place-content: center; padding: 2px 3px; color: #fff; text-align: center; }
+.water-movement-timeline-bar span + span { border-left: 1px solid rgba(255,255,255,.7); }
+.water-movement-timeline-bar .flood { background: #3e9fc6; }
+.water-movement-timeline-bar .drain { background: repeating-linear-gradient(135deg, #83adba 0 5px, #9bbdc6 5px 10px); }
+.water-movement-timeline-bar .active { box-shadow: inset 0 -3px 0 #176a89; }
+.water-movement-timeline-bar b, .water-movement-timeline-bar em { display: block; overflow: hidden; max-width: 100%; font-style: normal; line-height: 1.05; text-overflow: ellipsis; white-space: nowrap; }
+.water-movement-timeline-bar b { font-size: 9px; font-weight: 900; }
+.water-movement-timeline-bar em { margin-top: 1px; font-size: 8px; font-weight: 800; }
+.water-movement-timeline-dates { display: flex; justify-content: space-between; gap: 8px; color: #66808a; font-size: 9px; font-weight: 800; }
+.annual-water-movement-timeline { margin: 0 10px 10px; border-color: color-mix(in srgb, var(--water-line) 78%, white); }
+.annual-water-movement-timeline .water-movement-timeline-head b { color: var(--water-accent); }
+.annual-water-movement-timeline .water-movement-timeline-bar .flood { background: color-mix(in srgb, var(--water-accent) 78%, #399bc5); }
+.annual-water-movement-timeline .water-movement-timeline-bar .drain { background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--water-accent) 52%, #87adbc) 0 5px, color-mix(in srgb, var(--water-soft) 45%, #86b0bd) 5px 10px); }
 .water-edit-section { background: #fffefa; }
 .water-history-head { margin: 4px 2px 8px; }
 .water-history-head h3 { margin: 0; color: #263c2a; font-size: 16px; }
@@ -12335,6 +12353,24 @@ label {
   --water-line: #bae0dd;
 }
 
+.annual-water-period-saturated {
+  --water-accent: #258d9e;
+  --water-soft: #edf9f7;
+  --water-line: #bae0dd;
+}
+
+.annual-water-period-deep {
+  --water-accent: #3d87b7;
+  --water-soft: #edf6fc;
+  --water-line: #c4ddec;
+}
+
+.annual-water-period-drain {
+  --water-accent: #ad8230;
+  --water-soft: #fffae8;
+  --water-line: #e8d49b;
+}
+
 .annual-water-period-drainage {
   --water-accent: #ad8230;
   --water-soft: #fffae8;
@@ -12479,6 +12515,8 @@ label {
 @media (max-width: 390px) {
   .annual-water-movements p { display: grid; gap: 2px; }
   .annual-water-movements p span { text-align: left; }
+  .water-movement-timeline-head { align-items: start; flex-direction: column; gap: 2px; }
+  .water-movement-timeline-head small { text-align: left; }
 }
 
 .annual-water-review-list {

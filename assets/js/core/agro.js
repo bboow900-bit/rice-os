@@ -329,6 +329,48 @@
     return { index, current: index ? SEASON_STAGES[index - 1] : null };
   }
 
+  // A single irrigation period can contain repeated refill and drainage
+  // movements. Keep those movements factual and derive display statistics
+  // here so Home, water input, and annual review agree on the same history.
+  function waterMovementTimeline(record, options) {
+    const opts = options || {};
+    const asOf = String(opts.asOf || record && record.actualEndDate || "");
+    const rows = Array.isArray(record && record.waterMovements) ? record.waterMovements.slice() : [];
+    const segments = rows
+      .filter((item) => item && /^\d{4}-\d{2}-\d{2}$/.test(String(item.startDate || "")))
+      .sort((a, b) => String(a.startDate).localeCompare(String(b.startDate)) || String(a.createdAt || "").localeCompare(String(b.createdAt || "")))
+      .map((item) => {
+        const startDate = String(item.startDate);
+        const explicitEnd = /^\d{4}-\d{2}-\d{2}$/.test(String(item.endDate || "")) ? String(item.endDate) : "";
+        const endDate = explicitEnd || (asOf && asOf >= startDate ? asOf : "");
+        const elapsed = endDate ? U.daysBetween(startDate, endDate) : "";
+        const days = elapsed === "" || elapsed < 0 ? "" : Number(elapsed) + 1;
+        return {
+          movementId: String(item.movementId || ""),
+          phase: item.phase === "drain" ? "drain" : "flood",
+          startDate,
+          endDate: explicitEnd,
+          displayEndDate: endDate,
+          days,
+          active: !explicitEnd
+        };
+      })
+      .filter((item) => item.days !== "");
+    const summarize = (phase) => {
+      const matching = segments.filter((item) => item.phase === phase);
+      return {
+        count: matching.length,
+        days: matching.reduce((total, item) => total + Number(item.days || 0), 0)
+      };
+    };
+    return {
+      segments,
+      flood: summarize("flood"),
+      drain: summarize("drain"),
+      active: segments.find((item) => item.active) || null
+    };
+  }
+
   function managementStatus(field, date) {
     const targetDate = date || U.today();
     const year = U.dateYear(targetDate);
@@ -652,6 +694,7 @@
     criticalWaterWindow,
     harvestReferenceFor,
     postHeadingThermalStart,
+    waterMovementTimeline,
     SEASON_STAGES
   };
 })();

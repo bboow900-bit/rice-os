@@ -160,7 +160,7 @@
       const forecastMean = means.length ? Math.round(means.reduce((sum, value) => sum + value, 0) / means.length * 10) / 10 : "";
       weatherContext = {
         available: forecastMean !== "",
-        detail: forecastMean === "" ? "直近7日の平均気温を取得できませんでした" : `直近7日 平均 ${forecastMean}℃`,
+        detail: forecastMean === "" ? "今後7日の平均気温を取得できませんでした" : `今後7日 平均 ${forecastMean}℃`,
         normalAvailable: Boolean(historical && historical.days),
         normalDetail: historical && historical.label || "過去同時期の平均は未取得",
         asOf: today,
