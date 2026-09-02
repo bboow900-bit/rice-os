@@ -29,11 +29,13 @@
   const WATER_MOVEMENT_TYPES = {
     intermittent: {
       flood: { label: "入水", activeLabel: "入水中", actionLabel: "入水スタート" },
-      drain: { label: "落水", activeLabel: "落水中", actionLabel: "落水スタート" }
+      drain: { label: "落水", activeLabel: "落水中", actionLabel: "落水スタート" },
+      wait: { label: "入水待ち", activeLabel: "入水待ち", actionLabel: "水が切れた・入水待ち" }
     },
     saturated: {
       flood: { label: "給水・飽水", activeLabel: "飽水中", actionLabel: "給水・飽水を開始" },
-      drain: { label: "自然落水", activeLabel: "自然落水中", actionLabel: "自然落水へ" }
+      drain: { label: "自然落水", activeLabel: "自然落水中", actionLabel: "自然落水へ" },
+      wait: { label: "給水待ち", activeLabel: "給水待ち", actionLabel: "水が切れた・給水待ち" }
     }
   };
 
@@ -327,7 +329,7 @@
       : null;
     if (!timeline || !timeline.segments.length) return "";
     const label = (phase) => movementLabel(type, phase);
-    const summary = `${label("flood")} ${timeline.flood.count}回・計${timeline.flood.days}日 / ${label("drain")} ${timeline.drain.count}回・計${timeline.drain.days}日`;
+    const summary = `${label("flood")} ${timeline.flood.count}回・計${timeline.flood.days}日 / ${label("drain")} ${timeline.drain.count}回・計${timeline.drain.days}日${timeline.wait.count ? ` / ${label("wait")} ${timeline.wait.count}回・計${timeline.wait.days}日` : ""}`;
     return `<section class="water-movement-timeline" aria-label="${U.attr(`${type.label}の期間内の水の動き`)}">
       <div class="water-movement-timeline-head"><b>水の動き</b><small>${U.escapeHTML(summary)}</small></div>
       <div class="water-movement-timeline-bar">${timeline.segments.map((item) => `<span class="${U.attr(item.phase)} ${item.active ? "active" : ""}" style="--movement-days:${U.attr(String(item.days))}"><b>${U.escapeHTML(label(item.phase))}</b><em>${U.escapeHTML(`${item.days}日`)}</em></span>`).join("")}</div>
@@ -395,10 +397,10 @@
     const planLabel = unscheduled.length ? `${phase === "end" ? "終了予定を入れる" : "開始予定を入れる"}${isGroup && unscheduled.length !== actionable.length ? ` (${unscheduled.length}圃場)` : ""}` : "予定済み";
     const actualLabel = phase === "end" ? `終了を記録${countSuffix}` : `${finished ? "もう一度開始" : "開始を記録"}${countSuffix}`;
     const countNote = isGroup ? `${activeCount}/${summary.fields.length}圃場が実施中` : "";
-    // Rendering must never adopt or mutate a legacy record. Direct records
-    // expose their raw parent period here; legacy records simply have no
-    // within-period movement controls until explicitly edited.
-    const activeRecord = activeItem && activeItem.source === "direct" ? activeItem.raw : null;
+    // Rendering must never adopt or mutate a legacy record. The controls are
+    // still visible for an older active period; adoption happens only after
+    // the user confirms the first factual water movement.
+    const activeRecord = activeItem ? activeItem.raw : null;
     const currentMovement = activeRecord && openMovement(activeRecord);
     const movementControls = activeItem && activeRecord && supportsMovement(type) ? `
       <div class="water-movement-controls">
@@ -406,7 +408,9 @@
         <div class="water-movement-buttons">
           <button type="button" class="water-movement-button ${currentMovement?.phase === "flood" ? "current" : ""}" data-water-movement="${U.attr(`${type.key}-flood`)}" ${currentMovement?.phase === "flood" ? "disabled" : ""}>${U.escapeHTML(type.key === "saturated" ? "給水・飽水を開始" : "入水スタート")}</button>
           <button type="button" class="water-movement-button ${currentMovement?.phase === "drain" ? "current" : ""}" data-water-movement="${U.attr(`${type.key}-drain`)}" ${currentMovement?.phase === "drain" ? "disabled" : ""}>${U.escapeHTML(type.key === "saturated" ? "自然落水へ" : "落水スタート")}</button>
+          <button type="button" class="water-movement-button wait ${currentMovement?.phase === "wait" ? "current" : ""}" data-water-movement="${U.attr(`${type.key}-wait`)}" ${currentMovement?.phase === "wait" ? "disabled" : ""}>${U.escapeHTML(type.key === "saturated" ? "水が切れた・給水待ち" : "水が切れた・入水待ち")}</button>
         </div>
+        ${activeItem.source === "legacy-work" ? '<small class="water-movement-legacy-note">以前の作業記録です。最初の操作時に専用水管理へ引き継ぎます。元の記録は残ります。</small>' : ""}
       </div>` : "";
     return `
       <article class="water-period-card ${U.attr(type.tone)} ${focusedTypeKey === type.key ? "focus" : ""}" data-water-type-card="${U.attr(type.key)}">
@@ -554,30 +558,45 @@
     const date = U.$("waterDate").value || U.today();
     const [key, nextPhase] = String(action || "").split("-");
     const type = typeForKey(key);
-    if (!supportsMovement(type) || !["flood", "drain"].includes(nextPhase)) return;
+    if (!supportsMovement(type) || !["flood", "drain", "wait"].includes(nextPhase)) return;
     const fields = targetFields().filter((field) => Boolean(activePeriod(field, type, date)));
     if (!fields.length) {
       U.toast(`${type.label}を開始してから、水の動きを記録してください。`);
       return;
     }
-    const changes = fields.map((field) => {
-      const period = activePeriod(field, type, date);
-      const editable = editableRecordForPeriod(field, period);
-      if (!editable) return null;
-      const changed = switchMovement(editable, type, nextPhase, date);
-      return changed.ok ? changed.record : { skip: /すでに/.test(changed.reason), invalid: !/すでに/.test(changed.reason), field, reason: changed.reason };
+    const contexts = fields.map((field) => ({ field, period: activePeriod(field, type, date) }))
+      .filter((item) => item.period);
+    const invalid = contexts.find(({ period }) => {
+      const current = period.raw && openMovement(period.raw);
+      return current && String(date) <= String(current.startDate);
     });
-    const invalid = changes.find((item) => item && item.invalid);
     if (invalid) {
-      U.toast(`${invalid.field.name}: ${invalid.reason} 変更は保存していません。`);
+      U.toast(`${invalid.field.name}: 切替日は、現在の区間を始めた翌日以降にしてください。変更は保存していません。`);
       return;
     }
-    const records = changes.filter((item) => item && !item.skip);
-    if (!records.length) {
+    const targets = contexts.filter(({ period }) => {
+      const current = period.raw && openMovement(period.raw);
+      return !current || current.phase !== nextPhase;
+    });
+    if (!targets.length) {
       U.toast(`すでに${movementStatus(type, nextPhase)}です。`);
       return;
     }
-    if (!confirm(`${targetLabel()}の${records.length}圃場で、${U.fd(date)}から${movementLabel(type, nextPhase)}を記録します。`)) return;
+    const legacyCount = targets.filter(({ period }) => period.source === "legacy-work").length;
+    const legacyNote = legacyCount ? ` このうち${legacyCount}圃場は、元の作業記録を残したまま専用水管理へ引き継ぎます。` : "";
+    if (!confirm(`${targetLabel()}の${targets.length}圃場で、${U.fd(date)}から${movementLabel(type, nextPhase)}を記録します。${legacyNote}`)) return;
+    const changes = targets.map(({ field, period }) => {
+      const editable = editableRecordForPeriod(field, period);
+      if (!editable) return { invalid: true, field, reason: "この記録を引き継げませんでした。" };
+      const changed = switchMovement(editable, type, nextPhase, date);
+      return changed.ok ? changed.record : { invalid: true, field, reason: changed.reason };
+    });
+    const failed = changes.find((item) => item && item.invalid);
+    if (failed) {
+      U.toast(`${failed.field.name}: ${failed.reason} 変更は保存していません。`);
+      return;
+    }
+    const records = changes.filter(Boolean);
     const saved = state.saveIrrigationsBatch(records, `${targetLabel()}の${movementLabel(type, nextPhase)}を記録しました`);
     if (saved === null) return;
     render();

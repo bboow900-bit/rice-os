@@ -347,7 +347,7 @@
         const days = elapsed === "" || elapsed < 0 ? "" : Number(elapsed) + 1;
         return {
           movementId: String(item.movementId || ""),
-          phase: item.phase === "drain" ? "drain" : "flood",
+          phase: ["flood", "drain", "wait"].includes(item.phase) ? item.phase : "flood",
           startDate,
           endDate: explicitEnd,
           displayEndDate: endDate,
@@ -367,6 +367,7 @@
       segments,
       flood: summarize("flood"),
       drain: summarize("drain"),
+      wait: summarize("wait"),
       active: segments.find((item) => item.active) || null
     };
   }
@@ -407,11 +408,15 @@
       const currentMovement = movements.filter((item) => item && item.startDate && !item.endDate)
         .sort((a, b) => String(b.startDate).localeCompare(String(a.startDate)))[0] || null;
       const movementLabel = currentMovement && current.kind === "intermittent"
-        ? (currentMovement.phase === "drain" ? "間断灌水・落水中" : "間断灌水・入水中")
+        ? (currentMovement.phase === "wait" ? "間断灌水・入水待ち" : (currentMovement.phase === "drain" ? "間断灌水・落水中" : "間断灌水・入水中"))
         : currentMovement && current.kind === "saturated"
-          ? (currentMovement.phase === "drain" ? "飽水管理・自然落水中" : "飽水管理・給水中")
+          ? (currentMovement.phase === "wait" ? "飽水管理・給水待ち" : (currentMovement.phase === "drain" ? "飽水管理・自然落水中" : "飽水管理・給水中"))
           : labels[current.kind] || `${current.label}中`;
-      return { key: keys[current.kind] || current.kind, label: movementLabel, tone: current.kind === "dry" ? "warn" : "water", date: currentMovement?.startDate || current.startDate || "" };
+      const movementDays = currentMovement && currentMovement.startDate ? U.daysBetween(currentMovement.startDate, targetDate) : "";
+      const detail = currentMovement?.phase === "wait" && movementDays !== ""
+        ? `${Math.max(0, Number(movementDays)) + 1}日目。水が切れた後の待機を記録中`
+        : "";
+      return { key: keys[current.kind] || current.kind, label: movementLabel, tone: current.kind === "dry" ? "warn" : "water", date: currentMovement?.startDate || current.startDate || "", detail };
     }
     const completed = factual.filter((row) => hasValidEnd(row) && row.actualEndDate <= targetDate)
       .slice().sort((a, b) => String(b.actualEndDate || "").localeCompare(String(a.actualEndDate || "")))[0] || null;

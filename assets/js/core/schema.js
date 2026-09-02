@@ -5,7 +5,7 @@
   const U = RiceOS.utils;
 
   const SCHEMA_VERSION = 17;
-  const APP_VERSION = "20260901_ver265";
+  const APP_VERSION = "20260902_ver267";
   const STORE_KEY = "rice_os_v8_stable";
   const BACKUP_KEY = "rice_os_v8_stable_backup";
   const RELEASE_BACKUPS_KEY = "rice_os_v8_stable_release_backups";
@@ -657,7 +657,7 @@
       const row = movement || {};
       // Preserve an unknown legacy value rather than silently reclassifying
       // it as an irrigation event during JSON restore.
-      const phase = ["flood", "drain"].includes(row.phase) ? row.phase : "unknown";
+      const phase = ["flood", "drain", "wait"].includes(row.phase) ? row.phase : "unknown";
       return {
         movementId: String(row.movementId || row.id || `movement_${index + 1}`),
         phase,

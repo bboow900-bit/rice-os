@@ -529,6 +529,12 @@ const crossYearWater = S.normalize({
 });
 assert(crossYearWater.dryPeriods[0].date === "2025-12-28" && crossYearWater.dryPeriods[0].season === 2025, "中干しの年度が開始日に基づかない");
 assert(crossYearWater.irrigations[0].date === "2025-12-29" && crossYearWater.irrigations[0].season === 2025, "間断灌水の年度が開始日に基づかない");
+const waitMovementRoundTrip = S.normalize({
+  varieties: oldData.varieties,
+  fields: oldData.fields,
+  irrigations: [{ irrigationId: "irrigation_wait_roundtrip", fieldId: "field_a", date: "2026-07-22", startDate: "2026-07-11", method: "間断灌水", waterMovements: [{ movementId: "wait_1", phase: "wait", startDate: "2026-07-22" }] }]
+});
+assert(waitMovementRoundTrip.irrigations[0].waterMovements[0].phase === "wait", "入水待ちの水の動きがJSON読み込みで失われた");
 const mergedNotes = storage.mergeData(
   S.normalize({ varieties: oldData.varieties, fields: [{ fieldId: "field_a", name: "A", varietyId: "variety_test", seasonNotes: [{ noteId: "note_current", date: "2026-09-01", text: "current" }] }] }),
   S.normalize({ varieties: oldData.varieties, fields: [{ fieldId: "field_a", name: "A", varietyId: "variety_test", seasonNotes: [{ noteId: "note_imported", date: "2026-09-02", text: "imported" }] }] })

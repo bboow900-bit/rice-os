@@ -1646,6 +1646,15 @@
       const irrigationEnd = irrigation.actualEndDate || irrigation.endDate || "";
       const irrigationState = irrigation.actualEndDate ? "完了" : (irrigation.periodStatus || irrigation.status || "実施中");
       const key = /深水/.test(String(irrigation.method || "")) ? "deep" : (/飽水/.test(String(irrigation.method || "")) ? "saturated" : (/落水/.test(String(irrigation.method || "")) ? "drainage" : "intermittent"));
+      const activeMovement = (irrigation.raw && irrigation.raw.waterMovements || [])
+        .filter((movement) => movement && movement.startDate && !movement.endDate)
+        .slice().sort((a, b) => String(b.startDate).localeCompare(String(a.startDate)))[0] || null;
+      if (activeMovement && activeMovement.phase === "wait") {
+        const elapsed = U.daysBetween(activeMovement.startDate, date);
+        const days = elapsed === "" ? "" : `${Math.max(0, Number(elapsed)) + 1}日目`;
+        const label = /飽水/.test(String(irrigation.method || "")) ? "給水待ち" : "入水待ち";
+        return { key, label: irrigation.method || "水管理", value: `${label} ${days}`.trim(), percent: 50, detail: `${U.fd(activeMovement.startDate)}から水が切れた後の待機を記録中` };
+      }
       return { key, label: irrigation.method || "水管理", value: irrigationState, percent: irrigation.actualEndDate ? 100 : 50, detail: irrigationEnd ? `期間 ${U.fd(irrigation.startDate)} - ${U.fd(irrigationEnd)}` : `開始 ${U.fd(irrigation.startDate)} / 終了未登録` };
     }
     if (dryIsCurrent) {

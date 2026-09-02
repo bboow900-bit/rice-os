@@ -3,7 +3,7 @@
 
   const RiceOS = window.RiceOS = window.RiceOS || {};
   const NOTIFIED_KEY = "rice_os_notified_alerts";
-  const APP_VERSION = "20260901_ver265";
+  const APP_VERSION = "20260902_ver267";
   const UPDATE_RELOAD_KEY = "rice_os_pwa_reload_version";
 
   let deferredPrompt = null;
@@ -175,5 +175,3 @@
     installHelpText
   };
 })();
-
-
