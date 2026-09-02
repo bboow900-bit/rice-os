@@ -186,6 +186,16 @@ assert(state.seasonNotesForField("field_a", 2026).some((note) => note.noteId ===
 assert(state.deleteSeasonNote(currentSeasonNoteId, "field_a"), "season note could not be deleted from its field");
 assert(!state.seasonNotesForField("field_a", 2026).some((note) => note.noteId === currentSeasonNoteId), "deleted season note remained in the current year");
 assert(state.field("field_a").nextSeasonMemo === carryoverBeforeSeasonNotes, "season note changes altered next-season carryover memo");
+const nextSeasonIdeaId = state.saveNextSeasonIdea({ text: "来年は代かきを早める" });
+assert(nextSeasonIdeaId && state.nextSeasonIdeas().some((item) => item.ideaId === nextSeasonIdeaId && !item.done), "来年やりたいことを保存できない");
+const nextSeasonIdeasBeforeBlankSave = state.nextSeasonIdeas().length;
+assert(state.saveNextSeasonIdea({ text: "   " }) === "", "空欄の来年やりたいことを保存してはいけない");
+assert(state.nextSeasonIdeas().length === nextSeasonIdeasBeforeBlankSave, "空欄保存で来年やりたいことが変化した");
+assert(state.toggleNextSeasonIdea(nextSeasonIdeaId, true), "来年やりたいことを完了にできない");
+assert(state.nextSeasonIdeas().find((item) => item.ideaId === nextSeasonIdeaId).done, "来年やりたいことの完了状態が保存されない");
+assert(state.deleteNextSeasonIdea(nextSeasonIdeaId), "来年やりたいことを削除できない");
+assert(!state.nextSeasonIdeas().some((item) => item.ideaId === nextSeasonIdeaId), "削除した来年やりたいことが残っている");
+assert(state.deleteNextSeasonIdea("missing-next-season-idea") === null, "存在しない来年やりたいことを削除してはいけない");
 
 state.saveFieldWork({
   date: "2026-06-01",

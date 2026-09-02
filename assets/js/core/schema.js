@@ -5,7 +5,7 @@
   const U = RiceOS.utils;
 
   const SCHEMA_VERSION = 17;
-  const APP_VERSION = "20260902_ver267";
+  const APP_VERSION = "20260902_ver268";
   const STORE_KEY = "rice_os_v8_stable";
   const BACKUP_KEY = "rice_os_v8_stable_backup";
   const RELEASE_BACKUPS_KEY = "rice_os_v8_stable_release_backups";
@@ -994,7 +994,18 @@
         lastExportId: source.meta && source.meta.lastExportId || source.exportId || "",
         // Derived forecast snapshots are metadata only. Source records remain
         // authoritative and are never reconstructed from these rows.
-        outlookSnapshots: ensureArray(source.meta && source.meta.outlookSnapshots)
+        outlookSnapshots: ensureArray(source.meta && source.meta.outlookSnapshots),
+        // Global next-season ideas sit alongside, but never replace, each
+        // field's individual carryover note.
+        nextSeasonIdeas: ensureArray(source.meta && source.meta.nextSeasonIdeas)
+          .map((item, index) => ({
+            ideaId: String(item && item.ideaId || `next-season-idea-import-${index + 1}`),
+            text: String(item && item.text || "").trim(),
+            done: Boolean(item && item.done),
+            createdAt: String(item && item.createdAt || ""),
+            updatedAt: String(item && item.updatedAt || "")
+          }))
+          .filter((item) => item.text)
       }
     };
   }

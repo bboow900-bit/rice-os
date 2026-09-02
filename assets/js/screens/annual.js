@@ -9,6 +9,7 @@
   let selectedTab = "karte";
   let annualSearchValue = "";
   let annualSortValue = "updated";
+  let nextSeasonIdeaDraft = false;
   let seasonNoteDraft = null;
   let waterEditDraft = null;
   let reviewView = "overview";
@@ -718,6 +719,7 @@
     const fields = filteredFields();
     return `
       <div class="annual-v2-top">
+        ${renderNextSeasonIdeas()}
         <section class="annual-field-picker">
           <div class="section-title compact">
             <h3>圃場から振り返る</h3>
@@ -741,6 +743,18 @@
         ${renderSummary(rows)}
         ${renderAnnualFab()}
       </div>
+    `;
+  }
+
+  function renderNextSeasonIdeas() {
+    const ideas = state.nextSeasonIdeas ? state.nextSeasonIdeas() : [];
+    const openCount = ideas.filter((item) => !item.done).length;
+    return `
+      <section class="next-season-ideas" aria-label="来年やりたいこと">
+        <div class="next-season-ideas-head"><div><span>全体メモ</span><h3>来年やりたいこと</h3><small>${openCount ? `未完了 ${openCount}件` : "思いついたことを残しておけます"}</small></div><button type="button" class="secondary" data-next-season-idea-add>${nextSeasonIdeaDraft ? "閉じる" : "追加"}</button></div>
+        ${nextSeasonIdeaDraft ? `<form class="next-season-idea-editor" data-next-season-idea-form><textarea name="text" placeholder="例: 田植え機の爪を交換する。来年はこの圃場の中干しを2日早める。" autofocus></textarea><button type="submit" class="primary">追加する</button></form>` : ""}
+        <div class="next-season-idea-list">${ideas.length ? ideas.map((idea) => `<article class="${idea.done ? "done" : ""}"><label><input type="checkbox" data-next-season-idea-toggle="${U.attr(idea.ideaId)}" ${idea.done ? "checked" : ""}><span>${U.escapeHTML(idea.text)}</span></label><button type="button" class="danger" data-next-season-idea-delete="${U.attr(idea.ideaId)}" aria-label="削除">×</button></article>`).join("") : '<p>来年に試したいこと、直したいことを気軽に残せます。圃場ごとの内容は、各圃場の「来年に引き継ぐメモ」に残します。</p>'}</div>
+      </section>
     `;
   }
 
@@ -2284,6 +2298,18 @@
         window.scrollTo({ top: 0, behavior: "smooth" });
         return;
       }
+      if (event.target.closest("[data-next-season-idea-add]")) {
+        nextSeasonIdeaDraft = !nextSeasonIdeaDraft;
+        render();
+        if (nextSeasonIdeaDraft) setTimeout(() => U.$("annualTimeline").querySelector("[data-next-season-idea-form] textarea")?.focus(), 30);
+        return;
+      }
+      const ideaDelete = event.target.closest("[data-next-season-idea-delete]");
+      if (ideaDelete && state.deleteNextSeasonIdea && confirm("このメモを削除しますか？")) {
+        state.deleteNextSeasonIdea(ideaDelete.dataset.nextSeasonIdeaDelete);
+        render();
+        return;
+      }
       if (event.target.closest("[data-annual-record-detail-back]")) {
         handleBack();
         return;
@@ -2549,6 +2575,12 @@
       }
     });
     U.$("annualTimeline").addEventListener("change", (event) => {
+      const ideaToggle = event.target.closest("[data-next-season-idea-toggle]");
+      if (ideaToggle && state.toggleNextSeasonIdea) {
+        state.toggleNextSeasonIdea(ideaToggle.dataset.nextSeasonIdeaToggle, ideaToggle.checked);
+        render();
+        return;
+      }
       if (event.target && event.target.matches("[data-annual-field-switch]")) {
         switchFieldWithinAnnual(event.target.value);
         return;
@@ -2566,6 +2598,15 @@
       state.updateField(selectedFieldId, { [key]: value });
     });
     U.$("annualTimeline").addEventListener("submit", (event) => {
+      const ideaForm = event.target.closest("[data-next-season-idea-form]");
+      if (ideaForm && state.saveNextSeasonIdea) {
+        event.preventDefault();
+        const saved = state.saveNextSeasonIdea({ text: new FormData(ideaForm).get("text") });
+        if (!saved) return;
+        nextSeasonIdeaDraft = false;
+        render();
+        return;
+      }
       const form = event.target.closest("[data-annual-water-edit-form]");
       if (!form) return;
       event.preventDefault();

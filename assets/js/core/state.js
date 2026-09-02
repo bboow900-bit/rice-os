@@ -1382,6 +1382,54 @@
     }, "通知確認日を記録しました");
   }
 
+  function nextSeasonIdeas() {
+    const rows = data().meta && Array.isArray(data().meta.nextSeasonIdeas) ? data().meta.nextSeasonIdeas : [];
+    return rows.slice().sort((a, b) => {
+      const doneDiff = Number(Boolean(a.done)) - Number(Boolean(b.done));
+      return doneDiff || String(b.updatedAt || b.createdAt || "").localeCompare(String(a.updatedAt || a.createdAt || ""));
+    });
+  }
+
+  function saveNextSeasonIdea(record) {
+    const input = record || {};
+    const text = String(input.text || "").trim();
+    if (!text) return "";
+    const ideaId = String(input.ideaId || U.id("next-season-idea", U.today()));
+    const saved = mutate((d) => {
+      d.meta = d.meta || {};
+      const rows = Array.isArray(d.meta.nextSeasonIdeas) ? d.meta.nextSeasonIdeas : [];
+      const index = rows.findIndex((item) => String(item.ideaId) === ideaId);
+      const previous = index >= 0 ? rows[index] : null;
+      const normalized = {
+        ideaId,
+        text,
+        done: input.done === undefined ? Boolean(previous && previous.done) : Boolean(input.done),
+        createdAt: String(input.createdAt || previous && previous.createdAt || U.now()),
+        updatedAt: U.now()
+      };
+      if (index >= 0) rows[index] = { ...previous, ...normalized };
+      else rows.push(normalized);
+      d.meta.nextSeasonIdeas = rows;
+    }, "来年やりたいことを保存しました");
+    return saved ? ideaId : "";
+  }
+
+  function toggleNextSeasonIdea(ideaId, done) {
+    const current = nextSeasonIdeas().find((item) => String(item.ideaId) === String(ideaId));
+    if (!current) return null;
+    return saveNextSeasonIdea({ ...current, done: Boolean(done) }) ? true : null;
+  }
+
+  function deleteNextSeasonIdea(ideaId) {
+    const safeId = String(ideaId || "");
+    if (!safeId || !nextSeasonIdeas().some((item) => String(item.ideaId) === safeId)) return null;
+    return mutate((d) => {
+      d.meta = d.meta || {};
+      d.meta.nextSeasonIdeas = (Array.isArray(d.meta.nextSeasonIdeas) ? d.meta.nextSeasonIdeas : [])
+        .filter((item) => String(item.ideaId) !== safeId);
+    }, "来年やりたいことを削除しました");
+  }
+
   function undoLastSave() {
     let restored = null;
     try {
@@ -2039,6 +2087,10 @@
     updateWeatherLocation,
     markJsonExported,
     markNotificationCheck,
+    nextSeasonIdeas,
+    saveNextSeasonIdea,
+    toggleNextSeasonIdea,
+    deleteNextSeasonIdea,
     undoLastSave,
     fieldWorksFor,
     isMigratedWaterWork,
