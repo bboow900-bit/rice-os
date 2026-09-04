@@ -837,25 +837,67 @@
       .slice().sort((a, b) => String(a.startDate).localeCompare(String(b.startDate))).at(-1) || null;
   }
 
+  function homeWaterMovementPresentation(period, movement, dateText) {
+    const isSaturated = period.kind === "saturated";
+    const kindLabel = isSaturated ? "飽水管理" : "間断灌水";
+    const phase = String(movement && movement.phase || "");
+    const labels = isSaturated
+      ? {
+        flood: { current: "給水中", next: "自然落水を入力" },
+        drain: { current: "自然落水中", next: "給水を入力" },
+        wait: { current: "給水待ち", next: "給水を入力" }
+      }
+      : {
+        flood: { current: "入水中", next: "落水を入力" },
+        drain: { current: "落水中", next: "入水を入力" },
+        wait: { current: "入水待ち", next: "入水を入力" }
+      };
+    const state = labels[phase] || { current: `${kindLabel}中`, next: isSaturated ? "自然落水を入力" : "落水を入力" };
+    const elapsed = movement && movement.startDate ? U.daysBetween(movement.startDate, dateText) : U.daysBetween(period.startDate, dateText);
+    return {
+      kindLabel,
+      currentLabel: state.current,
+      nextLabel: state.next,
+      dayText: elapsed === "" ? "日数未確認" : `${Math.max(0, Number(elapsed)) + 1}日目`
+    };
+  }
+
+  function homeWaterMovementLabel(period, phase) {
+    const saturated = period.kind === "saturated";
+    if (phase === "flood") return saturated ? "給水" : "入水";
+    if (phase === "drain") return saturated ? "自然落水" : "落水";
+    if (phase === "wait") return saturated ? "給水待ち" : "入水待ち";
+    return "水管理";
+  }
+
+  function renderHomeWaterMovementTimeline(period, dateText) {
+    const timeline = RiceOS.agro && RiceOS.agro.waterMovementTimeline
+      ? RiceOS.agro.waterMovementTimeline(period.raw, { asOf: dateText })
+      : null;
+    if (!timeline || !timeline.segments.length) return "";
+    const label = (phase) => homeWaterMovementLabel(period, phase);
+    const summary = `${label("flood")} ${timeline.flood.count}回・${timeline.flood.days}日 / ${label("drain")} ${timeline.drain.count}回・${timeline.drain.days}日${timeline.wait.count ? ` / ${label("wait")} ${timeline.wait.count}回・${timeline.wait.days}日` : ""}`;
+    return `
+      <div class="home-water-quick-timeline water-movement-timeline" aria-label="${U.attr(`${period.label || "水管理"}の水の動き`)}">
+        <div class="water-movement-timeline-head"><b>水の動き</b><small>${U.escapeHTML(summary)}</small></div>
+        <div class="water-movement-timeline-bar">${timeline.segments.map((item) => `<span class="${U.attr(item.phase)} ${item.active ? "active" : ""}" style="--movement-days:${U.attr(String(item.days))}"><b>${U.escapeHTML(label(item.phase))}</b><em>${U.escapeHTML(`${item.days}日`)}</em></span>`).join("")}</div>
+        <div class="water-movement-timeline-dates"><span>${U.escapeHTML(U.fd(timeline.segments[0].startDate))}</span><span>${U.escapeHTML(timeline.active ? "継続中" : U.fd(timeline.segments.at(-1).displayEndDate))}</span></div>
+      </div>
+    `;
+  }
+
   function renderHomeWaterShortcut(field, dateText) {
     const period = activeHomeWaterPeriod(field, dateText);
     if (!period) return "";
     const movement = activeHomeWaterMovement(period);
-    const isSaturated = period.kind === "saturated";
-    const isDrain = movement && movement.phase === "drain";
-    const kindLabel = isSaturated ? "飽水管理" : "間断灌水";
-    const currentLabel = movement
-      ? (isDrain ? (isSaturated ? "自然落水中" : "落水中") : (isSaturated ? "飽水中" : "入水中"))
-      : `${kindLabel}中`;
-    const nextLabel = isDrain ? (isSaturated ? "給水を入力" : "入水を入力") : (isSaturated ? "自然落水を入力" : "落水を入力");
-    const elapsed = movement && movement.startDate ? U.daysBetween(movement.startDate, dateText) : U.daysBetween(period.startDate, dateText);
-    const dayText = elapsed === "" ? "日数未確認" : `${Math.max(0, Number(elapsed)) + 1}日目`;
+    const presentation = homeWaterMovementPresentation(period, movement, dateText);
     return `
-      <section class="home-water-quick" aria-label="${U.attr(`${field.name}の${kindLabel}`)}">
+      <section class="home-water-quick" aria-label="${U.attr(`${field.name}の${presentation.kindLabel}`)}">
         <span class="home-water-quick-icon" aria-hidden="true">💧</span>
-        <div class="home-water-quick-copy"><span>${U.escapeHTML(kindLabel)}</span><b>${U.escapeHTML(currentLabel)}</b><small>${U.escapeHTML(dayText)}</small></div>
-        <button type="button" class="home-water-quick-action" data-home-water-input data-home-water-field="${U.attr(field.fieldId)}" data-home-water-type="${U.attr(period.kind)}">${U.escapeHTML(nextLabel)}</button>
-        <button type="button" class="home-water-quick-open" data-home-water-open data-home-water-field="${U.attr(field.fieldId)}" data-home-water-type="${U.attr(period.kind)}" aria-label="${U.attr(`${kindLabel}を開く`)}">›</button>
+        <div class="home-water-quick-copy"><span>${U.escapeHTML(presentation.kindLabel)}</span><b>${U.escapeHTML(presentation.currentLabel)}</b><small>${U.escapeHTML(presentation.dayText)}</small></div>
+        <button type="button" class="home-water-quick-action" data-home-water-input data-home-water-field="${U.attr(field.fieldId)}" data-home-water-type="${U.attr(period.kind)}">${U.escapeHTML(presentation.nextLabel)}</button>
+        <button type="button" class="home-water-quick-open" data-home-water-open data-home-water-field="${U.attr(field.fieldId)}" data-home-water-type="${U.attr(period.kind)}" aria-label="${U.attr(`${presentation.kindLabel}を開く`)}">›</button>
+        ${renderHomeWaterMovementTimeline(period, dateText)}
       </section>
     `;
   }
@@ -2189,6 +2231,8 @@
       render();
     });
   }
+
+  if (window.__RICEOS_TEST__) RiceOS.homeTest = { homeWaterMovementPresentation, homeWaterMovementLabel, renderHomeWaterMovementTimeline };
 
   RiceOS.screens = RiceOS.screens || {};
   RiceOS.screens.home = { render, bind };

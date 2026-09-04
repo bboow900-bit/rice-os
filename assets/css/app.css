@@ -14829,6 +14829,13 @@ label {
 .home-water-quick-open { width: 25px; height: 28px; padding: 0; border: 0; background: transparent; color: #418ca4; font: inherit; font-size: 24px; line-height: 1; }
 .home-water-quick-action:active, .home-water-quick-open:active { transform: translateY(1px); }
 .home-water-quick-action:focus-visible, .home-water-quick-open:focus-visible { outline: 3px solid rgba(34, 130, 160, .34); outline-offset: 2px; }
+.home-water-quick-timeline { grid-column: 1 / -1; margin-top: 1px; padding: 6px; border-color: #bfe0ea; background: rgba(255,255,255,.76); }
+.home-water-quick-timeline .water-movement-timeline-head b { font-size: 10px; }
+.home-water-quick-timeline .water-movement-timeline-head small { font-size: 8px; }
+.home-water-quick-timeline .water-movement-timeline-bar { height: 28px; }
+.home-water-quick-timeline .water-movement-timeline-bar b { font-size: 8px; }
+.home-water-quick-timeline .water-movement-timeline-bar em,
+.home-water-quick-timeline .water-movement-timeline-dates { font-size: 8px; }
 .home-decision-card .home-decision-alert { margin: -2px 10px 8px; }
 .home-management-compare {
   display: grid;
