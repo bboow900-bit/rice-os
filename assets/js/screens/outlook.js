@@ -97,7 +97,7 @@
       </section>`;
   }
 
-  function render() {
+  function render(options) {
     const root = U.$("outlookDashboard");
     if (!root || !RiceOS.outlook) return;
     const weatherLocation = state.data().meta && state.data().meta.weatherLocation;
@@ -116,7 +116,7 @@
       <div class="outlook-toolbar"><label>対象圃場<select data-outlook-group><option value="all">全圃場</option>${groups.map((group) => `<option value="${U.attr(group.fieldGroupId)}" ${group.fieldGroupId === selectedGroupId ? "selected" : ""}>${U.escapeHTML(group.name)}</option>`).join("")}</select></label><button class="secondary" type="button" data-outlook-weather>${hasWeatherLocation ? "気象を再取得" : "現在地から気象を取得"}</button></div>
       <div class="outlook-actions"><p class="outlook-update-note">見通しを保存すると、予測と実績との差を翌年の補正に残せます。</p><button class="secondary" type="button" data-outlook-save>見通しを保存</button></div>
       <div class="outlook-list">${rows.length ? rows.map(fieldCard).join("") : '<div class="empty-state">このグループに表示できる圃場がありません。</div>'}</div>`;
-    loadWeather({ silent: true });
+    if (!options || !options.skipWeather) loadWeather({ silent: true });
   }
 
   function weatherKey(location, today) {
@@ -203,7 +203,11 @@
     return true;
   }
 
-  function resetNavigation() { selectedFieldId = ""; }
+  function resetNavigation() {
+    selectedFieldId = "";
+    render({ skipWeather: true });
+    if (RiceOS.app && RiceOS.app.syncBackButton) RiceOS.app.syncBackButton();
+  }
   RiceOS.screens = RiceOS.screens || {};
   RiceOS.screens.outlook = { render, bind, handleBack, canHandleBack: () => Boolean(selectedFieldId), resetNavigation };
 })();

@@ -5,7 +5,7 @@
   const U = RiceOS.utils;
 
   const SCHEMA_VERSION = 17;
-  const APP_VERSION = "20260904_ver270";
+  const APP_VERSION = "20260927_ver282";
   const STORE_KEY = "rice_os_v8_stable";
   const BACKUP_KEY = "rice_os_v8_stable_backup";
   const RELEASE_BACKUPS_KEY = "rice_os_v8_stable_release_backups";
@@ -372,6 +372,91 @@
     return found ? found.label : "-";
   }
 
+  function normalizeHarvestWeather(input) {
+    if (!input || typeof input !== "object" || Array.isArray(input)) return null;
+    const text = (value) => typeof value === "string" ? value : "";
+    const day = (value) => {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(text(value))) return NaN;
+      const time = Date.parse(`${value}T00:00:00Z`);
+      return Number.isFinite(time) && new Date(time).toISOString().slice(0, 10) === value ? time : NaN;
+    };
+    const number = (value) => (typeof value === "number" || typeof value === "string" && value.trim() !== "")
+      && Number.isFinite(Number(value)) ? Number(value) : "";
+    const startDate = text(input.startDate);
+    const endDate = text(input.endDate);
+    const days = (day(endDate) - day(startDate)) / 86400000 + 1;
+    const validRange = Number.isInteger(days) && days > 0 && days <= 366;
+    const latitude = number(input.latitude);
+    const longitude = number(input.longitude);
+    const located = latitude !== "" && longitude !== "" && Math.abs(latitude) <= 90 && Math.abs(longitude) <= 180;
+    const asOfDate = Number.isFinite(day(input.asOfDate)) ? input.asOfDate : U.today();
+    const result = { status: "no_data", startDate, endDate, expectedDays: validRange ? days : 0,
+      tempCount: 0, rainCount: 0, meanTemp: "", totalRain: "", source: "Open-Meteo Archive (reanalysis/model)",
+      locationLabel: text(input.locationLabel), latitude, longitude, fetchedAt: text(input.fetchedAt), asOfDate,
+      rows: [], missing: [], tempMissing: [], rainMissing: [] };
+    if (!startDate) result.status = "missing_drain";
+    else if (!validRange) result.status = "invalid_range";
+    else if (!located) result.status = "location_missing";
+    else if (input.status === "fetch_failed") result.status = "fetch_failed";
+    const byDate = new Map();
+    for (const row of ensureArray(input.rows)) {
+      if (!row || typeof row !== "object" || Array.isArray(row) || row.source !== "Open-Meteo Archive" || /forecast/i.test(text(row.dataset))
+        || !Number.isFinite(day(row.date)) || row.date < startDate || row.date > endDate
+        || row.date >= asOfDate || byDate.has(row.date)) continue;
+      byDate.set(row.date, row);
+    }
+    let tempSum = 0;
+    let rainSum = 0;
+    for (let i = 0; validRange && i < days; i++) {
+      const date = new Date(day(startDate) + i * 86400000).toISOString().slice(0, 10);
+      const raw = located && result.status !== "fetch_failed" ? byDate.get(date) : null;
+      const tempMean = number(raw && raw.tempMean);
+      const rain = number(raw && raw.precipitation);
+      const precipitation = rain !== "" && rain >= 0 ? rain : "";
+      result.rows.push({ date, tempMean, precipitation, source: raw ? "Open-Meteo Archive" : "" });
+      if (tempMean !== "") { result.tempCount++; tempSum += tempMean; } else result.tempMissing.push(date);
+      if (precipitation !== "") { result.rainCount++; rainSum += precipitation; } else result.rainMissing.push(date);
+      if (tempMean === "" || precipitation === "") result.missing.push(date);
+    }
+    if (result.tempCount) result.meanTemp = Number((tempSum / result.tempCount).toFixed(6));
+    if (result.rainCount) result.totalRain = Number(rainSum.toFixed(6));
+    if (result.status === "no_data" && (result.tempCount || result.rainCount)) {
+      result.status = result.missing.length ? "partial" : "complete";
+    }
+    return result;
+  }
+
+  function normalizeHarvestReview(input, strict = false) {
+    const validObject = input && typeof input === "object" && !Array.isArray(input);
+    if (!validObject && strict) throw new Error("収穫振り返りの形式を確認してください。");
+    const review = validObject ? input : {};
+    const choices = {
+      surface: ["硬め", "適度", "軟らかい", "ぬかるむ"],
+      traffic: ["問題なし", "一部苦労", "作業に支障"],
+      weeds: ["ほぼなし", "少し", "多い"],
+      weedExtent: ["一部", "広範囲"],
+      weedImpact: ["なし", "刈り取りに苦労", "作業を中断"],
+      yieldBasis: ["籾（乾燥前）", "籾（乾燥後）", "玄米（乾燥調製後）"]
+    };
+    const normalized = {};
+    Object.entries(choices).forEach(([key, values]) => {
+      const value = review[key] ?? "";
+      if (value !== "" && !values.includes(value) && strict) throw new Error("収穫振り返りの選択値を確認してください。");
+      normalized[key] = values.includes(value) ? value : "";
+    });
+    for (const key of ["yieldKg", "harvestAreaA"]) {
+      const raw = review[key] ?? "";
+      const value = typeof raw === "string" || typeof raw === "number" ? String(raw).trim() : null;
+      const valid = value !== null && (value === "" || (/^(?:\d+(?:\.\d*)?|\.\d+)$/.test(value)
+        && Number.isFinite(Number(value)) && (key === "yieldKg" ? Number(value) >= 0 : Number(value) > 0)));
+      if (!valid && strict) throw new Error("収量は0以上、収穫面積は0より大きい数値を入力してください（空欄可）。");
+      normalized[key] = valid ? value : "";
+    }
+    if (review.weedNote != null && typeof review.weedNote !== "string" && strict) throw new Error("雑草メモは文字列で入力してください。");
+    normalized.weedNote = typeof review.weedNote === "string" ? review.weedNote : "";
+    return normalized;
+  }
+
   function normalizeFieldWork(input) {
     const w = input || {};
     const date = String(w.date || U.today());
@@ -390,12 +475,16 @@
         season: U.number(row.season, U.season(date)),
         harvestDate: String(row.harvestDate || date),
         savedAt: String(row.savedAt || w.updatedAt || w.createdAt || U.now()),
+        ...(normalizeHarvestWeather(row.weather) ? { weather: normalizeHarvestWeather(row.weather) } : {}),
         water: {
           lastWateringDate: String(water.lastWateringDate || ""),
           lastWateringLabel: String(water.lastWateringLabel || ""),
           daysFromLastWatering: String(water.daysFromLastWatering || ""),
           finalDrainDate: String(water.finalDrainDate || ""),
-          daysFromFinalDrain: String(water.daysFromFinalDrain || "")
+          daysFromFinalDrain: String(water.daysFromFinalDrain || ""),
+          ...(water.elapsedDaysFromFinalDrain !== undefined ? { elapsedDaysFromFinalDrain: String(water.elapsedDaysFromFinalDrain ?? "") } : {}),
+          ...(water.elapsedDaysFromHeadingToDrain !== undefined ? { elapsedDaysFromHeadingToDrain: String(water.elapsedDaysFromHeadingToDrain ?? "") } : {}),
+          ...(typeof water.rewateringAfterDrain === "boolean" ? { rewateringAfterDrain: water.rewateringAfterDrain } : {})
         },
         outlook: {
           status: String(outlook.status || "記録なし"),
@@ -446,6 +535,10 @@
       machine: String(w.machine || w.machineName || ""),
       machineId: String(w.machineId || ""),
       material: String(w.material || ""),
+      materialId: String(w.materialId || ""),
+      herbicideLinks: ensureArray(w.herbicideLinks).filter((link) => link && link.fieldId && link.assignmentId && link.stepId).map((link) => ({ fieldId: String(link.fieldId), assignmentId: String(link.assignmentId), stepId: String(link.stepId) })),
+      herbicideCategory: String(w.herbicideCategory || ""),
+      herbicidePurpose: String(w.herbicidePurpose || ""),
       amount: String(w.amount || ""),
       fertilizerRateKg10a: String(w.fertilizerRateKg10a || ""),
       fertilizerTotalKg: String(w.fertilizerTotalKg || ""),
@@ -456,6 +549,7 @@
       // This remains attached to the work so a JSON export keeps the original
       // water timing and forecast comparison even after screens are revised.
       harvestSnapshots,
+      ...(w.harvestReview !== undefined ? { harvestReview: normalizeHarvestReview(w.harvestReview) } : {}),
       weather: String(w.weather || ""),
       weatherAuto: w.weatherAuto && typeof w.weatherAuto === "object" ? w.weatherAuto : null,
       photo: String(w.photo || ""),
@@ -534,14 +628,18 @@
   function normalizeMaterial(input) {
     const m = input || {};
     return {
+      ...m,
       materialId: String(m.materialId || m.id || U.id("material", U.today())),
       season: U.number(m.season, new Date().getFullYear()),
       category: String(m.category || "その他"),
       name: String(m.name || ""),
-      carryover: String(m.carryover || ""),
-      ordered: String(m.ordered || ""),
-      used: String(m.used || ""),
-      remaining: String(m.remaining || ""),
+      formalName: String(m.formalName || ""),
+      formulation: String(m.formulation || ""),
+      unit: String(m.unit || ""),
+      carryover: String(m.carryover ?? ""),
+      ordered: String(m.ordered ?? ""),
+      used: String(m.used ?? ""),
+      remaining: String(m.remaining ?? ""),
       deliveryDate: String(m.deliveryDate || ""),
       nextYearMemo: String(m.nextYearMemo || m.memo || ""),
       createdAt: String(m.createdAt || U.now()),
@@ -927,6 +1025,11 @@
 
     const otherWorks = dedupeBy(ensureArray(source.otherWorks || source.generalWorks).map(normalizeOtherWork), "otherWorkId");
     const materials = dedupeBy(ensureArray(source.materials).map(normalizeMaterial), "materialId");
+    Object.entries({ herbicidePrograms: "programId", herbicideAssignments: "assignmentId", herbicideObservations: "observationId" }).forEach(([key, idKey]) => {
+      const collection = source.meta && source.meta[key];
+      if (collection === undefined) return;
+      if (!Array.isArray(collection) || collection.some((row) => !row || typeof row !== "object" || typeof row[idKey] !== "string" || !row[idKey] || (key !== "herbicideObservations" && (!Array.isArray(row.steps) || row.steps.some((step) => !step || typeof step.id !== "string"))))) throw new Error("除草体系のデータ形式が不正です。元のデータは変更していません。");
+    });
     const varietyResults = dedupeBy(ensureArray(source.varietyResults).map(normalizeResult), "resultId");
     const schedules = dedupeBy(ensureArray(source.schedules).map(normalizeSchedule), "scheduleId").map((s) => ({
       ...s,
@@ -1071,6 +1174,8 @@
     leafColorScoreFromText,
     normalize,
     normalizeMachine,
+    normalizeHarvestReview,
+    normalizeHarvestWeather,
     normalizeMaintenanceRecord,
     normalizeGroupLabel,
     normalizeSeasonNote,

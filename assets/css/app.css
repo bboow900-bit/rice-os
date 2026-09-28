@@ -15037,6 +15037,67 @@ label {
 }
 
 /* Review cards: the status is a direct route to the missing record input. */
+.annual-used-materials {
+  margin-block: 16px;
+  border-block: 1px solid #d5dfd7;
+  padding-block: 12px;
+  min-width: 0;
+}
+.annual-used-materials summary { cursor: pointer; font-weight: 700; }
+.annual-used-materials small { margin-inline-start: 8px; font-size: 12px; font-weight: 400; }
+.annual-material-group { padding-block: 10px; min-width: 0; }
+.annual-material-group h4 { margin: 0 0 8px; font-size: 15px; overflow-wrap: anywhere; }
+.annual-material-work {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  gap: 4px;
+  padding: 12px 8px;
+  border: 0;
+  border-bottom: 1px solid #e0e5e1;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.annual-material-work span { font-size: 13px; }
+.annual-material-work:focus-visible { outline: 2px solid #16823a; outline-offset: -2px; }
+.annual-material-memo { white-space: pre-wrap; }
+.annual-harvest-totals { margin-block: 16px; padding-block: 12px; border-block: 1px solid #d5dfd7; min-width: 0; overflow-wrap: anywhere; }
+.annual-harvest-totals summary { cursor: pointer; font-weight: 700; padding-block: 6px; }
+.annual-harvest-totals h4 { font-size: 14px; margin: 16px 0 8px; }
+.annual-harvest-totals p { font-size: 13px; line-height: 1.6; margin: 8px 0; }
+.annual-harvest-totals .annual-material-work { max-width: 100%; line-height: 1.5; }
+.herbicide-management { margin-block: 16px 24px; padding-block: 14px; border-block: 1px solid #d5dfd7; }
+.herbicide-management summary, .herbicide-review summary { cursor: pointer; font-weight: 700; padding-block: 10px; }
+.herbicide-program-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; align-items: center; padding-block: 12px; border-bottom: 1px solid #d5dfd7; }
+.herbicide-program-row > div { grid-column: 1 / -1; min-width: 0; overflow-wrap: anywhere; }
+.herbicide-program-row > button { min-height: 44px; white-space: nowrap; }
+.herbicide-program-row small, .herbicide-assignment summary span { display: block; font-size: 13px; margin-top: 5px; }
+.herbicide-step-editor { display: grid; gap: 12px; min-width: 0; border: 0; border-left: 3px solid #5c914e; padding: 8px 0 16px 12px; margin: 16px 0; }
+#fwHarvestReview .harvest-review-wide { grid-column: 1 / -1; }
+.herbicide-work { grid-column: 1 / -1; display: grid; gap: 12px; min-width: 0; }
+.herbicide-assignment { border-top: 1px solid #d5dfd7; padding-block: 8px; }
+.herbicide-steps { margin: 12px 0; padding-left: 24px; }
+.herbicide-steps li { padding: 8px 0 16px; }
+.herbicide-steps p { margin-block: 6px; font-size: 13px; }
+.herbicide-note { white-space: pre-wrap; }
+.herbicide-review, .herbicide-management { overflow-wrap: anywhere; min-width: 0; }
+.herbicide-review input, .herbicide-review select, .herbicide-review textarea,
+.herbicide-management input, .herbicide-management select, .herbicide-management textarea { min-width: 0; width: 100%; max-width: 100%; }
+#fwMaterialId { width: 100%; min-width: 0; max-width: 100%; }
+#materialList .record { overflow-wrap: anywhere; }
+.material-reference-links { display: flex; flex-wrap: wrap; gap: 12px; margin-block: 12px; }
+.material-reference-links a { padding-block: 8px; text-underline-offset: 3px; }
+.material-carte { margin-top: 12px; border-top: 1px solid #d5dfd7; min-width: 0; }
+.material-carte > summary { padding-block: 14px; cursor: pointer; font-weight: 700; }
+.material-carte-work, .material-carte-observation { padding-block: 12px; border-bottom: 1px solid #e0e5e1; min-width: 0; }
+.material-carte p { margin-block: 6px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.material-carte h4 { font-size: 15px; margin-block: 12px 6px; }
+#mProductUrl { min-width: 0; max-width: 100%; }
+
 #screen-annual .annual-field-pick-card {
   grid-template-columns: minmax(0, 1fr) auto !important;
 }

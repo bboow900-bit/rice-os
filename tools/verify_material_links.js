@@ -1,0 +1,47 @@
+"use strict";
+
+const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const vm = require("node:vm");
+global.window = global;
+global.document = { getElementById: () => null, querySelectorAll: () => [] };
+global.alert = () => {};
+global.dispatchEvent = () => true;
+global.CustomEvent = class { constructor(type, init) { this.type = type; this.detail = init?.detail; } };
+Object.defineProperty(global, "navigator", { value: {}, configurable: true });
+const memory = new Map();
+global.localStorage = { getItem: key => memory.get(key) || null, setItem: (key, value) => memory.set(key, String(value)), removeItem: key => memory.delete(key) };
+for (const file of ["utils", "schema", "storage", "state"]) {
+  vm.runInThisContext(fs.readFileSync(`assets/js/core/${file}.js`, "utf8"));
+}
+const state = RiceOS.state;
+const schema = RiceOS.schema;
+state.saveMaterial({ season: 2026, name: "Original product", formulation: "granules", unit: "kg", ordered: "3 bags", nextYearMemo: "Keep this note" });
+const materialId = state.data().materials.find(row => row.name === "Original product").materialId;
+const fieldIds = state.fields().slice(0, 2).map(row => row.fieldId);
+state.saveFieldWork({ workId: "linked-work", date: "2026-07-10", fieldIds, workName: "除草剤", material: "Original product", materialId, amount: "1kg/10a" });
+assert.equal(state.data().fieldWorks.find(row => row.workId === "linked-work").materialId, materialId);
+const restored = schema.normalize(JSON.parse(JSON.stringify(state.data())));
+assert.equal(restored.fieldWorks.find(row => row.workId === "linked-work").materialId, materialId);
+assert.equal(restored.materials.find(row => row.materialId === materialId).unit, "kg");
+state.saveMaterial({ materialId, name: "Renamed product" });
+assert.equal(state.data().materials.filter(row => row.materialId === materialId).length, 1);
+assert.equal(state.data().materials.find(row => row.materialId === materialId).ordered, "3 bags");
+assert.equal(state.data().fieldWorks.find(row => row.workId === "linked-work").material, "Original product");
+state.saveFieldWork({ ...state.data().fieldWorks.find(row => row.workId === "linked-work"), memo: "Edited memo" });
+assert.equal(state.data().fieldWorks.find(row => row.workId === "linked-work").materialId, materialId);
+state.saveFieldWork({ workId: "previous-work", date: "2025-07-10", fieldIds, workName: "除草剤", material: "Original product", materialId });
+state.saveFieldWork({ workId: "unlinked-work", date: "2026-07-11", fieldIds, workName: "除草剤", material: "Original product" });
+const groups = state.materialUsageForYear(2026);
+assert.equal(groups.length, 2);
+assert.equal(groups.find(group => group.materialId === materialId).works.length, 1);
+assert.equal(groups.find(group => group.materialId === materialId).works[0].fieldIds.length, 2);
+assert.equal(groups.flatMap(group => group.works).some(work => work.workId === "previous-work"), false);
+assert.equal(state.data().fieldWorks.find(row => row.workId === "unlinked-work").materialId, "");
+state.saveFieldWork({ ...state.data().fieldWorks.find(row => row.workId === "linked-work"), material: "Explicit revised name", materialId });
+assert.equal(state.data().fieldWorks.find(row => row.workId === "linked-work").materialId, materialId);
+const changed = { ...state.data().fieldWorks.find(row => row.workId === "linked-work"), material: "Unlinked revised name" };
+delete changed.materialId;
+state.saveFieldWork(changed);
+assert.equal(state.data().fieldWorks.find(row => row.workId === "linked-work").materialId, "");
+console.log("PASS material reference persistence, rename and grouped record safety");

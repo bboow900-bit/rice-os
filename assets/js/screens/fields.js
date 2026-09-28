@@ -901,9 +901,31 @@
     `;
   }
 
+  function renderActiveAreaSummary() {
+    const seen = new Set();
+    let count = 0;
+    let known = 0;
+    let area = 0;
+    // activeFields currently includes fallow fields; this total excludes them.
+    state.activeFields().forEach((field) => {
+      if (["休止", "休耕", "終了"].includes(field.status) || seen.has(field.fieldId)) return;
+      seen.add(field.fieldId);
+      count++;
+      const raw = field.areaA;
+      if ((typeof raw !== "number" && typeof raw !== "string") || String(raw).trim() === "") return;
+      const value = Number(raw);
+      if (!Number.isFinite(value) || value <= 0) return;
+      known++;
+      area += value;
+    });
+    const total = `${formatNumber(area, 2)} a / ${formatNumber(area / 100, 4)} ha`;
+    return `<p class="muted" data-field-active-area><b>作付け中の合計面積（全圃場）</b><br>使用中の圃場：${total} ・ ${count}圃場${known < count ? ` ・ 0a・未設定 ${count - known}圃場（正の面積のみ集計）` : ""}</p>`;
+  }
+
   function renderFieldListView() {
     const groups = groupedFields();
-    const groupOptions = [`<option value="all">すべてのグループ</option>`, ...groups.map((group) => `<option value="${U.attr(group.fieldGroupId)}">${U.escapeHTML(group.unassigned ? "グループ未設定" : group.name)} (${group.fields.length})</option>`)].join("");
+    if (fieldGroupFilter !== "all" && !groups.some((group) => group.fieldGroupId === fieldGroupFilter)) fieldGroupFilter = "all";
+    const groupOptions = [`<option value="all" ${fieldGroupFilter === "all" ? "selected" : ""}>すべてのグループ</option>`, ...groups.map((group) => `<option value="${U.attr(group.fieldGroupId)}" ${fieldGroupFilter === group.fieldGroupId ? "selected" : ""}>${U.escapeHTML(group.unassigned ? "グループ未設定" : group.name)} (${group.fields.length})</option>`)].join("");
     const query = fieldSearch.trim().toLowerCase();
     const visible = state.activeFields()
       .filter((field) => fieldGroupFilter === "all" || field.fieldGroupId === fieldGroupFilter || (!field.fieldGroupId && fieldGroupFilter === ""))
@@ -913,6 +935,7 @@
     return `
         <section class="field-hub-list">
         <div class="field-hub-intro"><div><span>圃場一覧</span><h3>田んぼを管理する</h3><small>圃場名・品種・面積・グループなど固定情報を整えます。</small></div><button class="primary" type="button" data-action="add-field">＋ 圃場追加</button></div>
+        ${renderActiveAreaSummary()}
         <div class="field-hub-filters"><input type="search" data-field-search placeholder="圃場名・品種・地区で検索" value="${U.attr(fieldSearch)}"><select data-field-group-filter>${groupOptions}</select></div>
         <div class="field-hub-groups">${groups.map((group) => `<div><button type="button" data-field-group-open="${U.attr(group.fieldGroupId)}"><span>${U.escapeHTML(group.unassigned ? "グループ未設定" : group.name)}</span><small>${group.fields.length}圃場 / ${Math.round(group.area * 10) / 10}a</small></button>${group.unassigned ? "" : `<button type="button" data-field-group-bulk="${U.attr(group.fieldGroupId)}">一括作業入力</button>`}</div>`).join("")}</div>
         <div class="field-hub-cards">${visible.length ? visible.map(renderFieldListCard).join("") : '<div class="empty">条件に合う圃場はありません。</div>'}</div>
@@ -1068,7 +1091,7 @@
       }
       const groupOpen = event.target.closest("[data-field-group-open]");
       if (groupOpen) {
-        fieldGroupFilter = groupOpen.dataset.fieldGroupOpen || "all";
+        fieldGroupFilter = groupOpen.dataset.fieldGroupOpen ?? "all";
         render();
         return;
       }
@@ -1195,7 +1218,7 @@
     U.$("fieldList").addEventListener("change", (event) => {
       const group = event.target.closest("[data-field-group-filter]");
       if (group) {
-        fieldGroupFilter = group.value || "all";
+        fieldGroupFilter = group.value;
         render();
       }
     });

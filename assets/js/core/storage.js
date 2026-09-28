@@ -36,7 +36,15 @@
   // without replacing the user's current data or the normal undo snapshot.
   function createReleaseBackup(raw, sourceVersion) {
     if (!raw) return false;
-    const current = releaseBackups();
+    let current;
+    try {
+      // Only a missing key is empty history; never overwrite unreadable history.
+      const historyRaw = localStorage.getItem(S.RELEASE_BACKUPS_KEY);
+      current = historyRaw === null ? [] : JSON.parse(historyRaw);
+      if (!Array.isArray(current) || current.some((entry) => !entry || typeof entry.raw !== "string")) return false;
+    } catch (error) {
+      return false;
+    }
     if (current.some((entry) => entry.sourceVersion === sourceVersion && entry.raw === raw)) return true;
     const entry = {
       backupId: U.id("release_backup", U.today()),
@@ -325,6 +333,34 @@
       lastImportMode: "merge",
       lastImportSourceVersion: incoming.appVersion || incoming.meta && incoming.meta.appVersion || ""
     };
+    Object.entries({ nextSeasonIdeas: "ideaId", herbicidePrograms: "programId", herbicideAssignments: "assignmentId", herbicideObservations: "observationId" }).forEach(([key, idKey]) => {
+      const existing = Array.isArray(current.meta && current.meta[key]) ? current.meta[key] : [];
+      const source = Array.isArray(incoming.meta && incoming.meta[key]) ? incoming.meta[key] : [];
+      const ids = new Set(existing.map((row) => row[idKey]));
+      const additions = source.filter((row) => row && row[idKey] && !ids.has(row[idKey]) && ids.add(row[idKey]));
+      merged.meta[key] = U.clone([...existing, ...additions]);
+      added[key] = additions.length;
+      skipped[key] = source.length - additions.length;
+    });
+    const assignmentGroups = new Map();
+    (merged.meta.herbicideAssignments || []).forEach((row) => {
+      const key = JSON.stringify([row.fieldId, String(row.year)]);
+      if (!assignmentGroups.has(key)) assignmentGroups.set(key, []);
+      assignmentGroups.get(key).push(row);
+    });
+    assignmentGroups.forEach((rows) => {
+      const sourceRows = [...rows, ...(incoming.meta.herbicideAssignments || [])];
+      const supersededIds = new Set(sourceRows.filter((row) => row.supersededBy && rows.some((next) => next.assignmentId === row.supersededBy)).map((row) => row.assignmentId));
+      const candidates = rows.filter((row) => row.active !== false && !supersededIds.has(row.assignmentId))
+        .sort((a, b) => String(a.createdAt || "").localeCompare(String(b.createdAt || "")) || String(a.assignmentId).localeCompare(String(b.assignmentId)));
+      const chosen = candidates.at(-1);
+      rows.forEach((row) => {
+        if (row.active !== false && (supersededIds.has(row.assignmentId) || (chosen && row !== chosen))) {
+          row.active = false;
+          row.mergeResolution = "統合時に履歴として保持";
+        }
+      });
+    });
     return { data: S.normalize(merged), added, skipped };
   }
 
@@ -355,12 +391,16 @@
   }
 
   function backupBeforeAppUpdate() {
-    const raw = readRaw(S.STORE_KEY);
-    if (!raw) return true;
-    const current = safeParse(raw);
-    if (!current) return false;
-    const sourceVersion = String(current.appVersion || current.meta && current.meta.appVersion || S.APP_VERSION);
-    return createReleaseBackup(raw, sourceVersion);
+    try {
+      const raw = localStorage.getItem(S.STORE_KEY);
+      if (raw === null) return true;
+      const current = safeParse(raw);
+      if (!current) return false;
+      const sourceVersion = String(current.appVersion || current.meta && current.meta.appVersion || S.APP_VERSION);
+      return createReleaseBackup(raw, sourceVersion);
+    } catch (error) {
+      return false;
+    }
   }
 
   function exportJson(data) {

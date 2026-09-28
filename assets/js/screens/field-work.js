@@ -7,7 +7,52 @@
   const state = RiceOS.state;
   let recentScope = localStorage.getItem("riceFieldWorkRecentScope") || "all";
   let pendingScheduleId = "";
+  let linkedMaterialName = "";
+  let herbicideLinks = [];
+  let herbicideChoices = new Map();
   let workInputMode = localStorage.getItem("riceFieldWorkInputMode") || "simple";
+
+  const HARVEST_REVIEW_INPUTS = {
+    surface: "fwHarvestSurface",
+    traffic: "fwHarvestTraffic",
+    weeds: "fwHarvestWeeds",
+    weedExtent: "fwHarvestWeedExtent",
+    weedImpact: "fwHarvestWeedImpact",
+    weedNote: "fwHarvestWeedNote",
+    yieldKg: "fwHarvestYieldKg",
+    harvestAreaA: "fwHarvestAreaA",
+    yieldBasis: "fwHarvestYieldBasis"
+  };
+
+  function renderHarvestReview() {
+    const host = U.$("fwHarvestReview");
+    if (!host) return;
+    const active = isHarvestWork(U.$("fwName").value);
+    host.hidden = !active;
+    host.classList.toggle("hidden", !active);
+    Object.values(HARVEST_REVIEW_INPUTS).forEach((id) => {
+      const input = U.$(id);
+      if (input) input.disabled = !active;
+    });
+  }
+
+  function loadHarvestReview(work) {
+    const review = work && work.harvestReview || {};
+    Object.entries(HARVEST_REVIEW_INPUTS).forEach(([key, id]) => {
+      const input = U.$(id);
+      if (input) input.value = review[key] ?? "";
+    });
+    const host = U.$("fwHarvestReview");
+    if (host) host.open = Object.keys(HARVEST_REVIEW_INPUTS).some((key) => String(review[key] ?? "") !== "");
+    renderHarvestReview();
+  }
+
+  function harvestReviewValue() {
+    return Object.fromEntries(Object.entries(HARVEST_REVIEW_INPUTS).map(([key, id]) => {
+      const input = U.$(id);
+      return [key, input ? input.value : ""];
+    }));
+  }
 
   const WORK_PRESETS = {
     "草刈り": { machine: "草刈り機" },
@@ -46,6 +91,7 @@
   }
 
   function updateFieldSelectionSummary() {
+    renderHerbicidePicker();
     const summary = U.$("fwFieldSelectionSummary");
     if (!summary) return;
     const ids = selectedFieldIds();
@@ -107,6 +153,7 @@
     if (!el.value || el.dataset.autoFilled === "1") {
       el.value = value;
       el.dataset.autoFilled = "1";
+      if (id === "fwMaterial") renderMaterialPicker();
     }
   }
 
@@ -115,6 +162,61 @@
     if (!el) return;
     el.value = value || "";
     el.dataset.autoFilled = autoFilled ? "1" : "0";
+    if (id === "fwMaterial") renderMaterialPicker();
+  }
+
+  function renderMaterialPicker(materialId) {
+    const select = U.$("fwMaterialId");
+    if (!select) return;
+    const name = U.$("fwMaterial").value;
+    const selected = materialId !== undefined ? materialId : (name === linkedMaterialName ? select.value : "");
+    if (materialId !== undefined) linkedMaterialName = name;
+    const options = [{ value: "", label: "自由入力（未紐付け）" }, ...state.data().materials.map((item) => ({
+      value: item.materialId,
+      label: `${item.season} / ${item.formalName || item.name} / ${[item.category, item.formulation, item.unit].filter(Boolean).join("・")}${name && (name === item.name || name === item.formalName) ? "（名称一致候補）" : ""}`
+    }))];
+    if (selected && !options.some((item) => item.value === selected)) options.push({ value: selected, label: "保存済みの資材参照（台帳なし）" });
+    U.setOptions(select, options, selected || "");
+  }
+
+  function renderHerbicidePicker() {
+    const host = U.$("fwHerbicide");
+    if (!host || !RiceOS.herbicide) return;
+    const active = U.$("fwName").value === "除草剤";
+    host.classList.toggle("hidden", !active);
+    const ids = selectedFieldIds();
+    const year = U.$("fwDate").value.slice(0, 4);
+    const assignments = RiceOS.herbicide.assignments();
+    herbicideLinks = herbicideLinks.filter((link) => active && ids.includes(link.fieldId) && assignments.some((a) => a.assignmentId === link.assignmentId && a.fieldId === link.fieldId && String(a.year) === year && a.steps.some((s) => s.id === link.stepId)));
+    herbicideChoices = new Map();
+    const options = [{ value: "", label: "体系とは別に記録" }];
+    if (herbicideLinks.length) {
+      herbicideChoices.set("saved", { links: U.clone(herbicideLinks), values: {
+        material: U.$("fwMaterial").value,
+        materialId: U.$("fwMaterial").value === linkedMaterialName ? U.$("fwMaterialId").value : "",
+        category: U.$("fwHerbicideCategory").value,
+        purpose: U.$("fwHerbicidePurpose").value
+      } });
+      options.push({ value: "saved", label: `選択済みの体系（${herbicideLinks.length}圃場）` });
+    }
+    const current = ids.map((id) => RiceOS.herbicide.assignmentFor(id, year));
+    const first = current[0];
+    if (first && current.every((a) => a && a.programId === first.programId && a.revision === first.revision)) {
+      first.steps.forEach((step) => {
+        if (!current.every((a) => a.steps.some((s) => s.id === step.id))) return;
+        const value = `step:${step.id}`;
+        herbicideChoices.set(value, { step, links: current.map((a) => ({ fieldId: a.fieldId, assignmentId: a.assignmentId, stepId: step.id })) });
+        options.push({ value, label: `${first.name} / ${step.category} / ${step.materialName || "資材未定"}` });
+      });
+    } else if (ids.length) options[0].label = "体系なし・体系が異なるため個別選択";
+    U.setOptions(U.$("fwHerbicideStep"), options, herbicideLinks.length ? "saved" : "");
+  }
+
+  function loadHerbicideWork(work) {
+    herbicideLinks = U.clone(work && work.herbicideLinks || []);
+    U.$("fwHerbicideCategory").value = work && work.herbicideCategory || "";
+    U.$("fwHerbicidePurpose").value = work && work.herbicidePurpose || "";
+    renderHerbicidePicker();
   }
 
   function formatDuration(minutes) {
@@ -150,6 +252,8 @@
   }
 
   function applyWorkPreset(workName) {
+    renderHerbicidePicker();
+    renderHarvestReview();
     const preset = WORK_PRESETS[workName] || {};
     const learned = learnedPreset(workName);
     setAutoValue("fwMachine", preset.machine || learned.machine || "");
@@ -166,6 +270,8 @@
     const template = WORK_TEMPLATES.find((item) => item.key === key);
     if (!template) return;
     U.$("fwName").value = template.workName;
+    loadHarvestReview(null);
+    renderHerbicidePicker();
     setDirectValue("fwMachine", template.machine || (WORK_PRESETS[template.workName] && WORK_PRESETS[template.workName].machine) || "", true);
     setDirectValue("fwMaterial", templateMaterial(template), true);
     if (!U.$("fwAmount").value) U.$("fwAmount").dataset.autoFilled = "1";
@@ -268,12 +374,15 @@
   function resetForm() {
     U.$("fieldWorkHeading").textContent = "圃場作業入力";
     U.$("editFieldWorkId").value = "";
+    loadHerbicideWork(null);
     U.$("fwDate").value = U.today();
     setWorker("自分");
     U.$("fwName").value = "田植え";
+    loadHarvestReview(null);
     U.$("fwHours").value = "";
     U.$("fwMachine").value = "";
     U.$("fwMaterial").value = "";
+    renderMaterialPicker("");
     U.$("fwAmount").value = "";
     U.$("fwWeather").value = "";
     U.$("fwWeatherAutoJson").value = "";
@@ -357,6 +466,8 @@
     U.$("fwHours").value = work.hours || "";
     U.$("fwMachine").value = work.machine || "";
     U.$("fwMaterial").value = work.material || "";
+    U.$("fwMaterial").dataset.autoFilled = "0";
+    renderMaterialPicker(work.materialId || "");
     U.$("fwAmount").value = work.amount || "";
     U.$("fwWeather").value = work.weather || "";
     U.$("fwWeatherAutoJson").value = work.weatherAuto ? JSON.stringify(work.weatherAuto) : "";
@@ -369,6 +480,8 @@
     U.$("fwWeatherStatus").textContent = work.weatherAuto ? `${work.weatherAuto.source || "自動取得"}: ${work.weatherAuto.summary || work.weather}` : "必要なら作業日の天気を取得してください。";
     U.$("fwMemo").value = work.memo || "";
     setSelectedFieldIds(work.fieldIds || []);
+    loadHerbicideWork(work);
+    loadHarvestReview(work);
     const deleteButton = U.$("deleteFieldWorkButton");
     if (deleteButton) deleteButton.classList.remove("hidden");
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -425,7 +538,10 @@
   }
 
   function render() {
+    renderHerbicidePicker();
+    renderMaterialPicker();
     U.setOptions(U.$("fwName"), S.FIELD_WORK_NAMES, U.$("fwName").value || "田植え");
+    renderHarvestReview();
     renderTemplates();
     renderFieldCards();
     renderRecentScope();
@@ -440,7 +556,7 @@
     const form = U.$("fieldWorkForm");
     if (!form) return;
     form.dataset.workMode = workInputMode;
-    const sections = form.querySelectorAll("details.form-section");
+    const sections = form.querySelectorAll("details.form-section:not(#fwHarvestReview)");
     const detail = sections[1];
     if (detail) {
       detail.hidden = workInputMode !== "detail";
@@ -588,6 +704,31 @@
   }
 
   function bind() {
+    U.$("fwHerbicideStep").addEventListener("change", () => {
+      const choice = herbicideChoices.get(U.$("fwHerbicideStep").value);
+      herbicideLinks = U.clone(choice && choice.links || []);
+      if (choice && choice.values) {
+        U.$("fwHerbicideCategory").value = choice.values.category;
+        U.$("fwHerbicidePurpose").value = choice.values.purpose;
+        U.$("fwMaterial").value = choice.values.material;
+        U.$("fwMaterial").dataset.autoFilled = "0";
+        renderMaterialPicker(choice.values.materialId);
+      } else if (choice && choice.step) {
+        U.$("fwHerbicideCategory").value = choice.step.category;
+        U.$("fwHerbicidePurpose").value = choice.step.purpose || "";
+        const master = state.data().materials.find((m) => m.materialId === choice.step.materialId);
+        U.$("fwMaterial").value = master ? master.name || master.formalName : "";
+        U.$("fwMaterial").dataset.autoFilled = "0";
+        renderMaterialPicker(master ? master.materialId : "");
+      }
+    });
+    U.$("fwMaterialId").addEventListener("change", () => {
+      const master = state.data().materials.find((item) => item.materialId === U.$("fwMaterialId").value);
+      if (master) U.$("fwMaterial").value = master.name || master.formalName || "";
+      U.$("fwMaterial").dataset.autoFilled = "0";
+      linkedMaterialName = U.$("fwMaterial").value;
+    });
+    U.$("fwMaterial").addEventListener("input", () => renderMaterialPicker());
     U.$("fwFields").addEventListener("click", (event) => {
       const card = event.target.closest(".select-card");
       if (card) {
@@ -686,6 +827,7 @@
     });
 
     U.$("fwDate").addEventListener("change", () => {
+      renderHerbicidePicker();
       U.$("fwWeatherAutoJson").value = "";
       const location = state.data().meta && state.data().meta.weatherLocation;
       if (location && location.latitude !== undefined) fetchWorkWeather(false);
@@ -717,6 +859,11 @@
         hours: U.$("fwHours").value,
         machine: U.$("fwMachine").value,
         material: U.$("fwMaterial").value,
+        materialId: U.$("fwMaterial").value === linkedMaterialName ? U.$("fwMaterialId").value : "",
+        herbicideLinks: workName === "除草剤" ? herbicideLinks : [],
+        herbicideCategory: workName === "除草剤" ? U.$("fwHerbicideCategory").value : "",
+        herbicidePurpose: workName === "除草剤" ? U.$("fwHerbicidePurpose").value : "",
+        ...(isHarvestWork(workName) ? { harvestReview: harvestReviewValue() } : {}),
         amount: U.$("fwAmount").value,
         sourceScheduleId: pendingScheduleId,
         weather: U.$("fwWeather").value,
@@ -726,7 +873,16 @@
         memo: U.$("fwMemo").value
       });
       if (saved === null) return;
-      if (isHarvestWork(workName)) await saveHarvestThermalSnapshots(workId, ids, date);
+      if (isHarvestWork(workName)) {
+        await saveHarvestThermalSnapshots(workId, ids, date);
+        if (RiceOS.harvestWeather) {
+          for (const fieldId of ids) {
+            const saved = state.data().fieldWorks.find((item) => item.workId === workId);
+            const snapshot = saved && (saved.harvestSnapshots || []).find((item) => item.fieldId === fieldId);
+            if (snapshot && !snapshot.weather) await RiceOS.harvestWeather.capture(workId, fieldId);
+          }
+        }
+      }
       resetForm();
     });
 
@@ -748,10 +904,12 @@
         U.$("fieldWorkHeading").textContent = "圃場作業を複製";
         U.$("fwDate").value = U.today();
         U.$("fwName").value = work.workName;
+        loadHarvestReview(null);
         setWorker(work.worker || "自分");
         U.$("fwHours").value = work.hours || "";
         U.$("fwMachine").value = work.machine || "";
         U.$("fwMaterial").value = work.material || "";
+        renderMaterialPicker("");
         U.$("fwAmount").value = work.amount || "";
         U.$("fwWeather").value = "";
         U.$("fwWeatherAutoJson").value = "";
@@ -775,6 +933,8 @@
       U.$("fwHours").value = work.hours || "";
       U.$("fwMachine").value = work.machine || "";
       U.$("fwMaterial").value = work.material || "";
+      U.$("fwMaterial").dataset.autoFilled = "0";
+      renderMaterialPicker(work.materialId || "");
       U.$("fwAmount").value = work.amount || "";
       U.$("fwWeather").value = work.weather || "";
       U.$("fwWeatherAutoJson").value = work.weatherAuto ? JSON.stringify(work.weatherAuto) : "";
@@ -787,6 +947,8 @@
       U.$("fwWeatherStatus").textContent = work.weatherAuto ? `${work.weatherAuto.source || "自動取得"}: ${work.weatherAuto.summary || work.weather}` : "必要なら作業日の天気を取得してください。";
       U.$("fwMemo").value = work.memo || "";
       setSelectedFieldIds(work.fieldIds || []);
+      loadHerbicideWork(work);
+      loadHarvestReview(work);
       const deleteButton = U.$("deleteFieldWorkButton");
       if (deleteButton) deleteButton.classList.remove("hidden");
       window.scrollTo({ top: 0, behavior: "smooth" });

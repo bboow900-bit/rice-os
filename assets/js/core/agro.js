@@ -405,8 +405,13 @@
       const labels = { dry: "中干し中", intermittent: "間断灌水中", saturated: "飽水管理中", deep: "深水管理中", drain: "落水中" };
       const keys = { dry: "drying", intermittent: "intermittent", saturated: "saturated", deep: "deepWater", drain: "draining" };
       const movements = Array.isArray(current.raw && current.raw.waterMovements) ? current.raw.waterMovements : [];
-      const currentMovement = movements.filter((item) => item && item.startDate && !item.endDate)
-        .sort((a, b) => String(b.startDate).localeCompare(String(a.startDate)))[0] || null;
+      // Movement boundaries are inclusive, as in waterMovementTimeline.
+      // At a shared boundary, the most recently started movement takes over.
+      const currentMovement = movements.filter((item) => item && validDate(targetDate)
+        && validDate(item.startDate) && item.startDate <= targetDate
+        && (!item.endDate || (validDate(item.endDate) && item.endDate >= item.startDate && targetDate <= item.endDate)))
+        .sort((a, b) => String(a.startDate).localeCompare(String(b.startDate))
+          || String(a.createdAt || "").localeCompare(String(b.createdAt || ""))).at(-1) || null;
       const movementLabel = currentMovement && current.kind === "intermittent"
         ? (currentMovement.phase === "wait" ? "間断灌水・入水待ち" : (currentMovement.phase === "drain" ? "間断灌水・落水中" : "間断灌水・入水中"))
         : currentMovement && current.kind === "saturated"

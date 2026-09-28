@@ -105,7 +105,8 @@
   }
 
   function activeFieldId() {
-    const value = U.$("sheetField") && U.$("sheetField").value || selectedFieldId;
+    const select = U.$("sheetField");
+    const value = select ? select.value : selectedFieldId;
     selectedFieldId = value;
     return value;
   }
@@ -114,8 +115,8 @@
     const mode = U.$("sheetTargetMode") && U.$("sheetTargetMode").value || "field";
     if (mode === "group") {
       const groupId = U.$("sheetGroup") && U.$("sheetGroup").value || "";
-      const ids = state.fieldsForGroup ? state.fieldsForGroup(groupId).map((field) => field.fieldId) : [];
-      if (ids.length) return ids;
+      const group = groupId && scheduleGroups().find((item) => item.fieldGroupId === groupId);
+      return group ? group.fieldIds : [];
     }
     const fieldId = activeFieldId();
     return fieldId ? [fieldId] : [];
@@ -132,9 +133,8 @@
     const group = U.$("sheetGroup");
     if (!mode || !group) return;
     U.setOptions(group, [{ value: "", label: "グループを選ぶ" }, ...groups.map((item) => ({ value: item.fieldGroupId, label: `${item.name} (${item.fieldIds.length}圃場)` }))], group.value || "");
-    if (!groups.length && mode.value === "group") mode.value = "field";
-    mode.disabled = !groups.length;
-    const isGroup = mode.value === "group" && groups.length > 0;
+    mode.disabled = !groups.length && mode.value !== "group";
+    const isGroup = mode.value === "group";
     U.$("sheetFieldLabel").classList.toggle("hidden", isGroup);
     U.$("sheetGroupLabel").classList.toggle("hidden", !isGroup);
   }
@@ -276,6 +276,10 @@
     const mode = U.$("sheetScheduleTargetMode") ? U.$("sheetScheduleTargetMode").value : "field";
     const groups = scheduleGroups();
     const group = groups.find((item) => item.fieldGroupId === (U.$("sheetScheduleGroup") && U.$("sheetScheduleGroup").value));
+    if (!existing && mode === "group" && (!group || !group.fieldGroupId || !group.fieldIds.length)) {
+      U.toast("予定を登録するグループを選択してください");
+      return;
+    }
     const targets = existing
       ? [existing.fieldIds || []]
       : mode === "all"

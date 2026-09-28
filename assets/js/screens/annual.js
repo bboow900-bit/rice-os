@@ -20,6 +20,7 @@
   let timelineLongPressTimer = null;
   let timelinePointerStart = null;
   let suppressTimelineOpenUntil = 0;
+  const pendingHarvestWeather = new Set();
 
   const KIND_META = {
     fieldWork: { label: "作業", className: "work", icon: "作" },
@@ -741,6 +742,8 @@
           </div>
         </section>
         ${renderSummary(rows)}
+        ${renderUsedMaterials()}
+        ${RiceOS.herbicideUI ? RiceOS.herbicideUI.renderReview(null, yearValue()) : ""}
         ${renderAnnualFab()}
       </div>
     `;
@@ -1677,6 +1680,62 @@
     `;
   }
 
+  // Read-only recorded kg totals, never annual completion, area, or yield rates.
+  function harvestTotalsForFieldYear(fieldWorks, fieldId, year) {
+    const result = { individualSubtotals: [], individualRecords: [], sharedRecords: [] };
+    if (typeof fieldId !== "string" || !fieldId || !/^\d{4}$/.test(String(year))) return result;
+    const seen = new Set();
+    const subtotals = new Map();
+    const bases = ["籾（乾燥前）", "籾（乾燥後）", "玄米（乾燥調製後）"];
+    for (const work of Array.isArray(fieldWorks) ? fieldWorks : []) {
+      if (!work || typeof work.workId !== "string" || !work.workId.trim() || seen.has(work.workId)) continue;
+      // First ID wins, matching the existing detail lookup even for conflicting copies.
+      seen.add(work.workId);
+      if (!Array.isArray(work.fieldIds) || !work.fieldIds.includes(fieldId)
+        || typeof work.date !== "string" || !isTimelineDate(work.date) || work.date.slice(0, 4) !== String(year)
+        || !["稲刈り", "収穫"].includes(work.workName)) continue;
+      const review = work.harvestReview;
+      if (!review || typeof review !== "object" || Array.isArray(review)) continue;
+      const ids = [...new Set(work.fieldIds)];
+      const raw = review.yieldKg;
+      const text = typeof raw === "string" || typeof raw === "number" ? String(raw).trim() : "";
+      const kg = /^(?:\d+(?:\.\d*)?|\.\d+)$/.test(text) && Number.isFinite(Number(text)) ? Number(text) : null;
+      const basis = bases.includes(review.yieldBasis) ? review.yieldBasis : "";
+      const record = { workId: work.workId, date: work.date, workName: work.workName, fieldIds: ids, yieldKg: kg, yieldBasis: basis };
+      if (ids.length !== 1) {
+        result.sharedRecords.push(record);
+      } else {
+        result.individualRecords.push(record);
+        if (kg === null || !basis) continue;
+        const subtotal = subtotals.get(basis) || { yieldBasis: basis, yieldKg: 0, recordCount: 0 };
+        subtotal.yieldKg += kg;
+        subtotal.recordCount++;
+        subtotals.set(basis, subtotal);
+      }
+    }
+    result.individualSubtotals = [...subtotals.values()];
+    return result;
+  }
+
+  function renderHarvestTotals(field, year) {
+    const data = state.data();
+    const totals = harvestTotalsForFieldYear(data.fieldWorks, field.fieldId, year);
+    const basisLabel = (basis) => basis || "測定条件未確認";
+    const kgText = (kg) => String(Number(kg.toFixed(10)));
+    const records = (rows) => rows.map((row) => {
+      const names = row.fieldIds.map((id) => (data.fields || []).find((item) => item.fieldId === id)?.name || `圃場ID: ${id}`).join("・");
+      return `<button type="button" class="annual-material-work" data-annual-record-open-kind="fieldWork" data-annual-record-open-id="${U.attr(row.workId)}" data-annual-record-open-label="${U.attr(row.workName)}"><span>${U.escapeHTML(row.date)} / ${U.escapeHTML(names)}</span><span>${U.escapeHTML(row.yieldKg === null ? "収量未記録・要確認" : `${kgText(row.yieldKg)}kg`)} / ${U.escapeHTML(basisLabel(row.yieldBasis))}</span></button>`;
+    }).join("");
+    return `<details class="annual-harvest-totals"><summary>収穫作業の記録量（${U.escapeHTML(String(year))}年）</summary>
+      <p class="muted">記録済み分のみ。年間の全収量ではありません。</p>
+      <h4>この圃場の個別記録</h4>
+      ${totals.individualRecords.some((row) => !row.yieldBasis && row.yieldKg !== null) ? '<p class="muted">測定条件未確認の記録は小計対象外です。</p>' : ""}
+      ${totals.individualSubtotals.map((row) => `<p>${U.escapeHTML(basisLabel(row.yieldBasis))}: ${U.escapeHTML(kgText(row.yieldKg))}kg（${row.recordCount}件）</p>`).join("") || '<p class="muted">小計対象の収量記録はありません。</p>'}
+      ${records(totals.individualRecords)}
+      ${totals.sharedRecords.length ? `<h4>複数圃場の共有合計記録</h4><p class="muted">複数圃場の合計です。個別小計には含みません。</p>${records(totals.sharedRecords)}` : ""}
+    </details>`;
+  }
+
   function renderEndSeasonReflection(field, snapshot) {
     const latestNote = seasonNotesForReview(field.fieldId)[0] || null;
     const carryover = String(field.nextSeasonMemo || "").trim();
@@ -1688,7 +1747,7 @@
     }
     const facts = [
       `収穫 ${snapshot.harvest}`,
-      snapshot.yield ? `収量 ${snapshot.yield}` : "収量 未記録",
+      snapshot.yield ? `結果登録の収量 ${snapshot.yield}` : "結果登録の収量 未記録",
       snapshot.quality ? `品質 ${snapshot.quality}` : "品質 未記録",
       snapshot.panicle ? `幼穂確認 ${snapshot.panicle}` : "幼穂確認 未記録",
       snapshot.heading ? `出穂日 ${U.fd(snapshot.heading)}` : "出穂日 未記録",
@@ -1727,6 +1786,24 @@
     return entries;
   }
 
+  function renderUsedMaterials(field, targetYear) {
+    const year = targetYear || yearValue();
+    if (year === "all") {
+      const years = unique(state.data().fieldWorks.filter((work) => (work.materialId || String(work.material || "").trim())
+        && (!field || (work.fieldIds || []).includes(field.fieldId))).map((work) => U.dateYear(work.date)))
+        .filter((value) => /^\d{4}$/.test(String(value))).sort().reverse();
+      return `<details class="annual-used-materials"><summary>使用した資材 <small>全年度</small></summary>${years.length ? years.map((value) => renderUsedMaterials(field, String(value))).join("") : '<p class="muted">資材使用記録はありません。</p>'}</details>`;
+    }
+    const groups = state.materialUsageForYear(year).map((group) => ({
+      ...group, works: group.works.filter((work) => !field || (work.fieldIds || []).includes(field.fieldId))
+    })).filter((group) => group.works.length);
+    return `<details class="annual-used-materials"><summary>使用した資材 <small>${U.escapeHTML(year)}年</small></summary>${groups.length ? groups.map((group) => `<section class="annual-material-group"><h4>${U.escapeHTML(group.name)}${!group.materialId ? '<small>未紐付け</small>' : ""}</h4>${group.works.map((work) => {
+      const fieldId = field ? field.fieldId : (work.fieldIds || []).find((id) => state.field(id));
+      const fields = (work.fieldIds || []).map((id) => state.field(id)?.name || id).join("・");
+      return `<button type="button" class="annual-material-work" data-annual-record-open-kind="fieldWork" data-annual-record-open-id="${U.attr(work.workId)}" data-annual-record-open-label="${U.attr(work.workName)}" ${!field && fieldId ? `data-annual-material-field="${U.attr(fieldId)}"` : ""} ${!fieldId ? "disabled" : ""}><span>${U.escapeHTML(work.date)} / ${U.escapeHTML(fields || "圃場未設定")}</span><b>${U.escapeHTML(work.workName || "作業")}</b><span>${U.escapeHTML([work.material, work.amount].filter(Boolean).join(" / "))}</span>${work.memo ? `<span class="annual-material-memo">${U.escapeHTML(work.memo)}</span>` : ""}</button>`;
+    }).join("")}</section>`).join("") : '<p class="muted">この年の資材使用記録はありません。</p>'}</details>`;
+  }
+
   function renderReviewOverview(field) {
     const year = reviewYearValue();
     const previousYear = String(Number(year) - 1);
@@ -1734,7 +1811,10 @@
     return `
       <section class="annual-compare-launch"><div><span>振り返り</span><h3>今年と前年を比べる</h3><p>${U.escapeHTML(year)}年と${U.escapeHTML(previousYear)}年の節目・作業・水管理を、見やすく読み比べます。</p></div><button type="button" class="primary" data-annual-open-compare>比較を開く</button></section>
       ${renderYearFlow(field)}
+      ${renderUsedMaterials(field)}
+      ${RiceOS.herbicideUI ? RiceOS.herbicideUI.renderReview(field, yearValue()) : ""}
       ${renderEndSeasonReflection(field, snapshot)}
+      ${renderHarvestTotals(field, year)}
       ${renderSeasonNotes(field)}
       <label class="annual-carryover-note"><span>来年に引き継ぐメモ</span><textarea data-annual-field-edit="nextSeasonMemo" placeholder="例: この圃場は中干しを早めに始める。穂肥量は葉色を見て控えめに。">${U.escapeHTML(field.nextSeasonMemo || "")}</textarea><small>圃場マスターに保存され、年度をまたいで確認できます。</small></label>
     `;
@@ -1888,6 +1968,65 @@
     return `<div class="annual-record-detail-row"><span>${U.escapeHTML(label)}</span><b>${U.escapeHTML(String(value))}</b></div>`;
   }
 
+  function renderHarvestReview(row) {
+    const review = row.harvestReview;
+    if (!review || !Object.values(review).some((value) => value !== "" && value !== null && value !== undefined)) return "";
+    const grouped = (row.fieldIds || []).length > 1;
+    const info = [
+      annualRecordInfoRow("田面の状態", review.surface || "未確認"),
+      annualRecordInfoRow("機械の走行", review.traffic || "未確認"),
+      annualRecordInfoRow("収穫時の残草", review.weeds || "未確認"),
+      annualRecordInfoRow("残草の範囲", review.weedExtent || "未確認"),
+      annualRecordInfoRow("雑草による作業への影響", review.weedImpact || "未確認"),
+      annualRecordInfoRow("雑草名・気づき", review.weedNote || "未記録")
+    ].join("");
+    const kg = review.yieldKg !== "" && review.yieldKg != null ? Number(review.yieldKg) : NaN;
+    const area = review.harvestAreaA !== "" && review.harvestAreaA != null ? Number(review.harvestAreaA) : NaN;
+    const yieldRows = [
+      annualRecordInfoRow(grouped ? "今回の対象圃場合計収量" : "今回の収量", Number.isFinite(kg) && kg >= 0 ? `${kg}kg` : "未記録"),
+      annualRecordInfoRow("今回の収穫面積", Number.isFinite(area) && area > 0 ? `${area}a` : "未記録"),
+      annualRecordInfoRow("測定条件", review.yieldBasis || "未確認"),
+      annualRecordInfoRow("今回の10a換算", Number.isFinite(kg) && kg >= 0 && Number.isFinite(area) && area > 0 && review.yieldBasis ? `${Math.round(kg / area * 100) / 10}kg/10a` : "面積・収量・測定条件の記録待ち")
+    ].join("");
+    return `<section class="annual-record-detail-section"><h3>収穫時の振り返り</h3>${grouped ? '<p class="muted">選択した圃場に共通の観察です。収量は対象圃場の合計で、圃場別には配分していません。</p>' : ""}<div class="annual-record-detail-rows">${info}</div></section>
+      <section class="annual-record-detail-section"><h3>今回の収穫結果</h3><div class="annual-record-detail-rows">${yieldRows}</div><p class="muted">収量は年間の栽培全体の結果です。落水や雑草だけの影響とは判定できません。測定条件が異なる記録は単純比較できません。</p></section>`;
+  }
+
+  async function fetchHarvestWeather(workId, fieldId) {
+    const key = `${workId}:${fieldId}`;
+    if (!RiceOS.harvestWeather || pendingHarvestWeather.has(key)) return;
+    pendingHarvestWeather.add(key);
+    render();
+    try {
+      const result = await RiceOS.harvestWeather.capture(workId, fieldId);
+      if (result && result.status === "not_saved") U.toast("記録の変更、または取得不足のため更新しませんでした。保存済みの値は保持しています。");
+      else if (result && result.status === "fetch_failed") U.toast("過去気象を取得できませんでした。時間をおいて再度お試しください。");
+    } catch (error) {
+      U.toast("過去気象を取得できませんでした。保存済みの記録は保持しています。");
+    } finally {
+      pendingHarvestWeather.delete(key);
+      if (selectedFieldId === fieldId && recordDetail && recordDetail.id === workId) render();
+    }
+  }
+
+  function renderHarvestWeather(row, snapshot, fieldId) {
+    const weather = snapshot.weather;
+    const busy = pendingHarvestWeather.has(`${row.workId}:${fieldId}`);
+    const valid = (value) => value !== "" && value != null && Number.isFinite(Number(value));
+    const statuses = { complete: "取得済み（固定保存）", partial: "一部取得・欠測あり", no_data: "取得できる過去データなし", missing_drain: "落水開始日の記録待ち", invalid_range: "対象期間を確認", location_missing: "気象地点の設定待ち", fetch_failed: "取得失敗" };
+    const rows = weather ? [
+      annualRecordInfoRow("取得状態", statuses[weather.status] || "未取得"),
+      annualRecordInfoRow("対象期間", weather.startDate && weather.endDate ? `${U.fd(weather.startDate)} - ${U.fd(weather.endDate)}` : "落水開始日の記録待ち"),
+      annualRecordInfoRow("降水量（取得済み分）", valid(weather.totalRain) ? `${weather.totalRain}mm / ${weather.rainCount}日分` : "取得できる値なし"),
+      annualRecordInfoRow("平均気温（取得済み分）", valid(weather.meanTemp) ? `${weather.meanTemp}℃ / ${weather.tempCount}日分` : "取得できる値なし"),
+      annualRecordInfoRow("対象の日数", valid(weather.expectedDays) ? `${weather.expectedDays}日（開始日を含む）` : "未計算"),
+      annualRecordInfoRow("取得元・地点", [weather.source, weather.locationLabel].filter(Boolean).join(" / ") || "未取得"),
+      annualRecordInfoRow("取得日時", weather.fetchedAt || "未取得")
+    ].join("") : '<p class="muted">過去気象はまだ保存されていません。</p>';
+    const canFetch = Boolean(snapshot.water && snapshot.water.finalDrainDate && RiceOS.harvestWeather);
+    return `<section class="annual-record-detail-section"><h3>落水後の過去気象</h3><div class="annual-record-detail-rows">${rows}</div><p class="muted">過去気象のモデル参考値です。圃場の実測・乾燥日数ではありません。当日と未来の予報は含みません。</p>${weather && weather.status === "complete" ? '<p class="muted">取得済みの値を収穫実績として保存しています。</p>' : canFetch ? `<button type="button" class="secondary" data-harvest-weather="${U.attr(row.workId)}" data-harvest-weather-field="${U.attr(fieldId)}" ${busy ? "disabled" : ""}>${busy ? "取得中…" : weather && weather.status === "partial" ? "不足分を取得" : weather ? "過去気象を再取得" : "過去気象を取得"}</button>` : '<p class="muted">収穫時の落水開始記録が必要です。</p>'}</section>`;
+  }
+
   function renderHarvestSnapshot(row, fieldId) {
     const snapshot = (row.harvestSnapshots || []).find((item) => String(item.fieldId || "") === String(fieldId));
     if (!snapshot) return "";
@@ -1898,7 +2037,9 @@
       annualRecordInfoRow("最終の入水", water.lastWateringDate ? `${U.fd(water.lastWateringDate)} ${water.lastWateringLabel || ""}` : "記録なし"),
       annualRecordInfoRow("入水から収穫", water.daysFromLastWatering ? `${water.daysFromLastWatering}日` : "記録なし"),
       annualRecordInfoRow("落水開始", water.finalDrainDate ? U.fd(water.finalDrainDate) : "記録なし"),
-      annualRecordInfoRow("落水から収穫", water.daysFromFinalDrain ? `${water.daysFromFinalDrain}日` : "記録なし")
+      annualRecordInfoRow("落水開始からの経過", water.elapsedDaysFromFinalDrain !== undefined && water.elapsedDaysFromFinalDrain !== "" ? `${water.elapsedDaysFromFinalDrain}日経過` : water.daysFromFinalDrain ? `${water.daysFromFinalDrain}日間（開始日を含む旧記録）` : "記録なし"),
+      annualRecordInfoRow("出穂から落水開始", water.elapsedDaysFromHeadingToDrain !== undefined && water.elapsedDaysFromHeadingToDrain !== "" ? `${water.elapsedDaysFromHeadingToDrain}日経過` : "記録なし"),
+      water.rewateringAfterDrain ? annualRecordInfoRow("期間中の入水", "落水開始後に入水記録あり。連続して乾いていた期間ではありません。") : ""
     ].filter(Boolean).join("");
     const error = outlook.errorDays === "" || outlook.errorDays === undefined || outlook.errorDays === null
       ? ""
@@ -1917,6 +2058,7 @@
     ].filter(Boolean).join("") : annualRecordInfoRow("出穂後積算", thermal.status || "未保存");
     return `
       <section class="annual-record-detail-section annual-harvest-snapshot"><h3>収穫時の水管理実績</h3><div class="annual-record-detail-rows">${waterRows}</div></section>
+      ${renderHarvestWeather(row, snapshot, fieldId)}
       <section class="annual-record-detail-section annual-harvest-snapshot"><h3>見通しとの比較</h3><div class="annual-record-detail-rows">${outlookRows}</div></section>
       <section class="annual-record-detail-section annual-harvest-snapshot"><h3>収穫時の積算温度</h3><div class="annual-record-detail-rows">${thermalRows}</div></section>
     `;
@@ -1951,14 +2093,16 @@
     } else {
       info.push(annualRecordInfoRow("実施日", annualRecordDate(date)));
       info.push(annualRecordInfoRow("作業者", row.worker));
-      info.push(annualRecordInfoRow("作業時間", row.hours || row.totalHours ? U.formatHours(row.hours || row.totalHours) : ""));
+      info.push(annualRecordInfoRow("作業時間", row.hours || row.totalHours ? U.formatHours(U.parseWorkHours(row.hours || row.totalHours)) : ""));
       info.push(annualRecordInfoRow("機械", row.machine));
       info.push(annualRecordInfoRow("資材", row.material));
+      info.push(annualRecordInfoRow("除草の処理区分", row.herbicideCategory));
+      info.push(annualRecordInfoRow("この時期に使った理由", row.herbicidePurpose));
       info.push(annualRecordInfoRow("使用量", row.amount || row.quantity));
     }
     const memo = String(row.memo || row.note || "").trim();
     const photos = annualRecordPhotos(row);
-    const harvestSnapshot = category === "収穫" ? renderHarvestSnapshot(row, field.fieldId) : "";
+    const harvestSnapshot = category === "収穫" ? renderHarvestReview(row) + renderHarvestSnapshot(row, field.fieldId) : "";
     return `
       <section class="annual-record-detail" aria-label="${U.attr(title)}の実績詳細">
         <button type="button" class="annual-record-detail-back" data-annual-record-detail-back aria-label="一年の流れへ戻る">‹</button>
@@ -1994,6 +2138,7 @@
   function renderOptions() {
     const years = new Set([String(new Date().getFullYear())]);
     allRows().forEach((row) => years.add(String(row.season)));
+    if (RiceOS.herbicide) RiceOS.herbicide.assignments().forEach((row) => years.add(String(row.year)));
     const sorted = Array.from(years).sort((a, b) => Number(b) - Number(a));
     U.setOptions(U.$("annualYear"), [{ value: "all", label: "全年度" }, ...sorted.map((year) => ({ value: year, label: `${year}年` }))], yearValue());
     renderSortOptions();
@@ -2119,6 +2264,7 @@
 
   function handleBack() {
     if (recordDetail) {
+      if (recordDetail.fromMaterialsTop) selectedFieldId = "";
       recordDetail = null;
       render();
       window.scrollTo({ top: 0, behavior: "smooth" });
@@ -2398,10 +2544,19 @@
         });
         return;
       }
+      const harvestWeather = event.target.closest("[data-harvest-weather]");
+      if (harvestWeather) {
+        void fetchHarvestWeather(harvestWeather.dataset.harvestWeather, harvestWeather.dataset.harvestWeatherField);
+        return;
+      }
       const recordOpen = event.target.closest("[data-annual-record-open-kind]");
       if (recordOpen) {
         if (Date.now() < suppressTimelineOpenUntil) return;
-        openAnnualRecordDetail(recordOpen.dataset.annualRecordOpenKind, recordOpen.dataset.annualRecordOpenId, recordOpen.dataset.annualRecordOpenLabel);
+        const fromMaterialsTop = Boolean(recordOpen.dataset.annualMaterialField);
+        if (fromMaterialsTop) selectedFieldId = recordOpen.dataset.annualMaterialField;
+        const opened = openAnnualRecordDetail(recordOpen.dataset.annualRecordOpenKind, recordOpen.dataset.annualRecordOpenId, recordOpen.dataset.annualRecordOpenLabel);
+        if (opened && fromMaterialsTop) recordDetail.fromMaterialsTop = true;
+        if (!opened && fromMaterialsTop) selectedFieldId = "";
         return;
       }
       const tab = event.target.closest("[data-annual-tab]");
@@ -2636,7 +2791,7 @@
 
   // A small pure surface for the record-preservation verifier. It is only
   // exposed when the Node test harness opts in, never in the running app.
-  if (window.__RICEOS_TEST__) RiceOS.annualTest = { waterRoleRank, fieldYearTimeline };
+  if (window.__RICEOS_TEST__) RiceOS.annualTest = { waterRoleRank, fieldYearTimeline, harvestTotalsForFieldYear, renderHarvestTotals, annualRecordTarget };
 
   RiceOS.screens = RiceOS.screens || {};
   RiceOS.screens.annual = {

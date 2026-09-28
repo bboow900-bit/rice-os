@@ -18,6 +18,22 @@
   function dateAdd(date, days) { return date && U.dateAddDays ? U.dateAddDays(date, days) : ""; }
   function validDays(value) { return Number.isFinite(Number(value)) && Number(value) >= 70 && Number(value) <= 130; }
 
+  function seasonalDifference(previous, current) {
+    const parse = (value) => {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(String(value || ""))) return null;
+      const date = new Date(`${value}T00:00:00Z`);
+      return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value ? date : null;
+    };
+    const prior = parse(previous);
+    const actual = parse(current);
+    if (!prior || !actual) return "";
+    const year = actual.getUTCFullYear();
+    const month = prior.getUTCMonth();
+    // February 29 compares with February 28 in a non-leap target year.
+    const day = Math.min(prior.getUTCDate(), new Date(Date.UTC(year, month + 1, 0)).getUTCDate());
+    return Math.round((actual.getTime() - Date.UTC(year, month, day)) / 86400000);
+  }
+
   function median(values) {
     const rows = values.map(Number).filter(Number.isFinite).sort((a, b) => a - b);
     if (!rows.length) return "";
@@ -136,7 +152,7 @@
     // A heading observation confirms heading, not the later harvest window.
     // Keep the card confidence conservative until harvest itself is recorded.
     const confidenceKey = harvest.kind === "actual" ? "high" : heading.kind === "actual" || heading.kind === "panicle" ? "medium" : heading.date ? "low" : "missing";
-    const difference = heading.date && sameField && sameField.heading ? U.daysBetween(sameField.heading, heading.date) : "";
+    const difference = sameField ? seasonalDifference(sameField.heading, heading.date) : "";
     const weather = opts.weather || null;
     const sources = [
       source("current", "今年実測", headingActual || harvestActual ? 5 : panicle && panicle.supported ? 3 : 0, headingActual ? `出穂日 ${U.fd(headingActual)}` : panicle && panicle.supported ? `幼穂長 ${panicle.lengthMm}mm` : "未記録", headingActual || harvestActual || panicle && panicle.supported),

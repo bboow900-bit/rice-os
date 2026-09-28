@@ -97,6 +97,7 @@
             <span class="pill ok">${fieldCount}圃場</span>
             ${variety.targetTillers ? `<span class="pill info">目標 ${U.escapeHTML(variety.targetTillers)}</span>` : ""}
           </div>
+          <button type="button" class="secondary" data-variety-delete="${U.attr(variety.varietyId)}">削除</button>
         </div>
         <div class="record-body">
           <details class="form-section" open>
@@ -124,6 +125,13 @@
   }
 
   function bind() {
+    U.$("recipeList").addEventListener("click", (event) => {
+      const button = event.target.closest("[data-variety-delete]");
+      if (!button) return;
+      const variety = state.variety(button.dataset.varietyDelete);
+      if (!variety || !confirm(`品種「${variety.name}」の栽培レシピを削除しますか？この操作は取り消せません。`)) return;
+      state.deleteVariety(variety.varietyId);
+    });
     U.$("recipeList").addEventListener("change", (event) => {
       const el = event.target.closest("[data-recipe-field]");
       if (!el) return;

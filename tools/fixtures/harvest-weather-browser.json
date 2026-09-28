@@ -1,0 +1,5 @@
+{
+  "meta": {"weatherLocation": {"latitude": 37.75, "longitude": 140.47, "label": "検証用・福島市付近（圃場実位置ではない）"}},
+  "fields": [{"fieldId": "qa-harvest-weather", "name": "検証専用・気象保存", "area": 10}],
+  "fieldWorks": [{"workId": "qa-harvest-weather-work", "fieldIds": ["qa-harvest-weather"], "workName": "稲刈り", "date": "2025-09-10", "memo": "検証用データ。実圃場の記録ではありません。", "harvestSnapshots": [{"fieldId": "qa-harvest-weather", "harvestDate": "2025-09-10", "water": {"finalDrainDate": "2025-09-01"}}]}]
+}

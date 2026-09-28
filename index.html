@@ -10,12 +10,12 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="稲作カルテ">
-  <link rel="manifest" href="manifest.webmanifest?v=20260904_ver270">
+  <link rel="manifest" href="manifest.webmanifest?v=20260927_ver282">
   <link rel="icon" href="assets/icons/icon-192.png">
   <link rel="apple-touch-icon" href="assets/icons/icon-192.png">
   <title>稲作カルテ</title>
-  <link rel="stylesheet" href="assets/css/app.css?v=20260904_ver270">
-  <link rel="stylesheet" href="assets/css/field-management.css?v=20260904_ver270">
+  <link rel="stylesheet" href="assets/css/app.css?v=20260927_ver282">
+  <link rel="stylesheet" href="assets/css/field-management.css?v=20260927_ver282">
   <style>
     @media (max-width: 900px) {
       body .app-shell .side-nav .nav-item { display: none !important; }
@@ -143,8 +143,14 @@
             <summary>作業内容</summary>
             <div class="form-grid dense">
               <label>機械<input id="fwMachine" placeholder="例: 草刈り機"></label>
-              <label>資材<input id="fwMaterial" placeholder="例: 除草剤、肥料"></label>
+              <label>資材台帳<select id="fwMaterialId"><option value="">自由入力（未紐付け）</option></select></label>
+              <label>記録する資材名<input id="fwMaterial" placeholder="例: 除草剤、肥料"></label>
               <label>使用量<input id="fwAmount" placeholder="例: 3kg、1袋"></label>
+              <div id="fwHerbicide" class="herbicide-work hidden">
+                <label>体系の処理<select id="fwHerbicideStep"><option value="">体系とは別に記録</option></select></label>
+                <label>処理区分<input id="fwHerbicideCategory" list="herbicideCategories"></label>
+                <label>この時期に使った理由<input id="fwHerbicidePurpose" list="herbicidePurposes"></label>
+              </div>
               <label>天気<input id="fwWeather" placeholder="例: 晴れ / 平均24℃ / 降水0mm"></label>
             </div>
             <input type="hidden" id="fwWeatherAutoJson">
@@ -177,6 +183,21 @@
               <div class="field-selected-strip" id="fwSelectedFields"></div>
             </div>
             <div class="select-grid" id="fwFields"></div>
+          </details>
+          <details class="form-section hidden" id="fwHarvestReview">
+            <summary>収穫時の振り返り（任意）</summary>
+            <p class="muted">複数圃場では共通の状態と合計収量です。圃場ごとに異なる場合は個別に記録します。</p>
+            <div class="form-grid dense">
+              <label>田面の状態<select id="fwHarvestSurface"><option value="">未確認</option><option>硬め</option><option>適度</option><option>軟らかい</option><option>ぬかるむ</option></select></label>
+              <label>機械の走行<select id="fwHarvestTraffic"><option value="">未確認</option><option>問題なし</option><option>一部苦労</option><option>作業に支障</option></select></label>
+              <label>収穫時の残草<select id="fwHarvestWeeds"><option value="">未確認</option><option>ほぼなし</option><option>少し</option><option>多い</option></select></label>
+              <label>残草の範囲<select id="fwHarvestWeedExtent"><option value="">未確認</option><option>一部</option><option>広範囲</option></select></label>
+              <label class="harvest-review-wide">雑草による作業への影響<select id="fwHarvestWeedImpact"><option value="">未確認</option><option>なし</option><option>刈り取りに苦労</option><option>作業を中断</option></select></label>
+              <label class="harvest-review-wide">雑草名・気づき<textarea id="fwHarvestWeedNote"></textarea></label>
+              <label>今回の収穫面積（a）<input id="fwHarvestAreaA" type="number" min="0.01" step="any" inputmode="decimal"></label>
+              <label>今回の収量合計（kg）<input id="fwHarvestYieldKg" type="number" min="0" step="any" inputmode="decimal"></label>
+              <label class="harvest-review-wide">収量の測定条件<select id="fwHarvestYieldBasis"><option value="">未確認</option><option>籾（乾燥前）</option><option>籾（乾燥後）</option><option>玄米（乾燥調製後）</option></select></label>
+            </div>
           </details>
           <details class="form-section">
             <summary>写真・メモ</summary>
@@ -437,13 +458,22 @@
             <h2>資材台帳</h2>
           </div>
         </div>
+        <details class="herbicide-management" id="herbicideManagement"><summary>除草体系・年度設定</summary><div id="herbicideManagementContent"></div></details>
+        <datalist id="herbicideCategories"><option value="初期剤"><option value="初中期一発剤"><option value="中期剤"><option value="後期剤"><option value="その他"></datalist>
+        <datalist id="herbicidePurposes"><option value="発生前の予防"><option value="ノビエ対策"><option value="前年の残草対策"><option value="取りこぼし対応"></datalist>
         <form class="stack-form" id="materialForm">
+          <input id="editMaterialId" type="hidden">
           <details class="form-section" open>
             <summary>資材情報</summary>
             <div class="form-grid dense">
               <label>年度<input id="mSeason" type="number"></label>
               <label>分類<select id="mCategory"></select></label>
               <label>資材名<input id="mName" required></label>
+              <label>正式名称<input id="mFormalName"></label>
+              <label>剤型・規格<input id="mFormulation"></label>
+              <label>管理単位<input id="mUnit" placeholder="例: kg、袋、L"></label>
+              <label>農薬登録番号<input id="mRegistrationNumber" inputmode="numeric"></label>
+              <label>メーカー製品ページURL<input id="mProductUrl" type="url" inputmode="url" placeholder="https://" autocomplete="off"></label>
               <label>納品日<input id="mDeliveryDate" type="date"></label>
             </div>
           </details>
@@ -461,7 +491,8 @@
             <label>来年メモ<textarea id="mMemo"></textarea></label>
           </details>
           <div class="form-actions">
-            <button class="primary" type="submit">資材を保存</button>
+            <button class="primary" id="saveMaterialButton" type="submit">資材を保存</button>
+            <button class="secondary" id="cancelMaterialEdit" type="button">入力を取り消す</button>
           </div>
         </form>
         <div id="materialList"></div>
@@ -770,37 +801,40 @@
 
   <div id="toast" class="toast hidden" role="status"></div>
 
-  <script src="assets/js/core/utils.js?v=20260904_ver270"></script>
-  <script src="assets/js/core/schema.js?v=20260904_ver270"></script>
-  <script src="assets/js/core/storage.js?v=20260904_ver270"></script>
-  <script src="assets/js/core/state.js?v=20260904_ver270"></script>
-  <script src="assets/js/core/agro.js?v=20260904_ver270"></script>
-  <script src="assets/js/core/outlook.js?v=20260904_ver270"></script>
-  <script src="assets/js/core/record-actions.js?v=20260904_ver270"></script>
-  <script src="assets/js/core/calendar.js?v=20260904_ver270"></script>
-  <script src="assets/js/core/alerts.js?v=20260904_ver270"></script>
-  <script src="assets/js/core/weather.js?v=20260904_ver270"></script>
-  <script src="assets/js/core/navigation.js?v=20260904_ver270"></script>
-  <script src="assets/js/core/pwa.js?v=20260904_ver270"></script>
-  <script src="assets/js/screens/home.js?v=20260904_ver270"></script>
-  <script src="assets/js/screens/calendar.js?v=20260904_ver270"></script>
-  <script src="assets/js/screens/bottom-sheet.js?v=20260904_ver270"></script>
-  <script src="assets/js/screens/recipes.js?v=20260904_ver270"></script>
-  <script src="assets/js/screens/fields.js?v=20260904_ver270"></script>
-  <script src="assets/js/screens/field-work.js?v=20260904_ver270"></script>
-  <script src="assets/js/screens/fertilizer.js?v=20260904_ver270"></script>
-  <script src="assets/js/screens/growth.js?v=20260904_ver270"></script>
-  <script src="assets/js/screens/dry-period.js?v=20260904_ver270"></script>
-  <script src="assets/js/screens/irrigation.js?v=20260904_ver270"></script>
-  <script src="assets/js/screens/photos.js?v=20260904_ver270"></script>
-  <script src="assets/js/screens/other-work.js?v=20260904_ver270"></script>
-  <script src="assets/js/screens/annual.js?v=20260904_ver270"></script>
-  <script src="assets/js/screens/materials.js?v=20260904_ver270"></script>
-  <script src="assets/js/screens/results.js?v=20260904_ver270"></script>
-  <script src="assets/js/screens/notices.js?v=20260904_ver270"></script>
-  <script src="assets/js/screens/outlook.js?v=20260904_ver270"></script>
-  <script src="assets/js/screens/machines.js?v=20260904_ver270"></script>
-  <script src="assets/js/screens/data.js?v=20260904_ver270"></script>
-  <script src="assets/js/app.js?v=20260904_ver270"></script>
+  <script src="assets/js/core/utils.js?v=20260927_ver282"></script>
+  <script src="assets/js/core/schema.js?v=20260927_ver282"></script>
+  <script src="assets/js/core/storage.js?v=20260927_ver282"></script>
+  <script src="assets/js/core/state.js?v=20260927_ver282"></script>
+  <script src="assets/js/core/herbicide.js?v=20260927_ver282"></script>
+  <script src="assets/js/core/agro.js?v=20260927_ver282"></script>
+  <script src="assets/js/core/outlook.js?v=20260927_ver282"></script>
+  <script src="assets/js/core/record-actions.js?v=20260927_ver282"></script>
+  <script src="assets/js/core/calendar.js?v=20260927_ver282"></script>
+  <script src="assets/js/core/alerts.js?v=20260927_ver282"></script>
+  <script src="assets/js/core/weather.js?v=20260927_ver282"></script>
+  <script src="assets/js/core/harvest-weather.js?v=20260927_ver282"></script>
+  <script src="assets/js/core/navigation.js?v=20260927_ver282"></script>
+  <script src="assets/js/core/pwa.js?v=20260927_ver282"></script>
+  <script src="assets/js/screens/home.js?v=20260927_ver282"></script>
+  <script src="assets/js/screens/calendar.js?v=20260927_ver282"></script>
+  <script src="assets/js/screens/bottom-sheet.js?v=20260927_ver282"></script>
+  <script src="assets/js/screens/recipes.js?v=20260927_ver282"></script>
+  <script src="assets/js/screens/fields.js?v=20260927_ver282"></script>
+  <script src="assets/js/screens/field-work.js?v=20260927_ver282"></script>
+  <script src="assets/js/screens/fertilizer.js?v=20260927_ver282"></script>
+  <script src="assets/js/screens/growth.js?v=20260927_ver282"></script>
+  <script src="assets/js/screens/dry-period.js?v=20260927_ver282"></script>
+  <script src="assets/js/screens/irrigation.js?v=20260927_ver282"></script>
+  <script src="assets/js/screens/photos.js?v=20260927_ver282"></script>
+  <script src="assets/js/screens/other-work.js?v=20260927_ver282"></script>
+  <script src="assets/js/screens/herbicide.js?v=20260927_ver282"></script>
+  <script src="assets/js/screens/annual.js?v=20260927_ver282"></script>
+  <script src="assets/js/screens/materials.js?v=20260927_ver282"></script>
+  <script src="assets/js/screens/results.js?v=20260927_ver282"></script>
+  <script src="assets/js/screens/notices.js?v=20260927_ver282"></script>
+  <script src="assets/js/screens/outlook.js?v=20260927_ver282"></script>
+  <script src="assets/js/screens/machines.js?v=20260927_ver282"></script>
+  <script src="assets/js/screens/data.js?v=20260927_ver282"></script>
+  <script src="assets/js/app.js?v=20260927_ver282"></script>
 </body>
 </html>
