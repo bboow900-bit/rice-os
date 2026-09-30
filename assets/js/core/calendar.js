@@ -50,7 +50,11 @@
   }
 
   function isWaterWork(work) {
-    return /中干し|中干|間断灌水|深水|稲刈り前.*落水|^落水$/.test(String(work && work.workName || ""));
+    return work && work.targetScope !== "offField" && /中干し|中干|間断灌水|深水|稲刈り前.*落水|^落水$/.test(String(work.workName || ""));
+  }
+
+  function workTarget(record) {
+    return record.targetScope === "offField" ? "圃場外" : fieldNames(record.fieldIds);
   }
 
   function waterPeriodEntriesForDate(date) {
@@ -104,7 +108,7 @@
         kind: "schedule",
         tone: displayStatus === "期限超過" ? "schedule-overdue" : (isScheduleDone(x) ? "schedule-done" : "schedule"),
         title: x.title || x.scheduleType || "予定",
-        subtitle: fieldNames(x.fieldIds),
+        subtitle: workTarget(x),
         memo: [displayStatus, scheduleCompletionMemo(x), x.memo || ""].filter(Boolean).join(" / "),
         record: x
       });
@@ -121,7 +125,7 @@
         kind: "schedule-completed",
         tone: "schedule-done",
         title: `実施: ${x.title || x.scheduleType || "予定"}`,
-        subtitle: fieldNames(x.fieldIds),
+        subtitle: workTarget(x),
         memo: `予定 ${U.fd(x.date)} / 実施 ${U.fd(work.date)}`,
         record: x
       });
@@ -131,10 +135,15 @@
         kind: "work",
         tone: "work",
         title: x.workName,
-        subtitle: fieldNames(x.fieldIds),
+        subtitle: workTarget(x),
         memo: [x.worker ? `作業者:${x.worker}` : "", x.hours ? `時間:${x.hours}` : "", x.material || ""].filter(Boolean).join(" / "),
         record: x
       });
+    });
+    (d.otherWorks || []).filter((x) => x.date === date).forEach((x) => {
+      entries.push({ kind: "other", tone: "work", title: x.workName,
+        subtitle: fieldNames(x.relatedFieldIds) || "圃場外",
+        memo: [x.quantity, x.hours ? `時間:${x.hours}` : "", x.memo].filter(Boolean).join(" / "), record: x });
     });
     d.growthLogs.filter((x) => x.date === date).forEach((x) => {
       entries.push({
@@ -165,7 +174,8 @@
       ]).filter(Boolean);
     });
     const entries = [
-      ...d.fieldWorks.filter((x) => !isWaterWork(x)).map((x) => ({ date: x.date, title: x.workName, subtitle: fieldNames(x.fieldIds), kind: "work", record: x })),
+      ...d.fieldWorks.filter((x) => !isWaterWork(x)).map((x) => ({ date: x.date, title: x.workName, subtitle: workTarget(x), kind: "work", record: x })),
+      ...(d.otherWorks || []).map((x) => ({ date: x.date, title: x.workName, subtitle: fieldNames(x.relatedFieldIds) || "圃場外", kind: "other", record: x })),
       ...d.growthLogs.map((x) => ({ date: x.date, title: "生育ログ", subtitle: fieldName(x.fieldId), kind: "growth", hasPhoto: Boolean(x.photoData || x.photo), record: x })),
       ...resolvedWater
     ];
@@ -184,7 +194,8 @@
     const range = U.lastYearSamePeriod(U.today(), rangeDays || 10);
     const d = state().data();
     const rows = [
-      ...d.fieldWorks.filter((x) => U.inDateRange(x.date, range.start, range.end)).map((x) => ({ date: x.date, title: x.workName, subtitle: fieldNames(x.fieldIds), kind: "work" })),
+      ...d.fieldWorks.filter((x) => U.inDateRange(x.date, range.start, range.end)).map((x) => ({ date: x.date, title: x.workName, subtitle: workTarget(x), kind: "work" })),
+      ...(d.otherWorks || []).filter((x) => U.inDateRange(x.date, range.start, range.end)).map((x) => ({ date: x.date, title: x.workName, subtitle: fieldNames(x.relatedFieldIds) || "圃場外", kind: "other" })),
       ...d.growthLogs.filter((x) => U.inDateRange(x.date, range.start, range.end)).map((x) => ({ date: x.date, title: "生育ログ", subtitle: fieldName(x.fieldId), kind: "growth", hasPhoto: Boolean(x.photoData || x.photo) }))
     ];
     return { range, rows: rows.sort((a, b) => String(a.date).localeCompare(String(b.date))) };

@@ -11,7 +11,10 @@ const memory = new Map();
 const elements = new Map();
 function element(id) {
   if (!elements.has(id)) elements.set(id, { value: "", dataset: {}, hidden: false,
-    classList: { toggle() {}, add() {}, remove() {} }, querySelectorAll: () => [] });
+    classList: { toggle() {}, add() {}, remove() {} }, querySelectorAll: () => [],
+    get parentElement() { return element(`${id}:parent`); },
+    closest(selector) { return element(`${id}:ancestor:${selector}`); },
+    setAttribute(name, value) { this[name] = String(value); } });
   return elements.get(id);
 }
 const context = vm.createContext({ console, navigator: {}, alert() {}, dispatchEvent() {},
@@ -225,6 +228,34 @@ test("source contract: both edit loaders, reset, template, duplicate and prefill
   for (const id of ["Surface", "Traffic", "Weeds", "WeedExtent", "WeedImpact", "WeedNote", "YieldKg", "AreaA", "YieldBasis"]) {
     assert.equal((source("index.html").match(new RegExp(`id="fwHarvest${id}"`, "g")) || []).length, 1);
   }
+});
+test("off-field custom name survives edit and schedule prefill without harvest defaults", () => {
+  const customName = "Custom harvest workshop";
+  const screen = context.RiceOS.screens.fieldWork;
+  state.saveFieldWork({ workId: "custom-off-field", date: "2026-09-10", targetScope: "offField", fieldIds: [], workName: customName });
+  screen.editWork("custom-off-field");
+  assert.equal(element("fwTargetScope").value, "offField");
+  assert.equal(element("fwName").value, "\u305d\u306e\u4ed6");
+  assert.equal(element("fwCustomName").value, customName);
+  assert.equal(element("fwCustomNameLabel").hidden, false);
+  assert.equal(element("fwCustomName").required, true);
+  assert.equal(element("fwHarvestReview").hidden, true);
+  screen.prefillSchedule({ scheduleId: "custom-plan", targetScope: "offField", fieldIds: [], title: `${customName}\u4e88\u5b9a` });
+  assert.equal(element("fwCustomName").value, customName);
+  assert.equal(element("fwMachine").value, "");
+  screen.resetForm();
+  assert.equal(element("fwCustomName").value, "");
+  assert.equal(element("fwCustomNameLabel").hidden, true);
+  assert.equal(element("fwCustomName").required, false);
+});
+test("literal Other off-field name remains editable", () => {
+  const name = "\u305d\u306e\u4ed6";
+  const screen = context.RiceOS.screens.fieldWork;
+  state.saveFieldWork({ workId: "literal-other", date: "2026-09-10", targetScope: "offField", fieldIds: [], workName: name });
+  screen.editWork("literal-other");
+  assert.equal(element("fwCustomName").value, name);
+  screen.prefillSchedule({ scheduleId: "literal-other-plan", targetScope: "offField", fieldIds: [], title: `${name}\u4e88\u5b9a` });
+  assert.equal(element("fwCustomName").value, name);
 });
 console.log(`Harvest review: ${passed} passed, ${failed} failed (UI source/VM checks; no browser verification).`);
 process.exitCode = failed ? 1 : 0;

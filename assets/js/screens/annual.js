@@ -9,6 +9,7 @@
   let selectedTab = "karte";
   let annualSearchValue = "";
   let annualSortValue = "updated";
+  let workScopeFilter = "all";
   let nextSeasonIdeaDraft = false;
   let seasonNoteDraft = null;
   let waterEditDraft = null;
@@ -302,10 +303,10 @@
     const d = state.data();
     // 専用の水管理期間として残る記録は、作業一覧との重複を避ける。
     const fieldWorks = d.fieldWorks
-      .filter((w) => !(state.waterEventForWorkName && state.waterEventForWorkName(w.workName)) && !(state.isMigratedWaterWork && state.isMigratedWaterWork(w)))
+      .filter((w) => w.targetScope === "offField" || (!(state.waterEventForWorkName && state.waterEventForWorkName(w.workName)) && !(state.isMigratedWaterWork && state.isMigratedWaterWork(w))))
       .flatMap((w) => {
       const visibleFieldIds = (w.fieldIds || []).filter((fieldId) => !(state.isMigratedWaterWork && state.isMigratedWaterWork(w, fieldId)));
-      if (!visibleFieldIds.length) return [];
+      if (!visibleFieldIds.length && w.targetScope !== "offField") return [];
       return [makeRow("fieldWork", w, {
       id: w.workId,
       date: w.date,
@@ -313,6 +314,7 @@
       title: w.workName,
       worker: w.worker || "",
       fieldIds: visibleFieldIds,
+      target: w.targetScope === "offField" ? "圃場外" : "",
       hours: w.hours || "",
       kindIcon: workIcon(w.workName),
       photoData: w.photoData || "",
@@ -384,6 +386,7 @@
       season: item.season,
       title: item.title || item.scheduleType || "予定",
       fieldIds: item.fieldIds || [],
+      target: item.targetScope === "offField" ? "圃場外" : "",
       status: item.status || "",
       detailParts: [item.scheduleType || "", item.memo || ""]
     }));
@@ -393,6 +396,7 @@
       season: o.season,
       title: o.workName,
       fieldIds: o.relatedFieldIds || [],
+      target: (o.relatedFieldIds || []).length ? "" : "圃場外",
       hours: o.hours || "",
       detailParts: [o.quantity ? `数量 ${o.quantity}` : "", o.memo || ""]
     }));
@@ -446,7 +450,7 @@
 
   function renderSummary(rows) {
     const fields = unique(rows.flatMap((row) => row.fieldIds || []));
-    const workCount = rows.filter((row) => row.kind === "fieldWork").length;
+    const workCount = rows.filter((row) => row.kind === "fieldWork" || row.kind === "other").length;
     // Water history is read through the common resolver so older work records
     // and direct water entries use the same counting rule as field detail.
     const selectedYear = yearValue() === "all" ? undefined : yearValue();
@@ -742,11 +746,23 @@
           </div>
         </section>
         ${renderSummary(rows)}
+        ${renderWorkArchive(rows)}
         ${renderUsedMaterials()}
         ${RiceOS.herbicideUI ? RiceOS.herbicideUI.renderReview(null, yearValue()) : ""}
         ${renderAnnualFab()}
       </div>
     `;
+  }
+
+  function renderWorkArchive(rows) {
+    const works = rows.filter((row) => row.kind === "fieldWork" || row.kind === "other");
+    const visible = works.filter((row) => {
+      const offField = row.raw.targetScope === "offField" || (row.kind === "other" && !row.fieldIds.length);
+      return workScopeFilter === "all" || (workScopeFilter === "offField" ? offField : !offField);
+    });
+    return `<section class="annual-work-archive"><div class="section-title compact"><h3>作業を振り返る</h3><span>${visible.length}件</span></div>
+      <div class="annual-compare-filter-row" role="group" aria-label="作業の対象">${[["all", "すべての作業"], ["field", "圃場作業"], ["offField", "圃場外作業"]].map(([value, label]) => `<button type="button" class="${workScopeFilter === value ? "active" : ""}" aria-pressed="${workScopeFilter === value}" data-annual-work-scope="${value}">${label}</button>`).join("")}</div>
+      <details><summary>作業履歴を見る（${visible.length}件）</summary><div class="card-list">${visible.length ? visible.map((row) => renderEntry(row, true)).join("") : '<div class="empty">この対象の作業記録はありません。</div>'}</div></details></section>`;
   }
 
   function renderNextSeasonIdeas() {
@@ -1042,7 +1058,8 @@
           ${row.worker ? chip(row.worker, "worker") : ""}
           ${row.hours ? chip(`時間 ${row.hours}`, "hours") : ""}
           ${row.status ? chip(row.status, row.status === "完了" ? "done" : "status") : ""}
-          ${chip(`田植後 ${U.daysAfterPlanting(state.field((row.fieldIds || [])[0]), row.date) || "-"}日`, "dap")}
+          ${chip(row.target, "target")}
+          ${(row.fieldIds || []).length ? chip(`田植後 ${U.daysAfterPlanting(state.field(row.fieldIds[0]), row.date) || "-"}日`, "dap") : ""}
         </div>
         <div class="inline-actions annual-work-actions">
           <button class="secondary" data-annual-action="edit" data-kind="${U.attr(row.kind)}" data-id="${U.attr(row.id)}">編集</button>
@@ -1800,6 +1817,7 @@
     return `<details class="annual-used-materials"><summary>使用した資材 <small>${U.escapeHTML(year)}年</small></summary>${groups.length ? groups.map((group) => `<section class="annual-material-group"><h4>${U.escapeHTML(group.name)}${!group.materialId ? '<small>未紐付け</small>' : ""}</h4>${group.works.map((work) => {
       const fieldId = field ? field.fieldId : (work.fieldIds || []).find((id) => state.field(id));
       const fields = (work.fieldIds || []).map((id) => state.field(id)?.name || id).join("・");
+      if (work.targetScope === "offField") return `<button type="button" class="annual-material-work" data-annual-action="edit" data-kind="fieldWork" data-id="${U.attr(work.workId)}"><span>${U.escapeHTML(work.date)} / 圃場外</span><b>${U.escapeHTML(work.workName || "作業")}</b><span>${U.escapeHTML([work.material, work.amount].filter(Boolean).join(" / "))}</span></button>`;
       return `<button type="button" class="annual-material-work" data-annual-record-open-kind="fieldWork" data-annual-record-open-id="${U.attr(work.workId)}" data-annual-record-open-label="${U.attr(work.workName)}" ${!field && fieldId ? `data-annual-material-field="${U.attr(fieldId)}"` : ""} ${!fieldId ? "disabled" : ""}><span>${U.escapeHTML(work.date)} / ${U.escapeHTML(fields || "圃場未設定")}</span><b>${U.escapeHTML(work.workName || "作業")}</b><span>${U.escapeHTML([work.material, work.amount].filter(Boolean).join(" / "))}</span>${work.memo ? `<span class="annual-material-memo">${U.escapeHTML(work.memo)}</span>` : ""}</button>`;
     }).join("")}</section>`).join("") : '<p class="muted">この年の資材使用記録はありません。</p>'}</details>`;
   }
@@ -2420,6 +2438,12 @@
     const year = U.$("annualYear");
     if (year) year.addEventListener("change", render);
     U.$("annualTimeline").addEventListener("click", (event) => {
+      const scopeButton = event.target.closest("[data-annual-work-scope]");
+      if (scopeButton) {
+        workScopeFilter = scopeButton.dataset.annualWorkScope;
+        render();
+        return;
+      }
       const statusAction = event.target.closest("[data-annual-status-action]");
       if (statusAction) {
         event.preventDefault();
@@ -2791,7 +2815,7 @@
 
   // A small pure surface for the record-preservation verifier. It is only
   // exposed when the Node test harness opts in, never in the running app.
-  if (window.__RICEOS_TEST__) RiceOS.annualTest = { waterRoleRank, fieldYearTimeline, harvestTotalsForFieldYear, renderHarvestTotals, annualRecordTarget };
+  if (window.__RICEOS_TEST__) RiceOS.annualTest = { waterRoleRank, fieldYearTimeline, harvestTotalsForFieldYear, renderHarvestTotals, annualRecordTarget, allRows, rowsForField, renderWorkArchive };
 
   RiceOS.screens = RiceOS.screens || {};
   RiceOS.screens.annual = {

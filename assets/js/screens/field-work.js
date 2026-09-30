@@ -12,6 +12,43 @@
   let herbicideChoices = new Map();
   let workInputMode = localStorage.getItem("riceFieldWorkInputMode") || "simple";
 
+  function targetScope() {
+    return U.$("fwTargetScope").value === "offField" ? "offField" : "field";
+  }
+
+  function renderCustomWorkName() {
+    const active = targetScope() === "offField" && U.$("fwName").value === "その他";
+    U.$("fwCustomNameLabel").hidden = !active;
+    U.$("fwCustomName").disabled = !active;
+    U.$("fwCustomName").required = active;
+  }
+
+  function loadWorkName(name) {
+    const custom = targetScope() === "offField" && (name === "その他" || !S.OTHER_WORK_NAMES.includes(name));
+    U.$("fwName").value = custom ? "その他" : name;
+    U.$("fwCustomName").value = custom ? name : "";
+    renderCustomWorkName();
+  }
+
+  function setTargetScope(scope) {
+    U.$("fwTargetScope").value = scope === "offField" ? "offField" : "field";
+    const offField = targetScope() === "offField";
+    U.setOptions(U.$("fwName"), offField ? S.OTHER_WORK_NAMES : S.FIELD_WORK_NAMES, U.$("fwName").value);
+    U.$("fwFields").closest("details").hidden = offField;
+    U.$("fwTemplatePicks").parentElement.hidden = offField;
+    U.$("fwWeatherStatus").closest(".weather-panel").hidden = offField;
+    U.$("fwWeather").closest("label").hidden = offField;
+    if (offField) {
+      setSelectedFieldIds([]);
+      U.$("fwWeather").value = "";
+      U.$("fwWeatherAutoJson").value = "";
+      herbicideLinks = [];
+    }
+    renderHarvestReview();
+    renderHerbicidePicker();
+    renderCustomWorkName();
+  }
+
   const HARVEST_REVIEW_INPUTS = {
     surface: "fwHarvestSurface",
     traffic: "fwHarvestTraffic",
@@ -27,7 +64,7 @@
   function renderHarvestReview() {
     const host = U.$("fwHarvestReview");
     if (!host) return;
-    const active = isHarvestWork(U.$("fwName").value);
+    const active = targetScope() === "field" && isHarvestWork(U.$("fwName").value);
     host.hidden = !active;
     host.classList.toggle("hidden", !active);
     Object.values(HARVEST_REVIEW_INPUTS).forEach((id) => {
@@ -78,6 +115,7 @@
   ];
 
   function selectedFieldIds() {
+    if (targetScope() === "offField") return [];
     return U.$$("#fwFields .select-card.selected").map((el) => el.dataset.id);
   }
 
@@ -114,8 +152,11 @@
   }
 
   function setSelectedFieldIds(ids) {
-    const selected = new Set(ids || []);
-    U.$$("#fwFields .select-card").forEach((el) => el.classList.toggle("selected", selected.has(el.dataset.id)));
+    const selected = new Set(targetScope() === "offField" ? [] : ids || []);
+    U.$$("#fwFields .select-card").forEach((el) => {
+      el.classList.toggle("selected", selected.has(el.dataset.id));
+      el.setAttribute("aria-pressed", String(selected.has(el.dataset.id)));
+    });
     updateFieldSelectionSummary();
   }
 
@@ -126,6 +167,7 @@
   }
 
   function recommendedMaterial(workName) {
+    if (targetScope() === "offField") return "";
     const variety = selectedVarietyForWork();
     if (!variety) return "";
     if (workName === "基肥・元肥") return [variety.baseFertilizerName, variety.baseFertilizerAmount].filter(Boolean).join(" ");
@@ -137,7 +179,7 @@
 
   function learnedPreset(workName) {
     const recent = state.data().fieldWorks
-      .filter((work) => work.workName === workName)
+      .filter((work) => work.targetScope !== "offField" && work.workName === workName)
       .sort((a, b) => String(b.date).localeCompare(String(a.date)))[0];
     if (!recent) return {};
     return {
@@ -182,7 +224,7 @@
   function renderHerbicidePicker() {
     const host = U.$("fwHerbicide");
     if (!host || !RiceOS.herbicide) return;
-    const active = U.$("fwName").value === "除草剤";
+    const active = targetScope() === "field" && U.$("fwName").value === "除草剤";
     host.classList.toggle("hidden", !active);
     const ids = selectedFieldIds();
     const year = U.$("fwDate").value.slice(0, 4);
@@ -254,6 +296,7 @@
   function applyWorkPreset(workName) {
     renderHerbicidePicker();
     renderHarvestReview();
+    if (targetScope() === "offField") return;
     const preset = WORK_PRESETS[workName] || {};
     const learned = learnedPreset(workName);
     setAutoValue("fwMachine", preset.machine || learned.machine || "");
@@ -267,6 +310,7 @@
   }
 
   function applyWorkTemplate(key) {
+    if (targetScope() === "offField") return;
     const template = WORK_TEMPLATES.find((item) => item.key === key);
     if (!template) return;
     U.$("fwName").value = template.workName;
@@ -332,10 +376,10 @@
     U.$("fwFields").innerHTML = state.activeFields().map((field) => {
       const variety = state.variety(field.varietyId);
       return `
-        <div class="select-card" data-id="${U.attr(field.fieldId)}">
+        <button type="button" class="select-card" aria-pressed="false" data-id="${U.attr(field.fieldId)}">
           <b>${U.escapeHTML(field.name)}</b><br>
           <span class="muted">${U.escapeHTML(variety && variety.name || "")} / ${U.escapeHTML(String(field.areaA || 0))}a</span>
-        </div>
+        </button>
       `;
     }).join("");
     setSelectedFieldIds(selected);
@@ -372,7 +416,9 @@
   }
 
   function resetForm() {
-    U.$("fieldWorkHeading").textContent = "圃場作業入力";
+    setTargetScope("field");
+    U.$("fwCustomName").value = "";
+    U.$("fieldWorkHeading").textContent = "作業入力";
     U.$("editFieldWorkId").value = "";
     loadHerbicideWork(null);
     U.$("fwDate").value = U.today();
@@ -413,14 +459,16 @@
     if (fieldId) setSelectedFieldIds([fieldId]);
   }
 
-  function prefillFields(date, fieldIds) {
+  function prefillFields(date, fieldIds, options = {}) {
     resetForm();
+    setTargetScope(options.targetScope);
     U.$("fwDate").value = date || U.today();
     setSelectedFieldIds(fieldIds || []);
   }
 
   function workNameFromSchedule(schedule) {
     const text = String(schedule && (schedule.title || schedule.scheduleType) || "");
+    if (schedule.targetScope === "offField") return text.replace(/予定$/, "").trim() || S.OTHER_WORK_NAMES[0];
     const names = ["田植え", "代かき", "草刈り", "除草剤", "追肥", "防除", "溝切り", "稲刈り", "出穂確認"];
     return names.find((name) => text.includes(name.replace("開始", "").replace("終了", ""))) || text.replace(/予定|確認候補|確認/g, "").trim() || "その他";
   }
@@ -428,10 +476,11 @@
   function prefillSchedule(schedule) {
     if (!schedule) return;
     resetForm();
+    setTargetScope(schedule.targetScope);
     pendingScheduleId = schedule.scheduleId || "";
     U.$("fieldWorkHeading").textContent = "予定から作業を記録";
     U.$("fwDate").value = U.today();
-    U.$("fwName").value = workNameFromSchedule(schedule);
+    loadWorkName(workNameFromSchedule(schedule));
     setSelectedFieldIds(schedule.fieldIds || []);
     applyWorkPreset(U.$("fwName").value);
     if (schedule.memo) {
@@ -446,7 +495,7 @@
     if (!select) return;
     const groups = fieldGroups();
     const options = [
-      { value: "all", label: "全圃場" },
+      { value: "all", label: "すべての作業" },
       ...groups.map((group) => ({ value: `group:${group.fieldGroupId}`, label: `${group.name}グループ` })),
       ...state.activeFields().map((field) => ({ value: `field:${field.fieldId}`, label: field.name }))
     ];
@@ -457,11 +506,12 @@
   function editWork(workId) {
     const work = state.data().fieldWorks.find((item) => item.workId === workId);
     if (!work) return;
+    setTargetScope(work.targetScope);
     pendingScheduleId = work.sourceScheduleId || "";
-    U.$("fieldWorkHeading").textContent = "圃場作業を編集";
+    U.$("fieldWorkHeading").textContent = "作業を編集";
     U.$("editFieldWorkId").value = work.workId;
     U.$("fwDate").value = work.date;
-    U.$("fwName").value = work.workName;
+    loadWorkName(work.workName);
     setWorker(work.worker || "");
     U.$("fwHours").value = work.hours || "";
     U.$("fwMachine").value = work.machine || "";
@@ -488,7 +538,8 @@
   }
 
   function renderList() {
-    let rows = state.data().fieldWorks.filter((work) => !(state.waterEventForWorkName && state.waterEventForWorkName(work.workName)));
+    let rows = state.data().fieldWorks.filter((work) => work.targetScope === "offField" || !(state.waterEventForWorkName && state.waterEventForWorkName(work.workName)));
+    if (recentScope !== "all") rows = rows.filter((work) => work.targetScope !== "offField");
     if (recentScope.startsWith("field:")) {
       const fieldId = recentScope.slice("field:".length);
       rows = rows.filter((work) => (work.fieldIds || []).includes(fieldId) && !(state.isMigratedWaterWork && state.isMigratedWaterWork(work, fieldId)));
@@ -501,6 +552,7 @@
     }
     if (!recentScope || recentScope === "all") {
       rows = rows.flatMap((work) => {
+        if (work.targetScope === "offField") return [{ ...work, fieldIds: [] }];
         const visibleFieldIds = (work.fieldIds || []).filter((fieldId) => !(state.isMigratedWaterWork && state.isMigratedWaterWork(work, fieldId)));
         return visibleFieldIds.length ? [{ ...work, fieldIds: visibleFieldIds }] : [];
       });
@@ -508,7 +560,7 @@
     rows = rows.sort((a, b) => String(b.date).localeCompare(String(a.date))).slice(0, 40);
     U.$("fieldWorkCount").textContent = `${rows.length}件`;
     U.$("fieldWorkList").innerHTML = rows.length ? rows.map((work) => {
-      const fieldNames = (work.fieldIds || []).map((id) => state.field(id) && state.field(id).name).filter(Boolean).join("・");
+      const fieldNames = work.targetScope === "offField" ? "圃場外" : (work.fieldIds || []).map((id) => state.field(id) && state.field(id).name).filter(Boolean).join("・");
       const dap = daysText(work.fieldIds, work.date);
       const visual = workVisual(work.workName);
       const weather = compactWeather(work.weather);
@@ -534,13 +586,13 @@
           ${details.length ? `<details class="work-log-detail"><summary>詳細を見る</summary><div>${details.map((detail) => `<p>${U.escapeHTML(detail)}</p>`).join("")}</div></details>` : ""}
         </article>
       `;
-    }).join("") : '<div class="empty">圃場作業はまだありません。</div>';
+    }).join("") : '<div class="empty">作業記録はまだありません。</div>';
   }
 
   function render() {
     renderHerbicidePicker();
     renderMaterialPicker();
-    U.setOptions(U.$("fwName"), S.FIELD_WORK_NAMES, U.$("fwName").value || "田植え");
+    setTargetScope(targetScope());
     renderHarvestReview();
     renderTemplates();
     renderFieldCards();
@@ -623,11 +675,13 @@
   }
 
   async function fetchWorkWeather(showAlert) {
+    if (targetScope() === "offField") return null;
     try {
       const date = U.$("fwDate").value || U.today();
       setWeatherStatus(`${U.fd(date)} の天気を取得中です。`);
       const location = await RiceOS.weather.ensureLocation();
       const weather = await RiceOS.weather.fetchDaily(date, location);
+      if (targetScope() === "offField" || U.$("fwDate").value !== date) return null;
       U.$("fwWeather").value = weather.summary;
       U.$("fwWeather").dataset.autoFilled = "1";
       U.$("fwWeatherAutoJson").value = JSON.stringify(weather);
@@ -704,6 +758,17 @@
   }
 
   function bind() {
+    U.$("fwTargetScope").addEventListener("change", () => {
+      pendingScheduleId = "";
+      ["fwMachine", "fwMaterial", "fwAmount"].forEach((id) => setDirectValue(id, "", false));
+      renderMaterialPicker("");
+      U.$("fwHerbicideCategory").value = "";
+      U.$("fwHerbicidePurpose").value = "";
+      if (U.$("fwMemo").dataset.templateFilled === "1") U.$("fwMemo").value = "";
+      setTargetScope(targetScope());
+      U.$("fwCustomName").value = "";
+      loadHarvestReview(null);
+    });
     U.$("fwHerbicideStep").addEventListener("change", () => {
       const choice = herbicideChoices.get(U.$("fwHerbicideStep").value);
       herbicideLinks = U.clone(choice && choice.links || []);
@@ -733,6 +798,7 @@
       const card = event.target.closest(".select-card");
       if (card) {
         card.classList.toggle("selected");
+        card.setAttribute("aria-pressed", String(card.classList.contains("selected")));
         updateFieldSelectionSummary();
         applyWorkPreset(U.$("fwName").value);
       }
@@ -792,7 +858,10 @@
       }
     });
 
-    U.$("fwName").addEventListener("change", () => applyWorkPreset(U.$("fwName").value));
+    U.$("fwName").addEventListener("change", () => {
+      renderCustomWorkName();
+      applyWorkPreset(U.$("fwName").value);
+    });
     U.$$("[data-worker-preset]").forEach((button) => {
       button.addEventListener("click", () => setWorker(button.dataset.workerPreset));
     });
@@ -836,44 +905,51 @@
     U.$("fieldWorkForm").addEventListener("submit", async (event) => {
       event.preventDefault();
       const ids = selectedFieldIds();
-      if (!ids.length) {
+      const offField = targetScope() === "offField";
+      if (!offField && !ids.length) {
         alert("対象圃場を選んでください。");
         return;
       }
       const waterEvent = state.waterEventForWorkName && state.waterEventForWorkName(U.$("fwName").value);
-      if (waterEvent) {
+      if (!offField && waterEvent) {
         RiceOS.app.show("irrigation", { skipHistory: true, preserveInputOrigin: true });
         RiceOS.screens.irrigation.prefillFields(U.$("fwDate").value || U.today(), ids, waterEvent.kind);
         U.toast("水管理として入力します。開始または終了を記録してください。");
         return;
       }
       const date = U.$("fwDate").value || U.today();
-      const workName = U.$("fwName").value;
+      const workName = offField && U.$("fwName").value === "その他"
+        ? U.$("fwCustomName").value.trim() : U.$("fwName").value;
+      if (!workName) {
+        alert("作業名を入力してください。");
+        return;
+      }
       const workId = U.$("editFieldWorkId").value || U.id("work", date);
       const saved = state.saveFieldWork({
         workId,
         date,
         workName,
+        targetScope: targetScope(),
         fieldIds: ids,
         worker: U.$("fwWorker") ? U.$("fwWorker").value : "",
         hours: U.$("fwHours").value,
         machine: U.$("fwMachine").value,
         material: U.$("fwMaterial").value,
         materialId: U.$("fwMaterial").value === linkedMaterialName ? U.$("fwMaterialId").value : "",
-        herbicideLinks: workName === "除草剤" ? herbicideLinks : [],
-        herbicideCategory: workName === "除草剤" ? U.$("fwHerbicideCategory").value : "",
-        herbicidePurpose: workName === "除草剤" ? U.$("fwHerbicidePurpose").value : "",
-        ...(isHarvestWork(workName) ? { harvestReview: harvestReviewValue() } : {}),
+        herbicideLinks: !offField && workName === "除草剤" ? herbicideLinks : [],
+        herbicideCategory: !offField && workName === "除草剤" ? U.$("fwHerbicideCategory").value : "",
+        herbicidePurpose: !offField && workName === "除草剤" ? U.$("fwHerbicidePurpose").value : "",
+        ...(!offField && isHarvestWork(workName) ? { harvestReview: harvestReviewValue() } : {}),
         amount: U.$("fwAmount").value,
         sourceScheduleId: pendingScheduleId,
-        weather: U.$("fwWeather").value,
-        weatherAuto: weatherAutoValue(),
+        weather: offField ? "" : U.$("fwWeather").value,
+        weatherAuto: offField ? null : weatherAutoValue(),
         photo: U.$("fwPhoto") ? U.$("fwPhoto").value : "",
         photoData: U.$("fwPhotoPreview") ? U.$("fwPhotoPreview").dataset.photoData || "" : "",
         memo: U.$("fwMemo").value
       });
       if (saved === null) return;
-      if (isHarvestWork(workName)) {
+      if (!offField && isHarvestWork(workName)) {
         await saveHarvestThermalSnapshots(workId, ids, date);
         if (RiceOS.harvestWeather) {
           for (const fieldId of ids) {
@@ -901,9 +977,10 @@
       }
       if (button.dataset.workAction === "duplicate") {
         resetForm();
-        U.$("fieldWorkHeading").textContent = "圃場作業を複製";
+        setTargetScope(work.targetScope);
+        U.$("fieldWorkHeading").textContent = "作業を複製";
         U.$("fwDate").value = U.today();
-        U.$("fwName").value = work.workName;
+        loadWorkName(work.workName);
         loadHarvestReview(null);
         setWorker(work.worker || "自分");
         U.$("fwHours").value = work.hours || "";
@@ -924,11 +1001,12 @@
         window.scrollTo({ top: 0, behavior: "smooth" });
         return;
       }
-      U.$("fieldWorkHeading").textContent = "圃場作業を編集";
+      U.$("fieldWorkHeading").textContent = "作業を編集";
+      setTargetScope(work.targetScope);
       pendingScheduleId = work.sourceScheduleId || "";
       U.$("editFieldWorkId").value = work.workId;
       U.$("fwDate").value = work.date;
-      U.$("fwName").value = work.workName;
+      loadWorkName(work.workName);
       setWorker(work.worker || "");
       U.$("fwHours").value = work.hours || "";
       U.$("fwMachine").value = work.machine || "";

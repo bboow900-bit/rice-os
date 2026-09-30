@@ -10,6 +10,40 @@
   let selectedKind = "";
   let editingScheduleId = "";
   let savingSchedule = false;
+  let workFieldIds = [];
+  let scheduleFieldIds = [];
+
+  function entryId(entry) {
+    return entry.kind === "other" ? entry.record.otherWorkId || "" : RiceOS.recordActions ? RiceOS.recordActions.idFor(entry.kind, entry.record) : "";
+  }
+
+  function openEntry(entry) {
+    close();
+    if (entry.kind === "other") {
+      if (RiceOS.navigation && RiceOS.navigation.openRecord && RiceOS.navigation.openRecord("other", entryId(entry))) return;
+      if (RiceOS.screens.otherWork) {
+        RiceOS.app.show("other-work");
+        RiceOS.screens.otherWork.editWork(entryId(entry));
+      }
+      return;
+    }
+    RiceOS.recordActions.edit(entry.kind, entry.record);
+  }
+
+  function renderSelectionCards(hostId, ids, disabled) {
+    U.$(hostId).innerHTML = state.activeFields().map((field) => `
+      <button type="button" class="select-card ${ids.includes(field.fieldId) ? "selected" : ""}"
+        data-sheet-field="${U.attr(field.fieldId)}" aria-pressed="${ids.includes(field.fieldId)}" ${disabled ? "disabled" : ""}>
+        <b>${U.escapeHTML(field.name)}</b><small>${U.escapeHTML(String(field.areaA || 0))}a</small>
+      </button>`).join("");
+  }
+
+  function modeFieldIds(mode, groupId) {
+    if (mode === "offField") return [];
+    if (mode === "all") return state.activeFields().map((field) => field.fieldId);
+    if (mode === "group") return (scheduleGroups().find((group) => group.fieldGroupId === groupId) || {}).fieldIds || [];
+    return null;
+  }
   const SCHEDULE_PRESETS = [
     { label: "草刈り", title: "草刈り予定" },
     { label: "追肥", title: "追肥予定" },
@@ -38,7 +72,7 @@
   }
 
   function entryHtml(entry) {
-    const id = RiceOS.recordActions ? RiceOS.recordActions.idFor(entry.kind, entry.record) : "";
+    const id = entryId(entry);
     const toneClass = entry.tone || "";
     const canCompleteSchedule = entry.kind === "schedule" && id && !scheduleDone(entry.record);
     return `
@@ -51,8 +85,8 @@
         ${id ? `
           <div class="record-actions mini-actions">
             ${canCompleteSchedule ? `<button class="primary" type="button" data-sheet-action="complete" data-kind="${U.attr(entry.kind)}" data-id="${U.attr(id)}">実施を記録</button>` : ""}
-            <button class="secondary" type="button" data-sheet-action="edit" data-kind="${U.attr(entry.kind)}" data-id="${U.attr(id)}">編集</button>
-            <button class="danger" type="button" data-sheet-action="delete" data-kind="${U.attr(entry.kind)}" data-id="${U.attr(id)}">削除</button>
+            <button class="secondary" type="button" data-sheet-action="edit" data-kind="${U.attr(entry.kind)}" data-id="${U.attr(id)}">${entry.kind === "other" ? "表示" : "編集"}</button>
+            ${entry.kind !== "other" ? `<button class="danger" type="button" data-sheet-action="delete" data-kind="${U.attr(entry.kind)}" data-id="${U.attr(id)}">削除</button>` : ""}
           </div>
         ` : ""}
       </div>
@@ -61,7 +95,7 @@
 
   function findEntry(kind, id) {
     return RiceOS.calendar.entriesForDate(selectedDate).find((entry) => {
-      return RiceOS.recordActions && RiceOS.recordActions.idFor(entry.kind, entry.record) === id && entry.kind === kind;
+      return entryId(entry) === id && entry.kind === kind;
     });
   }
 
@@ -78,6 +112,9 @@
   function open(date, fieldId) {
     selectedDate = date || U.today();
     selectedFieldId = fieldId || "";
+    workFieldIds = selectedFieldId ? [selectedFieldId] : [];
+    scheduleFieldIds = [];
+    U.$("sheetScheduleTargetMode").value = "field";
     selectedKind = "";
     if (U.$("sheetTargetMode")) U.$("sheetTargetMode").value = "field";
     if (U.$("sheetGroup")) U.$("sheetGroup").value = "";
@@ -113,11 +150,14 @@
 
   function targetFieldIds() {
     const mode = U.$("sheetTargetMode") && U.$("sheetTargetMode").value || "field";
+    if (mode === "offField") return [];
+    if (mode === "all") return state.activeFields().map((field) => field.fieldId);
     if (mode === "group") {
       const groupId = U.$("sheetGroup") && U.$("sheetGroup").value || "";
       const group = groupId && scheduleGroups().find((item) => item.fieldGroupId === groupId);
       return group ? group.fieldIds : [];
     }
+    if (selectedKind === "work") return workFieldIds.filter((id) => state.activeFields().some((field) => field.fieldId === id));
     const fieldId = activeFieldId();
     return fieldId ? [fieldId] : [];
   }
@@ -133,10 +173,16 @@
     const group = U.$("sheetGroup");
     if (!mode || !group) return;
     U.setOptions(group, [{ value: "", label: "グループを選ぶ" }, ...groups.map((item) => ({ value: item.fieldGroupId, label: `${item.name} (${item.fieldIds.length}圃場)` }))], group.value || "");
-    mode.disabled = !groups.length && mode.value !== "group";
+    if (mode.value === "group" || mode.value === "all") workFieldIds = modeFieldIds(mode.value, group.value);
+    mode.disabled = false;
+    const offOption = mode.querySelector('option[value="offField"]');
+    offOption.disabled = selectedKind !== "work";
+    if (selectedKind !== "work" && mode.value === "offField") mode.value = "field";
     const isGroup = mode.value === "group";
-    U.$("sheetFieldLabel").classList.toggle("hidden", isGroup);
+    U.$("sheetFieldLabel").classList.toggle("hidden", selectedKind === "work" || mode.value !== "field");
     U.$("sheetGroupLabel").classList.toggle("hidden", !isGroup);
+    U.$("sheetWorkFields").hidden = selectedKind !== "work" || mode.value === "offField";
+    renderSelectionCards("sheetWorkFields", workFieldIds, false);
   }
 
   function kindLabel(kind) {
@@ -153,10 +199,11 @@
     const ids = targetFieldIds();
     const fields = ids.map((id) => state.field(id)).filter(Boolean);
     const summary = U.$("sheetTargetSummary");
-    if (summary) summary.textContent = fields.length ? `対象: ${fields.map((field) => field.name).join("・")}` : "対象を選択してください";
+    const offField = selectedKind === "work" && U.$("sheetTargetMode").value === "offField";
+    if (summary) summary.textContent = offField ? "対象: 圃場外" : fields.length ? `対象: ${fields.map((field) => field.name).join("・")}` : "対象を選択してください";
     const openButton = U.$("sheetOpenRecord");
     if (openButton) {
-      openButton.disabled = !selectedKind || !fields.length;
+      openButton.disabled = !selectedKind || (!offField && !fields.length);
       openButton.textContent = selectedKind ? `${kindLabel(selectedKind)}の入力を開く` : "入力を開く";
     }
   }
@@ -180,14 +227,18 @@
     if (!mode || !group || !groupLabel) return;
     const groups = scheduleGroups();
     U.setOptions(group, groups.map((item) => ({ value: item.fieldGroupId, label: `${item.name} (${item.fieldIds.length}圃場)` })), group.value || (groups[0] && groups[0].fieldGroupId) || "");
-    mode.value = record ? "field" : (mode.value || "field");
+    mode.value = record ? record.targetScope === "offField" ? "offField" : "field" : (mode.value || "field");
     groupLabel.classList.toggle("hidden", mode.value !== "group" || !groups.length);
-    mode.disabled = Boolean(record);
-    group.disabled = Boolean(record);
+    mode.disabled = Boolean(editingScheduleId);
+    group.disabled = Boolean(editingScheduleId);
+    U.$("sheetScheduleFields").hidden = mode.value === "offField";
+    renderSelectionCards("sheetScheduleFields", scheduleFieldIds, Boolean(editingScheduleId));
+    renderSchedulePresets();
+    renderFertilizerScheduleFields(record);
   }
 
   function topDressingPlan() {
-    const field = state.field(activeFieldId());
+    const field = state.field(scheduleFieldIds[0]);
     const variety = field ? state.variety(field.varietyId) : null;
     const amountText = String(variety && variety.topDressingAmount || "");
     const rate = amountText.match(/\d+(?:\.\d+)?/);
@@ -201,7 +252,7 @@
     const block = U.$("sheetScheduleFertilizerFields");
     const title = String(U.$("sheetScheduleTitle") && U.$("sheetScheduleTitle").value || "");
     if (!block) return;
-    const visible = title.includes("追肥");
+    const visible = U.$("sheetScheduleTargetMode").value !== "offField" && title.includes("追肥");
     block.classList.toggle("hidden", !visible);
     if (!visible) return;
     const plan = topDressingPlan();
@@ -220,7 +271,9 @@
     const root = U.$("sheetSchedulePresetPicks");
     if (!root) return;
     const title = String(U.$("sheetScheduleTitle").value || "");
-    root.innerHTML = SCHEDULE_PRESETS.map((preset) => `
+    const presets = U.$("sheetScheduleTargetMode").value === "offField"
+      ? RiceOS.schema.OTHER_WORK_NAMES.map((name) => ({ title: `${name}予定`, label: name })) : SCHEDULE_PRESETS;
+    root.innerHTML = presets.map((preset) => `
       <button type="button" class="${title === preset.title ? "active" : ""}" data-schedule-preset="${U.attr(preset.title)}">${U.escapeHTML(preset.label)}</button>
     `).join("");
   }
@@ -248,6 +301,8 @@
     const form = U.$("sheetScheduleForm");
     if (!form) return;
     editingScheduleId = record && record.scheduleId || "";
+    scheduleFieldIds = record ? record.targetScope === "offField" ? [] : (record.fieldIds || []).slice() : targetFieldIds();
+    U.$("sheetScheduleTargetMode").value = record ? record.targetScope === "offField" ? "offField" : "field" : U.$("sheetTargetMode").value === "offField" ? "offField" : "field";
     U.$("sheetScheduleTitle").value = record ? record.title || record.scheduleType || "" : "";
     U.$("sheetScheduleMemo").value = record ? record.memo || "" : "";
     U.$("sheetScheduleFertilizerName").value = record ? record.plannedFertilizerName || "" : "";
@@ -269,7 +324,7 @@
       return;
     }
     const memo = String(U.$("sheetScheduleMemo").value || "").trim();
-    const isFertilizer = title.includes("追肥");
+    const isFertilizer = U.$("sheetScheduleTargetMode").value !== "offField" && title.includes("追肥");
     const existing = editingScheduleId
       ? (state.data().schedules || []).find((schedule) => schedule.scheduleId === editingScheduleId)
       : null;
@@ -280,21 +335,21 @@
       U.toast("予定を登録するグループを選択してください");
       return;
     }
-    const targets = existing
-      ? [existing.fieldIds || []]
-      : mode === "all"
-        ? state.activeFields().map((field) => [field.fieldId])
-        : mode === "group" && group
-          ? group.fieldIds.map((fieldId) => [fieldId])
-          : [activeFieldId() ? [activeFieldId()] : []];
-    const batchId = !existing && targets.length > 1 ? U.id("schedule-batch", selectedDate) : "";
-    const batchFieldIds = !existing && targets.length > 1 ? targets.flat() : [];
+    const offField = existing ? existing.targetScope === "offField" : mode === "offField";
+    const targets = offField ? [[]] : existing ? [existing.fieldIds || []] : scheduleFieldIds.map((id) => [id]);
+    if (!offField && (!targets.length || targets.some((ids) => !ids.length))) {
+      U.toast("予定を登録する圃場を選択してください");
+      return;
+    }
+    const batchId = existing ? existing.batchId || "" : targets.length > 1 ? U.id("schedule-batch", selectedDate) : "";
+    const batchFieldIds = existing ? existing.batchFieldIds || [] : targets.length > 1 ? targets.flat() : [];
     savingSchedule = true;
     const saved = targets.every((fieldIds) => state.saveSchedule({
       ...(existing || {}),
       scheduleId: existing ? editingScheduleId : undefined,
       date: selectedDate,
       fieldIds,
+      targetScope: offField ? "offField" : "field",
       batchId,
       batchFieldIds,
       scheduleType: title,
@@ -311,7 +366,7 @@
 
   function openScreen(screen, callback) {
     const fieldIds = targetFieldIds();
-    if (!fieldIds.length) {
+    if (!fieldIds.length && !(screen === "field-work" && U.$("sheetTargetMode").value === "offField")) {
       U.toast("記録する圃場またはグループを選択してください");
       return;
     }
@@ -324,6 +379,7 @@
   }
 
   function scheduleRecordKind(record) {
+    if (record && record.targetScope === "offField") return { kind: "work", waterType: "" };
     if (record && record.recordKind === "water" && record.waterKind) return { kind: "water", waterType: record.waterKind };
     const title = String(record && (record.title || record.scheduleType) || "");
     if (/中干し/.test(title)) return { kind: "water", waterType: "dry" };
@@ -338,7 +394,7 @@
   function openScheduleCompletion(record) {
     const target = scheduleRecordKind(record);
     const fieldIds = (record.fieldIds || []).filter((id) => state.field(id));
-    if (!fieldIds.length) return;
+    if (!fieldIds.length && record.targetScope !== "offField") return;
     const originScreen = RiceOS.app && RiceOS.app.currentScreen ? RiceOS.app.currentScreen() : "home";
     close();
     if (RiceOS.navigation && RiceOS.navigation.clear) RiceOS.navigation.clear();
@@ -365,11 +421,26 @@
       selectedFieldId = U.$("sheetField").value;
       renderRecordChoice();
     });
-    if (U.$("sheetTargetMode")) U.$("sheetTargetMode").addEventListener("change", () => { renderTargetSelect(); renderRecordChoice(); });
-    if (U.$("sheetGroup")) U.$("sheetGroup").addEventListener("change", renderRecordChoice);
+    if (U.$("sheetTargetMode")) U.$("sheetTargetMode").addEventListener("change", () => {
+      workFieldIds = modeFieldIds(U.$("sheetTargetMode").value, U.$("sheetGroup").value) || workFieldIds;
+      renderTargetSelect(); renderRecordChoice();
+    });
+    if (U.$("sheetGroup")) U.$("sheetGroup").addEventListener("change", () => {
+      workFieldIds = modeFieldIds("group", U.$("sheetGroup").value);
+      renderTargetSelect(); renderRecordChoice();
+    });
     if (U.$("sheetScheduleTargetMode")) {
-      U.$("sheetScheduleTargetMode").addEventListener("change", () => renderScheduleTargets());
+      U.$("sheetScheduleTargetMode").addEventListener("change", () => {
+        scheduleFieldIds = modeFieldIds(U.$("sheetScheduleTargetMode").value, U.$("sheetScheduleGroup").value) || scheduleFieldIds;
+        U.$("sheetScheduleFertilizerName").value = "";
+        U.$("sheetScheduleFertilizerRate").value = "";
+        renderScheduleTargets();
+      });
     }
+    U.$("sheetScheduleGroup").addEventListener("change", () => {
+      scheduleFieldIds = modeFieldIds("group", U.$("sheetScheduleGroup").value);
+      renderScheduleTargets();
+    });
     if (U.$("sheetScheduleTitle")) {
       U.$("sheetScheduleTitle").addEventListener("input", () => {
         renderFertilizerScheduleFields();
@@ -377,12 +448,30 @@
       });
     }
     U.$("dateSheet").addEventListener("click", (event) => {
+      const fieldCard = event.target.closest("[data-sheet-field]");
+      if (fieldCard) {
+        const schedule = Boolean(fieldCard.closest("#sheetScheduleFields"));
+        if (schedule && editingScheduleId) return;
+        const ids = new Set(schedule ? scheduleFieldIds : workFieldIds);
+        const id = fieldCard.dataset.sheetField;
+        if (ids.has(id)) ids.delete(id); else ids.add(id);
+        if (schedule) {
+          scheduleFieldIds = Array.from(ids);
+          U.$("sheetScheduleTargetMode").value = "field";
+          renderScheduleTargets();
+        } else {
+          workFieldIds = Array.from(ids);
+          U.$("sheetTargetMode").value = "field";
+          renderTargetSelect(); renderRecordChoice();
+        }
+        return;
+      }
       const actionButton = event.target.closest("[data-sheet-action]");
       if (actionButton && RiceOS.recordActions) {
         const entry = findEntry(actionButton.dataset.kind, actionButton.dataset.id);
         if (!entry) return;
         if (actionButton.dataset.sheetAction === "complete" && entry.kind === "schedule") {
-          if (String(entry.record.title || entry.record.scheduleType || "").includes("追肥") && RiceOS.screens.fertilizer) {
+          if (entry.record.targetScope !== "offField" && String(entry.record.title || entry.record.scheduleType || "").includes("追肥") && RiceOS.screens.fertilizer) {
             RiceOS.screens.fertilizer.open(entry.record, render);
             return;
           }
@@ -394,8 +483,7 @@
             showScheduleForm(entry.record);
             return;
           }
-          close();
-          RiceOS.recordActions.edit(entry.kind, entry.record);
+          openEntry(entry);
         }
         if (actionButton.dataset.sheetAction === "delete") {
           if (RiceOS.recordActions.remove(entry.kind, entry.record)) render();
@@ -420,7 +508,7 @@
       if (openRecord) {
         if (!selectedKind) return;
         if (selectedKind === "growth") openScreen("growth", (fieldIds) => RiceOS.screens.growth.prefillFields(selectedDate, fieldIds));
-        else if (selectedKind === "work") openScreen("field-work", (fieldIds) => RiceOS.screens.fieldWork.prefillFields(selectedDate, fieldIds));
+        else if (selectedKind === "work") openScreen("field-work", (fieldIds) => RiceOS.screens.fieldWork.prefillFields(selectedDate, fieldIds, { targetScope: U.$("sheetTargetMode").value === "offField" ? "offField" : "field" }));
         else if (selectedKind === "stage") openScreen("growth", (fieldIds) => RiceOS.screens.growth.prefillStageRecord(selectedDate, fieldIds));
         else if (selectedKind === "water") showWaterQuick();
         return;
@@ -429,6 +517,7 @@
       const action = button.dataset.sheetAdd;
       if (["growth", "work", "stage", "water"].includes(action)) {
         selectedKind = action;
+        renderTargetSelect();
         hideWaterQuick();
         renderRecordChoice();
       } else if (action === "photo") {

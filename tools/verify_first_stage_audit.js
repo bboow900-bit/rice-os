@@ -58,6 +58,7 @@ const elements = new Map();
 function element(id) {
   if (!elements.has(id)) elements.set(id, {
     value: "", disabled: false, dataset: {}, handlers: {},
+    querySelector(selector) { return element(`${id}:${selector}`); },
     classList: { add() {}, remove() {}, toggle() {}, contains() { return false; } },
     setAttribute() {}, addEventListener(type, fn) { this.handlers[type] = fn; }
   });
@@ -82,6 +83,7 @@ vm.runInThisContext(fs.readFileSync(path.join(root, "assets/js/screens/bottom-sh
 RiceOS.screens.bottomSheet.bind();
 const change = (id, value) => { element(id).value = value; element(id).handlers.change(); };
 const click = (selector, dataset = {}) => element("dateSheet").handlers.click({ target: { closest: (query) => query === selector ? { dataset } : null } });
+const clickField = (id, schedule = false) => element("dateSheet").handlers.click({ target: { closest: (query) => query === "[data-sheet-field]" ? { dataset: { sheetField: id }, closest: () => schedule ? element("sheetScheduleFields") : null } : null } });
 function start() {
   RiceOS.bottomSheet.open("2026-09-15", "a");
   click("[data-sheet-add]", { sheetAdd: "work" });
@@ -112,13 +114,14 @@ RiceOS.bottomSheet.render();
 assert.equal(element("sheetTargetMode").value, "group", "Removed groups must not switch to a stale individual");
 blocked();
 change("sheetTargetMode", "field");
-assert.equal(element("sheetOpenRecord").disabled, false);
-element("sheetField").value = "";
-click("#sheetOpenRecord");
-assert.equal(prefilled.length, 1, "Cleared select must not reuse cached field even before change fires");
-change("sheetField", "");
 blocked();
-change("sheetField", "b");
+clickField("a");
+assert.equal(element("sheetOpenRecord").disabled, false);
+clickField("a");
+click("#sheetOpenRecord");
+assert.equal(prefilled.length, 1, "Cleared cards must not reuse cached field");
+blocked();
+clickField("b");
 click("#sheetOpenRecord");
 assert.deepEqual(prefilled.at(-1), ["b"]);
 assert.ok(toasted >= 6);
@@ -144,7 +147,7 @@ for (const groupId of ["", "missing", "empty"]) {
   assert.equal(element("sheetScheduleMemo").value, "Keep this draft");
   assert.equal(toasted, toastBefore + 1);
 }
-element("sheetScheduleGroup").value = "g";
+change("sheetScheduleGroup", "g");
 submitSchedule();
 assert.equal(prevented, 4, "Exercise the bound form submit handler");
 assert.deepEqual(schedules.map((record) => record.fieldIds), [["a"], ["b"]]);
@@ -157,4 +160,25 @@ for (const record of schedules) {
   assert.equal(record.memo, "Keep this draft");
 }
 assert.ok(hidden > 0, "Valid save closes the schedule form");
+start();
+change("sheetTargetMode", "group");
+change("sheetGroup", "g");
+clickField("a");
+clickField("unassigned");
+assert.equal(element("sheetTargetMode").value, "field");
+click("#sheetOpenRecord");
+assert.deepEqual(prefilled.at(-1), ["b", "unassigned"], "Group convenience must allow arbitrary card changes");
+change("sheetScheduleTargetMode", "group");
+change("sheetScheduleGroup", "g");
+clickField("a", true);
+clickField("unassigned", true);
+assert.equal(element("sheetScheduleTargetMode").value, "field");
+submitSchedule();
+assert.deepEqual(schedules.slice(2).map((record) => record.fieldIds), [["b"], ["unassigned"]]);
+assert.deepEqual(schedules[2].batchFieldIds, ["b", "unassigned"]);
+assert.equal(schedules[2].batchId, schedules[3].batchId);
+clickField("b", true);
+clickField("unassigned", true);
+submitSchedule();
+assert.equal(schedules.length, 4, "Empty arbitrary selection must not save a stale first field");
 console.log("PASS: first-stage audit record/schedule targets and next-season idea merge");

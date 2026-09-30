@@ -10,12 +10,12 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="稲作カルテ">
-  <link rel="manifest" href="manifest.webmanifest?v=20260927_ver282">
+  <link rel="manifest" href="manifest.webmanifest?v=20260930_ver283">
   <link rel="icon" href="assets/icons/icon-192.png">
   <link rel="apple-touch-icon" href="assets/icons/icon-192.png">
   <title>稲作カルテ</title>
-  <link rel="stylesheet" href="assets/css/app.css?v=20260927_ver282">
-  <link rel="stylesheet" href="assets/css/field-management.css?v=20260927_ver282">
+  <link rel="stylesheet" href="assets/css/app.css?v=20260930_ver283">
+  <link rel="stylesheet" href="assets/css/field-management.css?v=20260930_ver283">
   <style>
     @media (max-width: 900px) {
       body .app-shell .side-nav .nav-item { display: none !important; }
@@ -101,13 +101,14 @@
       <section class="screen" id="screen-field-work" data-title="作業入力">
         <div class="screen-head">
           <div>
-            <p class="eyebrow">圃場作業</p>
+            <p class="eyebrow">作業記録</p>
             <h2 id="fieldWorkHeading">作業入力</h2>
           </div>
           <button class="secondary" data-action="reset-field-work">リセット</button>
         </div>
         <form class="stack-form" id="fieldWorkForm" data-work-mode="simple">
           <input type="hidden" id="editFieldWorkId">
+          <label>作業対象<select id="fwTargetScope"><option value="field">圃場作業</option><option value="offField">圃場外作業</option></select></label>
           <div class="growth-input-mode work-input-mode" role="group" aria-label="作業入力モード">
             <button type="button" class="active" data-work-mode-select="simple"><b>かんたん入力</b><small>圃場・日付・作業・時間・写真・メモ</small></button>
             <button type="button" data-work-mode-select="detail"><b>詳細入力</b><small>機械・資材・天気まで記録</small></button>
@@ -128,6 +129,7 @@
                 </span>
               </label>
               <label>作業<select id="fwName"></select></label>
+              <label id="fwCustomNameLabel" hidden>作業名<input id="fwCustomName" maxlength="100"></label>
               <label>作業時間<input id="fwHours" placeholder="例: 1時間30分"></label>
             </div>
             <div class="work-time-tools">
@@ -698,11 +700,12 @@
       <section class="sheet-target-step hidden" id="sheetTargetStep" aria-label="記録対象">
         <p><b>2. 記録する圃場</b><small id="sheetSelectedKind">種類を選んでください</small></p>
         <div class="sheet-target-select">
-          <label>対象<select id="sheetTargetMode"><option value="field">圃場ごと</option><option value="group">圃場グループ</option></select></label>
+          <label>対象<select id="sheetTargetMode"><option value="field">圃場を選択</option><option value="group">圃場グループ</option><option value="all">全圃場</option><option value="offField">圃場外（作業のみ）</option></select></label>
           <label id="sheetFieldLabel">圃場<select id="sheetField"></select></label>
           <label id="sheetGroupLabel" class="hidden">グループ<select id="sheetGroup"></select></label>
         </div>
         <div id="sheetTargetSummary" class="sheet-target-summary">対象を選択してください</div>
+        <div id="sheetWorkFields" class="select-grid sheet-field-cards" role="group" aria-label="作業対象の圃場"></div>
         <button type="button" id="sheetOpenRecord" class="primary sheet-open-record" disabled>入力を開く</button>
       </section>
       <div class="sheet-secondary-actions"><button type="button" data-sheet-add="schedule">予定を登録</button><button type="button" data-sheet-add="result">収穫・結果</button></div>
@@ -728,9 +731,11 @@
             <option value="field">選択中の圃場</option>
             <option value="group">圃場グループ</option>
             <option value="all">全圃場</option>
+            <option value="offField">圃場外</option>
           </select></label>
           <label class="hidden" id="sheetScheduleGroupLabel">グループ<select id="sheetScheduleGroup"></select></label>
         </div>
+        <div id="sheetScheduleFields" class="select-grid sheet-field-cards" role="group" aria-label="予定対象の圃場"></div>
         <div id="sheetScheduleFertilizerFields" class="sheet-fertilizer-fields hidden">
           <label>追肥肥料名<input id="sheetScheduleFertilizerName" placeholder="レシピから自動入力"></label>
           <label>予定量(kg/10a)<input id="sheetScheduleFertilizerRate" inputmode="decimal" placeholder="例: 10"></label>
@@ -801,40 +806,40 @@
 
   <div id="toast" class="toast hidden" role="status"></div>
 
-  <script src="assets/js/core/utils.js?v=20260927_ver282"></script>
-  <script src="assets/js/core/schema.js?v=20260927_ver282"></script>
-  <script src="assets/js/core/storage.js?v=20260927_ver282"></script>
-  <script src="assets/js/core/state.js?v=20260927_ver282"></script>
-  <script src="assets/js/core/herbicide.js?v=20260927_ver282"></script>
-  <script src="assets/js/core/agro.js?v=20260927_ver282"></script>
-  <script src="assets/js/core/outlook.js?v=20260927_ver282"></script>
-  <script src="assets/js/core/record-actions.js?v=20260927_ver282"></script>
-  <script src="assets/js/core/calendar.js?v=20260927_ver282"></script>
-  <script src="assets/js/core/alerts.js?v=20260927_ver282"></script>
-  <script src="assets/js/core/weather.js?v=20260927_ver282"></script>
-  <script src="assets/js/core/harvest-weather.js?v=20260927_ver282"></script>
-  <script src="assets/js/core/navigation.js?v=20260927_ver282"></script>
-  <script src="assets/js/core/pwa.js?v=20260927_ver282"></script>
-  <script src="assets/js/screens/home.js?v=20260927_ver282"></script>
-  <script src="assets/js/screens/calendar.js?v=20260927_ver282"></script>
-  <script src="assets/js/screens/bottom-sheet.js?v=20260927_ver282"></script>
-  <script src="assets/js/screens/recipes.js?v=20260927_ver282"></script>
-  <script src="assets/js/screens/fields.js?v=20260927_ver282"></script>
-  <script src="assets/js/screens/field-work.js?v=20260927_ver282"></script>
-  <script src="assets/js/screens/fertilizer.js?v=20260927_ver282"></script>
-  <script src="assets/js/screens/growth.js?v=20260927_ver282"></script>
-  <script src="assets/js/screens/dry-period.js?v=20260927_ver282"></script>
-  <script src="assets/js/screens/irrigation.js?v=20260927_ver282"></script>
-  <script src="assets/js/screens/photos.js?v=20260927_ver282"></script>
-  <script src="assets/js/screens/other-work.js?v=20260927_ver282"></script>
-  <script src="assets/js/screens/herbicide.js?v=20260927_ver282"></script>
-  <script src="assets/js/screens/annual.js?v=20260927_ver282"></script>
-  <script src="assets/js/screens/materials.js?v=20260927_ver282"></script>
-  <script src="assets/js/screens/results.js?v=20260927_ver282"></script>
-  <script src="assets/js/screens/notices.js?v=20260927_ver282"></script>
-  <script src="assets/js/screens/outlook.js?v=20260927_ver282"></script>
-  <script src="assets/js/screens/machines.js?v=20260927_ver282"></script>
-  <script src="assets/js/screens/data.js?v=20260927_ver282"></script>
-  <script src="assets/js/app.js?v=20260927_ver282"></script>
+  <script src="assets/js/core/utils.js?v=20260930_ver283"></script>
+  <script src="assets/js/core/schema.js?v=20260930_ver283"></script>
+  <script src="assets/js/core/storage.js?v=20260930_ver283"></script>
+  <script src="assets/js/core/state.js?v=20260930_ver283"></script>
+  <script src="assets/js/core/herbicide.js?v=20260930_ver283"></script>
+  <script src="assets/js/core/agro.js?v=20260930_ver283"></script>
+  <script src="assets/js/core/outlook.js?v=20260930_ver283"></script>
+  <script src="assets/js/core/record-actions.js?v=20260930_ver283"></script>
+  <script src="assets/js/core/calendar.js?v=20260930_ver283"></script>
+  <script src="assets/js/core/alerts.js?v=20260930_ver283"></script>
+  <script src="assets/js/core/weather.js?v=20260930_ver283"></script>
+  <script src="assets/js/core/harvest-weather.js?v=20260930_ver283"></script>
+  <script src="assets/js/core/navigation.js?v=20260930_ver283"></script>
+  <script src="assets/js/core/pwa.js?v=20260930_ver283"></script>
+  <script src="assets/js/screens/home.js?v=20260930_ver283"></script>
+  <script src="assets/js/screens/calendar.js?v=20260930_ver283"></script>
+  <script src="assets/js/screens/bottom-sheet.js?v=20260930_ver283"></script>
+  <script src="assets/js/screens/recipes.js?v=20260930_ver283"></script>
+  <script src="assets/js/screens/fields.js?v=20260930_ver283"></script>
+  <script src="assets/js/screens/field-work.js?v=20260930_ver283"></script>
+  <script src="assets/js/screens/fertilizer.js?v=20260930_ver283"></script>
+  <script src="assets/js/screens/growth.js?v=20260930_ver283"></script>
+  <script src="assets/js/screens/dry-period.js?v=20260930_ver283"></script>
+  <script src="assets/js/screens/irrigation.js?v=20260930_ver283"></script>
+  <script src="assets/js/screens/photos.js?v=20260930_ver283"></script>
+  <script src="assets/js/screens/other-work.js?v=20260930_ver283"></script>
+  <script src="assets/js/screens/herbicide.js?v=20260930_ver283"></script>
+  <script src="assets/js/screens/annual.js?v=20260930_ver283"></script>
+  <script src="assets/js/screens/materials.js?v=20260930_ver283"></script>
+  <script src="assets/js/screens/results.js?v=20260930_ver283"></script>
+  <script src="assets/js/screens/notices.js?v=20260930_ver283"></script>
+  <script src="assets/js/screens/outlook.js?v=20260930_ver283"></script>
+  <script src="assets/js/screens/machines.js?v=20260930_ver283"></script>
+  <script src="assets/js/screens/data.js?v=20260930_ver283"></script>
+  <script src="assets/js/app.js?v=20260930_ver283"></script>
 </body>
 </html>

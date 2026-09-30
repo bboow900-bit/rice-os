@@ -268,7 +268,7 @@
   // confirmation candidates are excluded from biological calculations.
   function isActualFieldWork(work) {
     const name = String(work && work.workName || "");
-    return Boolean(work && work.date) && !/(?:予定|確認候補)/.test(name);
+    return targetScope(work) === "field" && Boolean(work && work.date) && !/(?:予定|確認候補)/.test(name);
   }
 
   function isInYear(record, year) {
@@ -485,8 +485,25 @@
     return keys.find((key) => text.includes(key)) || "";
   }
 
+  function targetScope(record) {
+    return record && record.targetScope === "offField" ? "offField" : "field";
+  }
+
+  function workTargets(draft, record, previous) {
+    const scope = record.targetScope === undefined ? targetScope(previous) : targetScope(record);
+    const ids = scope === "offField" ? [] : (record.fieldIds === undefined ? previous && previous.fieldIds || [] : record.fieldIds);
+    // Existing legacy records may have lost targets; new field work must not.
+    if (scope === "field" && (!previous || targetScope(previous) === "offField")) {
+      if (!Array.isArray(ids) || !ids.length || ids.some((id) => !draft.fields.some((field) => field.fieldId === id))) {
+        throw new Error("対象の圃場を選択してください。");
+      }
+    }
+    return { targetScope: scope, fieldIds: ids.slice() };
+  }
+
   function scheduleMatchesWork(schedule, work) {
     if (!schedule || !work || schedule.status === "実施済み" || schedule.status === "手動完了") return false;
+    if (targetScope(schedule) !== targetScope(work)) return false;
     const scheduleFields = schedule.fieldIds || [];
     const workFields = work.fieldIds || [];
     if (scheduleFields.length && !scheduleFields.some((id) => workFields.includes(id))) return false;
@@ -517,6 +534,8 @@
   }
 
   function workSaveFeedback(record) {
+    const previous = record.workId && data().fieldWorks.find((work) => work.workId === record.workId);
+    if ((record.targetScope === undefined ? targetScope(previous) : targetScope(record)) === "offField") return "作業を保存しました。";
     const ids = record.fieldIds || [];
     const place = ids.length > 1 ? `${fieldNameForFeedback(ids[0])}ほか${ids.length - 1}圃場` : fieldNameForFeedback(ids[0]);
     const workName = record.workName || "作業";
@@ -608,37 +627,47 @@
   }
 
   function saveFieldWork(record) {
-    if (waterEventFromWorkName(record && record.workName) && !(record && record.legacyWaterRecord)) {
-      if (typeof alert === "function") alert("中干し・間断灌水・深水・落水は、水管理として記録してください。");
-      return null;
-    }
     return mutate((d) => {
       const date = record.date || U.today();
       const previous = record.workId ? d.fieldWorks.find((work) => work.workId === record.workId) : null;
+      const targets = workTargets(d, record, previous);
+      const offField = targets.targetScope === "offField";
+      if (offField && previous && targetScope(previous) === "field"
+        && ((previous.fieldIds || []).length || (previous.orphanedFieldIds || []).length)
+        && (isPlantingWorkName(previous.workName) || isHeadingWorkName(previous.workName)
+          || isDryStartWorkName(previous.workName) || isDryEndWorkName(previous.workName)
+          || legacyWaterEventFromWorkName(previous.workName) || (previous.waterMigrationLinks || []).length)) {
+        throw new Error("圃場の生育・水管理に紐付いた作業は、対象範囲を変更できません。");
+      }
+      if (!offField && waterEventFromWorkName(record.workName) && !record.legacyWaterRecord) {
+        throw new Error("中干し・間断灌水・深水・落水は、水管理として記録してください。");
+      }
       const harvestReview = record.harvestReview === undefined ? previous && previous.harvestReview : S.normalizeHarvestReview(record.harvestReview, true);
       const mergedHarvestReview = record.harvestReview === undefined ? harvestReview
         : S.normalizeHarvestReview({ ...(previous && previous.harvestReview || {}), ...record.harvestReview }, true);
-      const targetFieldIds = (record.fieldIds || []).slice();
-      const requestedLinks = record.herbicideLinks === undefined ? (previous && previous.herbicideLinks || []) : record.herbicideLinks;
+      const targetFieldIds = targets.fieldIds;
+      const requestedLinks = offField ? [] : record.herbicideLinks === undefined ? (previous && previous.herbicideLinks || []) : record.herbicideLinks;
       if (!Array.isArray(requestedLinks)) throw new Error("除草体系の紐付けを確認してください。");
       const herbicideLinks = (record.workName === "除草剤" ? requestedLinks : []).filter((link) => targetFieldIds.includes(link.fieldId));
       const assignments = Array.isArray(d.meta && d.meta.herbicideAssignments) ? d.meta.herbicideAssignments : [];
       if (herbicideLinks.some((link) => !assignments.some((a) => a.assignmentId === link.assignmentId && a.fieldId === link.fieldId && String(a.year) === String(date).slice(0, 4) && Array.isArray(a.steps) && a.steps.some((s) => s.id === link.stepId)))) throw new Error("除草体系の年度・圃場が作業と一致しません。選び直してください。");
-      const batchId = String(record.batchId || previous && previous.batchId || (targetFieldIds.length > 1 ? U.id("batch", date) : ""));
-      const timeAccounting = record.timeAccounting || previous && previous.timeAccounting || (targetFieldIds.length > 1 ? "shared" : "single");
+      const batchId = offField ? "" : String(record.batchId || previous && previous.batchId || (targetFieldIds.length > 1 ? U.id("batch", date) : ""));
+      const timeAccounting = offField ? "single" : record.timeAccounting || previous && previous.timeAccounting || (targetFieldIds.length > 1 ? "shared" : "single");
       const totalHours = record.totalHours || record.hours || previous && previous.totalHours || "";
       const totalHoursValue = U.parseWorkHours(totalHours);
-      const fieldAllocatedHours = record.fieldAllocatedHours || (timeAccounting === "shared" && targetFieldIds.length > 1 && totalHoursValue
+      const fieldAllocatedHours = offField ? {} : record.fieldAllocatedHours || (timeAccounting === "shared" && targetFieldIds.length > 1 && totalHoursValue
         ? Object.fromEntries(targetFieldIds.map((fieldId) => [fieldId, Math.round(totalHoursValue / targetFieldIds.length * 100) / 100]))
         : previous && previous.fieldAllocatedHours || {});
       const normalized = {
         workId: record.workId || U.id("work", date),
         type: "fieldWork",
+        targetScope: targets.targetScope,
         date,
         season: U.season(date),
         fieldIds: targetFieldIds,
         batchId,
-        batchFieldIds: (record.batchFieldIds || previous && previous.batchFieldIds || targetFieldIds).slice(),
+        batchFieldIds: offField ? [] : (record.batchFieldIds || previous && previous.batchFieldIds || targetFieldIds).slice(),
+        ...(offField ? { orphanedFieldIds: [], waterMigrationLinks: [] } : {}),
         timeAccounting,
         totalHours,
         fieldAllocatedHours,
@@ -664,10 +693,10 @@
         sourceScheduleId: record.sourceScheduleId || previous && previous.sourceScheduleId || "",
         // The regular work form does not edit fertilizer decision snapshots.
         // Retain them until the dedicated fertilizer flow explicitly replaces them.
-        growthSnapshots: record.growthSnapshots === undefined
+        growthSnapshots: offField ? {} : record.growthSnapshots === undefined
           ? (previous && previous.growthSnapshots || {})
           : record.growthSnapshots,
-        harvestSnapshots: record.harvestSnapshots === undefined
+        harvestSnapshots: offField ? [] : record.harvestSnapshots === undefined
           ? (previous && previous.harvestSnapshots || [])
           : record.harvestSnapshots,
         ...(mergedHarvestReview !== undefined && mergedHarvestReview !== null ? { harvestReview: U.clone(mergedHarvestReview) } : {}),
@@ -682,7 +711,7 @@
       const index = d.fieldWorks.findIndex((w) => w.workId === normalized.workId);
       if (index >= 0) d.fieldWorks[index] = { ...d.fieldWorks[index], ...normalized };
       else d.fieldWorks.push(normalized);
-      if (/稲刈り|収穫/.test(String(normalized.workName || ""))) {
+      if (!offField && /稲刈り|収穫/.test(String(normalized.workName || ""))) {
         const existing = Array.isArray(normalized.harvestSnapshots) ? normalized.harvestSnapshots : [];
         normalized.harvestSnapshots = harvestSnapshotsForWork(d, normalized).map((snapshot) =>
           existing.find((item) => item.fieldId === snapshot.fieldId && item.harvestDate === snapshot.harvestDate) || snapshot);
@@ -718,6 +747,7 @@
         }
       }
       completeMatchingSchedules(d, normalized);
+      if (offField) return;
       if (isPlantingWorkName(normalized.workName)) {
         normalized.fieldIds.forEach((fieldId) => {
           const fieldIndex = d.fields.findIndex((f) => f.fieldId === fieldId);
@@ -1138,14 +1168,18 @@
   function saveSchedule(record) {
     return mutate((d) => {
       const date = record.date || U.today();
+      const previous = record.scheduleId ? d.schedules.find((schedule) => schedule.scheduleId === record.scheduleId) : null;
+      const targets = workTargets(d, record, previous);
       const normalized = {
         scheduleId: record.scheduleId || U.id("schedule", date),
         type: "schedule",
+        targetScope: targets.targetScope,
         date,
         season: U.season(date),
-        fieldIds: record.fieldIds || [],
-        batchId: record.batchId || "",
-        batchFieldIds: record.batchFieldIds || record.fieldIds || [],
+        fieldIds: targets.fieldIds,
+        batchId: targets.targetScope === "offField" ? "" : record.batchId || "",
+        batchFieldIds: targets.targetScope === "offField" ? [] : record.batchFieldIds || targets.fieldIds,
+        ...(targets.targetScope === "offField" ? { orphanedFieldIds: [] } : {}),
         scheduleType: record.scheduleType || "作業予定",
         title: record.title || record.scheduleType || "予定",
         status: record.status || "予定",
@@ -1164,6 +1198,19 @@
         createdAt: record.createdAt || U.now(),
         updatedAt: U.now()
       };
+      if (previous && targetScope(previous) !== targets.targetScope) {
+        // A completion link cannot cross scopes after editing the schedule.
+        normalized.status = "予定";
+        normalized.completedAt = "";
+        normalized.completedByWorkId = "";
+        normalized.completedByWaterPeriodId = "";
+        normalized.completedManuallyAt = "";
+        normalized.completionReason = "";
+        normalized.completionLink = undefined;
+        d.fieldWorks.forEach((work) => {
+          if (work.sourceScheduleId === normalized.scheduleId && targetScope(work) !== targets.targetScope) work.sourceScheduleId = "";
+        });
+      }
       const index = d.schedules.findIndex((s) => s.scheduleId === normalized.scheduleId);
       if (index >= 0) d.schedules[index] = { ...d.schedules[index], ...normalized };
       else d.schedules.push(normalized);
@@ -1190,6 +1237,7 @@
       const scheduleIndex = (d.schedules || []).findIndex((schedule) => schedule.scheduleId === record.scheduleId);
       if (scheduleIndex < 0) return;
       const schedule = d.schedules[scheduleIndex];
+      if (targetScope(schedule) !== "field" || targetScope(record) !== "field") throw new Error("圃場の予定を選択してください。");
       const date = record.date || U.today();
       const workId = U.id("work", date);
       const rate = String(record.fertilizerRateKg10a || "");
@@ -1258,6 +1306,7 @@
     const index = (d.schedules || []).findIndex((schedule) => schedule.scheduleId === scheduleId);
     if (index < 0) return;
     const schedule = d.schedules[index];
+    if (targetScope(schedule) !== "field") return;
     const waterKind = recordKind === "dry" ? "dry" : waterKindFromMethod(record.method);
     if (schedule.recordKind !== "water" || schedule.waterKind !== waterKind || schedule.waterPhase !== phase) return;
     if ((schedule.fieldIds || []).length !== 1 || schedule.fieldIds[0] !== record.fieldId) return;

@@ -100,7 +100,9 @@
 
   function entryFieldIds(entry) {
     const record = entry && entry.record || {};
+    if (record.targetScope === "offField") return [];
     if (record.fieldIds) return record.fieldIds;
+    if (record.relatedFieldIds) return record.relatedFieldIds;
     if (record.fieldId) return [record.fieldId];
     return [];
   }

@@ -18,7 +18,7 @@
       if (entry.tone === "schedule-done") return "済";
       return "予定";
     }
-    if (entry.kind === "work") return "実績";
+    if (entry.kind === "work" || entry.kind === "other") return "実績";
     if (entry.kind === "growth") return "生育";
     if (entry.kind === "dry" || entry.kind === "irrigation") return "水管理";
     return "";
@@ -31,7 +31,7 @@
       return "mark-schedule";
     }
     if (entry.kind === "growth") return "mark-growth";
-    if (entry.kind === "work") return "mark-work";
+    if (entry.kind === "work" || entry.kind === "other") return "mark-work";
     return "mark-water";
   }
 
@@ -138,12 +138,15 @@
         const entry = findEntry(action.dataset.kind, action.dataset.id);
         if (!entry) return;
         if (action.dataset.calendarAction === "complete" && entry.kind === "schedule") {
-          if (entry.record.recordKind === "water" && RiceOS.bottomSheet && RiceOS.bottomSheet.openScheduleCompletion) {
+          if (entry.record.targetScope !== "offField" && String(entry.record.title || entry.record.scheduleType || "").includes("追肥") && RiceOS.screens.fertilizer) {
+            RiceOS.screens.fertilizer.open(entry.record, render);
+            return;
+          }
+          if (RiceOS.bottomSheet && RiceOS.bottomSheet.openScheduleCompletion) {
             RiceOS.bottomSheet.openScheduleCompletion(entry.record);
             return;
           }
-          RiceOS.state.completeSchedule(action.dataset.id);
-          render();
+          U.toast("作業入力を開けません。画面を開き直してください。");
           return;
         }
         if (action.dataset.calendarAction === "edit" && RiceOS.recordActions) {

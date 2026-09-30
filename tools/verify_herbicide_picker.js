@@ -23,6 +23,9 @@ function node(id) {
     const classes = new Set();
     nodes.set(id, {
       value: "", dataset: {}, listeners: {},
+      get parentElement() { return node(`${id}:parent`); },
+      closest(selector) { return node(`${id}:ancestor:${selector}`); },
+      setAttribute(name, value) { this[name] = String(value); },
       classList: {
         toggle: (name, active) => active ? classes.add(name) : classes.delete(name),
         add: name => classes.add(name), remove: name => classes.delete(name),
@@ -88,6 +91,19 @@ async function main() {
     assert.ok(H.usageForAssignment(assignment.assignmentId).steps.find(s => s.id === "a").works.some(w => w.workId === workId));
     assert.equal(H.usageForAssignment(assignment.assignmentId).steps.find(s => s.id === "b").works.some(w => w.workId === workId), false);
   }
-  console.log("PASS herbicide picker saved restoration, actual reasons, free input, missing master and persisted review links");
+  RiceOS.screens.fieldWork.editWork("picker-free");
+  for (const id of ["fwMachine", "fwMaterial", "fwAmount", "fwWeather", "fwWeatherAutoJson", "fwHerbicideCategory", "fwHerbicidePurpose"]) node(id).value = "stale field default";
+  node("fwMemo").value = "template memo";
+  node("fwMemo").dataset.templateFilled = "1";
+  await fire("fwTargetScope", "change", "offField");
+  for (const id of ["fwMachine", "fwMaterial", "fwMaterialId", "fwAmount", "fwWeather", "fwWeatherAutoJson", "fwHerbicideCategory", "fwHerbicidePurpose", "fwMemo"]) {
+    assert.equal(node(id).value, "", `${id} must not retain a field default after switching off-field`);
+  }
+  assert.equal(card.classList.contains("selected"), false);
+  assert.equal(card["aria-pressed"], "false");
+  assert.equal(node("fwFields").closest("details").hidden, true);
+  await fire("fwTargetScope", "change", "field");
+  assert.equal(card.classList.contains("selected"), false, "Returning to field scope must not restore stale field IDs");
+  console.log("PASS herbicide picker saved restoration, actual reasons, free input, missing master, persisted review links and scope default clearing");
 }
 main().catch(error => { console.error(error); process.exitCode = 1; });

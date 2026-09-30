@@ -5,7 +5,7 @@
   const U = RiceOS.utils;
 
   const SCHEMA_VERSION = 17;
-  const APP_VERSION = "20260927_ver282";
+  const APP_VERSION = "20260930_ver283";
   const STORE_KEY = "rice_os_v8_stable";
   const BACKUP_KEY = "rice_os_v8_stable_backup";
   const RELEASE_BACKUPS_KEY = "rice_os_v8_stable_release_backups";
@@ -459,8 +459,9 @@
 
   function normalizeFieldWork(input) {
     const w = input || {};
+    const offField = w.targetScope === "offField";
     const date = String(w.date || U.today());
-    const harvestSnapshots = ensureArray(w.harvestSnapshots).map((snapshot) => {
+    const harvestSnapshots = (offField ? [] : ensureArray(w.harvestSnapshots)).map((snapshot) => {
       const row = snapshot || {};
       const water = row.water && typeof row.water === "object" ? row.water : {};
       const outlook = row.outlook && typeof row.outlook === "object" ? row.outlook : {};
@@ -513,22 +514,23 @@
     return {
       workId: String(w.workId || w.id || U.id("work", date)),
       type: "fieldWork",
+      targetScope: offField ? "offField" : "field",
       date,
       season: U.number(w.season, U.season(date)),
-      fieldIds: ensureArray(w.fieldIds).length ? ensureArray(w.fieldIds).map(String) : (w.fieldId ? [String(w.fieldId)] : []),
-      orphanedFieldIds: ensureArray(w.orphanedFieldIds).map(String),
-      batchId: String(w.batchId || ""),
-      batchFieldIds: ensureArray(w.batchFieldIds || w.fieldIds).map(String),
-      waterMigrationLinks: ensureArray(w.waterMigrationLinks).map((link) => ({
+      fieldIds: offField ? [] : ensureArray(w.fieldIds).length ? ensureArray(w.fieldIds).map(String) : (w.fieldId ? [String(w.fieldId)] : []),
+      orphanedFieldIds: offField ? [] : ensureArray(w.orphanedFieldIds).map(String),
+      batchId: offField ? "" : String(w.batchId || ""),
+      batchFieldIds: offField ? [] : ensureArray(w.batchFieldIds || w.fieldIds).map(String),
+      waterMigrationLinks: (offField ? [] : ensureArray(w.waterMigrationLinks)).map((link) => ({
         fieldId: String(link && link.fieldId || ""),
         kind: String(link && link.kind || ""),
         legacyKey: String(link && link.legacyKey || ""),
         periodId: String(link && link.periodId || ""),
         linkedAt: String(link && link.linkedAt || U.now())
       })).filter((link) => link.fieldId && link.kind && link.legacyKey && link.periodId),
-      timeAccounting: String(w.timeAccounting || (ensureArray(w.fieldIds).length > 1 ? "shared" : "single")),
+      timeAccounting: offField ? "single" : String(w.timeAccounting || (ensureArray(w.fieldIds).length > 1 ? "shared" : "single")),
       totalHours: String(w.totalHours || w.hours || ""),
-      fieldAllocatedHours: w.fieldAllocatedHours && typeof w.fieldAllocatedHours === "object" ? w.fieldAllocatedHours : {},
+      fieldAllocatedHours: !offField && w.fieldAllocatedHours && typeof w.fieldAllocatedHours === "object" ? w.fieldAllocatedHours : {},
       workName: String(w.workName || w.name || "その他"),
       worker: String(w.worker || ""),
       hours: String(w.hours || ""),
@@ -536,7 +538,7 @@
       machineId: String(w.machineId || ""),
       material: String(w.material || ""),
       materialId: String(w.materialId || ""),
-      herbicideLinks: ensureArray(w.herbicideLinks).filter((link) => link && link.fieldId && link.assignmentId && link.stepId).map((link) => ({ fieldId: String(link.fieldId), assignmentId: String(link.assignmentId), stepId: String(link.stepId) })),
+      herbicideLinks: (offField ? [] : ensureArray(w.herbicideLinks)).filter((link) => link && link.fieldId && link.assignmentId && link.stepId).map((link) => ({ fieldId: String(link.fieldId), assignmentId: String(link.assignmentId), stepId: String(link.stepId) })),
       herbicideCategory: String(w.herbicideCategory || ""),
       herbicidePurpose: String(w.herbicidePurpose || ""),
       amount: String(w.amount || ""),
@@ -544,11 +546,11 @@
       fertilizerTotalKg: String(w.fertilizerTotalKg || ""),
       fertilizerBagCount: String(w.fertilizerBagCount || ""),
       sourceScheduleId: String(w.sourceScheduleId || ""),
-      growthSnapshots: w.growthSnapshots && typeof w.growthSnapshots === "object" ? w.growthSnapshots : {},
+      growthSnapshots: !offField && w.growthSnapshots && typeof w.growthSnapshots === "object" ? w.growthSnapshots : {},
       // A harvest work can hold one factual close-out snapshot per field.
       // This remains attached to the work so a JSON export keeps the original
       // water timing and forecast comparison even after screens are revised.
-      harvestSnapshots,
+      harvestSnapshots: offField ? [] : harvestSnapshots,
       ...(w.harvestReview !== undefined ? { harvestReview: normalizeHarvestReview(w.harvestReview) } : {}),
       weather: String(w.weather || ""),
       weatherAuto: w.weatherAuto && typeof w.weatherAuto === "object" ? w.weatherAuto : null,
@@ -671,16 +673,18 @@
 
   function normalizeSchedule(input) {
     const s = input || {};
+    const offField = s.targetScope === "offField";
     const date = String(s.date || U.today());
     return {
       scheduleId: String(s.scheduleId || s.id || U.id("schedule", date)),
       type: "schedule",
+      targetScope: offField ? "offField" : "field",
       date,
       season: U.number(s.season, U.season(date)),
-      fieldIds: ensureArray(s.fieldIds).map(String),
-      batchId: String(s.batchId || ""),
-      batchFieldIds: ensureArray(s.batchFieldIds || s.fieldIds).map(String),
-      orphanedFieldIds: ensureArray(s.orphanedFieldIds).map(String),
+      fieldIds: offField ? [] : ensureArray(s.fieldIds).map(String),
+      batchId: offField ? "" : String(s.batchId || ""),
+      batchFieldIds: offField ? [] : ensureArray(s.batchFieldIds || s.fieldIds).map(String),
+      orphanedFieldIds: offField ? [] : ensureArray(s.orphanedFieldIds).map(String),
       scheduleType: String(s.scheduleType || s.kind || "作業予定"),
       title: String(s.title || s.workName || s.scheduleType || "予定"),
       status: String(s.status || "予定"),

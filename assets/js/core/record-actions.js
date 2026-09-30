@@ -59,6 +59,11 @@
       RiceOS.screens.growth.editLog(record.logId);
       return true;
     }
+    if (kind === "other" && RiceOS.screens.otherWork) {
+      RiceOS.app.show("other-work");
+      RiceOS.screens.otherWork.editWork(record.otherWorkId);
+      return true;
+    }
     if ((kind === "dry" || kind === "irrigation") && RiceOS.screens.annual) {
       RiceOS.app.show("annual", { skipHistory: true });
       RiceOS.screens.annual.openWaterEditor(kind, kind === "dry" ? (record.dryPeriodId || record.directId) : (record.irrigationId || record.directId));
