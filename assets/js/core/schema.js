@@ -809,17 +809,73 @@
     };
   }
 
-  function normalizeShipment(input) {
-    const s = input || {};
-    const date = String(s.date || U.today());
+  function normalizePricePer60Kg(value, strict = false) {
+    if (value == null || typeof value === "string" && !value.trim()) return "";
+    const price = typeof value === "number" || typeof value === "string" ? Number(value) : NaN;
+    if (Number.isSafeInteger(price) && price >= 0) return price;
+    if (strict) throw new Error("60kgあたりの単価は0以上の整数で入力してください。");
+    return "";
+  }
+
+  function normalizeShipmentPrice(input, strict = false) {
+    const row = input && typeof input === "object" && !Array.isArray(input) ? input : {};
+    const recipient = typeof row.recipient === "string" ? row.recipient.trim() : "";
+    const season = String(row.season ?? "").trim();
+    const pricePer60Kg = normalizePricePer60Kg(row.pricePer60Kg, strict);
+    if (strict) {
+      if (!["number", "string"].includes(typeof row.season) || !/^[1-9]\d{3}$/.test(season)) throw new Error("収穫年度を入力してください。");
+      if (!recipient) throw new Error("出荷先・相手先を入力してください。");
+      if (pricePer60Kg === "") throw new Error("60kgあたりの単価を入力してください。");
+    }
     return {
+      ...row,
+      priceId: String(row.priceId || U.id("shipment_price", U.today())),
+      season: U.number(row.season, 0),
+      recipient,
+      pricePer60Kg,
+      createdAt: String(row.createdAt || U.now()),
+      updatedAt: String(row.updatedAt || U.now())
+    };
+  }
+
+  function normalizeShipment(input, strict = false) {
+    const s = input && typeof input === "object" && !Array.isArray(input) ? input : {};
+    const date = String(s.date || (strict ? "" : U.today())).trim();
+    const season = String(s.season ?? "").trim();
+    const recipient = typeof s.recipient === "string" ? s.recipient.trim() : "";
+    const packageNumber = (value) => typeof value === "number" || typeof value === "string" && value.trim() ? Number(value) : NaN;
+    const packages = ensureArray(s.packages).map((item) => {
+      const row = item && typeof item === "object" && !Array.isArray(item) ? item : {};
+      const kg = packageNumber(row.kg);
+      const bags = packageNumber(row.bags);
+      if (strict && (!Number.isFinite(kg) || kg <= 0 || !Number.isSafeInteger(bags) || bags <= 0)) {
+        throw new Error("袋の重量は正の数、袋数は正の整数を入力してください。");
+      }
+      return { ...row, kg: Number.isFinite(kg) && kg > 0 ? kg : "", bags: Number.isSafeInteger(bags) && bags > 0 ? bags : "" };
+    });
+    if (strict) {
+      const parsedDate = new Date(`${date}T00:00:00Z`);
+      if (typeof s.date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(date) || !Number.isFinite(parsedDate.getTime()) || parsedDate.toISOString().slice(0, 10) !== date) throw new Error("有効な日付を入力してください。");
+      if (!["number", "string"].includes(typeof s.season) || !/^[1-9]\d{3}$/.test(season)) throw new Error("収穫年度を入力してください。");
+      if (!recipient) throw new Error("出荷先・相手先を入力してください。");
+      if (!["shipment", "sale", "gift"].includes(s.kind)) throw new Error("出荷・販売・贈答の区分を選択してください。");
+      if (!["brown", "white"].includes(s.riceType)) throw new Error("玄米・白米の区分を選択してください。");
+      if (!packages.length) throw new Error("袋の重量と袋数を1件以上入力してください。");
+    }
+    return {
+      ...s,
       shipmentId: String(s.shipmentId || s.id || U.id("shipment", date)),
       type: "shipment",
       date,
       season: U.number(s.season, U.season(date)),
+      kind: ["shipment", "sale", "gift"].includes(s.kind) ? s.kind : "shipment",
+      recipient,
       varietyId: String(s.varietyId || ""),
-      quantity: String(s.quantity || ""),
-      amount: String(s.amount || ""),
+      riceType: ["brown", "white"].includes(s.riceType) ? s.riceType : "brown",
+      packages,
+      pricePer60Kg: normalizePricePer60Kg(s.pricePer60Kg, strict),
+      quantity: String(s.quantity ?? ""),
+      amount: String(s.amount ?? ""),
       memo: String(s.memo || ""),
       createdAt: String(s.createdAt || U.now()),
       updatedAt: String(s.updatedAt || U.now())
@@ -1053,7 +1109,15 @@
       fieldId: fieldIds.has(i.fieldId) ? i.fieldId : "",
       batchFieldIds: ensureArray(i.batchFieldIds).filter((id) => fieldIds.has(id))
     }));
-    const shipments = dedupeBy(ensureArray(source.shipments).map(normalizeShipment), "shipmentId");
+    const shipments = dedupeBy(ensureArray(source.shipments).map((row) => normalizeShipment(row)), "shipmentId");
+    const priceKeys = new Set();
+    const shipmentPrices = dedupeBy(ensureArray(source.shipmentPrices).map((row) => normalizeShipmentPrice(row)), "priceId")
+      .filter((row) => {
+        const key = JSON.stringify([row.season, row.recipient]);
+        if (priceKeys.has(key)) return false;
+        priceKeys.add(key);
+        return true;
+      });
     const machines = dedupeBy(ensureArray(source.machines).map(normalizeMachine), "machineId");
     const machineIds = new Set(machines.map((row) => row.machineId));
     // Preserve a record even if its old machine master is missing. The
@@ -1079,6 +1143,7 @@
       materials,
       varietyResults,
       shipments,
+      shipmentPrices,
       confirmationCandidates,
       machines,
       maintenanceRecords,
@@ -1131,6 +1196,7 @@
       materials: [],
       varietyResults: [],
       shipments: [],
+      shipmentPrices: [],
       confirmationCandidates: [],
       machines: [],
       maintenanceRecords: [],
@@ -1181,6 +1247,8 @@
     normalizeHarvestReview,
     normalizeHarvestWeather,
     normalizeMaintenanceRecord,
+    normalizeShipment,
+    normalizeShipmentPrice,
     normalizeGroupLabel,
     normalizeSeasonNote,
     emptyData,

@@ -24,6 +24,7 @@
     "recipes",
     "photos",
     "results",
+    "shipments",
     "other-work"
   ]);
 
@@ -66,7 +67,7 @@
     U.$$(".screen").forEach((section) => {
       section.classList.toggle("active", section.id === `screen-${screenId}`);
     });
-    const navScreen = screenId === "machines" ? "data" : screenId;
+    const navScreen = screenId === "machines" ? "data" : screenId === "shipments" ? "annual" : screenId;
     U.$$(".nav-item").forEach((button) => {
       button.classList.toggle("active", button.dataset.screen === navScreen);
     });
@@ -83,6 +84,10 @@
     // first so Home/Calendar state and any selected calendar date remain.
     if (RiceOS.bottomSheet && RiceOS.bottomSheet.isOpen && RiceOS.bottomSheet.isOpen()) {
       RiceOS.bottomSheet.close();
+      updateBackButton();
+      return;
+    }
+    if (activeScreen === "shipments" && RiceOS.screens.shipments && RiceOS.screens.shipments.canHandleBack() && RiceOS.screens.shipments.handleBack()) {
       updateBackButton();
       return;
     }

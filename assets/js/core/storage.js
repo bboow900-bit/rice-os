@@ -192,6 +192,8 @@
     schedules: "scheduleId",
     dryPeriods: "dryPeriodId",
     irrigations: "irrigationId",
+    shipments: "shipmentId",
+    shipmentPrices: "priceId",
     machines: "machineId",
     maintenanceRecords: "maintenanceId",
     confirmationCandidates: "candidateId"

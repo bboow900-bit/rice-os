@@ -1,5 +1,5 @@
-const CACHE_NAME = "rice-karte-20261002-284";
-const APP_VERSION = "20261002_ver284";
+const CACHE_NAME = "rice-karte-20261002-285";
+const APP_VERSION = "20261002_ver285";
 const CACHE_PREFIX = "rice-karte-";
 const RETAINED_APP_CACHES = 2;
 
@@ -96,6 +96,7 @@ const APP_SHELL = [
   `./assets/js/screens/machines.js?v=${APP_VERSION}`,
   `./assets/js/screens/data.js?v=${APP_VERSION}`,
   `./assets/js/app.js?v=${APP_VERSION}`,
+  `./assets/js/screens/shipments.js?v=${APP_VERSION}`,
   "./assets/icons/icon-192.png",
   "./assets/icons/icon-512.png"
 ];

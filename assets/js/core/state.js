@@ -2120,6 +2120,73 @@
     return growthLogsFor(fieldId).slice().sort((a, b) => String(b.date).localeCompare(String(a.date)))[0] || null;
   }
 
+  function shipments() {
+    return U.clone(data().shipments || []);
+  }
+
+  function saveShipment(record) {
+    const input = record || {};
+    let shipmentId;
+    const saved = mutate((d) => {
+      d.shipments = d.shipments || [];
+      const index = d.shipments.findIndex((row) => row.shipmentId === input.shipmentId);
+      const previous = index >= 0 ? d.shipments[index] : null;
+      const normalized = S.normalizeShipment({
+        ...previous,
+        ...input,
+        createdAt: previous ? previous.createdAt : U.now(),
+        updatedAt: U.now()
+      }, true);
+      shipmentId = normalized.shipmentId;
+      if (index >= 0) d.shipments[index] = normalized;
+      else d.shipments.push(normalized);
+    }, "出荷記録を保存しました");
+    return saved ? U.clone(saved.shipments.find((row) => row.shipmentId === shipmentId)) : null;
+  }
+
+  function deleteShipment(shipmentId) {
+    if (!(data().shipments || []).some((row) => row.shipmentId === shipmentId)) return null;
+    return mutate((d) => {
+      d.shipments = (d.shipments || []).filter((row) => row.shipmentId !== shipmentId);
+    }, "出荷記録を削除しました");
+  }
+
+  function shipmentPrices() {
+    return U.clone(data().shipmentPrices || []);
+  }
+
+  function saveShipmentPrice(record) {
+    const input = record || {};
+    let priceId;
+    const saved = mutate((d) => {
+      d.shipmentPrices = d.shipmentPrices || [];
+      const byId = d.shipmentPrices.find((row) => row.priceId === input.priceId);
+      const candidate = S.normalizeShipmentPrice({ ...byId, ...input }, true);
+      const byKey = d.shipmentPrices.find((row) => row.season === candidate.season && row.recipient === candidate.recipient);
+      if (byId && byKey && byId.priceId !== byKey.priceId) throw new Error("同じ相手先・収穫年度の単価が既にあります。");
+      const previous = byKey || byId;
+      const normalized = {
+        ...previous,
+        ...candidate,
+        priceId: previous ? previous.priceId : candidate.priceId,
+        createdAt: previous ? previous.createdAt : U.now(),
+        updatedAt: U.now()
+      };
+      priceId = normalized.priceId;
+      const index = d.shipmentPrices.findIndex((row) => row.priceId === priceId);
+      if (index >= 0) d.shipmentPrices[index] = normalized;
+      else d.shipmentPrices.push(normalized);
+    }, "相手先の単価を保存しました");
+    return saved ? U.clone(saved.shipmentPrices.find((row) => row.priceId === priceId)) : null;
+  }
+
+  function deleteShipmentPrice(priceId) {
+    if (!(data().shipmentPrices || []).some((row) => row.priceId === priceId)) return null;
+    return mutate((d) => {
+      d.shipmentPrices = (d.shipmentPrices || []).filter((row) => row.priceId !== priceId);
+    }, "相手先の単価を削除しました");
+  }
+
   function machines(options) {
     const opts = options || {};
     return (data().machines || []).filter((row) => opts.includeRetired || row.status !== "使用停止")
@@ -2201,6 +2268,12 @@
     save,
     replace,
     mutate,
+    shipments,
+    saveShipment,
+    deleteShipment,
+    shipmentPrices,
+    saveShipmentPrice,
+    deleteShipmentPrice,
     varieties,
     fields,
     activeFields,

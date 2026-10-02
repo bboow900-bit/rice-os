@@ -756,6 +756,7 @@
         </section>
         ` : ""}
         ${topView === "work" ? `
+        <button type="button" class="annual-shipment-entry" data-annual-shipments><b>出荷・配布</b><span>渡した先・袋数の履歴を見る ›</span></button>
         <details class="annual-hub-summary"><summary>サマリー</summary>${renderSummary(rows)}</details>
         ${renderWorkArchive(rows)}
         ${renderUsedMaterials()}
@@ -1068,7 +1069,7 @@
     return `
       <article class="annual-entry annual-${U.attr(row.kindClass)} annual-work-card">
         <div class="annual-entry-main annual-work-main">
-          <span class="annual-kind-icon ${row.kind === "fieldWork" ? "annual-work-icon" : ""}">${row.kind === "fieldWork" ? iconSvg(workIconClass(row.title), "annual-entry-svg") : U.escapeHTML(row.kindIcon || row.kindLabel.slice(0, 1))}</span>
+          <span class="annual-kind-icon ${row.kind === "fieldWork" ? "annual-work-icon" : ""}">${row.kind === "fieldWork" && /草刈り/.test(row.title) ? '<img class="annual-entry-svg" src="assets/images/light-icons/mowing-worker.png" alt="草刈り作業">' : row.kind === "fieldWork" ? iconSvg(workIconClass(row.title), "annual-entry-svg") : U.escapeHTML(row.kindIcon || row.kindLabel.slice(0, 1))}</span>
           <div class="annual-entry-title">
             <time>${showDate ? U.escapeHTML(U.fd(row.date)) : ""}</time>
             <b>${U.escapeHTML(row.title)}</b>
@@ -2475,6 +2476,11 @@
       if (event.target.matches("[data-annual-work-list]")) workArchiveOpen = event.target.open;
     }, true);
     U.$("annualTimeline").addEventListener("click", (event) => {
+      if (event.target.closest("[data-annual-shipments]")) {
+        if (RiceOS.navigation) RiceOS.navigation.clear();
+        RiceOS.app.openInput("shipments", "annual");
+        return;
+      }
       const hubView = event.target.closest("[data-annual-hub-view]");
       if (hubView && ["fields", "work", "compare"].includes(hubView.dataset.annualHubView)) {
         topView = hubView.dataset.annualHubView;

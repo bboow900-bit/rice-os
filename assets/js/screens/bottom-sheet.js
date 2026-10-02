@@ -529,6 +529,12 @@
         showScheduleForm();
       } else if (action === "result") {
         openScreen("results");
+      } else if (action === "shipment") {
+        const originScreen = RiceOS.app.currentScreen();
+        close();
+        if (RiceOS.navigation) RiceOS.navigation.clear();
+        RiceOS.app.openInput("shipments", originScreen);
+        RiceOS.screens.shipments.openNew(selectedDate);
       }
     });
     if (U.$("sheetScheduleForm")) {
