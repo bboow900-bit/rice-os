@@ -7,6 +7,10 @@
 
   let selectedFieldId = "";
   let selectedTab = "karte";
+  let topView = "fields";
+  let hubNotesOpen = false;
+  let workArchiveOpen = false;
+  let compareFromHub = false;
   let annualSearchValue = "";
   let annualSortValue = "updated";
   let workScopeFilter = "all";
@@ -696,7 +700,7 @@
       : `<span class="annual-status-badge ${U.attr(status.tone)}">${U.escapeHTML(status.label)}</span>`;
     return `
       <article class="annual-field-pick-card status-${U.attr(status.tone)}">
-        <button type="button" class="annual-field-pick-open" data-annual-open-field="${U.attr(field.fieldId)}" aria-label="${U.attr(field.name)}の圃場履歴を開く">
+        <button type="button" class="annual-field-pick-open" data-annual-hub-open-field="${U.attr(field.fieldId)}" data-annual-open-field="${U.attr(field.fieldId)}" aria-label="${U.attr(field.name)}の圃場履歴を開く">
           <span class="annual-field-plant stage-${U.attr(String(riceStage).padStart(2, "0"))}" aria-hidden="true">${annualPickerRiceImage(riceStage)}</span>
           <div class="annual-field-pick-main">
           <div class="annual-field-pick-head">
@@ -721,10 +725,15 @@
   }
 
   function renderTop(rows) {
-    const fields = filteredFields();
+    const fields = topView === "fields" ? filteredFields() : [];
     return `
       <div class="annual-v2-top">
-        ${renderNextSeasonIdeas()}
+        <div class="annual-hub-tools"><button type="button" data-annual-hub-notes aria-expanded="${hubNotesOpen}" aria-controls="annualHubNotes">来年メモ</button></div>
+        <div class="annual-hub-nav" role="group" aria-label="振り返りの表示">
+          ${[["fields", "圃場の一年"], ["work", "作業・資材"], ["compare", "年の比較"]].map(([value, label]) => `<button type="button" data-annual-hub-view="${value}" class="${topView === value ? "active" : ""}" aria-pressed="${topView === value}">${label}</button>`).join("")}
+        </div>
+        <div class="annual-hub-panel" data-annual-hub-panel="${topView}">
+        ${topView === "fields" ? `
         <section class="annual-field-picker">
           <div class="section-title compact">
             <h3>圃場から振り返る</h3>
@@ -745,13 +754,27 @@
             ${fields.length ? fields.map(renderFieldPickerCard).join("") : '<div class="empty">条件に合う圃場がありません。</div>'}
           </div>
         </section>
-        ${renderSummary(rows)}
+        ` : ""}
+        ${topView === "work" ? `
+        <details class="annual-hub-summary"><summary>サマリー</summary>${renderSummary(rows)}</details>
         ${renderWorkArchive(rows)}
         ${renderUsedMaterials()}
         ${RiceOS.herbicideUI ? RiceOS.herbicideUI.renderReview(null, yearValue()) : ""}
+        ` : ""}
+        ${topView === "compare" ? renderHubCompare() : ""}
+        </div>
+        <div id="annualHubNotes"${hubNotesOpen ? "" : " hidden"}>${hubNotesOpen ? renderNextSeasonIdeas() : ""}</div>
         ${renderAnnualFab()}
       </div>
     `;
+  }
+
+  function renderHubCompare() {
+    const year = reviewYearValue();
+    const fields = state.activeFields();
+    return `<section class="annual-hub-compare"><div class="section-title compact"><h3>圃場の年度比較</h3><span>${U.escapeHTML(year)}年 / ${Number(year) - 1}年</span></div>
+      ${yearValue() === "all" ? `<p class="muted">全年度を選択中のため、比較は${U.escapeHTML(year)}年と前年を表示します。</p>` : ""}
+      <div class="annual-field-pick-grid">${fields.length ? fields.map((field) => `<button type="button" class="annual-hub-compare-card" data-annual-hub-compare-field="${U.attr(field.fieldId)}" aria-label="${U.attr(field.name)}の年度比較を開く"><span class="annual-hub-compare-thumb" aria-hidden="true">${annualPickerRiceImage(riceStageNumberForField(field))}</span><span class="annual-hub-compare-main"><b>${U.escapeHTML(field.name)}</b><small>${U.escapeHTML(varietyName(field))}${field.areaA ? ` / ${U.escapeHTML(field.areaA)}a` : ""}</small></span><span class="annual-hub-compare-arrow" aria-hidden="true">›</span></button>`).join("") : '<div class="empty">比較する圃場がありません。</div>'}</div></section>`;
   }
 
   function renderWorkArchive(rows) {
@@ -762,7 +785,7 @@
     });
     return `<section class="annual-work-archive"><div class="section-title compact"><h3>作業を振り返る</h3><span>${visible.length}件</span></div>
       <div class="annual-compare-filter-row" role="group" aria-label="作業の対象">${[["all", "すべての作業"], ["field", "圃場作業"], ["offField", "圃場外作業"]].map(([value, label]) => `<button type="button" class="${workScopeFilter === value ? "active" : ""}" aria-pressed="${workScopeFilter === value}" data-annual-work-scope="${value}">${label}</button>`).join("")}</div>
-      <details><summary>作業履歴を見る（${visible.length}件）</summary><div class="card-list">${visible.length ? visible.map((row) => renderEntry(row, true)).join("") : '<div class="empty">この対象の作業記録はありません。</div>'}</div></details></section>`;
+      <details data-annual-work-list${workArchiveOpen ? " open" : ""}><summary>作業履歴を見る（${visible.length}件）</summary><div class="card-list">${visible.length ? visible.map((row) => renderEntry(row, true)).join("") : '<div class="empty">この対象の作業記録はありません。</div>'}</div></details></section>`;
   }
 
   function renderNextSeasonIdeas() {
@@ -2189,6 +2212,7 @@
       const opened = RiceOS.navigation.openRecord(kind, id, {
         fieldId: selectedFieldId,
         originScreen: "annual",
+        returnToAnnualHub: !selectedFieldId,
         tab: selectedTab,
         returnToAnnualFieldId: selectedFieldId,
         returnToAnnualTab: selectedTab
@@ -2263,6 +2287,7 @@
   function closeFieldDetail() {
     if (!selectedFieldId) return false;
     selectedFieldId = "";
+    compareFromHub = false;
     selectedTab = "karte";
     seasonNoteDraft = null;
     waterEditDraft = null;
@@ -2294,6 +2319,7 @@
       return true;
     }
     if (reviewView === "compare") {
+      if (compareFromHub) return closeFieldDetail();
       reviewView = "overview";
       compareFilter = "work";
       render();
@@ -2389,6 +2415,7 @@
   }
 
   function openField(fieldId, tab) {
+    compareFromHub = false;
     selectedFieldId = fieldId || "";
     selectedTab = tab || "karte";
     waterEditDraft = null;
@@ -2404,6 +2431,7 @@
 
   function switchFieldWithinAnnual(fieldId) {
     if (!fieldId || fieldId === selectedFieldId || !state.field(fieldId)) return false;
+    compareFromHub = false;
     // The selector is a review filter, not a new navigation destination.
     // Editing still receives the selected field as its explicit return target.
     selectedFieldId = fieldId;
@@ -2421,7 +2449,13 @@
     return true;
   }
 
-  function resetNavigation() {
+  function resetNavigation(options) {
+    if (!options || !options.preserveHub) {
+      topView = "fields";
+      hubNotesOpen = false;
+      workArchiveOpen = false;
+    }
+    compareFromHub = false;
     selectedFieldId = "";
     selectedTab = "karte";
     seasonNoteDraft = null;
@@ -2437,10 +2471,49 @@
   function bind() {
     const year = U.$("annualYear");
     if (year) year.addEventListener("change", render);
+    U.$("annualTimeline").addEventListener("toggle", (event) => {
+      if (event.target.matches("[data-annual-work-list]")) workArchiveOpen = event.target.open;
+    }, true);
     U.$("annualTimeline").addEventListener("click", (event) => {
+      const hubView = event.target.closest("[data-annual-hub-view]");
+      if (hubView && ["fields", "work", "compare"].includes(hubView.dataset.annualHubView)) {
+        topView = hubView.dataset.annualHubView;
+        render();
+        return;
+      }
+      if (event.target.closest("[data-annual-hub-notes]")) {
+        hubNotesOpen = !hubNotesOpen;
+        render();
+        return;
+      }
+      const hubCompare = event.target.closest("[data-annual-hub-compare-field]");
+      if (hubCompare) {
+        const id = hubCompare.dataset.annualHubCompareField;
+        if (!state.field(id)) return;
+        selectedFieldId = id;
+        selectedTab = "karte";
+        reviewView = "compare";
+        compareFromHub = true;
+        compareFilter = "work";
+        recordDetail = null;
+        expandedFlowRecord = "";
+        timelineActionRecord = null;
+        waterEditDraft = null;
+        seasonNoteDraft = null;
+        render();
+        window.scrollTo({ top: 0, behavior: "smooth" });
+        return;
+      }
+      const hubField = event.target.closest("[data-annual-hub-open-field]");
+      if (hubField) {
+        const id = hubField.dataset.annualHubOpenField;
+        if (state.field(id)) openField(id, "karte");
+        return;
+      }
       const scopeButton = event.target.closest("[data-annual-work-scope]");
       if (scopeButton) {
         workScopeFilter = scopeButton.dataset.annualWorkScope;
+        workArchiveOpen = true;
         render();
         return;
       }
@@ -2510,6 +2583,11 @@
         return;
       }
       if (event.target.closest("[data-annual-close-compare]")) {
+        if (compareFromHub) {
+          closeFieldDetail();
+          window.scrollTo({ top: 0, behavior: "smooth" });
+          return;
+        }
         reviewView = "overview";
         compareFilter = "work";
         render();

@@ -375,7 +375,7 @@
       return true;
     }
     if (origin === "annual" && RiceOS.screens.annual && RiceOS.screens.annual.resetNavigation) {
-      RiceOS.screens.annual.resetNavigation();
+      RiceOS.screens.annual.resetNavigation({ preserveHub: Boolean(options.returnToAnnualHub) });
     }
     if (RiceOS.screens.fields && RiceOS.screens.fields.resetNavigation) {
       RiceOS.screens.fields.resetNavigation();

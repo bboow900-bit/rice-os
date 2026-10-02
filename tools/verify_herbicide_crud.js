@@ -149,4 +149,44 @@ noop(() => submit(observationForm), false);
 for (const key of ["herbicidePrograms", "herbicideAssignments", "herbicideObservations"]) {
   assert.equal(JSON.stringify(R.storage.loadData().meta[key]), JSON.stringify(state.data().meta[key]));
 }
-console.log("PASS herbicide CRUD: stable IDs, historical protection, stale edits, confirmed deletion, cancellation, rollback and persistence");
+// Exercise the actual program form and material change handler, not private helpers.
+const materialCount = state.data().materials.length;
+const controls = Object.fromEntries(Object.entries({
+  "[data-h-category]": "Free product category", "[data-h-material]": "",
+  "[data-h-material-name]": '  Product <A> "quoted"  ', "[data-h-timing]": "", "[data-h-purpose]": ""
+}).map(([selector, value]) => [selector, { value }]));
+const freeStep = { dataset: { hStep: "free-ui" }, querySelector: selector => controls[selector] };
+const freeForm = { ...programForm, dataset: {}, elements: { name: { value: "Free UI program" }, reviewYears: { value: "3" } }, querySelectorAll: () => [freeStep] };
+submit(freeForm);
+const freeSaved = H.programs().find(p => p.name === "Free UI program");
+assert.equal(freeSaved.steps[0].materialName, 'Product <A> "quoted"');
+assert.equal(state.data().materials.length, materialCount);
+click("data-h-edit", "hEdit", freeSaved.programId);
+assert(node("herbicideProgramEditor").innerHTML.includes('data-h-material-name value="Product &lt;A&gt; &quot;quoted&quot;"'));
+assert(!node("herbicideProgramEditor").innerHTML.includes(" readonly"));
+noop(() => click("data-h-cancel-program", "hCancelProgram", ""), false);
+assert.equal(node("herbicideProgramEditor").innerHTML, "");
+assert(state.saveMaterial({ name: "Short", formalName: "Canonical product", category: "\u9664\u8349\u5264" }));
+const master = state.data().materials.at(-1);
+const select = controls["[data-h-material]"];
+select.closest = selector => selector === "[data-h-material]" ? select : freeStep;
+select.value = master.materialId;
+handlers.change.forEach(handler => handler({ target: select }));
+assert.equal(controls["[data-h-material-name]"].value, "Canonical product");
+assert.equal(controls["[data-h-material-name]"].readOnly, true);
+freeForm.dataset.programId = freeSaved.programId;
+submit(freeForm);
+click("data-h-edit", "hEdit", freeSaved.programId);
+assert(node("herbicideProgramEditor").innerHTML.includes('data-h-material-name value="Canonical product" readonly'));
+select.value = "";
+handlers.change.forEach(handler => handler({ target: select }));
+assert.equal(controls["[data-h-material-name]"].readOnly, false);
+assert.equal(controls["[data-h-material-name]"].value, "Canonical product", "Unlinking retains an editable name");
+controls["[data-h-material-name]"].value = "  Edited direct name  ";
+submit(freeForm);
+const editedStep = H.programs().find(p => p.programId === freeSaved.programId).steps[0];
+assert.equal(editedStep.materialId, "");
+assert.equal(editedStep.materialName, "Edited direct name");
+assert.equal(R.storage.loadData().meta.herbicidePrograms.find(p => p.programId === freeSaved.programId).steps[0].materialName, "Edited direct name");
+assert.equal(state.data().materials.length, materialCount + 1);
+console.log("PASS herbicide CRUD: stable IDs, historical protection, stale edits, confirmed deletion, cancellation, rollback, persistence and direct-name UI");

@@ -27,6 +27,7 @@ const program = H.saveProgram({ name: "Test program", steps: [{ id: "step-a", ca
 assert.ok(program);
 assert.equal(program.revision, 1);
 assert.equal(program.reviewYears, 3);
+assert.equal(program.steps[0].materialName, "Original formal name", "Saving a linked step stores its canonical name");
 for (const patch of [{ steps: [] }, { steps: [{ category: " " }] }, { steps: [{ category: "Custom", materialId: "missing" }] }, ...[0, 21, 1.5, "bad", null, true].map((reviewYears) => ({ reviewYears }))]) {
   const before = JSON.stringify(state.data());
   assert.equal(H.saveProgram({ ...program, ...patch }), null);
@@ -187,4 +188,25 @@ assert.ok(state.saveFieldWork({ ...linkedSave, fieldIds: [fields[0]] }));
 assert.equal(state.data().fieldWorks.find(row => row.workId === linkedSave.workId).herbicideLinks.length, 1);
 assert.ok(state.saveFieldWork({ ...linkedSave, workName: "草刈り" }));
 assert.equal(state.data().fieldWorks.find(row => row.workId === linkedSave.workId).herbicideLinks.length, 0);
-console.log("PASS herbicide programs: group snapshots, revisions, replacement history, observation validation, persistence and exact work links");
+const masterBeforeFreeInput = JSON.stringify(state.data().materials);
+const freeProgram = H.saveProgram({ name: "Free-name program", steps: [
+  { id: "free", category: "Custom", materialName: "  Free product name  " },
+  { id: "unknown", category: "Undecided", materialName: "   " }
+] });
+assert.equal(freeProgram.steps[0].materialName, "Free product name");
+assert.equal(freeProgram.steps[0].materialId, "");
+assert.equal(freeProgram.steps[1].materialName, "", "An unknown product remains allowed");
+const freeAssignment = H.assignProgram({ programId: freeProgram.programId, year: 2050, fieldIds: [fields[0]] })[0];
+assert.equal(freeAssignment.steps[0].materialName, "Free product name");
+assert.equal(freeAssignment.steps[0].registrationNumber, "");
+assert.equal(freeAssignment.steps[1].materialName, "");
+const snapshotsBeforeEdit = JSON.stringify(H.assignments());
+const renamedFree = H.saveProgram({ ...freeProgram, steps: freeProgram.steps.map(step => ({ ...step, materialName: step.id === "free" ? "  Edited free name  " : "" })) });
+assert.equal(renamedFree.steps[0].materialName, "Edited free name");
+assert.equal(JSON.stringify(H.assignments()), snapshotsBeforeEdit, "Template edits must not rewrite any assignment snapshot");
+assert.equal(JSON.stringify(state.data().materials), masterBeforeFreeInput, "Free names must never create master materials");
+assert.equal(RiceOS.storage.loadData().meta.herbicidePrograms.find(p => p.programId === freeProgram.programId).steps[0].materialName, "Edited free name");
+assert.equal(RiceOS.schema.normalize(JSON.parse(JSON.stringify(state.data()))).meta.herbicideAssignments.find(a => a.assignmentId === freeAssignment.assignmentId).steps[0].materialName, "Free product name");
+const linkedName = H.saveProgram({ name: "Canonical name", steps: [{ category: "Custom", materialId, materialName: "Incorrect typed name" }] });
+assert.equal(linkedName.steps[0].materialName, "Renamed", "Master short name is canonical when formal name is empty");
+console.log("PASS herbicide programs: group snapshots, revisions, replacement history, observation validation, persistence, exact work links and free material names");

@@ -15134,3 +15134,116 @@ label {
 #screen-annual .annual-field-pick-card {
   grid-template-columns: minmax(0, 1fr) auto !important;
 }
+
+/* Review entry points; field history layouts remain unchanged. */
+#screen-annual .annual-hub-nav {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid #d5e2d6;
+  border-radius: 8px;
+  background: #edf3ef;
+  margin-bottom: 16px;
+}
+#screen-annual .annual-hub-nav button {
+  min-width: 0;
+  min-height: 48px;
+  margin: 0;
+  padding: 10px 4px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  box-shadow: none;
+  font-size: 13px;
+  line-height: 1.5;
+  font-weight: 750;
+  color: #43584a;
+  overflow-wrap: anywhere;
+  letter-spacing: 0;
+}
+#screen-annual .annual-hub-nav button.active,
+#screen-annual .annual-hub-nav button[aria-selected="true"] {
+  background: #207644;
+  color: #fff;
+  box-shadow: 0 2px 4px #173d1820;
+}
+#screen-annual .annual-hub-nav button:focus-visible,
+#screen-annual [data-annual-hub-notes]:focus-visible {
+  outline: 3px solid #236c96;
+  outline-offset: 2px;
+}
+#screen-annual .annual-hub-panel {
+  min-width: 0;
+  padding-bottom: 12px;
+}
+#screen-annual .annual-hub-panel > .section-title {
+  margin: 0 0 12px;
+}
+#screen-annual .annual-hub-panel .annual-work-archive > .section-title {
+  border-left: 3px solid #2b8759;
+  padding-left: 10px;
+}
+#screen-annual .annual-hub-panel > details {
+  padding: 12px 0;
+  border: 0;
+  border-top: 1px solid #dce3dc;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+#screen-annual .annual-hub-panel > details > summary {
+  min-height: 44px;
+  padding: 10px 2px;
+  font-size: 15px;
+  font-weight: 700;
+  color: #2a4936;
+  cursor: pointer;
+}
+#screen-annual [data-annual-hub-notes] {
+  min-height: 44px;
+  padding: 10px 14px;
+  color: #47633e;
+  border: 1px solid #cedbbf;
+  border-radius: 8px;
+  background: #f8fbf2;
+  box-shadow: none;
+  font-size: 13px;
+}
+#screen-annual .annual-hub-panel .annual-work-archive .annual-compare-filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 12px 0;
+}
+#screen-annual .annual-hub-panel .annual-work-archive .annual-compare-filter-row button {
+  min-height: 44px;
+  flex: 1 1 84px;
+  font-size: 12px;
+  padding: 8px;
+}
+#screen-annual .annual-hub-tools { display: flex; justify-content: flex-end; margin-bottom: 8px; }
+#screen-annual .annual-hub-panel .annual-field-pick-card { padding: 12px !important; gap: 8px !important; }
+#screen-annual .annual-hub-panel .annual-field-pick-open { grid-template-columns: 48px minmax(0, 1fr) !important; gap: 10px !important; box-shadow: none !important; border-radius: 0 !important; background: transparent !important; }
+#screen-annual .annual-hub-panel .annual-field-plant { width: 48px !important; height: 64px !important; }
+#screen-annual .annual-hub-panel .annual-field-pick-head { display: block !important; }
+#screen-annual .annual-hub-panel .annual-field-pick-head b { font-size: 16px !important; line-height: 1.5 !important; }
+#screen-annual .annual-hub-panel .annual-field-pick-head em { display: block; font-size: 12px !important; line-height: 1.5; }
+#screen-annual .annual-hub-panel .annual-field-pick-head strong { font-size: 12px !important; line-height: 1.5; }
+#screen-annual .annual-hub-panel .annual-field-pick-main > small { font-size: 11px !important; line-height: 1.6 !important; }
+#screen-annual .annual-hub-panel .annual-field-pick-metrics { display: flex !important; flex-wrap: wrap !important; gap: 4px 8px !important; overflow: visible !important; }
+#screen-annual .annual-hub-panel .annual-field-pick-metrics span { font-size: 11px !important; line-height: 1.6; }
+#screen-annual .annual-hub-panel .annual-status-badge { font-size: 11px !important; min-height: 44px; align-self: center; }
+#screen-annual .annual-hub-compare-card { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-height: 76px; padding: 14px; border: 1px solid #d5e2d6; border-radius: 8px; background: #fff; color: #254c36; text-align: left; box-shadow: none; }
+#screen-annual .annual-hub-compare-card b { font-size: 16px; }
+#screen-annual .annual-hub-compare-card span { font-size: 12px; line-height: 1.6; }
+#screen-annual .annual-hub-compare-thumb { width: 44px; height: 58px; flex: 0 0 44px; }
+#screen-annual .annual-hub-compare-thumb img { width: 100%; height: 100%; object-fit: contain; }
+#screen-annual .annual-hub-compare-main { flex: 1; min-width: 0; }
+#screen-annual .annual-hub-compare-main b, #screen-annual .annual-hub-compare-main small { display: block; overflow-wrap: anywhere; }
+#screen-annual .annual-hub-compare-arrow { flex: 0 0 16px; font-size: 22px !important; }
+#screen-annual .annual-hub-panel .annual-field-pick-head > div { display: block !important; }
+#screen-annual .annual-hub-panel .annual-field-pick-head b { white-space: normal !important; overflow-wrap: anywhere; }
+#screen-annual .annual-hub-panel .annual-field-pick-main > small { white-space: normal !important; }
+#screen-annual .annual-hub-panel .annual-field-pick-metrics span { flex: 0 0 auto !important; }
+#screen-annual .annual-hub-panel .annual-work-archive > .section-title { align-items: center; justify-content: space-between; flex-direction: row; text-align: left; }

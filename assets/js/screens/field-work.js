@@ -782,7 +782,7 @@
         U.$("fwHerbicideCategory").value = choice.step.category;
         U.$("fwHerbicidePurpose").value = choice.step.purpose || "";
         const master = state.data().materials.find((m) => m.materialId === choice.step.materialId);
-        U.$("fwMaterial").value = master ? master.name || master.formalName : "";
+        U.$("fwMaterial").value = master ? master.name || master.formalName : choice.step.materialName || "";
         U.$("fwMaterial").dataset.autoFilled = "0";
         renderMaterialPicker(master ? master.materialId : "");
       }

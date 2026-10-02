@@ -57,11 +57,13 @@
       const ids = new Set();
       const steps = next.steps.map((step) => {
         if (!step || typeof step !== "object") throw new Error("工程の形式を確認してください。");
-        materialFor(step, data);
+        const material = materialFor(step, data);
         const id = text(step.id || U.id("herbicide-step", U.today()));
         if (ids.has(id)) throw new Error("工程IDが重複しています。");
         ids.add(id);
-        return { ...copy(step), id, category: text(step.category), materialId: text(step.materialId), plannedTiming: text(step.plannedTiming), purpose: text(step.purpose) };
+        return { ...copy(step), id, category: text(step.category), materialId: text(step.materialId),
+          materialName: material ? text(material.formalName || material.name) : text(step.materialName).trim(),
+          plannedTiming: text(step.plannedTiming), purpose: text(step.purpose) };
       });
       const program = { ...next, programId: previous ? previous.programId : U.id("herbicide-program", U.today()),
         name: text(next.name).trim(), steps, reviewYears: reviewYears(next.reviewYears), revision: previous ? Number(previous.revision || 0) + 1 : 1,
@@ -82,7 +84,7 @@
       if (!Array.isArray(program.steps) || !program.steps.length) throw new Error("工程を追加してください。");
       const steps = program.steps.map((step) => {
         const material = materialFor(step, data);
-        return { ...copy(step), materialName: material ? text(material.formalName || material.name) : "",
+        return { ...copy(step), materialName: material ? text(material.formalName || material.name) : text(step.materialName).trim(),
           registrationNumber: material ? text(material.registrationNumber) : "" };
       });
       if (input.fieldIds !== undefined && !Array.isArray(input.fieldIds)) throw new Error("対象圃場を確認してください。");

@@ -64,7 +64,8 @@ async function main() {
   const materialB = state.data().materials.find(m => m.name === "Product B").materialId;
   const program = H.saveProgram({ name: "Program", steps: [
     { id: "a", category: "planned A", materialId: materialA, purpose: "planned reason A" },
-    { id: "b", category: "planned B", materialId: materialB, purpose: "planned reason B" }
+    { id: "b", category: "planned B", materialId: materialB, purpose: "planned reason B" },
+    { id: "free-name", category: "planned free", materialId: "", materialName: "Free product", purpose: "free reason" }
   ] });
   const [assignment] = H.assignProgram({ programId: program.programId, year: 2026, fieldIds: [fieldId] });
   const links = [{ fieldId, assignmentId: assignment.assignmentId, stepId: "a" }];
@@ -78,6 +79,8 @@ async function main() {
     assert.deepEqual(values(), expected, "Opening history must not apply planned values");
     await fire("fwHerbicideStep", "change", "step:b");
     assert.deepEqual(values(), ["Product B", materialB, "planned B", "planned reason B"]);
+    await fire("fwHerbicideStep", "change", "step:free-name");
+    assert.deepEqual(values(), ["Free product", "", "planned free", "free reason"]);
     await fire("fwHerbicideStep", "change", "saved");
     assert.deepEqual(values(), expected, "Restoring saved links must restore actual values");
     assert.equal(node("fwMaterial").dataset.autoFilled, "0");

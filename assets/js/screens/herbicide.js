@@ -11,9 +11,12 @@
 
   function stepEditor(step, index) {
     const materials = state.data().materials.filter((m) => m.category === "除草剤" || m.materialId === step.materialId);
+    const material = materials.find((m) => m.materialId === step.materialId);
+    const materialName = material ? material.formalName || material.name : step.materialName || "";
     return `<fieldset class="herbicide-step-editor" data-h-step="${attr(step.id || U.id("herbicide-step", U.today()))}"><legend>処理 ${index + 1}</legend>
       <label>区分<input data-h-category list="herbicideCategories" value="${attr(step.category || "")}" required></label>
-      <label>除草剤<select data-h-material>${option("", "資材は未定", step.materialId)}${materials.map((m) => option(m.materialId, `${m.name} / ${m.season}`, step.materialId)).join("")}</select></label>
+      <label>台帳から選択<select data-h-material>${option("", "自由入力・未定", step.materialId)}${step.materialId && !material ? option(step.materialId, "保存済みの資材（台帳なし）", step.materialId) : ""}${materials.map((m) => option(m.materialId, `${m.formalName || m.name} / ${m.season}`, step.materialId)).join("")}</select></label>
+      <label>除草剤名<input data-h-material-name value="${attr(materialName)}"${step.materialId ? " readonly" : ""}></label>
       <label>予定の時期<input data-h-timing value="${attr(step.plannedTiming || "")}" placeholder="例: 田植え時、雑草の発生を見て"></label>
       <label>選択理由<input data-h-purpose list="herbicidePurposes" value="${attr(step.purpose || "")}"></label>
       <button type="button" class="secondary" data-h-remove-step>この処理を外す</button></fieldset>`;
@@ -79,6 +82,14 @@
   }
 
   function bind() {
+    document.addEventListener("change", (event) => {
+      const select = event.target.closest("[data-h-material]");
+      if (!select) return;
+      const input = select.closest("[data-h-step]").querySelector("[data-h-material-name]");
+      const material = state.data().materials.find((m) => m.materialId === select.value);
+      input.readOnly = Boolean(select.value);
+      if (material) input.value = material.formalName || material.name || "";
+    });
     document.addEventListener("click", (event) => {
       const el = event.target.closest("button");
       if (!el) return;
@@ -109,7 +120,7 @@
       const form = event.target;
       if (form.id === "herbicideProgramForm") {
         event.preventDefault();
-        const steps = Array.from(form.querySelectorAll("[data-h-step]")).map((el) => ({ id: el.dataset.hStep, category: el.querySelector("[data-h-category]").value, materialId: el.querySelector("[data-h-material]").value, plannedTiming: el.querySelector("[data-h-timing]").value, purpose: el.querySelector("[data-h-purpose]").value }));
+        const steps = Array.from(form.querySelectorAll("[data-h-step]")).map((el) => ({ id: el.dataset.hStep, category: el.querySelector("[data-h-category]").value, materialId: el.querySelector("[data-h-material]").value, materialName: el.querySelector("[data-h-material-name]").value, plannedTiming: el.querySelector("[data-h-timing]").value, purpose: el.querySelector("[data-h-purpose]").value }));
         if (H.saveProgram({ programId: form.dataset.programId || undefined, name: form.elements.name.value, reviewYears: Number(form.elements.reviewYears.value), steps })) U.$("herbicideProgramEditor").replaceChildren();
       }
       if (form.id === "herbicideAssignmentForm") {
