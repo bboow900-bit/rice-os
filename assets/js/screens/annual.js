@@ -300,7 +300,8 @@
   }
 
   function completedWaterSchedule(item) {
-    return Boolean(item && item.recordKind === "water" && (item.completedAt || item.completedByWaterPeriodId || item.completionLink));
+    return Boolean(RiceOS.calendar && RiceOS.calendar.hasActualWaterCompletion
+      && RiceOS.calendar.hasActualWaterCompletion(item));
   }
 
   function allRows() {

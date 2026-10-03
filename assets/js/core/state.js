@@ -944,6 +944,7 @@
         season: U.season(date),
         fieldId: record.fieldId || "",
         leafCount: record.leafCount || "",
+        sourceScheduleId: record.sourceScheduleId === undefined ? previous && previous.sourceScheduleId || "" : String(record.sourceScheduleId || ""),
         tillerCount: record.tillerCount || "",
         plantHeightCm: record.plantHeightCm || "",
         panicleLengthMm: record.panicleLengthMm || "",
@@ -967,6 +968,7 @@
         createdAt: record.createdAt || previous && previous.createdAt || U.now(),
         updatedAt: U.now()
       };
+      reconcileGrowthSchedules(d, normalized, previous, record);
       const index = d.growthLogs.findIndex((g) => g.logId === normalized.logId);
       if (index >= 0) d.growthLogs[index] = { ...d.growthLogs[index], ...normalized };
       else d.growthLogs.push(normalized);
@@ -1015,6 +1017,70 @@
       });
   }
 
+  function growthScheduleEvent(schedule) {
+    if (schedule.targetScope === "offField" || schedule.recordKind === "water") return "";
+    const name = `${schedule.title || ""} ${schedule.scheduleType || ""}`;
+    const panicle = /幼穂/.test(name);
+    const heading = /出穂/.test(name);
+    return panicle === heading ? "" : panicle ? "panicle" : "heading";
+  }
+
+  function growthMatchesSchedule(schedule, log, evidence) {
+    const event = growthScheduleEvent(schedule);
+    const ids = schedule.fieldIds || [];
+    // A single growth row cannot prove completion for a multi-field legacy plan.
+    if (!event || ids.length !== 1 || ids[0] !== log.fieldId) return false;
+    if (String(schedule.season) !== String(log.season)
+      || String(U.season(schedule.date)) !== String(log.season)) return false;
+    return event === "heading" ? evidence.headingObserved === true
+      : ["string", "number"].includes(typeof evidence.panicleLengthMm)
+        && Number.isFinite(Number(evidence.panicleLengthMm)) && Number(evidence.panicleLengthMm) > 0;
+  }
+
+  function growthLinkOwned(schedule, logId) {
+    const link = schedule.completionLink;
+    return link && link.kind === "growth" && link.recordId === logId
+      && !schedule.completedManuallyAt && schedule.status !== "手動完了"
+      && !schedule.completedByWorkId && !schedule.completedByWaterPeriodId;
+  }
+
+  function reopenGrowthSchedule(schedule) {
+    schedule.status = "予定";
+    schedule.completedAt = "";
+    schedule.completionLink = undefined;
+    schedule.completionReason = "";
+    schedule.updatedAt = U.now();
+  }
+
+  function reconcileGrowthSchedules(d, log, previous, evidence) {
+    const moved = previous && (previous.date !== log.date || previous.fieldId !== log.fieldId);
+    let reopened = false;
+    (d.schedules || []).forEach((schedule) => {
+      if (!growthLinkOwned(schedule, log.logId)) return;
+      if (schedule.scheduleId !== log.sourceScheduleId) {
+        reopenGrowthSchedule(schedule);
+        return;
+      }
+      if (moved || !growthMatchesSchedule(schedule, log, evidence)
+        || schedule.completionLink.event !== growthScheduleEvent(schedule)) {
+        reopenGrowthSchedule(schedule);
+        reopened = true;
+      }
+    });
+    // A correction must not silently re-complete the plan it just reopened.
+    if (moved || reopened) log.sourceScheduleId = "";
+    const schedule = (d.schedules || []).find((s) => s.scheduleId === log.sourceScheduleId);
+    if (!schedule || !growthMatchesSchedule(schedule, log, evidence)) return;
+    if (schedule.completedManuallyAt || schedule.status === "手動完了"
+      || schedule.completedByWorkId || schedule.completedByWaterPeriodId) return;
+    if (schedule.completedAt || schedule.completionLink) return;
+    schedule.status = "実施済み";
+    schedule.completedAt = U.now();
+    schedule.completionLink = { kind: "growth", recordId: log.logId, fieldId: log.fieldId, event: growthScheduleEvent(schedule) };
+    schedule.completionReason = `${log.date} の生育記録と連動`;
+    schedule.updatedAt = U.now();
+  }
+
   function reconcileGrowthCandidate(d, candidate) {
     // Manual stage judgements are not evidence of an observed heading date.
     const replacement = d.growthLogs
@@ -1034,6 +1100,9 @@
     return mutate((d) => {
       const removed = d.growthLogs.find((g) => g.logId === logId);
       d.growthLogs = d.growthLogs.filter((g) => g.logId !== logId);
+      if (removed) (d.schedules || []).forEach((schedule) => {
+        if (growthLinkOwned(schedule, logId)) reopenGrowthSchedule(schedule);
+      });
       if (!removed || !Array.isArray(d.confirmationCandidates)) return;
 
       // A panicle measurement is the evidence for its own prediction. Removing it
@@ -1299,6 +1368,29 @@
 
   // A water schedule never becomes the source of truth for water management.
   // It is completed only when the exact linked direct period was saved.
+  function isWaterConfirmationSchedule(schedule) {
+    return Boolean(schedule && targetScope(schedule) === "field"
+      && (!schedule.recordKind || schedule.recordKind === "water")
+      && !schedule.waterKind && !schedule.waterPhase
+      && /^中干し確認(?:予定)?$/.test(String(schedule.title || "")));
+  }
+
+  function waterScheduleTarget(schedule) {
+    if (!schedule || targetScope(schedule) !== "field") return null;
+    if (schedule.recordKind && schedule.recordKind !== "water") return null;
+    if (schedule.waterKind || schedule.waterPhase) {
+      return ["dry", "intermittent", "saturated", "deep", "drain"].includes(schedule.waterKind)
+        && ["start", "end"].includes(schedule.waterPhase)
+        ? { kind: schedule.waterKind, phase: schedule.waterPhase } : null;
+    }
+    // Legacy plans use the same explicit start/end meanings as water work names.
+    const title = String(schedule.title || schedule.scheduleType || "").replace(/予定$/, "");
+    const types = [/中干し/, /間断|かんだん/, /飽水/, /深水/, /落水/];
+    if (types.filter((pattern) => pattern.test(title)).length !== 1) return null;
+    if (/開始/.test(title) && /終了|完了/.test(title)) return null;
+    return waterEventFromWorkName(title);
+  }
+
   function completeLinkedWaterSchedule(d, record, recordKind, recordId) {
     const scheduleId = String(record && record.sourceScheduleId || "");
     const phase = String(record && record.sourceSchedulePhase || "");
@@ -1308,12 +1400,16 @@
     const schedule = d.schedules[index];
     if (targetScope(schedule) !== "field") return;
     const waterKind = recordKind === "dry" ? "dry" : waterKindFromMethod(record.method);
-    if (schedule.recordKind !== "water" || schedule.waterKind !== waterKind || schedule.waterPhase !== phase) return;
+    const target = waterScheduleTarget(schedule);
+    if (!target || target.kind !== waterKind || target.phase !== phase) return;
     if ((schedule.fieldIds || []).length !== 1 || schedule.fieldIds[0] !== record.fieldId) return;
     const actualDate = phase === "end" ? String(record.actualEndDate || "") : String(record.startDate || record.date || "");
     // Planned and actual dates may differ. The explicit schedule ID is the link;
     // the actual boundary must still exist for the requested phase.
     if (!actualDate) return;
+    if (String(U.season(actualDate)) !== String(schedule.season)
+      || String(U.season(schedule.date)) !== String(schedule.season)) return;
+    if (schedule.completedManuallyAt || schedule.status === "手動完了" || schedule.completedByWorkId) return;
     const existingLink = schedule.completionLink || null;
     if (schedule.completedAt && (!existingLink || existingLink.recordId !== recordId || existingLink.kind !== recordKind)) return;
     d.schedules[index] = {
@@ -2334,6 +2430,8 @@
     fieldWorksFor,
     isMigratedWaterWork,
     waterEventForWorkName: waterEventFromWorkName,
+    waterScheduleTarget,
+    isWaterConfirmationSchedule,
     growthLogsFor,
     dryPeriodsFor,
     irrigationsFor,

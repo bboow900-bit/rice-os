@@ -78,7 +78,50 @@
   }
 
   function isScheduleDone(schedule) {
-    return Boolean(schedule && (schedule.completedAt || schedule.completedByWorkId || schedule.status === "実施済み" || schedule.status === "手動完了"));
+    return Boolean(schedule && (schedule.completedAt || schedule.completedByWorkId || schedule.completedByWaterPeriodId || schedule.status === "実施済み" || schedule.status === "手動完了"));
+  }
+
+  function isActualEntry(entry) {
+    if (!entry || entry.planned || /^(?:schedule|candidate)/.test(String(entry.tone || ""))) return false;
+    if (!["work", "other", "growth", "water", "dry", "irrigation", "shipment"].includes(entry.kind)) return false;
+    const record = entry.record || {};
+    return !["予定", "planned", "scheduled"].includes(record.status)
+      && !["予定", "planned", "scheduled"].includes(record.periodStatus);
+  }
+
+  function strictDateYear(value) {
+    if (typeof value !== "string" || !/^[1-9]\d{3}-\d{2}-\d{2}$/.test(value)) return "";
+    const [year, month, day] = value.split("-").map(Number);
+    const date = new Date(Date.UTC(year, month - 1, day));
+    return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day
+      ? String(year) : "";
+  }
+
+  function hasActualWaterCompletion(schedule) {
+    if (!schedule || !isScheduleDone(schedule)) return false;
+    const target = state().waterScheduleTarget(schedule);
+    const ids = schedule.fieldIds || [];
+    if (!target || ids.length !== 1) return false;
+    const link = schedule.completionLink || {};
+    if (link.fieldId && link.fieldId !== ids[0]) return false;
+    const id = schedule.completedByWaterPeriodId || (["dry", "irrigation"].includes(link.kind) ? link.recordId : "");
+    if (!id) return false;
+    const kind = target.kind === "dry" ? "dry" : "irrigation";
+    if (schedule.completionLink && (link.kind !== kind || link.recordId !== id || link.event !== target.phase)) return false;
+    const d = state().data();
+    const row = kind === "dry" ? (d.dryPeriods || []).find((item) => item.dryPeriodId === id)
+      : (d.irrigations || []).find((item) => item.irrigationId === id);
+    if (!row || row.fieldId !== ids[0]) return false;
+    if (kind === "irrigation") {
+      const event = state().waterEventForWorkName(`${row.method || ""}開始`);
+      if (!event || event.kind !== target.kind) return false;
+    }
+    const date = target.phase === "end" ? row.actualEndDate : row.startDate;
+    const actualYear = strictDateYear(date);
+    const plannedYear = strictDateYear(schedule.date);
+    return Boolean(actualYear && plannedYear && actualYear === String(schedule.season)
+      && plannedYear === String(schedule.season)
+      && String(row.season) === String(schedule.season));
   }
 
   function scheduleDisplayStatus(schedule) {
@@ -102,7 +145,7 @@
   function entriesForDate(date) {
     const d = state().data();
     const entries = [];
-    (d.schedules || []).filter((x) => x.date === date && !(x.recordKind === "water" && isScheduleDone(x))).forEach((x) => {
+    (d.schedules || []).filter((x) => x.date === date && !hasActualWaterCompletion(x)).forEach((x) => {
       const displayStatus = scheduleDisplayStatus(x);
       entries.push({
         kind: "schedule",
@@ -144,6 +187,26 @@
       entries.push({ kind: "other", tone: "work", title: x.workName,
         subtitle: fieldNames(x.relatedFieldIds) || "圃場外",
         memo: [x.quantity, x.hours ? `時間:${x.hours}` : "", x.memo].filter(Boolean).join(" / "), record: x });
+    });
+    (d.shipments || []).filter((x) => x && x.date === date).forEach((x) => {
+      const packages = Array.isArray(x.packages) ? x.packages : [];
+      const validNumber = (value) => typeof value === "number" || typeof value === "string" && value.trim() !== "";
+      const knownPackages = packages.length && packages.every((row) => row
+        && validNumber(row.kg) && Number.isFinite(Number(row.kg)) && Number(row.kg) > 0
+        && validNumber(row.bags) && Number.isSafeInteger(Number(row.bags)) && Number(row.bags) > 0);
+      const summary = knownPackages ? packages.map((row) => `${Number(row.kg)}kg×${Number(row.bags)}袋`).join("・") : "";
+      const memo = [x.quantity, x.memo].filter((value) => typeof value === "string" && value.trim())
+        .map((value) => value.trim()).join(" / ").replace(/\s+/g, " ");
+      entries.push({
+        kind: "shipment",
+        tone: "shipment",
+        title: x.kind === "gift" ? "おすそ分け" : x.kind === "sale" ? "販売" : "出荷",
+        subtitle: [typeof x.recipient === "string" ? x.recipient.trim() : "",
+          /^[1-9]\d{3}$/.test(String(x.season || "")) ? `${x.season}年産` : "",
+          x.riceType === "brown" ? "玄米" : x.riceType === "white" ? "白米" : "", summary].filter(Boolean).join(" / "),
+        memo: memo.length > 80 ? `${memo.slice(0, 80)}…` : memo,
+        record: x
+      });
     });
     d.growthLogs.filter((x) => x.date === date).forEach((x) => {
       entries.push({
@@ -218,6 +281,8 @@
     monthLabel,
     daysForMonth,
     entriesForDate,
+    isActualEntry,
+    hasActualWaterCompletion,
     recentEntries,
     upcomingSchedules,
     lastYearSamePeriod,

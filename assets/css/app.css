@@ -15308,3 +15308,24 @@ label {
 #shipmentContent .shipment-price-row span { font-size: 13px; margin-top: 6px; }
 #shipmentContent .shipment-price-actions { display: flex; gap: 8px; }
 #shipmentContent .shipment-sales-missing { display: block; color: #88612f; line-height: 1.6; }
+
+#screen-calendar .calendar-view-tools { display: flex; align-items: end; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+#screen-calendar .calendar-view-tools label { min-width: 0; width: 180px; }
+#screen-calendar .calendar-view-tools select { width: 100%; min-height: 44px; }
+#screen-calendar .calendar-view-tools button { min-height: 44px; }
+#screen-calendar .calendar-grid { grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+#screen-calendar .calendar-day { min-width: 0; min-height: 96px; padding: 5px 2px; display: flex; flex-direction: column; align-items: stretch; justify-content: flex-start; overflow: hidden; gap: 3px; }
+#screen-calendar .calendar-day .day-number { display: block; text-align: center; font-size: 14px; line-height: 20px; }
+#screen-calendar .calendar-event-label { display: block; min-width: 0; font-size: 10px; line-height: 17px; padding: 1px 2px; border-radius: 3px; text-overflow: ellipsis; overflow: hidden; white-space: nowrap; font-weight: 600; color: #245637; background: #eaf4e8; letter-spacing: 0; }
+#screen-calendar .calendar-event-label.mark-schedule { color: #79541c; background: #fff0c7; }
+#screen-calendar .calendar-event-label.mark-schedule-overdue { color: #973831; background: #ffe6e0; }
+#screen-calendar .calendar-event-label.mark-water { color: #246784; background: #e6f3fa; }
+#screen-calendar .calendar-event-label.mark-schedule-done { color: #59665c; background: #e9eeeb; }
+#screen-calendar .calendar-event-more { font-size: 10px; line-height: 16px; color: #58675d; text-align: center; }
+#screen-calendar .calendar-view-tools { flex-wrap: wrap; }
+#screen-calendar .calendar-view-tools label { flex: 1 1 120px; width: auto; }
+#screen-calendar .calendar-add-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+#screen-calendar .calendar-add-actions button { min-width: 0; min-height: 44px; white-space: normal; }
+#screen-calendar .calendar-entry-menu summary { cursor: pointer; padding: 10px; }
+#screen-calendar .calendar-entry-menu { min-width: 0; }
+#screen-calendar .mark-shipment { background: #fff4d9; color: #765619; }

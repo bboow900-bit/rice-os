@@ -578,6 +578,7 @@
       season: U.season(date),
       fieldId: String(g.fieldId || ""),
       orphanedFieldId: String(g.orphanedFieldId || ""),
+      ...(g.sourceScheduleId ? { sourceScheduleId: String(g.sourceScheduleId) } : {}),
       leafCount: String(g.leafCount || ""),
       tillerCount: String(g.tillerCount || ""),
       plantHeightCm: String(g.plantHeightCm || g.plantHeight || ""),

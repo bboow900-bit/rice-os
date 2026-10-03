@@ -487,12 +487,13 @@
   }
 
   function matchingWaterSchedule(fieldId, type, phase, date) {
-    if (pendingWaterSchedule
-      && pendingWaterSchedule.waterKind === type.key
-      && pendingWaterSchedule.waterPhase === phase
-      && (pendingWaterSchedule.fieldIds || []).length === 1
-      && pendingWaterSchedule.fieldIds[0] === fieldId
-      && pendingWaterSchedule.date === date) return pendingWaterSchedule;
+    if (pendingWaterSchedule) {
+      const schedule = (state.data().schedules || []).find((item) => item.scheduleId === pendingWaterSchedule.scheduleId);
+      const target = state.waterScheduleTarget(schedule);
+      return target && target.kind === type.key && target.phase === phase
+        && (schedule.fieldIds || []).length === 1 && schedule.fieldIds[0] === fieldId
+        && String(schedule.season) === String(U.season(date)) ? schedule : null;
+    }
     return pendingSchedule(fieldId, type, phase, date);
   }
 
@@ -520,15 +521,17 @@
       const batchId = fields.length > 1 ? U.id("water-batch", date) : "";
       const batchFieldIds = fields.map((field) => field.fieldId);
       if (type.source === "dry") {
-        state.saveDryPeriodsBatch(fields.map((field) => {
+        const saved = state.saveDryPeriodsBatch(fields.map((field) => {
           const linkedSchedule = matchingWaterSchedule(field.fieldId, type, "start", date);
           return { fieldId: field.fieldId, batchId, batchFieldIds, date, startDate: date, targetDays: String(type.target(field) || ""), status: "実施中", memo: "", sourceScheduleId: linkedSchedule?.scheduleId || "", sourceSchedulePhase: linkedSchedule ? "start" : "" };
         }), `${targetLabel()}の中干しを開始しました`);
+        if (saved === null) return;
       } else {
-        state.saveIrrigationsBatch(fields.map((field) => {
+        const saved = state.saveIrrigationsBatch(fields.map((field) => {
           const linkedSchedule = matchingWaterSchedule(field.fieldId, type, "start", date);
           return { ...irrigationRecord(field, type.method, date, "", ""), batchId, batchFieldIds, sourceScheduleId: linkedSchedule?.scheduleId || "", sourceSchedulePhase: linkedSchedule ? "start" : "" };
         }), `${targetLabel()}の${type.label}を開始しました`);
+        if (saved === null) return;
       }
     } else {
       const records = fields.map((field) => {
@@ -760,10 +763,11 @@
   }
 
   function prefillSchedule(record) {
-    const fieldIds = (record && record.fieldIds || []).filter(Boolean);
-    pendingWaterSchedule = record && record.recordKind === "water" ? record : null;
-    prefillFields(record && record.date || U.today(), fieldIds, record && record.waterKind || "");
-    pendingWaterSchedule = record && record.recordKind === "water" ? record : null;
+    const schedule = (state.data().schedules || []).find((item) => item.scheduleId === (record && record.scheduleId));
+    const target = state.waterScheduleTarget(schedule);
+    const fieldIds = (schedule && schedule.fieldIds || []).filter(Boolean);
+    prefillFields(schedule && schedule.date || U.today(), fieldIds, target && target.kind || "");
+    pendingWaterSchedule = schedule || (record && record.scheduleId ? { scheduleId: record.scheduleId } : null);
   }
 
   function bind() {

@@ -108,6 +108,7 @@
   }
 
   function eventTone(entry) {
+    if (entry.kind === "schedule-completed") return "plan-done";
     if (entry.kind === "growth") return "growth";
     if (entry.kind === "schedule") {
       if (entry.tone === "schedule-overdue") return "candidate";
@@ -122,6 +123,7 @@
 
   function entryStatusLabel(entry) {
     if (!entry) return "";
+    if (entry.kind === "schedule-completed") return "済";
     if (entry.kind === "schedule") {
       if (entry.tone === "schedule-overdue") return "超過";
       if (entry.tone === "schedule-done") return "済";
@@ -324,10 +326,7 @@
   }
 
   function actualEntriesForDate(date) {
-    return entriesForDate(date).filter((entry) => {
-      if (entry.kind === "candidate" || entry.planned) return false;
-      return entry.kind !== "schedule" || scheduleDone(entry.record);
-    });
+    return entriesForDate(date).filter(RiceOS.calendar.isActualEntry);
   }
 
   function entriesForCell(date, field) {
@@ -2234,7 +2233,7 @@
     });
   }
 
-  if (window.__RICEOS_TEST__) RiceOS.homeTest = { homeWaterMovementPresentation, homeWaterMovementLabel, renderHomeWaterMovementTimeline };
+  if (window.__RICEOS_TEST__) RiceOS.homeTest = { homeWaterMovementPresentation, homeWaterMovementLabel, renderHomeWaterMovementTimeline, actualEntriesForDate, eventTone };
 
   RiceOS.screens = RiceOS.screens || {};
   RiceOS.screens.home = { render, bind };

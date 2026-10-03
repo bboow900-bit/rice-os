@@ -6,6 +6,7 @@
   const S = RiceOS.schema;
   const state = RiceOS.state;
   let bulkFieldIds = [];
+  let sourceScheduleId = "";
   let inputMode = localStorage.getItem("riceGrowthInputMode") || "simple";
   let headingSaveApproved = false;
   let pendingHeadingSave = null;
@@ -294,6 +295,9 @@
   }
 
   function resetForm() {
+    sourceScheduleId = "";
+    headingSaveApproved = false;
+    closeHeadingConfirm();
     U.$("growthHeading").textContent = "生育ログ";
     U.$("editGrowthId").value = "";
     U.$("gDate").value = U.today();
@@ -358,8 +362,9 @@
     U.toast(`${bulkFieldIds.length}圃場へ同じ生育ログを登録します`);
   }
 
-  function prefillStageRecord(date, fieldIds) {
+  function prefillStageRecord(date, fieldIds, options = {}) {
     prefillFields(date, fieldIds);
+    sourceScheduleId = options.sourceScheduleId || "";
     const ids = (fieldIds || []).filter(Boolean);
     const matchingGroup = fieldGroups().find((group) => group.fields.length === ids.length && group.fields.every((field) => ids.includes(field.fieldId)));
     if (matchingGroup) {
@@ -537,6 +542,10 @@
   }
 
   function fillEdit(log) {
+    sourceScheduleId = log.sourceScheduleId || "";
+    clearBulkFields();
+    headingSaveApproved = false;
+    closeHeadingConfirm();
     U.$("growthHeading").textContent = "生育ログを編集";
     U.$("editGrowthId").value = log.logId;
     const deleteButton = U.$("deleteGrowthButton");
@@ -635,6 +644,7 @@
 
   function saveHeadingObservedRecords(targets) {
     const records = targets.fields.map((field) => ({
+        sourceScheduleId,
         date: U.$("gDate").value || U.today(),
         fieldId: field.fieldId,
         leafColorScore: U.$("gLeaf").value || "3",
@@ -737,6 +747,7 @@
         ? "heading"
         : selectedStage || (U.number(U.$("gPanicleLengthMm") && U.$("gPanicleLengthMm").value, 0) > 0 ? "panicle" : (U.$("gTillerCount") && U.$("gTillerCount").value !== "" ? "tillering" : ""));
       const common = {
+        sourceScheduleId,
         logId: U.$("editGrowthId").value,
         date: U.$("gDate").value,
         leafCount: U.$("gLeafCount") ? U.$("gLeafCount").value : "",

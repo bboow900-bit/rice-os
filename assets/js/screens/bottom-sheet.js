@@ -14,6 +14,7 @@
   let scheduleFieldIds = [];
 
   function entryId(entry) {
+    if (entry.kind === "shipment") return "";
     return entry.kind === "other" ? entry.record.otherWorkId || "" : RiceOS.recordActions ? RiceOS.recordActions.idFor(entry.kind, entry.record) : "";
   }
 
@@ -49,7 +50,8 @@
     { label: "追肥", title: "追肥予定" },
     { label: "防除", title: "防除予定" },
     { label: "除草剤", title: "除草剤散布予定" },
-    { label: "中干し", title: "中干し確認" },
+    { label: "中干し開始", title: "中干し開始" },
+    { label: "中干し終了", title: "中干し終了" },
     { label: "田植え", title: "田植え予定" },
     { label: "稲刈り", title: "稲刈り予定" },
     { label: "幼穂確認", title: "幼穂確認" }
@@ -65,7 +67,7 @@
       if (entry.tone === "schedule-done") return "済";
       return "予定";
     }
-    if (entry.kind === "work") return "実績";
+    if (entry.kind === "work" || entry.kind === "shipment") return "実績";
     if (entry.kind === "growth") return "生育";
     if (entry.kind === "dry" || entry.kind === "irrigation") return "水管理";
     return "";
@@ -75,6 +77,7 @@
     const id = entryId(entry);
     const toneClass = entry.tone || "";
     const canCompleteSchedule = entry.kind === "schedule" && id && !scheduleDone(entry.record);
+    const isWaterConfirmation = state.isWaterConfirmationSchedule && state.isWaterConfirmationSchedule(entry.record);
     return `
       <div class="mini-card ${U.attr(entry.kind)} ${U.attr(toneClass)}">
         <b>${U.escapeHTML(entry.title)}</b>
@@ -82,9 +85,10 @@
         <span>${U.escapeHTML(entry.subtitle || "")}</span>
         ${entry.memo ? `<small>${U.escapeHTML(entry.memo)}</small>` : ""}
         ${entry.hasPhoto ? '<span class="pill info">写真あり</span>' : ""}
+        ${entry.kind === "shipment" && entry.record.shipmentId ? `<button class="secondary" type="button" data-sheet-open-shipment="${U.attr(entry.record.shipmentId)}">出荷の詳細を見る</button>` : ""}
         ${id ? `
           <div class="record-actions mini-actions">
-            ${canCompleteSchedule ? `<button class="primary" type="button" data-sheet-action="complete" data-kind="${U.attr(entry.kind)}" data-id="${U.attr(id)}">実施を記録</button>` : ""}
+            ${canCompleteSchedule ? `<button class="primary" type="button" data-sheet-action="${isWaterConfirmation ? "confirm" : "complete"}" data-kind="${U.attr(entry.kind)}" data-id="${U.attr(id)}">${isWaterConfirmation ? "確認済みにする" : "実施を記録"}</button>` : ""}
             <button class="secondary" type="button" data-sheet-action="edit" data-kind="${U.attr(entry.kind)}" data-id="${U.attr(id)}">${entry.kind === "other" ? "表示" : "編集"}</button>
             ${entry.kind !== "other" ? `<button class="danger" type="button" data-sheet-action="delete" data-kind="${U.attr(entry.kind)}" data-id="${U.attr(id)}">削除</button>` : ""}
           </div>
@@ -99,26 +103,40 @@
     });
   }
 
-  function render() {
+  function render(target) {
     U.$("sheetDateTitle").textContent = `${U.fd(selectedDate)} の記録`;
     if (!savingSchedule) hideScheduleForm();
     hideWaterQuick();
-    renderTargetSelect();
+    renderTargetSelect(target);
     renderRecordChoice();
     const rows = RiceOS.calendar.entriesForDate(selectedDate);
     U.$("sheetEntries").innerHTML = rows.length ? rows.map(entryHtml).join("") : '<div class="empty">この日の記録はまだありません。</div>';
   }
 
-  function open(date, fieldId) {
+  function initialTarget(fieldId, target) {
+    const requested = target || { mode: "field", fieldId };
+    const empty = { mode: "field", fieldId: "", groupId: "", fieldIds: [] };
+    if (requested.mode === "offField") return { ...empty, mode: "offField" };
+    if (requested.mode === "group") {
+      const group = scheduleGroups().find((item) => item.fieldGroupId === requested.groupId);
+      return group && group.fieldIds.length ? { ...empty, mode: "group", groupId: group.fieldGroupId, fieldIds: group.fieldIds.slice() } : empty;
+    }
+    if (requested.mode !== "field") return empty;
+    const field = state.activeFields().find((item) => item.fieldId === requested.fieldId);
+    return field ? { ...empty, fieldId: field.fieldId, fieldIds: [field.fieldId] } : empty;
+  }
+
+  function open(date, fieldId, target) {
+    const selection = initialTarget(fieldId, target);
     selectedDate = date || U.today();
-    selectedFieldId = fieldId || "";
-    workFieldIds = selectedFieldId ? [selectedFieldId] : [];
+    selectedFieldId = selection.fieldId;
+    workFieldIds = selection.fieldIds;
     scheduleFieldIds = [];
     U.$("sheetScheduleTargetMode").value = "field";
     selectedKind = "";
-    if (U.$("sheetTargetMode")) U.$("sheetTargetMode").value = "field";
+    if (U.$("sheetTargetMode")) U.$("sheetTargetMode").value = selection.mode;
     if (U.$("sheetGroup")) U.$("sheetGroup").value = "";
-    render();
+    render(selection);
     const sheet = U.$("dateSheet");
     sheet.classList.remove("hidden");
     sheet.setAttribute("aria-hidden", "false");
@@ -162,7 +180,7 @@
     return fieldId ? [fieldId] : [];
   }
 
-  function renderTargetSelect() {
+  function renderTargetSelect(target) {
     const fields = state.activeFields();
     U.setOptions(U.$("sheetField"), [{ value: "", label: "圃場を選ぶ" }, ...fields.map((field) => ({
       value: field.fieldId,
@@ -172,12 +190,12 @@
     const mode = U.$("sheetTargetMode");
     const group = U.$("sheetGroup");
     if (!mode || !group) return;
-    U.setOptions(group, [{ value: "", label: "グループを選ぶ" }, ...groups.map((item) => ({ value: item.fieldGroupId, label: `${item.name} (${item.fieldIds.length}圃場)` }))], group.value || "");
+    U.setOptions(group, [{ value: "", label: "グループを選ぶ" }, ...groups.map((item) => ({ value: item.fieldGroupId, label: `${item.name} (${item.fieldIds.length}圃場)` }))], target && target.mode === "group" ? target.groupId : group.value || "");
     if (mode.value === "group" || mode.value === "all") workFieldIds = modeFieldIds(mode.value, group.value);
     mode.disabled = false;
     const offOption = mode.querySelector('option[value="offField"]');
-    offOption.disabled = selectedKind !== "work";
-    if (selectedKind !== "work" && mode.value === "offField") mode.value = "field";
+    offOption.disabled = Boolean(selectedKind) && selectedKind !== "work";
+    if (selectedKind && selectedKind !== "work" && mode.value === "offField") mode.value = "field";
     const isGroup = mode.value === "group";
     U.$("sheetFieldLabel").classList.toggle("hidden", selectedKind === "work" || mode.value !== "field");
     U.$("sheetGroupLabel").classList.toggle("hidden", !isGroup);
@@ -220,13 +238,13 @@
     }));
   }
 
-  function renderScheduleTargets(record) {
+  function renderScheduleTargets(record, groupId) {
     const mode = U.$("sheetScheduleTargetMode");
     const group = U.$("sheetScheduleGroup");
     const groupLabel = U.$("sheetScheduleGroupLabel");
     if (!mode || !group || !groupLabel) return;
     const groups = scheduleGroups();
-    U.setOptions(group, groups.map((item) => ({ value: item.fieldGroupId, label: `${item.name} (${item.fieldIds.length}圃場)` })), group.value || (groups[0] && groups[0].fieldGroupId) || "");
+    U.setOptions(group, groups.map((item) => ({ value: item.fieldGroupId, label: `${item.name} (${item.fieldIds.length}圃場)` })), groupId || group.value || (groups[0] && groups[0].fieldGroupId) || "");
     mode.value = record ? record.targetScope === "offField" ? "offField" : "field" : (mode.value || "field");
     groupLabel.classList.toggle("hidden", mode.value !== "group" || !groups.length);
     mode.disabled = Boolean(editingScheduleId);
@@ -302,13 +320,14 @@
     if (!form) return;
     editingScheduleId = record && record.scheduleId || "";
     scheduleFieldIds = record ? record.targetScope === "offField" ? [] : (record.fieldIds || []).slice() : targetFieldIds();
-    U.$("sheetScheduleTargetMode").value = record ? record.targetScope === "offField" ? "offField" : "field" : U.$("sheetTargetMode").value === "offField" ? "offField" : "field";
+    const mode = U.$("sheetTargetMode").value;
+    U.$("sheetScheduleTargetMode").value = record ? record.targetScope === "offField" ? "offField" : "field" : mode === "group" || mode === "offField" ? mode : "field";
     U.$("sheetScheduleTitle").value = record ? record.title || record.scheduleType || "" : "";
     U.$("sheetScheduleMemo").value = record ? record.memo || "" : "";
     U.$("sheetScheduleFertilizerName").value = record ? record.plannedFertilizerName || "" : "";
     U.$("sheetScheduleFertilizerRate").value = record ? record.plannedFertilizerRateKg10a || "" : "";
     renderSchedulePresets();
-    renderScheduleTargets(record);
+    renderScheduleTargets(record, !record && mode === "group" ? U.$("sheetGroup").value : "");
     renderFertilizerScheduleFields(record);
     const head = form.querySelector(".sheet-schedule-head b");
     if (head) head.textContent = editingScheduleId ? "予定を編集" : "予定を登録";
@@ -380,7 +399,8 @@
 
   function scheduleRecordKind(record) {
     if (record && record.targetScope === "offField") return { kind: "work", waterType: "" };
-    if (record && record.recordKind === "water" && record.waterKind) return { kind: "water", waterType: record.waterKind };
+    const waterTarget = state.waterScheduleTarget && state.waterScheduleTarget(record);
+    if (waterTarget) return { kind: "water", waterType: waterTarget.kind };
     const title = String(record && (record.title || record.scheduleType) || "");
     if (/中干し/.test(title)) return { kind: "water", waterType: "dry" };
     if (/間断|かんだん/.test(title)) return { kind: "water", waterType: "intermittent" };
@@ -392,6 +412,7 @@
   }
 
   function openScheduleCompletion(record) {
+    if (state.isWaterConfirmationSchedule && state.isWaterConfirmationSchedule(record)) return;
     const target = scheduleRecordKind(record);
     const fieldIds = (record.fieldIds || []).filter((id) => state.field(id));
     if (!fieldIds.length && record.targetScope !== "offField") return;
@@ -407,7 +428,7 @@
     if (target.kind === "stage") {
       if (RiceOS.app && RiceOS.app.openInput) RiceOS.app.openInput("growth", originScreen);
       else RiceOS.app.show("growth");
-      RiceOS.screens.growth.prefillStageRecord(U.today(), fieldIds);
+      RiceOS.screens.growth.prefillStageRecord(U.today(), fieldIds, { sourceScheduleId: record.scheduleId });
       return;
     }
     if (RiceOS.app && RiceOS.app.openInput) RiceOS.app.openInput("field-work", originScreen);
@@ -448,6 +469,18 @@
       });
     }
     U.$("dateSheet").addEventListener("click", (event) => {
+      const shipment = event.target.closest("[data-sheet-open-shipment]");
+      if (shipment) {
+        const id = shipment.dataset.sheetOpenShipment;
+        const exists = RiceOS.calendar.entriesForDate(selectedDate).some((entry) => entry.kind === "shipment" && entry.record.shipmentId === id);
+        if (!exists || !RiceOS.app || !RiceOS.screens.shipments || !RiceOS.screens.shipments.openDetail) return;
+        const originScreen = RiceOS.app.currentScreen ? RiceOS.app.currentScreen() : "home";
+        close();
+        if (RiceOS.navigation) RiceOS.navigation.clear();
+        RiceOS.app.openInput("shipments", originScreen);
+        RiceOS.screens.shipments.openDetail(id);
+        return;
+      }
       const fieldCard = event.target.closest("[data-sheet-field]");
       if (fieldCard) {
         const schedule = Boolean(fieldCard.closest("#sheetScheduleFields"));
@@ -470,6 +503,13 @@
       if (actionButton && RiceOS.recordActions) {
         const entry = findEntry(actionButton.dataset.kind, actionButton.dataset.id);
         if (!entry) return;
+        if (actionButton.dataset.sheetAction === "confirm" && entry.kind === "schedule") {
+          if (scheduleDone(entry.record) || !state.isWaterConfirmationSchedule(entry.record)) return;
+          if (confirm("中干しの確認を済ませましたか？ 水管理の開始・終了実績は登録しません。")) {
+            if (state.completeSchedule(entry.record.scheduleId) !== null) render();
+          }
+          return;
+        }
         if (actionButton.dataset.sheetAction === "complete" && entry.kind === "schedule") {
           if (entry.record.targetScope !== "offField" && String(entry.record.title || entry.record.scheduleType || "").includes("追肥") && RiceOS.screens.fertilizer) {
             RiceOS.screens.fertilizer.open(entry.record, render);
@@ -548,7 +588,12 @@
     }
   }
 
-  RiceOS.bottomSheet = { open, close, isOpen, render, openScheduleCompletion };
+  function openSchedule(date, target) {
+    open(date, "", target);
+    showScheduleForm();
+  }
+
+  RiceOS.bottomSheet = { open, close, isOpen, render, openScheduleCompletion, openSchedule };
   RiceOS.screens = RiceOS.screens || {};
   RiceOS.screens.bottomSheet = { bind };
 })();
