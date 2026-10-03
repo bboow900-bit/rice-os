@@ -11,6 +11,62 @@
   let herbicideLinks = [];
   let herbicideChoices = new Map();
   let workInputMode = localStorage.getItem("riceFieldWorkInputMode") || "simple";
+  let harvestStatuses = {};
+  let legacyHarvestFields = new Set();
+  let quickHarvestMounts = null;
+  let workFormSession = 0;
+
+  function renderHarvestQuick(active) {
+    if (!document.createComment) return;
+    let host = U.$("fwHarvestQuickReview");
+    if (!host && active) {
+      U.$("fwHarvestReview").insertAdjacentHTML("beforebegin", '<section id="fwHarvestQuickReview"><h3>稲刈りの振り返り（任意）</h3><div class="harvest-quick-fields"></div></section>');
+      host = U.$("fwHarvestQuickReview");
+      quickHarvestMounts = ["fwHarvestSurface", "fwHarvestWeeds", "fwMemo"].map((id) => {
+        const label = U.$(id).closest("label");
+        const anchor = document.createComment(id);
+        label.before(anchor);
+        return { label, anchor, text: label.firstChild && label.firstChild.textContent };
+      });
+    }
+    if (!host || !quickHarvestMounts) return;
+    const visible = active && workInputMode === "simple";
+    host.hidden = !visible;
+    quickHarvestMounts.forEach(({ label, anchor, text }, index) => {
+      if (visible) host.querySelector(".harvest-quick-fields").append(label);
+      else anchor.after(label);
+      if (index === 2 && label.firstChild && label.firstChild.nodeType === 3) label.firstChild.textContent = visible ? "今年のひとこと（任意）" : text;
+    });
+  }
+
+  function renderHarvestCompletion(active) {
+    let host = U.$("fwHarvestCompletion");
+    if (!host) {
+      const review = U.$("fwHarvestReview");
+      if (!review) return;
+      review.insertAdjacentHTML("beforebegin", '<div class="form-section" id="fwHarvestCompletion"><h3>圃場別の稲刈り</h3><div id="fwHarvestStatusFields"></div></div>');
+      host = U.$("fwHarvestCompletion");
+    }
+    host.hidden = !active;
+    host.classList.toggle("hidden", !active);
+    U.$("fwHarvestStatusFields").innerHTML = active ? selectedFieldIds().map((id) => {
+      const field = state.field(id);
+      const legacy = legacyHarvestFields.has(id);
+      const value = harvestStatuses[id] || (legacy ? "legacy" : "");
+      const choices = [["partial", "一部"], ["complete", "完了"], ...(legacy ? [["legacy", "旧記録のまま（完了区分未確認）"]] : [])];
+      return `<fieldset><legend>${U.escapeHTML(field && field.name || id)}</legend><div class="fw-harvest-choices">${choices.map(([key, label]) => `<label${key === "legacy" ? ' class="fw-harvest-legacy"' : ""}><input type="radio" name="fwHarvestStatus-${U.attr(id)}" data-harvest-field="${U.attr(id)}" value="${key}"${value === key ? " checked" : ""}${legacy ? "" : " required"}>${label}</label>`).join("")}</div></fieldset>`;
+    }).join("") : "";
+  }
+
+  function harvestStatusValue(ids) {
+    const map = {};
+    for (const id of ids) {
+      const value = harvestStatuses[id] || (legacyHarvestFields.has(id) ? "legacy" : "");
+      if (["partial", "complete"].includes(value)) map[id] = value;
+      else if (value !== "legacy" || !legacyHarvestFields.has(id)) throw new Error("各圃場の稲刈りを一部・完了から選択してください。");
+    }
+    return Object.keys(map).length ? map : undefined;
+  }
 
   function targetScope() {
     return U.$("fwTargetScope").value === "offField" ? "offField" : "field";
@@ -65,6 +121,8 @@
     const host = U.$("fwHarvestReview");
     if (!host) return;
     const active = targetScope() === "field" && isHarvestWork(U.$("fwName").value);
+    renderHarvestCompletion(active);
+    renderHarvestQuick(active);
     host.hidden = !active;
     host.classList.toggle("hidden", !active);
     Object.values(HARVEST_REVIEW_INPUTS).forEach((id) => {
@@ -74,6 +132,8 @@
   }
 
   function loadHarvestReview(work) {
+    harvestStatuses = { ...(work && work.harvestStatusByField || {}) };
+    legacyHarvestFields = new Set((work && work.fieldIds || []).filter((id) => !Object.prototype.hasOwnProperty.call(harvestStatuses, id)));
     const review = work && work.harvestReview || {};
     Object.entries(HARVEST_REVIEW_INPUTS).forEach(([key, id]) => {
       const input = U.$(id);
@@ -130,6 +190,7 @@
 
   function updateFieldSelectionSummary() {
     renderHerbicidePicker();
+    renderHarvestCompletion(targetScope() === "field" && isHarvestWork(U.$("fwName").value));
     const summary = U.$("fwFieldSelectionSummary");
     if (!summary) return;
     const ids = selectedFieldIds();
@@ -416,6 +477,7 @@
   }
 
   function resetForm() {
+    workFormSession += 1;
     setTargetScope("field");
     U.$("fwCustomName").value = "";
     U.$("fieldWorkHeading").textContent = "作業入力";
@@ -504,6 +566,7 @@
   }
 
   function editWork(workId) {
+    workFormSession += 1;
     const work = state.data().fieldWorks.find((item) => item.workId === workId);
     if (!work) return;
     setTargetScope(work.targetScope);
@@ -608,6 +671,7 @@
     const form = U.$("fieldWorkForm");
     if (!form) return;
     form.dataset.workMode = workInputMode;
+    renderHarvestQuick(targetScope() === "field" && isHarvestWork(U.$("fwName").value));
     const sections = form.querySelectorAll("details.form-section:not(#fwHarvestReview)");
     const detail = sections[1];
     if (detail) {
@@ -713,51 +777,18 @@
   }
 
   async function saveHarvestThermalSnapshots(workId, fieldIds, harvestDate) {
-    if (!state.saveHarvestThermalSnapshots) return;
-    const location = state.data().meta && state.data().meta.weatherLocation;
-    const rows = await Promise.all((fieldIds || []).map(async (fieldId) => {
-      const field = state.field(fieldId);
-      const headingDate = state.headingDateForField && state.headingDateForField(fieldId, U.season(harvestDate), harvestDate);
-      const plantingDate = state.plantingDateForField && state.plantingDateForField(fieldId, U.season(harvestDate));
-      if (!headingDate) return { fieldId, status: "出穂日待ち", plantingDate: plantingDate || "" };
-      if (!location || location.latitude === undefined || location.longitude === undefined) {
-        return { fieldId, status: "天気の地点待ち", headingDate, plantingDate: plantingDate || "" };
-      }
-      const startDate = RiceOS.agro && RiceOS.agro.postHeadingThermalStart
-        ? RiceOS.agro.postHeadingThermalStart(headingDate)
-        : headingDate;
-      try {
-        const weather = await RiceOS.weather.fetchDailyRange(startDate, harvestDate, location);
-        const reference = RiceOS.agro && RiceOS.agro.harvestReferenceFor ? RiceOS.agro.harvestReferenceFor(field) : null;
-        const expectedDays = inclusiveDays(startDate, harvestDate);
-        const total = weather.count ? weather.total : "";
-        const target = reference && reference.target || "";
-        const isSameDay = harvestDate >= U.today();
-        return {
-          fieldId,
-          status: weather.count === Number(expectedDays) ? (isSameDay ? "当日速報" : "確定") : "一部欠測",
-          headingDate,
-          startDate,
-          endDate: harvestDate,
-          total,
-          target,
-          difference: total === "" || target === "" ? "" : Math.round((Number(total) - Number(target)) * 10) / 10,
-          count: String(weather.count || 0),
-          expectedDays,
-          plantingDate: plantingDate || "",
-          daysFromPlanting: plantingDate ? inclusiveDays(plantingDate, harvestDate) : "",
-          source: Array.from(new Set((weather.rows || []).map((item) => item.dataset || item.source).filter(Boolean))).join(" / "),
-          locationLabel: location.label || "取得位置",
-          retrievedAt: weather.retrievedAt || U.now()
-        };
-      } catch (error) {
-        return { fieldId, status: "気温取得失敗", headingDate, plantingDate: plantingDate || "", source: error.message || "気温を取得できませんでした" };
-      }
-    }));
-    state.saveHarvestThermalSnapshots(workId, rows);
+    if (!state.retryHarvestThermal) return;
+    for (const fieldId of fieldIds || []) await state.retryHarvestThermal(workId, fieldId);
   }
 
   function bind() {
+    U.$("fieldWorkForm").addEventListener("input", () => { workFormSession += 1; });
+    U.$("fieldWorkForm").addEventListener("click", () => { workFormSession += 1; });
+    U.$("fieldWorkForm").addEventListener("change", (event) => {
+      workFormSession += 1;
+      const input = event.target.closest("[data-harvest-field]");
+      if (input && input.checked) harvestStatuses[input.dataset.harvestField] = input.value;
+    });
     U.$("fwTargetScope").addEventListener("change", () => {
       pendingScheduleId = "";
       ["fwMachine", "fwMaterial", "fwAmount"].forEach((id) => setDirectValue(id, "", false));
@@ -925,6 +956,14 @@
         return;
       }
       const workId = U.$("editFieldWorkId").value || U.id("work", date);
+      const submittedSession = workFormSession;
+      const sameInputSession = () => workFormSession === submittedSession
+        && (!RiceOS.app || typeof RiceOS.app.currentScreen !== "function" || RiceOS.app.currentScreen() === "field-work");
+      let harvestStatusByField;
+      if (!offField && isHarvestWork(workName)) {
+        try { harvestStatusByField = harvestStatusValue(ids); }
+        catch (error) { alert(error.message); return; }
+      }
       const saved = state.saveFieldWork({
         workId,
         date,
@@ -940,6 +979,7 @@
         herbicideCategory: !offField && workName === "除草剤" ? U.$("fwHerbicideCategory").value : "",
         herbicidePurpose: !offField && workName === "除草剤" ? U.$("fwHerbicidePurpose").value : "",
         ...(!offField && isHarvestWork(workName) ? { harvestReview: harvestReviewValue() } : {}),
+        ...(harvestStatusByField !== undefined ? { harvestStatusByField } : {}),
         amount: U.$("fwAmount").value,
         sourceScheduleId: pendingScheduleId,
         weather: offField ? "" : U.$("fwWeather").value,
@@ -951,18 +991,21 @@
       if (saved === null) return;
       if (!offField && isHarvestWork(workName)) {
         await saveHarvestThermalSnapshots(workId, ids, date);
+        if (!sameInputSession()) return;
         if (RiceOS.harvestWeather) {
           for (const fieldId of ids) {
             const saved = state.data().fieldWorks.find((item) => item.workId === workId);
             const snapshot = saved && (saved.harvestSnapshots || []).find((item) => item.fieldId === fieldId);
             if (snapshot && !snapshot.weather) await RiceOS.harvestWeather.capture(workId, fieldId);
+            if (!sameInputSession()) return;
           }
         }
       }
-      resetForm();
+      if (sameInputSession()) resetForm();
     });
 
     U.$("fieldWorkList").addEventListener("click", (event) => {
+      workFormSession += 1;
       const button = event.target.closest("[data-work-action]");
       if (!button) return;
       const id = button.dataset.id;

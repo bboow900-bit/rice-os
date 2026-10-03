@@ -490,9 +490,7 @@
     const headingDate = headingDateInYear(field.fieldId, year, date);
     const panicleLog = latestPanicleLog(field.fieldId, year, date);
     const management = managementStatus(field, date);
-    const harvested = state().fieldWorksFor(field.fieldId, year)
-      .filter((row) => !state().isActualFieldWork || state().isActualFieldWork(row))
-      .some((row) => /稲刈り|収穫/.test(String(row.workName || "")) && String(row.date || "") <= String(date));
+    const harvested = state().harvestStatusForField(field.fieldId, year, date).harvested;
     if (harvested) return { active: false };
 
     if (headingDate) {
@@ -586,7 +584,8 @@
       }
       else if (row.tillerCount !== undefined && String(row.tillerCount) !== "") evidence.push({ date: row.date, key: "peakTillering", source: "measured", kind: "tiller", recordId: row.logId || "" });
     });
-    works.filter((row) => /稲刈り|収穫/.test(String(row.workName || "")))
+    const harvestStatus = state().harvestStatusForField(field.fieldId, year, date);
+    works.filter((row) => harvestStatus.harvested && harvestStatus.workIds.includes(row.workId))
       .forEach((row) => evidence.push({ date: row.date, key: "maturity", source: "work", kind: "harvest", recordId: row.workId || "" }));
     const explicitCorrection = evidence.filter((item) => item.source === "confirmed" && item.correctionReason)
       .sort((a, b) => String(a.date).localeCompare(String(b.date))).pop() || null;

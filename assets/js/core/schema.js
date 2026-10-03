@@ -348,6 +348,7 @@
       season,
       date,
       text: String(note.text ?? note.memo ?? ""),
+      ...(note.kind ? { kind: String(note.kind) } : {}),
       createdAt: String(note.createdAt || note.updatedAt || U.now()),
       updatedAt: String(note.updatedAt || note.createdAt || U.now())
     };
@@ -551,6 +552,8 @@
       // This remains attached to the work so a JSON export keeps the original
       // water timing and forecast comparison even after screens are revised.
       harvestSnapshots: offField ? [] : harvestSnapshots,
+      ...(!offField && w.harvestStatusByField && typeof w.harvestStatusByField === "object" && !Array.isArray(w.harvestStatusByField)
+        ? { harvestStatusByField: Object.fromEntries(Object.entries(w.harvestStatusByField).map(([id, value]) => [id, ["partial", "complete"].includes(value) ? value : ""])) } : {}),
       ...(w.harvestReview !== undefined ? { harvestReview: normalizeHarvestReview(w.harvestReview) } : {}),
       weather: String(w.weather || ""),
       weatherAuto: w.weatherAuto && typeof w.weatherAuto === "object" ? w.weatherAuto : null,

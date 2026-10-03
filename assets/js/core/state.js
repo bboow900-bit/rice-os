@@ -271,6 +271,36 @@
     return targetScope(work) === "field" && Boolean(work && work.date) && !/(?:予定|確認候補)/.test(name);
   }
 
+  function isHarvestWork(work) {
+    return isActualFieldWork(work) && /稲刈り|収穫/.test(String(work.workName || "")) && !/落水/.test(String(work.workName || ""));
+  }
+
+  function harvestDateYear(value) {
+    if (typeof value !== "string" || !/^[1-9]\d{3}-\d{2}-\d{2}$/.test(value)) return "";
+    const [year, month, day] = value.split("-").map(Number);
+    const date = new Date(Date.UTC(year, month - 1, day));
+    return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day ? String(year) : "";
+  }
+
+  function harvestStatusForField(fieldId, year, asOf) {
+    const through = asOf === undefined ? U.today() : asOf;
+    if (!harvestDateYear(through) || !/^[1-9]\d{3}$/.test(String(year))) {
+      return { status: "none", harvested: false, date: "", workIds: [] };
+    }
+    const rows = data().fieldWorks.filter((work) => isHarvestWork(work)
+      && (work.fieldIds || []).includes(fieldId) && harvestDateYear(work.date) === String(year)
+      && String(work.date) <= String(through));
+    const complete = rows.filter((work) => (work.harvestStatusByField || {})[fieldId] === "complete");
+    const partial = rows.filter((work) => (work.harvestStatusByField || {})[fieldId] === "partial");
+    const legacy = rows.filter((work) => !Object.prototype.hasOwnProperty.call(work.harvestStatusByField || {}, fieldId));
+    const selected = complete.length ? complete : partial.length ? partial : legacy;
+    const status = complete.length ? "complete" : partial.length ? "partial" : legacy.length ? "legacy" : "none";
+    const dates = selected.map((work) => work.date).sort();
+    return { status, harvested: status === "complete" || status === "legacy",
+      date: status === "legacy" ? dates[0] || "" : dates.at(-1) || "",
+      workIds: selected.map((work) => work.workId) };
+  }
+
   function isInYear(record, year) {
     const date = record && (record.date || record.startDate || record.actualEndDate || record.endDate);
     return U.isInYear(date, year);
@@ -506,6 +536,11 @@
     if (targetScope(schedule) !== targetScope(work)) return false;
     const scheduleFields = schedule.fieldIds || [];
     const workFields = work.fieldIds || [];
+    if (isHarvestWork(work) && work.harvestStatusByField) {
+      const targets = scheduleFields.length ? scheduleFields : workFields;
+      if (!targets.length || !targets.every((id) => workFields.includes(id)
+        && (work.harvestStatusByField[id] === "complete" || work.harvestStatusByField[id] === undefined))) return false;
+    }
     if (scheduleFields.length && !scheduleFields.some((id) => workFields.includes(id))) return false;
     const diff = Math.abs(U.daysBetween(schedule.date, work.date));
     if (diff > 2) return false;
@@ -646,6 +681,23 @@
       const mergedHarvestReview = record.harvestReview === undefined ? harvestReview
         : S.normalizeHarvestReview({ ...(previous && previous.harvestReview || {}), ...record.harvestReview }, true);
       const targetFieldIds = targets.fieldIds;
+      let harvestStatusByField;
+      if (!offField && isHarvestWork({ ...record, date, targetScope: targets.targetScope })) {
+        const requested = record.harvestStatusByField === undefined ? previous && previous.harvestStatusByField : record.harvestStatusByField;
+        if (requested !== undefined) {
+          if (!harvestDateYear(date)) throw new Error("実在する稲刈り日を入力してください。");
+          if (!requested || typeof requested !== "object" || Array.isArray(requested)) throw new Error("圃場別の収穫状態を確認してください。");
+          harvestStatusByField = {};
+          targetFieldIds.forEach((id) => {
+            const value = requested[id];
+            if (["partial", "complete"].includes(value)) harvestStatusByField[id] = value;
+            else if (!(previous && (previous.fieldIds || []).includes(id)
+              && !Object.prototype.hasOwnProperty.call(previous.harvestStatusByField || {}, id) && value === undefined)) {
+              throw new Error("各圃場の稲刈りを一部・完了から選択してください。");
+            }
+          });
+        }
+      }
       const requestedLinks = offField ? [] : record.herbicideLinks === undefined ? (previous && previous.herbicideLinks || []) : record.herbicideLinks;
       if (!Array.isArray(requestedLinks)) throw new Error("除草体系の紐付けを確認してください。");
       const herbicideLinks = (record.workName === "除草剤" ? requestedLinks : []).filter((link) => targetFieldIds.includes(link.fieldId));
@@ -699,6 +751,7 @@
         harvestSnapshots: offField ? [] : record.harvestSnapshots === undefined
           ? (previous && previous.harvestSnapshots || [])
           : record.harvestSnapshots,
+        harvestStatusByField,
         ...(mergedHarvestReview !== undefined && mergedHarvestReview !== null ? { harvestReview: U.clone(mergedHarvestReview) } : {}),
         weather: record.weather || "",
         weatherAuto: record.weatherAuto || null,
@@ -851,10 +904,13 @@
     }, "収穫期間の過去気象参照を保存しました");
   }
 
-  function saveHarvestThermalSnapshots(workId, snapshots) {
+  function saveHarvestThermalSnapshots(workId, snapshots, options) {
     const id = String(workId || "");
     const incoming = (Array.isArray(snapshots) ? snapshots : []).filter((item) => item && item.fieldId);
     if (!id || !incoming.length) return null;
+    const current = data().fieldWorks.find((work) => work.workId === id);
+    if (!current || !isHarvestWork(current)
+      || options && options.expectedWork && JSON.stringify(current) !== options.expectedWork) return null;
     return mutate((draft) => {
       const workIndex = (draft.fieldWorks || []).findIndex((work) => work.workId === id);
       if (workIndex < 0 || !/稲刈り|収穫/.test(String(draft.fieldWorks[workIndex].workName || ""))) return;
@@ -866,6 +922,62 @@
       });
       draft.fieldWorks[workIndex] = work;
     }, "収穫時の積算気温を保存しました");
+  }
+
+  function completeHarvestThermal(thermal) {
+    if (thermal && thermal.status === "当日速報" && thermal.endDate < U.today()) return false;
+    return Boolean(thermal && thermal.total !== "" && thermal.total != null && Number.isFinite(Number(thermal.total))
+      && (thermal.status === "確定" || thermal.headingDate && thermal.startDate && thermal.endDate
+        && Number(thermal.count) > 0 && Number(thermal.count) === Number(thermal.expectedDays)));
+  }
+
+  async function retryHarvestThermal(workId, fieldId, options = {}) {
+    const work = data().fieldWorks.find((row) => row.workId === workId);
+    const snapshot = work && (work.harvestSnapshots || []).find((row) => row.fieldId === fieldId && row.harvestDate === work.date);
+    if (!work || !isHarvestWork(work) || !(work.fieldIds || []).includes(fieldId) || !snapshot) return { status: "not_saved" };
+    if (options.signal && options.signal.aborted) return { status: "cancelled" };
+    if (completeHarvestThermal(snapshot.thermal)) return { status: "unchanged" };
+    const expectedWork = JSON.stringify(work);
+    const date = work.date;
+    const headingDate = headingDateForField(fieldId, U.season(date), date);
+    const plantingDate = plantingDateForField(fieldId, U.season(date));
+    const location = data().meta && data().meta.weatherLocation;
+    if (!harvestDateYear(date) || !harvestDateYear(headingDate) || !location || location.latitude === undefined || location.longitude === undefined
+      || !RiceOS.weather || !RiceOS.weather.fetchDailyRange) return { status: "not_saved" };
+    const locationToken = JSON.stringify(location);
+    const headingToken = JSON.stringify(data().growthLogs.filter((row) => row.fieldId === fieldId && row.headingObserved));
+    const startDate = RiceOS.agro && RiceOS.agro.postHeadingThermalStart ? RiceOS.agro.postHeadingThermalStart(headingDate) : headingDate;
+    if (!harvestDateYear(startDate) || startDate > date) return { status: "not_saved" };
+    try {
+      const weather = await RiceOS.weather.fetchDailyRange(startDate, date, U.clone(location));
+      if (options.signal && options.signal.aborted) return { status: "cancelled" };
+      const latest = data().fieldWorks.find((row) => row.workId === workId);
+      if (!latest || JSON.stringify(latest) !== expectedWork
+        || JSON.stringify(data().meta && data().meta.weatherLocation) !== locationToken
+        || JSON.stringify(data().growthLogs.filter((row) => row.fieldId === fieldId && row.headingObserved)) !== headingToken
+        || headingDateForField(fieldId, U.season(date), date) !== headingDate
+        || plantingDateForField(fieldId, U.season(date)) !== plantingDate) return { status: "not_saved" };
+      const expectedDays = Number(U.daysBetween(startDate, date)) + 1;
+      const count = Number(weather && weather.count);
+      const total = weather && weather.total;
+      if (!Number.isFinite(expectedDays) || expectedDays <= 0 || !Number.isInteger(count) || count <= 0 || count > expectedDays
+        || total === "" || total == null || !Number.isFinite(Number(total))
+        || count < Number(snapshot.thermal && snapshot.thermal.count || 0)
+        || count < expectedDays && count <= Number(snapshot.thermal && snapshot.thermal.count || 0)) return { status: "not_saved" };
+      const reference = RiceOS.agro && RiceOS.agro.harvestReferenceFor ? RiceOS.agro.harvestReferenceFor(field(fieldId)) : null;
+      const target = reference && reference.target || "";
+      const thermal = { fieldId, headingDate, startDate, endDate: date, total: Number(total), target,
+        difference: target === "" ? "" : Math.round((Number(total) - Number(target)) * 10) / 10,
+        count: String(count), expectedDays: String(expectedDays), plantingDate: plantingDate || "",
+        daysFromPlanting: plantingDate ? String(Number(U.daysBetween(plantingDate, date)) + 1) : "",
+        status: count === expectedDays ? (date >= U.today() ? "当日速報" : "確定") : "一部欠測",
+        source: Array.from(new Set((weather.rows || []).map((row) => row.dataset || row.source).filter(Boolean))).join(" / "),
+        locationLabel: location.label || "取得位置", retrievedAt: weather.retrievedAt || U.now() };
+      const saved = saveHarvestThermalSnapshots(workId, [thermal], { expectedWork });
+      return { status: saved ? "saved" : "not_saved" };
+    } catch (error) {
+      return { status: options.signal && options.signal.aborted ? "cancelled" : "fetch_failed" };
+    }
   }
 
   function deleteFieldWorks(workIds, message) {
@@ -2127,10 +2239,11 @@
     return { works, headingWorks, growth, waterPeriods, others };
   }
 
-  function seasonNotesForField(fieldId, year) {
+  function seasonNotesForField(fieldId, year, options) {
     const fieldRecord = field(fieldId);
     return (fieldRecord && Array.isArray(fieldRecord.seasonNotes) ? fieldRecord.seasonNotes : [])
-      .filter((note) => year === undefined || year === null || String(year).trim() === "" || String(note.season) === String(year))
+      .filter((note) => (options && options.includeCarryover || note.kind !== "carryover")
+        && (year === undefined || year === null || year === "all" || String(year).trim() === "" || String(note.season) === String(year)))
       .slice()
       .sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")) || String(b.updatedAt || "").localeCompare(String(a.updatedAt || "")));
   }
@@ -2150,6 +2263,7 @@
       const existingIndex = notes.findIndex((item) => item.noteId === noteId);
       const existing = existingIndex >= 0 ? notes[existingIndex] : null;
       const normalized = S.normalizeSeasonNote({
+        ...existing,
         ...input,
         noteId,
         fieldId,
@@ -2170,13 +2284,29 @@
     const safeNoteId = String(noteId || "");
     const safeFieldId = String(fieldId || "");
     if (!safeNoteId || !safeFieldId || !field(safeFieldId)) return null;
-    if (!seasonNotesForField(safeFieldId).some((item) => item.noteId === safeNoteId)) return null;
+    if (!seasonNotesForField(safeFieldId, "all", { includeCarryover: true }).some((item) => item.noteId === safeNoteId)) return null;
     return mutate((d) => {
       const fieldIndex = d.fields.findIndex((item) => item.fieldId === safeFieldId);
       if (fieldIndex < 0) return;
       d.fields[fieldIndex].seasonNotes = (d.fields[fieldIndex].seasonNotes || [])
         .filter((item) => item.noteId !== safeNoteId);
     }, "今年の気づきを削除しました");
+  }
+
+  function carryoverNoteForField(fieldId, year) {
+    return seasonNotesForField(fieldId, year, { includeCarryover: true }).find((note) => note.kind === "carryover") || null;
+  }
+
+  function saveCarryoverNote(record) {
+    const input = record || {};
+    const year = String(input.season || "");
+    const fieldId = String(input.fieldId || "");
+    const text = typeof input.text === "string" ? input.text.trim() : "";
+    const date = input.date || `${year}-01-01`;
+    if (!field(fieldId) || !/^[1-9]\d{3}$/.test(year) || !text || harvestDateYear(date) !== year) return "";
+    const existing = carryoverNoteForField(fieldId, year);
+    if (input.noteId && (!existing || existing.noteId !== input.noteId)) return "";
+    return saveSeasonNote({ ...existing, fieldId, season: year, date, text, kind: "carryover", noteId: existing && existing.noteId || "" });
   }
 
   // Derived outlook history is kept apart from farm records. It is append-only
@@ -2394,9 +2524,12 @@
     growthSummaryFor,
     fieldWorksByNameFor,
     isActualFieldWork,
+    harvestStatusForField,
     isHeadingWorkName,
     saveFieldWork,
     saveHarvestThermalSnapshots,
+    retryHarvestThermal,
+    completeHarvestThermal,
     saveHarvestWeatherSnapshot,
     deleteFieldWork,
     deleteFieldWorks,
@@ -2444,6 +2577,8 @@
     seasonNotesForField,
     saveSeasonNote,
     deleteSeasonNote,
+    carryoverNoteForField,
+    saveCarryoverNote,
     saveOutlookSnapshots,
     lastFieldWork,
     lastGrowthLog,

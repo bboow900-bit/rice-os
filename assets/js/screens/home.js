@@ -11,6 +11,7 @@
   let homeGroupFilter = "all";
   let expandedManagementFieldId = "";
   let homeCandidatesExpanded = false;
+  let homeHarvestCompletedExpanded = false;
   const heatCache = new Map();
   const heatProjectionCache = new Map();
   const waterForecastCache = new Map();
@@ -436,7 +437,7 @@
     const planting = plantingDateForYear(field.fieldId, year);
     const hasWork = (pattern) => works.some((row) => pattern.test(String(row.workName || "")));
     const heading = Boolean(growthSummary && growthSummary.headingDate) || hasWork(/出穂/);
-    const harvest = hasWork(/稲刈り|収穫/);
+    const harvest = state.harvestStatusForField(field.fieldId, year, dateText).harvested;
     const panicle = Boolean(panicleLog);
     const dap = planting ? U.daysBetween(planting, dateText) : "";
     let index = 0;
@@ -700,7 +701,8 @@
     const panicle = panicleLogForYear(field.fieldId, year, dateText);
     const headingActual = actualHeadingDate(field, dateText);
     const heading = headingActual || stage.predictedHeadingDate || "";
-    const harvest = fieldWorkDate(field.fieldId, year, /稲刈り|収穫/);
+    const harvestStatus = state.harvestStatusForField(field.fieldId, year, dateText);
+    const harvest = harvestStatus.harvested ? harvestStatus.date : "";
     const flowEnd = harvest || (heading ? addDays(heading, 48) : addDays(planting, 145));
     const todayPercent = flowPercent(dateText, planting, flowEnd);
     const growthDate = earliestGrowthDate(field.fieldId, year);
@@ -774,12 +776,14 @@
     const stageImage = fieldStage ? `assets/images/rice-stages/rice-stage-${String(fieldStage.image).padStart(2, "0")}.png` : "assets/images/rice-stages/rice-stage-01.png";
     const candidateCount = candidatesForDate(date).filter((entry) => entryFieldIds(entry).includes(field.fieldId)).length;
     const isExpanded = expandedManagementFieldId === field.fieldId;
+    const harvestStatus = state.harvestStatusForField(field.fieldId, cropYear(date), date);
+    const harvestLabel = harvestStatus.status === "legacy" ? "区分未確認" : harvestStatus.status === "partial" ? "一部実施" : "";
     return `
       <article class="home-decision-card ${isExpanded ? "expanded" : ""}" data-home-stage-card="${U.attr(field.fieldId)}">
         <button type="button" class="home-decision-card-toggle" data-home-toggle-field="${U.attr(field.fieldId)}" aria-expanded="${isExpanded ? "true" : "false"}" aria-controls="home-management-${U.attr(field.fieldId)}">
         <div class="home-decision-card-head">
           <img class="stage" src="${U.attr(stageImage)}" alt="">
-          <div><b>${U.escapeHTML(field.name)}</b><small>${U.escapeHTML(fieldVariety(field))} / ${U.escapeHTML(areaText(field))}${candidateCount ? ` ・ 確認${U.escapeHTML(String(candidateCount))}件` : ""}</small></div>
+          <div><b>${U.escapeHTML(field.name)}</b><small>${U.escapeHTML(fieldVariety(field))} / ${U.escapeHTML(areaText(field))}${harvestLabel ? ` ・ ${harvestLabel}` : ""}${candidateCount ? ` ・ 確認${U.escapeHTML(String(candidateCount))}件` : ""}</small></div>
           <i aria-hidden="true">${isExpanded ? "⌃" : "⌄"}</i>
         </div>
           ${renderDecisionProgressGrid(field, stage, waterManagement, criticalWater, date)}
@@ -1166,6 +1170,19 @@
     }).sort((a, b) => b.score - a.score || String(a.lastDate || "").localeCompare(String(b.lastDate || "")) || String(a.field.name).localeCompare(String(b.field.name)));
   }
 
+  function renderHarvestGroupedFields(rows, date) {
+    const completed = [];
+    const pending = [];
+    rows.forEach((field) => {
+      const status = state.harvestStatusForField(field.fieldId, cropYear(date), date);
+      (status.status === "complete" ? completed : pending).push(field);
+    });
+    const count = `収穫済み ${completed.length}/${rows.length}圃場`;
+    return `<p class="home-harvest-count">${U.escapeHTML(count)}（表示対象）</p>
+      <div class="home-decision-list" data-home-unharvested-fields>${pending.length ? pending.map(renderDecisionFieldCard).join("") : `<div class="farm-empty">${rows.length ? "表示対象の圃場はすべて収穫完了です。" : "このグループには圃場がありません。"}</div>`}</div>
+      ${completed.length ? `<details class="home-harvest-completed" data-home-harvest-completed${homeHarvestCompletedExpanded ? " open" : ""}><summary>${U.escapeHTML(count)}</summary><div class="home-decision-list">${completed.map(renderDecisionFieldCard).join("")}</div></details>` : ""}`;
+  }
+
   function renderDecisionDashboard() {
     const todayEntries = actualEntriesForDate(U.today());
     const candidates = candidatesForDate(U.today());
@@ -1190,7 +1207,7 @@
       ${renderTodayPlans(U.today())}
       <section class="home-decision-section">
         <div class="home-decision-section-head"><div><h3>全圃場</h3><small>今日の状況を優先順に表示</small></div><select data-home-group-filter aria-label="圃場グループを絞り込む">${groupOptions}</select></div>
-        <div class="home-decision-list">${rows.length ? rows.map(renderDecisionFieldCard).join("") : '<div class="farm-empty">このグループには圃場がありません。</div>'}</div>
+        ${renderHarvestGroupedFields(rows, U.today())}
       </section>
     `;
   }
@@ -1542,8 +1559,11 @@
       ? projectionRows.filter((row) => row.date >= today && row.date >= thermalStart)
       : [];
     const percent = actual.total === "" ? 0 : progressPercent(actual.total, target);
-    const status = ripeningStatus(actual.total, target, heading);
-    const projectedEta = futureRows.length
+    const harvestStatus = state.harvestStatusForField(field.fieldId, cropYear(date), date);
+    const completed = harvestStatus.status === "complete";
+    const status = completed ? { label: "収穫済み", tone: "ready", note: `稲刈り完了 ${U.fd(harvestStatus.date)}` }
+      : ripeningStatus(actual.total, target, heading);
+    const projectedEta = completed ? "" : futureRows.length
       ? heatEtaFromProjection(actual.total || 0, target, futureRows, "収穫目安", "収穫目安まで")
       : heatEtaLabel(actual.total || "", target, heatPace({ rows: availableRows.slice(-10) }), "収穫目安", "収穫目安まで");
     const title = !heading.date
@@ -2084,6 +2104,9 @@
     const root = U.$("homeVisualDashboard");
     if (!root || root.dataset.boundHomeCalendar === "1") return;
     root.dataset.boundHomeCalendar = "1";
+    root.addEventListener("toggle", (event) => {
+      if (event.target.matches("[data-home-harvest-completed]")) homeHarvestCompletedExpanded = event.target.open;
+    }, true);
     root.addEventListener("click", (event) => {
       const overview = event.target.closest("[data-home-overview]");
       if (overview) {
@@ -2233,7 +2256,7 @@
     });
   }
 
-  if (window.__RICEOS_TEST__) RiceOS.homeTest = { homeWaterMovementPresentation, homeWaterMovementLabel, renderHomeWaterMovementTimeline, actualEntriesForDate, eventTone };
+  if (window.__RICEOS_TEST__) RiceOS.homeTest = { homeWaterMovementPresentation, homeWaterMovementLabel, renderHomeWaterMovementTimeline, actualEntriesForDate, eventTone, renderRipeningHeatMeter };
 
   RiceOS.screens = RiceOS.screens || {};
   RiceOS.screens.home = { render, bind };

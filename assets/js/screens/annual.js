@@ -16,6 +16,8 @@
   let workScopeFilter = "all";
   let nextSeasonIdeaDraft = false;
   let seasonNoteDraft = null;
+  let carryoverDraft = null;
+  const thermalRetries = new Map();
   let waterEditDraft = null;
   let reviewView = "overview";
   let compareFilter = "work";
@@ -1349,7 +1351,12 @@
   }
 
   function fieldYearRows(fieldId, year) {
-    return allRows().filter((row) => (row.fieldIds || []).includes(fieldId) && String(row.season || String(row.date || "").slice(0, 4)) === String(year));
+    return allRows().filter((row) => {
+      const harvest = row.kind === "fieldWork" && state.isActualFieldWork(row.raw)
+        && /稲刈り|収穫/.test(String(row.title || "")) && !/落水/.test(String(row.title || ""));
+      const rowYear = harvest ? String(row.date || "").slice(0, 4) : row.season || String(row.date || "").slice(0, 4);
+      return (row.fieldIds || []).includes(fieldId) && String(rowYear) === String(year);
+    });
   }
 
   function firstDate(rows, test) {
@@ -1400,7 +1407,8 @@
     const growthSummary = state.growthSummaryFor ? state.growthSummaryFor(field.fieldId, year) : null;
     const heading = growthSummary && growthSummary.headingDate
       || firstDate(growth, (row) => Boolean(row.raw && row.raw.headingObserved));
-    const harvest = firstDate(works, (row) => /収穫|稲刈/.test(String(row.title || "")));
+    const harvestStatus = state.harvestStatusForField(field.fieldId, year, U.today());
+    const harvest = harvestStatus.harvested ? harvestStatus.date : "";
     const materialRows = works.filter((row) => String(row.raw && row.raw.material || "").trim());
     const panicle = growthSummary && growthSummary.panicleLog
       || growth.map((row) => row.raw).filter((row) => U.number(row && row.panicleLengthMm, 0) > 0).sort((a, b) => String(a.date).localeCompare(String(b.date)))[0] || null;
@@ -1423,6 +1431,7 @@
       workHours: totalHoursForField(works, field.fieldId),
       materials: materialRows.length ? unique(materialRows.map((row) => row.raw.material)).join("・") : "",
       harvest,
+      harvestStatus,
       photos: rows.filter((row) => row.photoData || row.photo).length,
       yield: result && result.yield ? `${result.yield}${resultScope}` : "",
       yieldPer10a: result && result.yieldPer10a ? `${result.yieldPer10a}${resultScope}` : "",
@@ -1468,6 +1477,18 @@
         </div>
       </section>
     `;
+  }
+
+  function renderCarryoverNotes(field) {
+    const year = reviewYearValue();
+    const note = state.carryoverNoteForField(field.fieldId, year);
+    const draft = carryoverDraft && carryoverDraft.fieldId === field.fieldId && carryoverDraft.year === year ? carryoverDraft : null;
+    const legacy = String(field.nextSeasonMemo || "").trim();
+    return `<section class="annual-carryover-notes"><h3>${U.escapeHTML(year)}年からの引継ぎ</h3>
+      ${draft ? `<div class="annual-season-note-editor" data-carryover-editor><label>引継ぎメモ<textarea data-carryover-text>${U.escapeHTML(draft.text)}</textarea></label><div><button type="button" class="secondary" data-carryover-cancel>閉じる</button><button type="button" class="primary" data-carryover-save="${U.attr(field.fieldId)}">保存</button></div></div>`
+        : note ? `<p>${U.escapeHTML(note.text)}</p><button type="button" class="secondary" data-carryover-edit="${U.attr(field.fieldId)}">編集</button><button type="button" class="danger" data-carryover-delete="${U.attr(note.noteId)}">削除</button>`
+          : `<p class="muted">この年の引継ぎメモは未記録</p><button type="button" class="secondary" data-carryover-add="${U.attr(field.fieldId)}">この年の引継ぎを記録</button>`}
+      ${legacy ? `<details class="annual-legacy-carryover"><summary>年度不明の旧メモ</summary><p>${U.escapeHTML(legacy)}</p><button type="button" class="secondary" data-carryover-copy="${U.attr(field.fieldId)}">この年へコピー</button></details>` : ""}</section>`;
   }
 
   function isTimelineDate(value) {
@@ -1700,7 +1721,8 @@
     const year = reviewYearValue();
     const entries = fieldYearTimeline(field, year);
     const planting = entries.find((entry) => /田植/.test(entry.label))?.date || "";
-    const harvest = entries.find((entry) => entry.category === "収穫")?.date || "";
+    const harvestStatus = state.harvestStatusForField(field.fieldId, year, U.today());
+    const harvest = harvestStatus.harvested ? harvestStatus.date : "";
     const seasonLength = timelineDays(planting, harvest);
     const seasonText = planting
       ? `${timelineDateParts(planting, true).text} → ${harvest ? `${timelineDateParts(harvest, true).text}${seasonLength !== "" ? ` / ${seasonLength}日` : ""}` : "収穫記録待ち"}`
@@ -1778,13 +1800,27 @@
     </details>`;
   }
 
+  function harvestThermalDisplayStatus(row, fieldId, thermal) {
+    if (row && thermalRetries.has(`${row.workId}:${fieldId}`)) return "取得中";
+    const hasValue = thermal.total !== "" && thermal.total != null && Number.isFinite(Number(thermal.total));
+    if (hasValue) return thermal.status && !/取得中/.test(thermal.status) ? thermal.status : "保存済み";
+    const heading = row && state.headingDateForField(fieldId, U.season(row.date), row.date);
+    if (!heading) return "出穂日待ち";
+    const location = state.data().meta && state.data().meta.weatherLocation;
+    if (!location || location.latitude == null || location.longitude == null) return "地点待ち";
+    return "未取得";
+  }
+
   function renderEndSeasonReflection(field, snapshot) {
+    const harvestStatus = snapshot.harvestStatus || state.harvestStatusForField(field.fieldId, snapshot.year, U.today());
     const latestNote = seasonNotesForReview(field.fieldId)[0] || null;
-    const carryover = String(field.nextSeasonMemo || "").trim();
+    const carryover = state.carryoverNoteForField(field.fieldId, snapshot.year);
+    const legacyCarryover = String(field.nextSeasonMemo || "").trim();
     const noteStatus = latestNote
       ? `今年の気づき ${latestNote.date ? U.fd(latestNote.date) : "記録あり"}`
-      : carryover ? "来年に引き継ぐメモあり" : "今年の気づき・来年メモは未記録";
+      : carryover ? "この年の引継ぎメモあり" : legacyCarryover ? "年度不明の旧メモあり" : "今年の気づき・引継ぎメモは未記録";
     if (!snapshot.harvest) {
+      if (harvestStatus.status === "partial") return `<div class="annual-compare-check"><b>稲刈り 一部実施</b><span>${U.escapeHTML(U.fd(harvestStatus.date))} / 収穫完了は未登録</span><button type="button" class="secondary" data-annual-reflection-focus>気づき・来年メモへ</button></div>`;
       return `<div class="annual-compare-check"><b>収穫後にここで振り返る</b><span>収穫日が記録されると、この年の実績と引き継ぎメモをまとめて確認できます。</span></div>`;
     }
     const facts = [
@@ -1796,7 +1832,24 @@
       snapshot.workHours ? `作業時間 ${U.formatHours(snapshot.workHours)}` : "作業時間 未記録",
       noteStatus
     ];
-    return `<div class="annual-compare-check complete"><b>収穫後の振り返り</b><span>${U.escapeHTML(facts.join(" / "))}</span><button type="button" class="secondary" data-annual-reflection-focus>気づき・来年メモへ</button></div>`;
+    let metrics = "";
+    let actions = "";
+    if (harvestStatus.status === "complete") {
+      const work = state.data().fieldWorks.find((row) => harvestStatus.workIds.includes(row.workId) && row.date === harvestStatus.date);
+      const saved = work && (work.harvestSnapshots || []).find((row) => row.fieldId === field.fieldId && row.harvestDate === harvestStatus.date);
+      const thermal = saved && saved.thermal || {};
+      const days = thermal.headingDate ? U.daysBetween(thermal.headingDate, harvestStatus.date) : "";
+      const thermalValue = thermal.total !== "" && thermal.total !== undefined && thermal.total !== null && Number.isFinite(Number(thermal.total))
+        ? `${Math.round(Number(thermal.total))}℃` : "未保存";
+      metrics = `<dl class="annual-harvest-metrics"><div><dt>収穫日</dt><dd>${U.escapeHTML(timelineDateParts(harvestStatus.date).text)}</dd></div><div><dt>出穂後</dt><dd>${days !== "" && Number(days) >= 0 ? `${U.escapeHTML(days)}日` : "未記録"}</dd></div><div><dt>保存済積算</dt><dd>${U.escapeHTML(thermalValue)}</dd><small>${U.escapeHTML(harvestThermalDisplayStatus(work, field.fieldId, thermal))}</small></div></dl>`;
+      if (work) {
+        const yieldMissing = !work.harvestReview || work.harvestReview.yieldKg === "" || work.harvestReview.yieldKg == null;
+        const busy = thermalRetries.has(`${work.workId}:${field.fieldId}`);
+        actions = `${yieldMissing ? `<button type="button" class="secondary" data-annual-harvest-edit="${U.attr(work.workId)}">${(work.fieldIds || []).length > 1 ? "共有収量を入力" : "圃場収量を入力"}</button>` : ""}
+          ${state.completeHarvestThermal(thermal) ? "" : `<button type="button" class="secondary" data-harvest-thermal-retry="${U.attr(work.workId)}" data-harvest-field="${U.attr(field.fieldId)}"${busy ? " disabled" : ""}>${busy ? "積算を取得中…" : "積算温度を再取得"}</button>${busy ? `<button type="button" class="secondary" data-harvest-thermal-cancel="${U.attr(work.workId)}" data-harvest-field="${U.attr(field.fieldId)}">取得を取消</button>` : ""}`}`;
+      }
+    }
+    return `<div class="annual-compare-check${harvestStatus.status === "complete" ? " complete" : ""}"><b>${harvestStatus.status === "complete" ? "収穫済み・今年の一区切り" : "収穫後の振り返り（完了区分未確認）"}</b>${metrics}${actions}<details class="annual-harvest-details"><summary>結果・記録の詳細</summary><ul>${facts.map((fact) => `<li>${U.escapeHTML(fact)}</li>`).join("")}</ul></details><button type="button" class="secondary" data-annual-results>品種集計の結果へ</button><button type="button" class="secondary" data-annual-reflection-focus>この年のひとことを入力</button></div>`;
   }
 
   function compareRecordCard(entry, year, field) {
@@ -1859,7 +1912,7 @@
       ${renderEndSeasonReflection(field, snapshot)}
       ${renderHarvestTotals(field, year)}
       ${renderSeasonNotes(field)}
-      <label class="annual-carryover-note"><span>来年に引き継ぐメモ</span><textarea data-annual-field-edit="nextSeasonMemo" placeholder="例: この圃場は中干しを早めに始める。穂肥量は葉色を見て控えめに。">${U.escapeHTML(field.nextSeasonMemo || "")}</textarea><small>圃場マスターに保存され、年度をまたいで確認できます。</small></label>
+      ${renderCarryoverNotes(field)}
     `;
   }
 
@@ -1930,7 +1983,7 @@
         ${renderEndSeasonReflection(field, current)}
         ${missing.length ? `<div class="annual-compare-check"><b>翌年比較のため、今年はここを残す</b><span>${U.escapeHTML(missing.join(" / "))}</span></div>` : '<div class="annual-compare-check complete"><b>比較に必要な基本記録がそろっています</b><span>来年の判断材料として使えます</span></div>'}
         ${renderSeasonNotes(field)}
-        <label class="annual-carryover-note"><span>来年に引き継ぐメモ</span><textarea data-annual-field-edit="nextSeasonMemo" placeholder="例: この圃場は中干しを早めに始める。穂肥量は葉色を見て控えめに。">${U.escapeHTML(field.nextSeasonMemo || "")}</textarea><small>圃場マスターに保存され、年度をまたいで確認できます。</small></label>
+        ${renderCarryoverNotes(field)}
       </section>
     `;
   }
@@ -2097,8 +2150,8 @@
       annualRecordInfoRow("目安との差", thermal.difference === "" || thermal.difference === undefined || thermal.difference === null ? "-" : `${Number(thermal.difference) >= 0 ? "+" : ""}${thermal.difference}℃`),
       annualRecordInfoRow("計算期間", thermal.startDate && thermal.endDate ? `${U.fd(thermal.startDate)} - ${U.fd(thermal.endDate)} / ${thermal.count || "-"}日分` : "-"),
       annualRecordInfoRow("田植えから収穫", thermal.daysFromPlanting ? `${thermal.daysFromPlanting}日` : "田植え日未記録"),
-      annualRecordInfoRow("気象データ", `${thermal.status || "保存済み"}${thermal.source ? ` / ${thermal.source}` : ""}`)
-    ].filter(Boolean).join("") : annualRecordInfoRow("出穂後積算", thermal.status || "未保存");
+      annualRecordInfoRow("気象データ", `${harvestThermalDisplayStatus(row, fieldId, thermal)}${thermal.source ? ` / ${thermal.source}` : ""}`)
+    ].filter(Boolean).join("") : annualRecordInfoRow("出穂後積算", harvestThermalDisplayStatus(row, fieldId, thermal));
     return `
       <section class="annual-record-detail-section annual-harvest-snapshot"><h3>収穫時の水管理実績</h3><div class="annual-record-detail-rows">${waterRows}</div></section>
       ${renderHarvestWeather(row, snapshot, fieldId)}
@@ -2470,7 +2523,61 @@
     render();
   }
 
+  function openHarvestResults() {
+    const field = state.field(selectedFieldId);
+    if (!field || !RiceOS.screens.results) return;
+    const year = reviewYearValue();
+    const origin = { fieldId: selectedFieldId, tab: selectedTab, review: reviewView,
+      year: yearValue(), fromHub: compareFromHub, filter: compareFilter, top: topView };
+    if (RiceOS.navigation && RiceOS.navigation.clear) RiceOS.navigation.clear();
+    selectedFieldId = origin.fieldId;
+    selectedTab = origin.tab;
+    reviewView = origin.review;
+    compareFromHub = origin.fromHub;
+    compareFilter = origin.filter;
+    topView = origin.top;
+    if (U.$("annualYear")) U.$("annualYear").value = origin.year;
+    RiceOS.app.openInput("results", "annual");
+    RiceOS.screens.results.resetForm();
+    U.$("rSeason").value = year;
+    U.$("rVariety").value = field.varietyId;
+  }
+
+  function openHarvestWork(workId) {
+    const fieldId = selectedFieldId;
+    const work = state.data().fieldWorks.find((row) => row.workId === workId && (row.fieldIds || []).includes(fieldId));
+    if (!work) return;
+    const origin = { fieldId, tab: selectedTab, review: reviewView, year: yearValue(), fromHub: compareFromHub, filter: compareFilter, top: topView };
+    if (RiceOS.navigation && RiceOS.navigation.clear) RiceOS.navigation.clear();
+    selectedFieldId = origin.fieldId; selectedTab = origin.tab; reviewView = origin.review;
+    compareFromHub = origin.fromHub; compareFilter = origin.filter; topView = origin.top;
+    U.$("annualYear").value = origin.year;
+    RiceOS.app.openInput("field-work", "annual");
+    RiceOS.screens.fieldWork.editWork(workId);
+    U.$("fwHarvestReview").open = true;
+    U.$("fwHarvestYieldKg").focus();
+  }
+
+  async function retryThermal(workId, fieldId) {
+    const key = `${workId}:${fieldId}`;
+    if (thermalRetries.has(key)) return;
+    const controller = new AbortController();
+    thermalRetries.set(key, controller);
+    render();
+    try {
+      const result = await state.retryHarvestThermal(workId, fieldId, { signal: controller.signal });
+      if (result.status === "saved") U.toast("積算温度を保存しました");
+      else if (result.status !== "cancelled" && result.status !== "unchanged") U.toast("取得不足・記録変更・取得失敗のため、保存済みの値は変更していません");
+    } finally {
+      if (thermalRetries.get(key) === controller) thermalRetries.delete(key);
+      if (selectedFieldId === fieldId) render();
+    }
+  }
+
   function bind() {
+    U.$("annualTimeline").addEventListener("input", (event) => {
+      if (event.target.matches("[data-carryover-text]") && carryoverDraft) carryoverDraft.text = event.target.value;
+    });
     const year = U.$("annualYear");
     if (year) year.addEventListener("change", render);
     U.$("annualTimeline").addEventListener("toggle", (event) => {
@@ -2739,6 +2846,44 @@
       const fab = event.target.closest("[data-annual-fab]");
       if (fab) {
         openAdd(fab.dataset.annualFab);
+        return;
+      }
+      const harvestEdit = event.target.closest("[data-annual-harvest-edit]");
+      if (harvestEdit) { openHarvestWork(harvestEdit.dataset.annualHarvestEdit); return; }
+      const thermalRetry = event.target.closest("[data-harvest-thermal-retry]");
+      if (thermalRetry) { void retryThermal(thermalRetry.dataset.harvestThermalRetry, thermalRetry.dataset.harvestField); return; }
+      const thermalCancel = event.target.closest("[data-harvest-thermal-cancel]");
+      if (thermalCancel) {
+        const key = `${thermalCancel.dataset.harvestThermalCancel}:${thermalCancel.dataset.harvestField}`;
+        const controller = thermalRetries.get(key);
+        if (controller) controller.abort();
+        thermalRetries.delete(key); render(); return;
+      }
+      const carryoverAction = event.target.closest("[data-carryover-add], [data-carryover-edit], [data-carryover-copy]");
+      if (carryoverAction && selectedFieldId) {
+        const field = state.field(selectedFieldId);
+        const year = reviewYearValue();
+        const existing = state.carryoverNoteForField(selectedFieldId, year);
+        carryoverDraft = { fieldId: selectedFieldId, year, noteId: existing && existing.noteId || "",
+          text: carryoverAction.hasAttribute("data-carryover-copy") ? field.nextSeasonMemo || "" : existing && existing.text || "" };
+        render(); return;
+      }
+      if (event.target.closest("[data-carryover-cancel]")) { carryoverDraft = null; render(); return; }
+      const carryoverSave = event.target.closest("[data-carryover-save]");
+      if (carryoverSave && carryoverDraft && carryoverDraft.fieldId === selectedFieldId && carryoverDraft.year === reviewYearValue()) {
+        const id = state.saveCarryoverNote({ fieldId: selectedFieldId, season: carryoverDraft.year,
+          noteId: carryoverDraft.noteId, text: carryoverDraft.text, date: defaultSeasonNoteDate(carryoverDraft.year) });
+        if (id) { carryoverDraft = null; render(); } return;
+      }
+      const carryoverDelete = event.target.closest("[data-carryover-delete]");
+      if (carryoverDelete && confirm("この年の引継ぎメモを削除しますか？")) {
+        const note = state.carryoverNoteForField(selectedFieldId, reviewYearValue());
+        if (note && note.noteId === carryoverDelete.dataset.carryoverDelete
+          && state.deleteSeasonNote(note.noteId, selectedFieldId)) { carryoverDraft = null; render(); }
+        return;
+      }
+      if (event.target.closest("[data-annual-results]")) {
+        openHarvestResults();
         return;
       }
       if (event.target.closest("[data-annual-reflection-focus]")) {

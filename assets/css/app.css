@@ -15329,3 +15329,36 @@ label {
 #screen-calendar .calendar-entry-menu summary { cursor: pointer; padding: 10px; }
 #screen-calendar .calendar-entry-menu { min-width: 0; }
 #screen-calendar .mark-shipment { background: #fff4d9; color: #765619; }
+
+#fieldWorkForm #fwHarvestCompletion h3 { font-size: 14px; margin: 0 0 6px; }
+#fieldWorkForm #fwHarvestCompletion fieldset { min-width: 0; margin: 6px 0; padding: 4px 10px; border: 1px solid #d7e4d2; }
+#fieldWorkForm #fwHarvestCompletion legend { font-size: 12px; padding: 0 4px; overflow-wrap: anywhere; }
+#fieldWorkForm #fwHarvestCompletion .fw-harvest-choices { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 12px; }
+#fieldWorkForm #fwHarvestCompletion label { display: flex; align-items: center; gap: 8px; min-width: 0; min-height: 44px; margin: 0; padding: 0; font-size: 13px; }
+#fieldWorkForm #fwHarvestCompletion .fw-harvest-legacy { grid-column: 1 / -1; font-size: 12px; }
+#fieldWorkForm #fwHarvestCompletion input[type="radio"] { appearance: auto; width: 16px; height: 16px; min-width: 16px; min-height: 16px; max-width: 16px; max-height: 16px; padding: 0; margin: 0; flex: 0 0 16px; border: initial; border-radius: initial; background: initial; box-shadow: none; accent-color: #2b7148; }
+#screen-annual .annual-harvest-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 6px 0; }
+#screen-annual .annual-harvest-metrics > div { min-width: 0; }
+#screen-annual .annual-harvest-metrics dt { font-size: 11px; color: #526455; }
+#screen-annual .annual-harvest-metrics dd { margin: 2px 0; font-size: 14px; font-weight: 700; overflow-wrap: anywhere; }
+#screen-annual .annual-harvest-metrics small { font-size: 10px; color: #526455; overflow-wrap: anywhere; }
+#screen-annual .annual-harvest-details { font-size: 12px; }
+#screen-annual .annual-harvest-details summary { padding: 8px 0; }
+#screen-annual .annual-harvest-details ul { padding-left: 18px; margin: 4px 0; }
+
+#fieldWorkForm #fwHarvestQuickReview { border-block: 1px solid #d7e4d2; padding-block: 10px; }
+#fieldWorkForm #fwHarvestQuickReview h3 { margin: 0 0 8px; font-size: 14px; }
+#fieldWorkForm #fwHarvestQuickReview .harvest-quick-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+#fieldWorkForm #fwHarvestQuickReview label { min-width: 0; font-size: 12px; }
+#fieldWorkForm #fwHarvestQuickReview label:has(#fwMemo) { grid-column: 1 / -1; }
+#fieldWorkForm #fwHarvestQuickReview textarea { min-height: 64px; }
+#screen-annual .annual-carryover-notes { padding-block: 14px; border-block: 1px solid #d7e4d2; margin-block: 12px; }
+#screen-annual .annual-carryover-notes h3 { margin: 0 0 8px; font-size: 14px; }
+#screen-annual .annual-carryover-notes p { font-size: 13px; white-space: pre-wrap; overflow-wrap: anywhere; }
+#screen-annual .annual-carryover-notes button { min-height: 44px; margin: 4px 6px 4px 0; }
+#screen-annual .annual-legacy-carryover { margin-top: 10px; font-size: 12px; color: #526455; }
+#screen-annual .annual-legacy-carryover summary { min-height: 44px; display: flex; align-items: center; }
+#screen-home .home-harvest-count { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; line-height: 1.5; color: #356348; background: #edf5ed; padding: 4px 8px; border-radius: 4px; }
+#screen-home .home-harvest-completed > summary { min-height: 44px; display: flex; align-items: center; gap: 8px; font-size: 13px; color: #356348; cursor: pointer; padding: 8px 0; }
+#screen-home .home-harvest-completed > summary::after { content: ""; width: 8px; height: 8px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(45deg); margin-left: auto; margin-right: 6px; flex: 0 0 8px; }
+#screen-home .home-harvest-completed[open] > summary::after { transform: rotate(225deg); }

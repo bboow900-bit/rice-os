@@ -115,7 +115,8 @@
     const planting = state().plantingDateForField(field.fieldId, year);
     const summary = state().growthSummaryFor(field.fieldId, year, { asOfDate: asOf });
     const headingActual = summary.headingDate || state().headingDateForField(field.fieldId, year, asOf);
-    const harvestActual = workDate(field.fieldId, year, asOf, /稲刈り|収穫/);
+    const harvestStatus = state().harvestStatusForField(field.fieldId, year, asOf);
+    const harvestActual = harvestStatus.harvested ? harvestStatus.date : "";
     const panicle = !headingActual && summary.panicleLog && agro().panicleEstimate
       ? agro().panicleEstimate(field, summary.panicleLog.panicleLengthMm, summary.panicleLog.date)
       : null;
@@ -137,7 +138,7 @@
       heading = { kind: "varietyPrevious", date: sameVariety.date, range: dateRange(sameVariety.date, 6), label: "同品種前年からの見通し", source: "同品種の前年実績" };
     }
     let harvest = { kind: "missing", date: "", range: dateRange(""), label: "記録不足", source: "" };
-    if (harvestActual) harvest = { kind: "actual", date: harvestActual, range: dateRange(harvestActual), label: "実測済", source: "今年の収穫日" };
+    if (harvestActual) harvest = { kind: "actual", date: harvestActual, range: dateRange(harvestActual), label: harvestStatus.status === "legacy" ? "完了区分未確認" : "収穫完了", source: "今年の収穫日" };
     else if (heading.date) {
       const reference = heatTarget(field);
       const date = dateAdd(heading.date, Math.round((reference.daysMin + reference.daysMax) / 2));

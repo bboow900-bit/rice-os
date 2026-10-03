@@ -1,0 +1,32 @@
+"use strict";
+const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const path = require("node:path");
+const vm = require("node:vm");
+const source = fs.readFileSync(path.resolve(__dirname, "../assets/js/screens/annual.js"), "utf8");
+const helper = source.slice(source.indexOf("  function harvestThermalDisplayStatus("), source.indexOf("  function renderEndSeasonReflection("));
+let heading = "";
+const data = { meta: {} };
+const busy = new Map();
+const context = vm.createContext({ thermalRetries: busy, state: { headingDateForField: () => heading, data: () => data }, U: { season: date => date.slice(0,4) } });
+vm.runInContext(helper, context);
+const row = { workId: "h", date: "2026-09-10" };
+const thermal = { total: "", status: "\u6c17\u8c61\u5b9f\u7e3e\u3092\u53d6\u5f97\u4e2d" };
+const status = () => context.harvestThermalDisplayStatus(row,"a",thermal);
+const before = JSON.stringify([row,thermal]);
+assert.equal(status(),"\u51fa\u7a42\u65e5\u5f85\u3061");
+heading = "2026-09-01";
+assert.equal(status(),"\u5730\u70b9\u5f85\u3061");
+data.meta.weatherLocation = { latitude: 0, longitude: 0 };
+assert.equal(status(),"\u672a\u53d6\u5f97");
+busy.set("h:b",true); assert.equal(status(),"\u672a\u53d6\u5f97");
+busy.set("h:a",true); assert.equal(status(),"\u53d6\u5f97\u4e2d");
+busy.delete("h:a"); assert.equal(status(),"\u672a\u53d6\u5f97");
+assert.equal(JSON.stringify([row,thermal]),before);
+for (const label of ["\u78ba\u5b9a","\u5f53\u65e5\u901f\u5831","\u4e00\u90e8\u6b20\u6e2c"]) {
+  assert.equal(context.harvestThermalDisplayStatus(row,"a",{ total: 0, status: label }),label);
+}
+assert.equal(context.harvestThermalDisplayStatus(row,"a",{ total: 100, status: thermal.status }),"\u4fdd\u5b58\u6e08\u307f");
+assert(source.includes("harvestThermalDisplayStatus(work, field.fieldId, thermal)"));
+assert(source.includes("harvestThermalDisplayStatus(row, fieldId, thermal)"));
+console.log("Harvest thermal display: busy-only loading, heading/location/unfetched, saved values, no mutation PASS");
