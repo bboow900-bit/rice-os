@@ -1834,6 +1834,10 @@
     ];
     let metrics = "";
     let actions = "";
+    if (harvestStatus.status === "legacy") {
+      const work = state.data().fieldWorks.find((row) => harvestStatus.workIds.includes(row.workId) && row.date === harvestStatus.date);
+      if (work) actions = `<button type="button" class="secondary" data-annual-harvest-confirm="${U.attr(work.workId)}" data-harvest-field="${U.attr(field.fieldId)}">この圃場の刈り取り完了を確認</button>`;
+    }
     if (harvestStatus.status === "complete") {
       const work = state.data().fieldWorks.find((row) => harvestStatus.workIds.includes(row.workId) && row.date === harvestStatus.date);
       const saved = work && (work.harvestSnapshots || []).find((row) => row.fieldId === field.fieldId && row.harvestDate === harvestStatus.date);
@@ -2846,6 +2850,14 @@
       const fab = event.target.closest("[data-annual-fab]");
       if (fab) {
         openAdd(fab.dataset.annualFab);
+        return;
+      }
+      const harvestConfirm = event.target.closest("[data-annual-harvest-confirm]");
+      if (harvestConfirm) {
+        const fieldId = harvestConfirm.dataset.harvestField;
+        if (fieldId === selectedFieldId && confirm("この圃場の刈り取りが完了したことを確認しますか？")) {
+          if (state.confirmHarvestCompletion(harvestConfirm.dataset.annualHarvestConfirm, fieldId)) render();
+        }
         return;
       }
       const harvestEdit = event.target.closest("[data-annual-harvest-edit]");

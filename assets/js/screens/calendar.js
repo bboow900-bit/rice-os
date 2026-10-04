@@ -59,7 +59,11 @@
 
   function visibleEntries(date) {
     const entries = RiceOS.calendar.entriesForDate(date);
-    return entries.filter((entry) => matchesTarget(entry) && (displayMode === "all" || isPlan(entry)));
+    return entries.filter((entry) => !isCompletedPlan(entry) && matchesTarget(entry) && (displayMode === "all" || isPlan(entry)));
+  }
+
+  function isCompletedPlan(entry) {
+    return entry.kind === "schedule-completed" || entry.kind === "schedule" && scheduleDone(entry.record);
   }
 
   function scheduleDone(record) {
@@ -193,7 +197,7 @@
     if (!/^\d{4}-\d{2}-\d{2}$/.test(String(date || ""))) return;
     currentMonth = RiceOS.calendar.monthStart(date);
     selectedDate = date;
-    const entries = RiceOS.calendar.entriesForDate(date);
+    const entries = RiceOS.calendar.entriesForDate(date).filter((entry) => !isCompletedPlan(entry));
     if (displayMode === "planned" && entries.length && !entries.some(isPlan)) displayMode = "all";
     render();
   }

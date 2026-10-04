@@ -301,6 +301,45 @@
       workIds: selected.map((work) => work.workId) };
   }
 
+  function confirmHarvestCompletion(workId, fieldId) {
+    const work = data().fieldWorks.find((row) => row.workId === workId);
+    if (!work || !isHarvestWork(work) || !field(fieldId) || !(work.fieldIds || []).includes(fieldId)
+      || !harvestDateYear(work.date) || work.date > U.today()
+      || Object.prototype.hasOwnProperty.call(work.harvestStatusByField || {}, fieldId)) return null;
+    return mutate((draft) => {
+      const saved = draft.fieldWorks.find((row) => row.workId === workId);
+      saved.harvestStatusByField = { ...saved.harvestStatusByField, [fieldId]: "complete" };
+      saved.updatedAt = U.now();
+      (draft.schedules || []).forEach((schedule) => {
+        if (schedule.completedByWorkId !== workId) return;
+        if (schedule.status === "手動完了" || schedule.completedManuallyAt) return;
+        const ids = schedule.fieldIds && schedule.fieldIds.length ? schedule.fieldIds : saved.fieldIds;
+        if (ids.length && ids.every((id) => saved.fieldIds.includes(id) && saved.harvestStatusByField[id] === "complete")) return;
+        schedule.status = "予定";
+        schedule.completedAt = "";
+        schedule.completedByWorkId = "";
+        schedule.completionReason = "";
+        schedule.updatedAt = U.now();
+      });
+      // Confirm only schedules whose actual targets are now explicitly complete.
+      const schedules = (draft.schedules || []).filter((schedule) => {
+        if (schedule.status === "手動完了" || schedule.completedManuallyAt) return false;
+        const ids = schedule.fieldIds && schedule.fieldIds.length ? schedule.fieldIds : saved.fieldIds;
+        return ids.includes(fieldId) && ids.every((id) => saved.fieldIds.includes(id)
+          && saved.harvestStatusByField[id] === "complete");
+      });
+      const source = schedules.find((schedule) => schedule.scheduleId === saved.sourceScheduleId);
+      if (source && scheduleMatchesWork(source, saved, { explicitSource: true })) {
+        source.status = "実施済み";
+        source.completedAt = U.now();
+        source.completedByWorkId = saved.workId;
+        source.completionReason = `${saved.workName || "作業"}の作業記録により完了`;
+        source.updatedAt = U.now();
+      }
+      completeMatchingSchedules({ schedules }, saved);
+    }, "この圃場の刈り取り完了を確認しました");
+  }
+
   function isInYear(record, year) {
     const date = record && (record.date || record.startDate || record.actualEndDate || record.endDate);
     return U.isInYear(date, year);
@@ -531,19 +570,24 @@
     return { targetScope: scope, fieldIds: ids.slice() };
   }
 
-  function scheduleMatchesWork(schedule, work) {
+  function scheduleMatchesWork(schedule, work, options = {}) {
     if (!schedule || !work || schedule.status === "実施済み" || schedule.status === "手動完了") return false;
     if (targetScope(schedule) !== targetScope(work)) return false;
     const scheduleFields = schedule.fieldIds || [];
     const workFields = work.fieldIds || [];
+    if (options.explicitSource) {
+      const year = harvestDateYear(work.date);
+      if (!year || harvestDateYear(schedule.date) !== year
+        || scheduleFields.some((id) => !workFields.includes(id))) return false;
+    }
     if (isHarvestWork(work) && work.harvestStatusByField) {
       const targets = scheduleFields.length ? scheduleFields : workFields;
       if (!targets.length || !targets.every((id) => workFields.includes(id)
-        && (work.harvestStatusByField[id] === "complete" || work.harvestStatusByField[id] === undefined))) return false;
+        && work.harvestStatusByField[id] === "complete")) return false;
     }
     if (scheduleFields.length && !scheduleFields.some((id) => workFields.includes(id))) return false;
     const diff = Math.abs(U.daysBetween(schedule.date, work.date));
-    if (diff > 2) return false;
+    if (!options.explicitSource && diff > 2) return false;
     const scheduleKey = scheduleKeyword(`${schedule.title || ""} ${schedule.scheduleType || ""}`);
     const workKey = scheduleKeyword(work.workName || "");
     if (scheduleKey && workKey) return scheduleKey === workKey;
@@ -785,7 +829,7 @@
       }
       if (normalized.sourceScheduleId) {
         const scheduleIndex = (d.schedules || []).findIndex((schedule) => schedule.scheduleId === normalized.sourceScheduleId);
-        if (scheduleIndex >= 0 && scheduleMatchesWork(d.schedules[scheduleIndex], normalized)) {
+        if (scheduleIndex >= 0 && scheduleMatchesWork(d.schedules[scheduleIndex], normalized, { explicitSource: true })) {
           d.schedules[scheduleIndex] = {
             ...d.schedules[scheduleIndex],
             status: "実施済み",
@@ -2525,6 +2569,7 @@
     fieldWorksByNameFor,
     isActualFieldWork,
     harvestStatusForField,
+    confirmHarvestCompletion,
     isHeadingWorkName,
     saveFieldWork,
     saveHarvestThermalSnapshots,
