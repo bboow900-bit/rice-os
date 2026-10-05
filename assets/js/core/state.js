@@ -25,6 +25,8 @@
   function save(next, message) {
     let saved = false;
     try {
+      reconcileHarvestWaterClosures(next);
+      reconcileWorkSchedules(next, { existingOnly: true });
       cache = storage.saveData(next);
       saved = true;
       lastError = null;
@@ -39,7 +41,10 @@
   function replace(next, message) {
     let saved = false;
     try {
-      cache = storage.replaceData(next);
+      const restored = U.clone(next);
+      reconcileHarvestWaterClosures(restored);
+      reconcileWorkSchedules(restored, { existingOnly: true });
+      cache = storage.replaceData(restored);
       saved = true;
       lastError = null;
       emit(message || "復元しました", "saved");
@@ -340,6 +345,90 @@
     }, "この圃場の刈り取り完了を確認しました");
   }
 
+  function harvestClosureFor(draft, fieldId, startDate) {
+    const year = harvestDateYear(startDate);
+    if (!year || !fieldId) return null;
+    return (draft.fieldWorks || []).filter((work) => isHarvestWork(work)
+      && harvestDateYear(work.date) === year && work.date >= startDate && work.date <= U.today()
+      && (work.fieldIds || []).includes(fieldId) && (work.harvestStatusByField || {})[fieldId] === "complete")
+      .sort((a, b) => String(a.date).localeCompare(String(b.date)) || String(a.workId).localeCompare(String(b.workId)))[0] || null;
+  }
+
+  function waterRecordForHarvestEdit(record, previous) {
+    if (!previous || !previous.harvestAutoEnd || previous.harvestAutoEnd.blocked) return record;
+    const auto = previous.harvestAutoEnd;
+    const edited = { ...record };
+    const manualEnd = record.harvestEndOverride === true
+      || record.actualEndDate !== undefined && record.actualEndDate !== auto.date;
+    if (manualEnd) {
+      edited.harvestAutoEnd = undefined;
+      // Keep the closed movement history when a user explicitly takes ownership.
+      if (!Array.isArray(edited.waterMovements) && Array.isArray(previous.waterMovements)) edited.waterMovements = previous.waterMovements;
+    } else {
+      edited.harvestAutoEnd = U.clone(auto);
+      edited.actualEndDate = auto.date;
+      if (record.status !== undefined) edited.harvestAutoEnd.original.status = record.status === "完了" ? auto.original.status : record.status;
+      if (record.periodStatus !== undefined) edited.harvestAutoEnd.original.periodStatus = record.periodStatus === "完了" ? auto.original.periodStatus : record.periodStatus;
+      if (Array.isArray(record.waterMovements) && JSON.stringify(record.waterMovements) !== JSON.stringify(previous.waterMovements)) {
+        edited.harvestAutoEnd.original.waterMovements = U.clone(record.waterMovements);
+      }
+    }
+    return edited;
+  }
+
+  // Auto-owned boundaries are reversible; recorded manual ends are never changed.
+  function reconcileHarvestWaterClosures(draft) {
+    const changedDryFields = new Set();
+    [...(draft.dryPeriods || []), ...(draft.irrigations || [])].forEach((row) => {
+      const oldEnd = row.actualEndDate;
+      const auto = row.harvestAutoEnd;
+      if (auto && !auto.blocked && row.actualEndDate === auto.date) {
+        row.actualEndDate = auto.original.actualEndDate;
+        if (row.type === "dryPeriod") row.status = auto.original.status;
+        else { row.status = auto.original.status; row.periodStatus = auto.original.periodStatus; }
+        if (Array.isArray(auto.original.waterMovements)) row.waterMovements = U.clone(auto.original.waterMovements);
+      }
+      delete row.harvestAutoEnd;
+      const planned = !row.startDate && Boolean(row.plannedStartDate || row.endDate || /予定/.test(String(row.status || row.periodStatus || "")));
+      const startDate = planned ? "" : row.startDate || row.date || "";
+      const knownKind = row.type === "dryPeriod" || Boolean(waterKindFromMethod(row.method));
+      const work = !row.actualEndDate && !planned && knownKind ? harvestClosureFor(draft, row.fieldId, startDate) : null;
+      const movements = row.waterMovements || [];
+      // Later recorded movements contradict an automatic boundary: keep all facts.
+      if (work) {
+        const blocked = movements.some((movement) => !harvestDateYear(movement.startDate) || movement.startDate > work.date);
+        row.harvestAutoEnd = { workId: work.workId, date: work.date, original: {
+          actualEndDate: row.actualEndDate || "", status: row.status || "", periodStatus: row.periodStatus || "",
+          ...(Array.isArray(row.waterMovements) ? { waterMovements: U.clone(row.waterMovements) } : {})
+        } };
+        if (blocked) {
+          row.harvestAutoEnd.blocked = true;
+          row.harvestAutoEnd.reason = "movement-outside-harvest";
+          if (row.type === "dryPeriod" && oldEnd !== row.actualEndDate) changedDryFields.add(row.fieldId);
+          return;
+        }
+        row.actualEndDate = work.date;
+        if (row.type === "dryPeriod") row.status = "完了";
+        else { row.status = "終了"; row.periodStatus = "完了"; }
+        if (Array.isArray(row.waterMovements)) row.waterMovements = movements.map((movement) =>
+          !movement.endDate || movement.endDate > work.date ? { ...movement, endDate: work.date } : movement);
+      }
+      if (row.type === "dryPeriod" && oldEnd !== row.actualEndDate) changedDryFields.add(row.fieldId);
+    });
+    (draft.fieldWorks || []).forEach((work) => { delete work.harvestWaterClosures; });
+    (draft.fields || []).forEach((field) => {
+      const years = new Set((draft.fieldWorks || []).filter((work) => (work.fieldIds || []).includes(field.fieldId))
+        .map((work) => harvestDateYear(work.date)).filter(Boolean));
+      years.forEach((year) => legacyWaterPeriodsFrom(draft, field.fieldId, year).forEach((period) => {
+        if (period.actualEndDate || period.requiresDateReview || period.migrated) return;
+        const harvest = harvestClosureFor(draft, field.fieldId, period.startDate);
+        if (harvest) period.raw.harvestWaterClosures = { ...period.raw.harvestWaterClosures,
+          [field.fieldId]: { workId: harvest.workId, date: harvest.date } };
+      }));
+    });
+    changedDryFields.forEach((id) => refreshDryingSummary(draft, id));
+  }
+
   function isInYear(record, year) {
     const date = record && (record.date || record.startDate || record.actualEndDate || record.endDate);
     return U.isInYear(date, year);
@@ -575,11 +664,10 @@
     if (targetScope(schedule) !== targetScope(work)) return false;
     const scheduleFields = schedule.fieldIds || [];
     const workFields = work.fieldIds || [];
-    if (options.explicitSource) {
-      const year = harvestDateYear(work.date);
-      if (!year || harvestDateYear(schedule.date) !== year
-        || scheduleFields.some((id) => !workFields.includes(id))) return false;
-    }
+    const year = harvestDateYear(work.date);
+    if (!year || harvestDateYear(schedule.date) !== year) return false;
+    if (options.explicitSource && !options.partialTargets
+      && scheduleFields.some((id) => !workFields.includes(id))) return false;
     if (isHarvestWork(work) && work.harvestStatusByField) {
       const targets = scheduleFields.length ? scheduleFields : workFields;
       if (!targets.length || !targets.every((id) => workFields.includes(id)
@@ -587,7 +675,7 @@
     }
     if (scheduleFields.length && !scheduleFields.some((id) => workFields.includes(id))) return false;
     const diff = Math.abs(U.daysBetween(schedule.date, work.date));
-    if (!options.explicitSource && diff > 2) return false;
+    if (!options.explicitSource && (!Number.isFinite(Number(diff)) || diff === "" || diff > 2)) return false;
     const scheduleKey = scheduleKeyword(`${schedule.title || ""} ${schedule.scheduleType || ""}`);
     const workKey = scheduleKeyword(work.workName || "");
     if (scheduleKey && workKey) return scheduleKey === workKey;
@@ -597,12 +685,52 @@
   }
 
   function completeMatchingSchedules(d, work) {
+    if (!isHarvestWork(work)) reconcileWorkSchedules(d);
     (d.schedules || []).forEach((schedule) => {
+      if (!isHarvestWork(work)) return;
       if (!scheduleMatchesWork(schedule, work)) return;
       schedule.status = "実施済み";
       schedule.completedAt = U.now();
       schedule.completedByWorkId = work.workId;
       schedule.completionReason = `${work.workName || "作業"}の作業記録により完了`;
+      schedule.updatedAt = U.now();
+    });
+  }
+
+  function reconcileWorkSchedules(d, options = {}) {
+    (d.schedules || []).forEach((schedule) => {
+      if (schedule.completedManuallyAt || schedule.status === "手動完了"
+        || schedule.completedByWaterPeriodId || schedule.completionLink) return;
+      const owner = (d.fieldWorks || []).find((row) => row.workId === schedule.completedByWorkId);
+      if (owner && isHarvestWork(owner)) return;
+      if (options.existingOnly && (!owner || schedule.status !== "実施済み")) return;
+      if (schedule.status === "実施済み" && !schedule.completedByWorkId) return;
+      const pending = { ...schedule, status: "予定" };
+      const matches = (d.fieldWorks || []).filter((row) => !isHarvestWork(row)
+        && !/予定|確認候補/.test(String(row.status || ""))
+        && scheduleMatchesWork(pending, row, {
+          explicitSource: row.sourceScheduleId === schedule.scheduleId, partialTargets: true
+        }));
+      const targets = schedule.fieldIds || [];
+      const complete = targetScope(schedule) === "offField" ? matches.length > 0
+        : targets.length ? targets.every((id) => matches.some((row) => (row.fieldIds || []).includes(id)))
+          : matches.length > 0;
+      if (complete) {
+        if (options.existingOnly) return;
+        const last = matches[matches.length - 1];
+        const reason = `${last.workName || "作業"}の作業記録により完了`;
+        if (schedule.status === "実施済み" && schedule.completedAt
+          && schedule.completedByWorkId === last.workId && schedule.completionReason === reason) return;
+        schedule.status = "実施済み";
+        schedule.completedAt = schedule.completedAt || U.now();
+        schedule.completedByWorkId = last.workId;
+        schedule.completionReason = reason;
+      } else if (schedule.completedByWorkId) {
+        schedule.status = "予定";
+        schedule.completedAt = "";
+        schedule.completedByWorkId = "";
+        schedule.completionReason = "";
+      } else return;
       schedule.updatedAt = U.now();
     });
   }
@@ -820,6 +948,7 @@
       if (previous) {
         (d.schedules || []).forEach((schedule) => {
           if (schedule.completedByWorkId !== normalized.workId) return;
+          if (schedule.completedManuallyAt || schedule.status === "手動完了") return;
           schedule.status = "予定";
           schedule.completedAt = "";
           schedule.completedByWorkId = "";
@@ -829,7 +958,8 @@
       }
       if (normalized.sourceScheduleId) {
         const scheduleIndex = (d.schedules || []).findIndex((schedule) => schedule.scheduleId === normalized.sourceScheduleId);
-        if (scheduleIndex >= 0 && scheduleMatchesWork(d.schedules[scheduleIndex], normalized, { explicitSource: true })) {
+        if (scheduleIndex >= 0 && scheduleMatchesWork({ ...d.schedules[scheduleIndex], status: "予定" }, normalized, { explicitSource: true, partialTargets: !isHarvestWork(normalized) })) {
+          if (isHarvestWork(normalized)) {
           d.schedules[scheduleIndex] = {
             ...d.schedules[scheduleIndex],
             status: "実施済み",
@@ -838,6 +968,7 @@
             completionReason: `${normalized.workName || "作業"}の作業記録により完了`,
             updatedAt: U.now()
           };
+          }
         } else {
           normalized.sourceScheduleId = "";
           if (index >= 0) d.fieldWorks[index] = { ...d.fieldWorks[index], sourceScheduleId: "" };
@@ -1043,12 +1174,14 @@
       intermittentFields.forEach((fieldId) => refreshIntermittentSummary(d, fieldId));
       (d.schedules || []).forEach((schedule) => {
         if (!ids.includes(schedule.completedByWorkId)) return;
+        if (schedule.completedManuallyAt || schedule.status === "手動完了") return;
         schedule.status = "予定";
         schedule.completedAt = "";
         schedule.completedByWorkId = "";
         schedule.completionReason = "";
         schedule.updatedAt = U.now();
       });
+      reconcileWorkSchedules(d);
     }, message || "圃場作業を削除しました");
   }
 
@@ -1439,6 +1572,9 @@
       const index = d.schedules.findIndex((s) => s.scheduleId === normalized.scheduleId);
       if (index >= 0) d.schedules[index] = { ...d.schedules[index], ...normalized };
       else d.schedules.push(normalized);
+      if (previous && previous.completedByWorkId && targetScope(previous) === targets.targetScope) {
+        reconcileWorkSchedules({ ...d, schedules: [d.schedules[index]] });
+      }
     }, "予定を保存しました");
   }
 
@@ -1616,6 +1752,7 @@
       const date = record.date || U.today();
       const dryPeriodId = record.dryPeriodId || U.id("dry", date);
       const previous = d.dryPeriods.find((item) => item.dryPeriodId === dryPeriodId) || null;
+      record = waterRecordForHarvestEdit(record, previous);
       const normalized = {
         dryPeriodId,
         type: "dryPeriod",
@@ -1628,6 +1765,7 @@
         startDate: record.startDate || "",
         endDate: record.endDate || "",
         actualEndDate: record.actualEndDate || "",
+        harvestAutoEnd: record.harvestAutoEnd,
         targetDays: record.targetDays || "",
         plannedStartDate: record.plannedStartDate || "",
         startReason: record.startReason || "",
@@ -1714,6 +1852,7 @@
       const date = record.date || U.today();
       const irrigationId = record.irrigationId || U.id("irrigation", date);
       const previous = d.irrigations.find((item) => item.irrigationId === irrigationId) || null;
+      record = waterRecordForHarvestEdit(record, previous);
       const normalized = {
         irrigationId,
         type: "irrigation",
@@ -1727,6 +1866,7 @@
         startDate: record.startDate || "",
         endDate: record.endDate || "",
         actualEndDate: record.actualEndDate || "",
+        harvestAutoEnd: record.harvestAutoEnd,
         targetDays: record.targetDays || "",
         plannedStartDate: record.plannedStartDate || "",
         startReason: record.startReason || "",
@@ -1982,8 +2122,12 @@
   }
 
   function legacyWaterPeriodsFor(fieldId, year, options) {
+    return legacyWaterPeriodsFrom(data(), fieldId, year, options);
+  }
+
+  function legacyWaterPeriodsFrom(draft, fieldId, year, options) {
     const opts = options || {};
-    const works = (data().fieldWorks || [])
+    const works = (draft.fieldWorks || [])
       .filter((row) => (row.fieldIds || []).includes(fieldId) && (!year || waterPeriodYear(row) === String(year)))
       .map((row) => ({ row, event: legacyWaterEventFromWorkName(row.workName) }))
       .filter((item) => item.event)
@@ -2043,15 +2187,16 @@
     return periods.map((period) => {
       const legacyKey = legacyWaterKey(fieldId, period.kind, period.sourceWorkIds);
       const linked = period.sourceWorkIds.length > 0 && period.sourceWorkIds.every((workId) => {
-        const work = (data().fieldWorks || []).find((row) => row.workId === workId);
+        const work = (draft.fieldWorks || []).find((row) => row.workId === workId);
         return (work && work.waterMigrationLinks || []).some((link) => link.fieldId === fieldId && link.kind === period.kind && link.legacyKey === legacyKey);
       });
       const linkedPeriodId = period.sourceWorkIds.map((workId) => {
-        const work = (data().fieldWorks || []).find((row) => row.workId === workId);
+        const work = (draft.fieldWorks || []).find((row) => row.workId === workId);
         const link = (work && work.waterMigrationLinks || []).find((item) => item.fieldId === fieldId && item.kind === period.kind && item.legacyKey === legacyKey);
         return link && link.periodId || "";
       }).find(Boolean) || "";
-      return { ...period, legacyKey, migrated: linked, linkedPeriodId };
+      const closure = !period.actualEndDate && !linked && period.raw.harvestWaterClosures && period.raw.harvestWaterClosures[fieldId];
+      return { ...period, ...(closure ? { actualEndDate: closure.date, status: "completed", harvestClosure: closure } : {}), legacyKey, migrated: linked, linkedPeriodId };
     }).filter((period) => (opts.includeMigrated || !period.migrated)
       && (opts.includeUnreviewed || !period.requiresDateReview));
   }
@@ -2531,6 +2676,10 @@
     if (!(data().maintenanceRecords || []).some((row) => row.maintenanceId === maintenanceId)) return null;
     return mutate((d) => { d.maintenanceRecords = (d.maintenanceRecords || []).filter((row) => row.maintenanceId !== maintenanceId); }, "整備記録を削除しました");
   }
+
+  // Existing records get the same reversible view without a startup storage write.
+  reconcileHarvestWaterClosures(cache);
+  reconcileWorkSchedules(cache, { existingOnly: true });
 
   RiceOS.state = {
     data,

@@ -808,7 +808,8 @@
       const log = state.data().growthLogs.find((item) => item.logId === id);
       if (!log) return;
       if (button.dataset.growthAction === "delete") {
-        if (confirm("この生育ログを削除しますか？")) state.deleteGrowthLog(id);
+        if (confirm("この生育ログを削除しますか？") && state.deleteGrowthLog(id)
+          && U.$("editGrowthId").value === id) resetForm();
         return;
       }
       fillEdit(log);

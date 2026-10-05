@@ -7,6 +7,7 @@
   let bulkFieldIds = [];
   let focusedTypeKey = "";
   let pendingWaterSchedule = null;
+  let manualWaterEndEdited = false;
 
   const ROAD = [
     { key: "establishment", label: "移植・活着", water: "deep", waterLabel: "深水" },
@@ -541,7 +542,7 @@
         if (!editable) return null;
         const closed = supportsMovement(type) ? closeOpenMovement(editable, date) : { ok: true, record: editable };
         if (!closed.ok) return { invalid: true, field };
-        return { ...closed.record, date: closed.record.date || closed.record.startDate, actualEndDate: date, status: "完了", periodStatus: "完了", sourceScheduleId: linkedSchedule?.scheduleId || closed.record.sourceScheduleId || "", sourceSchedulePhase: linkedSchedule ? "end" : closed.record.sourceSchedulePhase || "" };
+        return { ...closed.record, date: closed.record.date || closed.record.startDate, actualEndDate: date, harvestEndOverride: true, status: "完了", periodStatus: "完了", sourceScheduleId: linkedSchedule?.scheduleId || closed.record.sourceScheduleId || "", sourceSchedulePhase: linkedSchedule ? "end" : closed.record.sourceSchedulePhase || "" };
       }).filter(Boolean);
       const invalid = records.find((item) => item.invalid);
       if (invalid) {
@@ -646,9 +647,10 @@
       const start = item.startDate || item.date || "";
       const startStage = stageText(field, start);
       const endStage = end ? stageText(field, end) : "";
-      const note = legacy
+      const note = (legacy
         ? item.requiresDateReview ? "開始・終了日を確認してから引き継げます" : "旧作業記録。内容を確認してから引き継げます"
-        : `開始時: ${startStage}${endStage ? ` → 完了時: ${endStage}` : ""}`;
+        : `開始時: ${startStage}${endStage ? ` → 完了時: ${endStage}` : ""}`)
+        + (item.raw && item.raw.harvestAutoEnd && item.raw.harvestAutoEnd.blocked ? " / 収穫後の入落水記録があります。日付を要確認" : "");
       return `<article class="water-history-card ${U.attr(item.tone)}${legacy ? " legacy" : ""}"><div><span>${U.escapeHTML(item.label)}</span><b>${U.escapeHTML(field?.name || "圃場")}</b><small>${U.escapeHTML(U.fd(start))} - ${U.escapeHTML(end ? U.fd(end) : "終了日未記録")}${days !== "" ? ` / ${days}日` : ""}</small><em>${U.escapeHTML(note)}</em></div><button type="button" data-water-edit="${legacy ? "legacy" : U.attr(item.editType)}" data-id="${legacy ? "" : U.attr(item.editId)}" data-water-field="${U.attr(item.fieldId)}" data-water-legacy-key="${U.attr(item.legacyKey || "")}">${legacy ? "日付を確認" : "編集"}</button></article>`;
     };
     U.$("waterHistory").innerHTML = `
@@ -660,6 +662,8 @@
   }
 
   function resetEdit() {
+    manualWaterEndEdited = false;
+    if (U.$("waterManualEndConfirm")) U.$("waterManualEndConfirm").hidden = true;
     U.$("waterEditId").value = "";
     U.$("waterEditType").value = "";
     U.$("waterEditField").value = "";
@@ -678,6 +682,8 @@
         ? state.legacyWaterReviewFor(fieldId, { year: "" }).find((item) => item.legacyKey === legacyKey)
         : null;
       if (!legacy) return;
+      manualWaterEndEdited = false;
+      if (U.$("waterManualEndConfirm")) U.$("waterManualEndConfirm").hidden = true;
       U.$("waterEditType").value = "legacy";
       U.$("waterEditId").value = legacyKey;
       U.$("waterEditField").value = fieldId;
@@ -693,6 +699,8 @@
     }
     const item = type === "dry" ? state.data().dryPeriods.find((row) => row.dryPeriodId === id) : state.data().irrigations.find((row) => row.irrigationId === id);
     if (!item) return;
+    manualWaterEndEdited = false;
+    if (U.$("waterManualEndConfirm")) U.$("waterManualEndConfirm").hidden = !item.harvestAutoEnd || item.harvestAutoEnd.blocked === true;
     U.$("waterEditType").value = type;
     U.$("waterEditId").value = id;
     U.$("waterEditField").value = item.fieldId || "";
@@ -771,6 +779,9 @@
   }
 
   function bind() {
+    if (!U.$("waterManualEndConfirm")) U.$("waterEditForm").insertAdjacentHTML("beforeend", '<button type="submit" class="secondary" id="waterManualEndConfirm" hidden>終了日を手動確定して保存</button>');
+    U.$("waterEditEnd").addEventListener("input", () => { manualWaterEndEdited = true; });
+    U.$("waterEditEnd").addEventListener("change", () => { manualWaterEndEdited = true; });
     ["waterTargetMode", "waterField", "waterGroup"].forEach((id) => U.$(id).addEventListener("change", () => { bulkFieldIds = []; render(); }));
     U.$("waterDate").addEventListener("change", render);
     U.$("waterActionGrid").addEventListener("click", (event) => {
@@ -787,6 +798,7 @@
     });
     U.$("waterEditForm").addEventListener("submit", (event) => {
       event.preventDefault();
+      const manualEnd = Boolean(U.$("waterEditEnd").value) && (manualWaterEndEdited || event.submitter === U.$("waterManualEndConfirm"));
       const type = U.$("waterEditType").value;
       const id = U.$("waterEditId").value;
       if (type === "legacy") {
@@ -804,7 +816,7 @@
         const memo = !enteredMemo || inheritedMemo.includes(enteredMemo)
           ? inheritedMemo
           : [inheritedMemo, enteredMemo].filter(Boolean).join("\n");
-        const record = { ...item, date: item.date || U.$("waterEditStart").value, startDate: U.$("waterEditStart").value, actualEndDate: U.$("waterEditEnd").value, status: U.$("waterEditEnd").value ? "完了" : "実施中", periodStatus: U.$("waterEditEnd").value ? "完了" : "実施中", memo };
+        const record = { ...item, ...(manualEnd ? { harvestEndOverride: true } : {}), date: item.date || U.$("waterEditStart").value, startDate: U.$("waterEditStart").value, actualEndDate: U.$("waterEditEnd").value, status: U.$("waterEditEnd").value ? "完了" : "実施中", periodStatus: U.$("waterEditEnd").value ? "完了" : "実施中", memo };
         const saved = adopted.kind === "dry" ? state.saveDryPeriod(record) : state.saveIrrigation(record);
         if (saved !== null) { resetEdit(); render(); }
         return;
@@ -817,7 +829,7 @@
         alert("親期間の日付は、期間内の入水・落水の記録を含む範囲にしてください。");
         return;
       }
-      const record = { ...item, date: item.date || startDate, startDate, actualEndDate: endDate, status: endDate ? "完了" : "実施中", periodStatus: endDate ? "完了" : "実施中", memo: U.$("waterEditMemo").value };
+      const record = { ...item, ...(manualEnd ? { harvestEndOverride: true } : {}), date: item.date || startDate, startDate, actualEndDate: endDate, status: endDate ? "完了" : "実施中", periodStatus: endDate ? "完了" : "実施中", memo: U.$("waterEditMemo").value };
       const saved = type === "dry" ? state.saveDryPeriod(record) : state.saveIrrigation(record);
       if (saved !== null) { resetEdit(); render(); }
     });

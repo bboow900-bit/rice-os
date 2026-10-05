@@ -5,7 +5,7 @@
   const U = RiceOS.utils;
 
   const SCHEMA_VERSION = 17;
-  const APP_VERSION = "20260930_ver283";
+  const APP_VERSION = "20261005_ver289";
   const STORE_KEY = "rice_os_v8_stable";
   const BACKUP_KEY = "rice_os_v8_stable_backup";
   const RELEASE_BACKUPS_KEY = "rice_os_v8_stable_release_backups";
@@ -554,6 +554,7 @@
       harvestSnapshots: offField ? [] : harvestSnapshots,
       ...(!offField && w.harvestStatusByField && typeof w.harvestStatusByField === "object" && !Array.isArray(w.harvestStatusByField)
         ? { harvestStatusByField: Object.fromEntries(Object.entries(w.harvestStatusByField).map(([id, value]) => [id, ["partial", "complete"].includes(value) ? value : ""])) } : {}),
+      ...(!offField && w.harvestWaterClosures ? { harvestWaterClosures: normalizeHarvestWaterClosures(w.harvestWaterClosures) } : {}),
       ...(w.harvestReview !== undefined ? { harvestReview: normalizeHarvestReview(w.harvestReview) } : {}),
       weather: String(w.weather || ""),
       weatherAuto: w.weatherAuto && typeof w.weatherAuto === "object" ? w.weatherAuto : null,
@@ -716,6 +717,26 @@
     };
   }
 
+  function normalizeHarvestWaterClosures(input) {
+    if (!input || typeof input !== "object" || Array.isArray(input)) return {};
+    return Object.fromEntries(Object.entries(input).filter(([, row]) => row && row.workId && row.date)
+      .map(([id, row]) => [id, { workId: String(row.workId), date: String(row.date) }]));
+  }
+
+  function normalizeHarvestAutoEnd(input) {
+    if (!input || typeof input !== "object" || !input.workId || !input.date || !input.original) return undefined;
+    return {
+      workId: String(input.workId), date: String(input.date),
+      ...(input.blocked === true ? { blocked: true, reason: "movement-outside-harvest" } : {}),
+      original: {
+        actualEndDate: String(input.original.actualEndDate || ""),
+        status: String(input.original.status || ""),
+        periodStatus: String(input.original.periodStatus || ""),
+        ...(Array.isArray(input.original.waterMovements) ? { waterMovements: U.clone(input.original.waterMovements) } : {})
+      }
+    };
+  }
+
   function normalizeDryPeriod(input) {
     const d = input || {};
     const date = String(d.startDate || d.date || d.observedDate || U.today());
@@ -732,6 +753,7 @@
       startDate: String(d.startDate || d.drainageStartDate || ""),
       endDate: String(d.endDate || d.expectedEndDate || ""),
       actualEndDate: String(d.actualEndDate || ""),
+      ...(normalizeHarvestAutoEnd(d.harvestAutoEnd) ? { harvestAutoEnd: normalizeHarvestAutoEnd(d.harvestAutoEnd) } : {}),
       targetDays: String(d.targetDays || d.drainageTargetDays || ""),
       plannedStartDate: String(d.plannedStartDate || ""),
       startReason: String(d.startReason || ""),
@@ -787,6 +809,7 @@
       startDate: String(i.startDate || ""),
       endDate: String(i.endDate || ""),
       actualEndDate: String(i.actualEndDate || ""),
+      ...(normalizeHarvestAutoEnd(i.harvestAutoEnd) ? { harvestAutoEnd: normalizeHarvestAutoEnd(i.harvestAutoEnd) } : {}),
       targetDays: String(i.targetDays || ""),
       plannedStartDate: String(i.plannedStartDate || ""),
       startReason: String(i.startReason || ""),

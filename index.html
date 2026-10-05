@@ -10,13 +10,19 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="稲作カルテ">
-  <link rel="manifest" href="manifest.webmanifest?v=20261004_ver288">
+  <link rel="manifest" href="manifest.webmanifest?v=20261005_ver289">
   <link rel="icon" href="assets/icons/icon-192.png">
   <link rel="apple-touch-icon" href="assets/icons/icon-192.png">
   <title>稲作カルテ</title>
-  <link rel="stylesheet" href="assets/css/app.css?v=20261004_ver288">
-  <link rel="stylesheet" href="assets/css/field-management.css?v=20261004_ver288">
+  <link rel="stylesheet" href="assets/css/app.css?v=20261005_ver289">
+  <link rel="stylesheet" href="assets/css/field-management.css?v=20261005_ver289">
   <style>
+    #storageBootFailure[hidden] { display: none !important; }
+    #storageBootFailure { position: fixed; inset: 0; z-index: 2147483647; display: grid; align-content: center; background: #f7faf7; color: #243b2d; padding: 24px; }
+    #storageBootFailure > div { width: 100%; max-width: 420px; margin: auto; }
+    #storageBootFailure h1 { font-size: 20px; line-height: 1.5; }
+    #storageBootFailure p { font-size: 14px; line-height: 1.7; }
+    #storageBootReload { min-height: 44px; padding: 10px 18px; }
     @media (max-width: 900px) {
       body .app-shell .side-nav .nav-item { display: none !important; }
       body .app-shell .side-nav .nav-item[data-screen="home"],
@@ -817,41 +823,74 @@
 
   <div id="toast" class="toast hidden" role="status"></div>
 
-  <script src="assets/js/core/utils.js?v=20261004_ver288"></script>
-  <script src="assets/js/core/schema.js?v=20261004_ver288"></script>
-  <script src="assets/js/core/storage.js?v=20261004_ver288"></script>
-  <script src="assets/js/core/state.js?v=20261004_ver288"></script>
-  <script src="assets/js/core/herbicide.js?v=20261004_ver288"></script>
-  <script src="assets/js/core/agro.js?v=20261004_ver288"></script>
-  <script src="assets/js/core/outlook.js?v=20261004_ver288"></script>
-  <script src="assets/js/core/record-actions.js?v=20261004_ver288"></script>
-  <script src="assets/js/core/calendar.js?v=20261004_ver288"></script>
-  <script src="assets/js/core/alerts.js?v=20261004_ver288"></script>
-  <script src="assets/js/core/weather.js?v=20261004_ver288"></script>
-  <script src="assets/js/core/harvest-weather.js?v=20261004_ver288"></script>
-  <script src="assets/js/core/navigation.js?v=20261004_ver288"></script>
-  <script src="assets/js/core/pwa.js?v=20261004_ver288"></script>
-  <script src="assets/js/screens/home.js?v=20261004_ver288"></script>
-  <script src="assets/js/screens/calendar.js?v=20261004_ver288"></script>
-  <script src="assets/js/screens/bottom-sheet.js?v=20261004_ver288"></script>
-  <script src="assets/js/screens/recipes.js?v=20261004_ver288"></script>
-  <script src="assets/js/screens/fields.js?v=20261004_ver288"></script>
-  <script src="assets/js/screens/field-work.js?v=20261004_ver288"></script>
-  <script src="assets/js/screens/fertilizer.js?v=20261004_ver288"></script>
-  <script src="assets/js/screens/growth.js?v=20261004_ver288"></script>
-  <script src="assets/js/screens/dry-period.js?v=20261004_ver288"></script>
-  <script src="assets/js/screens/irrigation.js?v=20261004_ver288"></script>
-  <script src="assets/js/screens/photos.js?v=20261004_ver288"></script>
-  <script src="assets/js/screens/other-work.js?v=20261004_ver288"></script>
-  <script src="assets/js/screens/herbicide.js?v=20261004_ver288"></script>
-  <script src="assets/js/screens/annual.js?v=20261004_ver288"></script>
-  <script src="assets/js/screens/materials.js?v=20261004_ver288"></script>
-  <script src="assets/js/screens/results.js?v=20261004_ver288"></script>
-  <script src="assets/js/screens/notices.js?v=20261004_ver288"></script>
-  <script src="assets/js/screens/outlook.js?v=20261004_ver288"></script>
-  <script src="assets/js/screens/machines.js?v=20261004_ver288"></script>
-  <script src="assets/js/screens/data.js?v=20261004_ver288"></script>
-  <script src="assets/js/screens/shipments.js?v=20261004_ver288"></script>
-  <script src="assets/js/app.js?v=20261004_ver288"></script>
+  <script src="assets/js/core/utils.js?v=20261005_ver289"></script>
+  <script src="assets/js/core/schema.js?v=20261005_ver289"></script>
+  <script src="assets/js/core/storage.js?v=20261005_ver289"></script>
+  <section id="storageBootFailure" hidden role="alert" aria-labelledby="storageBootFailureTitle">
+    <div><h1 id="storageBootFailureTitle">保存データを読み込めませんでした</h1><p>データを上書きせず、起動を停止しました。保存領域の状態を確認してから再読み込みしてください。</p><button id="storageBootReload" type="button">再読み込み</button></div>
+  </section>
+  <script src="assets/js/core/state.js?v=20261005_ver289"></script>
+  <script id="storageBootGuard">
+    (function () {
+      "use strict";
+      if (window.RiceOS && window.RiceOS.state && typeof window.RiceOS.state.data === "function") return;
+      if (typeof document === "undefined") return;
+      const panel = document.getElementById && document.getElementById("storageBootFailure");
+      if (!panel) return;
+      panel.hidden = false;
+      if (document.body && document.body.children) Array.from(document.body.children).forEach((element) => {
+        if (element === panel || element.tagName === "SCRIPT" || element.tagName === "STYLE") return;
+        element.inert = true;
+        element.hidden = true;
+      });
+      if (typeof window.addEventListener === "function") {
+        window.addEventListener("DOMContentLoaded", (event) => { event.stopImmediatePropagation(); }, true);
+        ["click", "submit", "keydown", "pointerdown"].forEach((type) => {
+          window.addEventListener(type, (event) => {
+            if (typeof panel.contains === "function" && panel.contains(event.target)) return;
+            event.preventDefault();
+            event.stopImmediatePropagation();
+          }, true);
+        });
+      }
+      const reload = document.getElementById("storageBootReload");
+      if (reload && typeof reload.addEventListener === "function") reload.addEventListener("click", () => {
+        if (window.location && typeof window.location.reload === "function") window.location.reload();
+      });
+      if (reload && typeof reload.focus === "function") reload.focus();
+    })();
+  </script>
+  <script src="assets/js/core/herbicide.js?v=20261005_ver289"></script>
+  <script src="assets/js/core/agro.js?v=20261005_ver289"></script>
+  <script src="assets/js/core/outlook.js?v=20261005_ver289"></script>
+  <script src="assets/js/core/record-actions.js?v=20261005_ver289"></script>
+  <script src="assets/js/core/calendar.js?v=20261005_ver289"></script>
+  <script src="assets/js/core/alerts.js?v=20261005_ver289"></script>
+  <script src="assets/js/core/weather.js?v=20261005_ver289"></script>
+  <script src="assets/js/core/harvest-weather.js?v=20261005_ver289"></script>
+  <script src="assets/js/core/navigation.js?v=20261005_ver289"></script>
+  <script src="assets/js/core/pwa.js?v=20261005_ver289"></script>
+  <script src="assets/js/screens/home.js?v=20261005_ver289"></script>
+  <script src="assets/js/screens/calendar.js?v=20261005_ver289"></script>
+  <script src="assets/js/screens/bottom-sheet.js?v=20261005_ver289"></script>
+  <script src="assets/js/screens/recipes.js?v=20261005_ver289"></script>
+  <script src="assets/js/screens/fields.js?v=20261005_ver289"></script>
+  <script src="assets/js/screens/field-work.js?v=20261005_ver289"></script>
+  <script src="assets/js/screens/fertilizer.js?v=20261005_ver289"></script>
+  <script src="assets/js/screens/growth.js?v=20261005_ver289"></script>
+  <script src="assets/js/screens/dry-period.js?v=20261005_ver289"></script>
+  <script src="assets/js/screens/irrigation.js?v=20261005_ver289"></script>
+  <script src="assets/js/screens/photos.js?v=20261005_ver289"></script>
+  <script src="assets/js/screens/other-work.js?v=20261005_ver289"></script>
+  <script src="assets/js/screens/herbicide.js?v=20261005_ver289"></script>
+  <script src="assets/js/screens/annual.js?v=20261005_ver289"></script>
+  <script src="assets/js/screens/materials.js?v=20261005_ver289"></script>
+  <script src="assets/js/screens/results.js?v=20261005_ver289"></script>
+  <script src="assets/js/screens/notices.js?v=20261005_ver289"></script>
+  <script src="assets/js/screens/outlook.js?v=20261005_ver289"></script>
+  <script src="assets/js/screens/machines.js?v=20261005_ver289"></script>
+  <script src="assets/js/screens/data.js?v=20261005_ver289"></script>
+  <script src="assets/js/screens/shipments.js?v=20261005_ver289"></script>
+  <script src="assets/js/app.js?v=20261005_ver289"></script>
 </body>
 </html>

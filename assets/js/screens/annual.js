@@ -511,6 +511,8 @@
   }
 
   function fieldStatus(field, stats) {
+    const harvest = pickerHarvestStatus(field);
+    if (harvest.status === "complete") return { label: "収穫済み", tone: "harvest" };
     if (!stats.total) return { label: "記録なし", tone: "muted", action: "work" };
     const planting = firstDate(fieldYearRows(field.fieldId, yearValue()), (row) => row.kind === "fieldWork" && /田植/.test(String(row.title || "")));
     const asOfDate = stageAsOfDateForField(field.fieldId);
@@ -692,8 +694,18 @@
     });
   }
 
+  function pickerHarvestStatus(field) {
+    const selectedYear = yearValue();
+    const year = selectedYear === "all" ? U.today().slice(0, 4) : selectedYear;
+    return state.harvestStatusForField(field.fieldId, year, U.today());
+  }
+
   function renderFieldPickerCard(item) {
     const { field, stats, status } = item;
+    const harvest = pickerHarvestStatus(field);
+    const harvestLabel = harvest.status === "complete" ? `収穫済み・${Number(harvest.date.slice(5, 7))}/${Number(harvest.date.slice(8, 10))}`
+      : harvest.status === "partial" ? "稲刈り一部実施" : harvest.status === "legacy" ? "完了区分未確認" : "";
+    const harvestBadge = harvestLabel ? `<span class="harvest-list-badge ${U.attr(harvest.status)}" data-harvest-status="${U.attr(harvest.status)}">${U.escapeHTML(harvestLabel)}</span>` : "";
     const last = stats.lastDate ? U.fd(stats.lastDate) : "記録なし";
     const stage = annualStageForField(field);
     const riceStage = riceStageNumberForField(field);
@@ -714,6 +726,7 @@
             <strong>${U.escapeHTML(field.areaA ? `${field.areaA}a` : "面積未設定")}</strong>
           </div>
           <small>最終更新：${U.escapeHTML(last)}${district}</small>
+          ${harvestBadge}
           <small class="annual-field-stage">現在：${U.escapeHTML(stage && stage.current ? stage.current.label : "記録待ち")} / ${U.escapeHTML(stage && stage.certainty || "記録待ち")}</small>
           <div class="annual-field-pick-metrics">
             <span class="growth"><i aria-hidden="true"></i>生育 ${U.escapeHTML(String(stats.growth))}件</span>
@@ -1295,7 +1308,9 @@
           <input type="hidden" name="kind" value="${U.attr(waterEditDraft.kind)}"><input type="hidden" name="id" value="${U.attr(waterEditDraft.id)}">
           <div class="form-grid dense"><label>開始日<input name="startDate" type="date" value="${U.attr(record.startDate || record.date || "")}" required></label><label>終了日<input name="actualEndDate" type="date" value="${U.attr(record.actualEndDate || "")}"></label></div>
           <label>メモ<textarea name="memo">${U.escapeHTML(record.memo || "")}</textarea></label>
+          ${record.harvestAutoEnd && !record.harvestAutoEnd.blocked ? `<p class="muted">稲刈り完了日に連動して終了しています。メモの変更では連動を維持します。</p>` : ""}
           <div class="annual-water-editor-actions"><button type="button" class="secondary" data-annual-water-cancel>キャンセル</button><button type="submit" class="primary">変更を保存</button><button type="button" class="danger" data-annual-water-editor-delete="${U.attr(waterEditDraft.kind)}" data-id="${U.attr(waterEditDraft.id)}">この水管理記録を削除</button></div>
+          ${record.harvestAutoEnd && !record.harvestAutoEnd.blocked ? `<button type="submit" class="secondary" data-annual-water-manual-end>この終了日を手動確定して保存</button>` : ""}
         </form>
       </section>
     `;
@@ -3047,7 +3062,8 @@
         return;
       }
       if (record.actualEndDate && !actualEndDate && !confirm("この完了済み水管理を継続中に戻しますか？")) return;
-      const next = { ...record, date: startDate, season: String(startDate).slice(0, 4), startDate, actualEndDate, status: actualEndDate ? "完了" : "実施中", periodStatus: actualEndDate ? "完了" : "実施中", memo: String(formData.get("memo") || "").trim() };
+      const manualEnd = Boolean(actualEndDate && event.submitter && event.submitter.matches("[data-annual-water-manual-end]"));
+      const next = { ...record, ...(manualEnd ? { harvestEndOverride: true } : {}), date: startDate, season: String(startDate).slice(0, 4), startDate, actualEndDate, status: actualEndDate ? "完了" : "実施中", periodStatus: actualEndDate ? "完了" : "実施中", memo: String(formData.get("memo") || "").trim() };
       const saved = kind === "dry" ? state.saveDryPeriod(next) : state.saveIrrigation(next);
       if (!saved) return;
       waterEditDraft = null;

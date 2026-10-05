@@ -10,7 +10,8 @@ const data = {
     fieldGroupId: i < 3 ? "kameishi" : i === 3 ? "other" : ""
   })),
   fieldGroups: [{ fieldGroupId: "kameishi", name: "\u4e80\u77f3" }, { fieldGroupId: "other", name: "Other" }],
-  varieties: []
+  varieties: [],
+  fieldWorks: []
 };
 const before = JSON.stringify(data);
 const listeners = {};

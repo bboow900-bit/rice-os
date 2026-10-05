@@ -4,7 +4,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const vm = require("node:vm");
-const data = { fields: [], fieldGroups: [{ fieldGroupId: "g", name: "Group" }], varieties: [] };
+const data = { fields: [], fieldGroups: [{ fieldGroupId: "g", name: "Group" }], varieties: [], fieldWorks: [] };
 const listeners = {};
 const list = { innerHTML: "", addEventListener(type, fn) { (listeners[type] ||= []).push(fn); } };
 const context = vm.createContext({

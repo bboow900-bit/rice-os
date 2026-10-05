@@ -4,6 +4,14 @@
   const RiceOS = window.RiceOS = window.RiceOS || {};
   const U = RiceOS.utils;
   const S = RiceOS.schema;
+  let observedRaw;
+  let hasObservedRaw = false;
+
+  function loadedData(data, raw) {
+    observedRaw = raw;
+    hasObservedRaw = true;
+    return data;
+  }
 
   function safeParse(raw) {
     if (!raw) return null;
@@ -19,6 +27,14 @@
       return localStorage.getItem(key);
     } catch (error) {
       return null;
+    }
+  }
+
+  function readRequiredRaw(key) {
+    try {
+      return localStorage.getItem(key);
+    } catch (error) {
+      throw new Error("保存データを読み取れませんでした。書き込みを中断しました。保存領域を確認してから再読み込みしてください。");
     }
   }
 
@@ -82,9 +98,9 @@
     return createReleaseBackup(raw, sourceVersion);
   }
 
-  function findLegacy() {
+  function findLegacy(options = {}) {
     for (const key of S.LEGACY_STORES) {
-      const parsed = safeParse(readRaw(key));
+      const parsed = safeParse(options.strict ? readRequiredRaw(key) : readRaw(key));
       if (parsed && (parsed.fields || parsed.varieties || parsed.fieldWorks || parsed.growthLogs || parsed.works)) {
         parsed.importedFrom = key;
         return { key, data: parsed };
@@ -94,13 +110,14 @@
   }
 
   function loadData() {
-    const currentRaw = readRaw(S.STORE_KEY);
+    const currentRaw = readRequiredRaw(S.STORE_KEY);
+    let persistedRaw = currentRaw;
     const current = safeParse(currentRaw);
     if (current) {
       const sourceVersion = String(current.appVersion || current.meta && current.meta.appVersion || "");
       const appUpdated = sourceVersion !== S.APP_VERSION;
       const releaseBackedUp = !appUpdated || createReleaseBackup(currentRaw, sourceVersion);
-      if (!releaseBackedUp) return S.normalize(current);
+      if (!releaseBackedUp) return loadedData(S.normalize(current), persistedRaw);
       const normalized = stampAppVersion(current);
       const previousVersion = Number(current.schemaVersion || 0);
       if (previousVersion < S.SCHEMA_VERSION || appUpdated) {
@@ -114,55 +131,68 @@
           }
           normalized.meta.migratedFromSchemaVersion = previousVersion;
           normalized.meta.migratedAt = U.now();
-          writeRaw(S.STORE_KEY, JSON.stringify(normalized));
+          const raw = JSON.stringify(normalized);
+          writeRaw(S.STORE_KEY, raw);
+          persistedRaw = raw;
         } catch (error) {
           // Keep using the normalized in-memory copy if migration persistence fails.
         }
       }
-      return normalized;
+      return loadedData(normalized, persistedRaw);
     }
 
-    const backup = safeParse(readRaw(S.BACKUP_KEY));
-    if (backup) return S.normalize(backup);
+    const backup = safeParse(readRequiredRaw(S.BACKUP_KEY));
+    if (backup) return loadedData(S.normalize(backup), persistedRaw);
 
-    const legacy = findLegacy();
+    const legacy = findLegacy({ strict: true });
     if (legacy) {
       const data = S.normalize({ ...legacy.data, importedFrom: legacy.key });
       try {
-        writeRaw(S.STORE_KEY, JSON.stringify(data));
+        const raw = JSON.stringify(data);
+        writeRaw(S.STORE_KEY, raw);
+        persistedRaw = raw;
       } catch (error) {
         window.__riceMemoryData = data;
       }
-      return data;
+      return loadedData(data, persistedRaw);
     }
 
     const empty = S.emptyData();
     try {
-      writeRaw(S.STORE_KEY, JSON.stringify(empty));
+      const raw = JSON.stringify(empty);
+      writeRaw(S.STORE_KEY, raw);
+      persistedRaw = raw;
     } catch (error) {
       window.__riceMemoryData = empty;
     }
-    return empty;
+    return loadedData(empty, persistedRaw);
   }
 
   function saveData(data) {
     const normalized = stampAppVersion(data);
-    const currentRaw = readRaw(S.STORE_KEY);
+    const currentRaw = readRequiredRaw(S.STORE_KEY);
+    if (hasObservedRaw && currentRaw !== observedRaw) {
+      throw new Error("別のタブや画面で保存データが更新されました。古い内容で上書きしないため保存を中断しました。入力内容を控え、再読み込みして最新データを確認してください。");
+    }
     if (currentRaw && !releaseBackupBeforeOverwrite(currentRaw)) {
       throw new Error("更新前の自動保存に失敗しました。JSON保存を行ってから、もう一度お試しください。");
     }
     try {
-      if (currentRaw) {
+      const previous = safeParse(currentRaw);
+      // A corrupt primary must not replace the good backup used for recovery.
+      if (previous && typeof previous === "object" && !Array.isArray(previous)) {
         writeRaw(S.BACKUP_KEY, currentRaw);
         normalized.meta = normalized.meta || {};
         normalized.meta.lastBackupAt = U.now();
       }
     } catch (error) {
-      // Backup failure must not erase current data.
+      throw new Error("直前バックアップを保存できませんでした。元のデータを保持し、書き込みを中断しました。JSON保存後に保存領域を確認してください。");
     }
     try {
       const raw = JSON.stringify(normalized);
       writeRaw(S.STORE_KEY, raw);
+      observedRaw = raw;
+      hasObservedRaw = true;
       window.__riceMemoryData = normalized;
       return normalized;
     } catch (error) {

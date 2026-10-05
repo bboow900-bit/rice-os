@@ -1119,7 +1119,10 @@
 
   function activeWaterCount(dateText) {
     const activeKeys = new Set(["drying", "intermittent", "saturated", "deepWater", "draining", "overlap"]);
-    return state.activeFields().filter((field) => activeKeys.has(String(waterManagementForField(field, dateText).key || ""))).length;
+    return state.activeFields().filter((field) => {
+      const management = waterManagementForField(field, dateText);
+      return !management.harvestConflict && activeKeys.has(String(management.key || ""));
+    }).length;
   }
 
   function renderTodayPlans(dateText) {

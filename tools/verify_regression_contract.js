@@ -55,7 +55,9 @@ function main() {
 
   const pwaVersion = (pwa.match(/APP_VERSION\s*=\s*"([^"]+)"/) || [])[1];
   const workerVersion = (worker.match(/APP_VERSION\s*=\s*"([^"]+)"/) || [])[1];
+  const schemaVersionLabel = (schema.match(/APP_VERSION\s*=\s*"([^"]+)"/) || [])[1];
   assert(pwaVersion && workerVersion && pwaVersion === workerVersion, "PWA module and service worker versions differ");
+  assert(schemaVersionLabel === pwaVersion, "Saved data release label differs from the PWA release");
   assert(index.includes(`?v=${pwaVersion}`), "Index asset versions do not match the PWA version");
   assert(mobile.includes(`?v=${pwaVersion}`), "Mobile launcher version does not match the PWA version");
   assert(!versions(index).some((version) => version !== pwaVersion), "Index contains stale versioned assets");

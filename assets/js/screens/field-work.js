@@ -15,6 +15,8 @@
   let legacyHarvestFields = new Set();
   let quickHarvestMounts = null;
   let workFormSession = 0;
+  let workWeatherSession = 0;
+  let pendingWorkWeather = null;
 
   function renderHarvestQuick(active) {
     if (!document.createComment) return;
@@ -478,6 +480,7 @@
 
   function resetForm() {
     workFormSession += 1;
+    invalidateWorkWeather();
     setTargetScope("field");
     U.$("fwCustomName").value = "";
     U.$("fieldWorkHeading").textContent = "作業入力";
@@ -569,6 +572,7 @@
     workFormSession += 1;
     const work = state.data().fieldWorks.find((item) => item.workId === workId);
     if (!work) return;
+    invalidateWorkWeather();
     setTargetScope(work.targetScope);
     pendingScheduleId = work.sourceScheduleId || "";
     U.$("fieldWorkHeading").textContent = "作業を編集";
@@ -738,14 +742,52 @@
     }
   }
 
+  function invalidateWorkWeather() {
+    workWeatherSession += 1;
+    const pending = pendingWorkWeather;
+    pendingWorkWeather = null;
+    if (!pending) return;
+    if (pending.timer != null && typeof clearTimeout === "function") clearTimeout(pending.timer);
+    const status = U.$("fwWeatherStatus");
+    if (status && status.textContent === pending.loading) setWeatherStatus("必要なら作業日の天気を取得してください。");
+  }
+
+  function workWeatherFormKey() {
+    return JSON.stringify([workWeatherSession, U.$("editFieldWorkId").value,
+      U.$("fwDate").value || U.today(), targetScope(), selectedFieldIds().slice().sort(),
+      U.$("fwWeather").value, U.$("fwWeatherAutoJson").value]);
+  }
+
+  function workWeatherLocationKey(location) {
+    return JSON.stringify(location ? [location.latitude, location.longitude, location.label || "",
+      location.source || "", location.updatedAt || ""] : null);
+  }
+
   async function fetchWorkWeather(showAlert) {
     if (targetScope() === "offField") return null;
+    invalidateWorkWeather();
+    const date = U.$("fwDate").value || U.today();
+    const pending = { key: workWeatherFormKey(), loading: `${U.fd(date)} の天気を取得中です。`, timer: null };
+    pendingWorkWeather = pending;
+    const matchesForm = () => pendingWorkWeather === pending && pending.key === workWeatherFormKey()
+      && (!RiceOS.app || typeof RiceOS.app.currentScreen !== "function" || RiceOS.app.currentScreen() === "field-work");
+    let locationKey;
+    const matchesLocation = () => locationKey === workWeatherLocationKey(state.data().meta && state.data().meta.weatherLocation);
     try {
-      const date = U.$("fwDate").value || U.today();
-      setWeatherStatus(`${U.fd(date)} の天気を取得中です。`);
-      const location = await RiceOS.weather.ensureLocation();
-      const weather = await RiceOS.weather.fetchDaily(date, location);
-      if (targetScope() === "offField" || U.$("fwDate").value !== date) return null;
+      setWeatherStatus(pending.loading);
+      const request = (async () => {
+        const location = await RiceOS.weather.ensureLocation();
+        if (!matchesForm()) return null;
+        locationKey = workWeatherLocationKey(location);
+        if (!matchesLocation()) return null;
+        const weather = await RiceOS.weather.fetchDaily(date, { ...location });
+        return { weather, location };
+      })();
+      const result = typeof setTimeout === "function" ? await Promise.race([request, new Promise((resolve, reject) => {
+        pending.timer = setTimeout(() => reject(new Error("天気の取得が長引いています。もう一度取得してください。")), 30000);
+      })]) : await request;
+      if (!result || !matchesForm() || !matchesLocation()) return null;
+      const { weather, location } = result;
       U.$("fwWeather").value = weather.summary;
       U.$("fwWeather").dataset.autoFilled = "1";
       U.$("fwWeatherAutoJson").value = JSON.stringify(weather);
@@ -753,9 +795,18 @@
       if (showAlert) U.toast("天気を取得しました");
       return weather;
     } catch (error) {
-      setWeatherStatus(error.message);
-      if (showAlert) alert(error.message);
+      if (matchesForm() && (locationKey === undefined || matchesLocation())) {
+        setWeatherStatus(error.message);
+        if (showAlert) alert(error.message);
+      }
       return null;
+    } finally {
+      if (pending.timer != null && typeof clearTimeout === "function") clearTimeout(pending.timer);
+      if (pendingWorkWeather === pending) {
+        pendingWorkWeather = null;
+        const status = U.$("fwWeatherStatus");
+        if (status && status.textContent === pending.loading) setWeatherStatus("必要なら作業日の天気を取得してください。");
+      }
     }
   }
 
@@ -782,6 +833,11 @@
   }
 
   function bind() {
+    U.$("fieldWorkForm").addEventListener("input", invalidateWorkWeather, true);
+    U.$("fieldWorkForm").addEventListener("change", invalidateWorkWeather, true);
+    U.$("fieldWorkForm").addEventListener("click", (event) => {
+      if (event.target.closest("#fwFields, [data-fw-select], [data-fw-group], [data-fw-remove-field], [data-fw-template]")) invalidateWorkWeather();
+    }, true);
     U.$("fieldWorkForm").addEventListener("input", () => { workFormSession += 1; });
     U.$("fieldWorkForm").addEventListener("click", () => { workFormSession += 1; });
     U.$("fieldWorkForm").addEventListener("change", (event) => {
@@ -1011,11 +1067,13 @@
       const id = button.dataset.id;
       const work = state.data().fieldWorks.find((item) => item.workId === id);
       if (!work) return;
+      if (button.dataset.workAction !== "delete") invalidateWorkWeather();
       if (button.dataset.workAction === "delete") {
         const fieldNames = (work.fieldIds || []).map((fieldId) => state.field(fieldId)?.name).filter(Boolean).join("・");
         const fieldCount = (work.fieldIds || []).length;
         const scope = fieldNames ? `\n対象: ${fieldNames}${fieldCount > 1 ? `（${fieldCount}圃場すべての履歴から削除されます）` : ""}` : "";
-        if (confirm(`${U.fd(work.date)} ${work.workName}を削除しますか？${scope}`)) state.deleteFieldWork(id);
+        if (confirm(`${U.fd(work.date)} ${work.workName}を削除しますか？${scope}`) && state.deleteFieldWork(id)
+          && U.$("editFieldWorkId").value === id) resetForm();
         return;
       }
       if (button.dataset.workAction === "duplicate") {

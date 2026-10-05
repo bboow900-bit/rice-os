@@ -15,9 +15,24 @@
     U.$$(`#${containerId} .select-card`).forEach((el) => el.classList.toggle("selected", set.has(el.dataset.id)));
   }
 
-  function renderSelectCards() {
-    U.$("owVarieties").innerHTML = state.varieties().map((v) => `<div class="select-card" data-id="${U.attr(v.varietyId)}"><b>${U.escapeHTML(v.name)}</b></div>`).join("");
-    U.$("owFields").innerHTML = state.activeFields().map((f) => `<div class="select-card" data-id="${U.attr(f.fieldId)}"><b>${U.escapeHTML(f.name)}</b></div>`).join("");
+  function renderSelectCards(varietyIds = selected("owVarieties"), fieldIds = selected("owFields")) {
+    const varieties = state.varieties().slice();
+    const fields = state.activeFields();
+    // Keep historical targets selectable even after their master is archived.
+    varietyIds.forEach((id) => {
+      if (!varieties.some((variety) => variety.varietyId === id)) {
+        varieties.push(state.variety(id) || { varietyId: id, name: id });
+      }
+    });
+    fieldIds.forEach((id) => {
+      if (!fields.some((field) => field.fieldId === id)) {
+        fields.push(state.field(id) || { fieldId: id, name: id });
+      }
+    });
+    U.$("owVarieties").innerHTML = varieties.map((v) => `<div class="select-card" data-id="${U.attr(v.varietyId)}"><b>${U.escapeHTML(v.name)}</b></div>`).join("");
+    U.$("owFields").innerHTML = fields.map((f) => `<div class="select-card" data-id="${U.attr(f.fieldId)}"><b>${U.escapeHTML(f.name)}</b></div>`).join("");
+    setSelected("owVarieties", varietyIds);
+    setSelected("owFields", fieldIds);
   }
 
   function resetForm() {
@@ -76,8 +91,7 @@
     U.$("owQuantity").value = work.quantity || "";
     U.$("owHours").value = work.hours || "";
     U.$("owMemo").value = work.memo || "";
-    setSelected("owVarieties", work.varietyIds || []);
-    setSelected("owFields", work.relatedFieldIds || []);
+    renderSelectCards(work.varietyIds || [], work.relatedFieldIds || []);
     const deleteButton = U.$("deleteOtherWorkButton");
     if (deleteButton) deleteButton.classList.remove("hidden");
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -117,7 +131,8 @@
       const work = state.data().otherWorks.find((item) => item.otherWorkId === id);
       if (!work) return;
       if (button.dataset.otherAction === "delete") {
-        if (confirm("このその他作業を削除しますか？")) state.deleteOtherWork(id);
+        if (confirm("このその他作業を削除しますか？") && state.deleteOtherWork(id)
+          && U.$("editOtherWorkId").value === id) resetForm();
         return;
       }
       fillEdit(work);

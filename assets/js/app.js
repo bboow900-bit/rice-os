@@ -271,7 +271,9 @@
         return;
       }
       event.preventDefault();
-      show(target);
+      const primaryScreens = new Set(["home", "fields", "calendar", "annual", "outlook", "data"]);
+      if (activeScreen === "data" && !primaryScreens.has(target)) openInput(target, "data");
+      else show(target);
       if (target === "machines" && RiceOS.screens.machines && RiceOS.screens.machines.enter) RiceOS.screens.machines.enter("data");
       if (target === "irrigation" && jump.dataset.waterType && RiceOS.screens.irrigation) {
         const firstField = RiceOS.state.activeFields()[0];

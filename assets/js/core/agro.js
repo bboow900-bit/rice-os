@@ -388,6 +388,14 @@
     // visible in their own views, but never let them replace current status.
     const factual = periods.filter((row) => validDate(row.startDate) && !row.planned && row.startDate <= targetDate);
     const hasValidEnd = (row) => validDate(row.actualEndDate) && row.actualEndDate >= row.startDate;
+    const harvestConflict = factual.find((row) => row.raw && row.raw.harvestAutoEnd
+      && row.raw.harvestAutoEnd.blocked && validDate(row.raw.harvestAutoEnd.date)
+      && row.raw.harvestAutoEnd.date <= targetDate);
+    if (harvestConflict) return {
+      key: "overlap", label: "収穫後の水管理を確認", tone: "warn", harvestConflict: true,
+      date: harvestConflict.raw.harvestAutoEnd.date,
+      detail: "稲刈り日より後の入水・落水記録があります。履歴の日付を確認できます。"
+    };
     const active = factual.filter((row) => !row.actualEndDate || (hasValidEnd(row) && row.actualEndDate > targetDate))
       .slice().sort((a, b) => String(b.startDate || "").localeCompare(String(a.startDate || "")));
     const activeKinds = Array.from(new Set(active.map((row) => row.kind)));

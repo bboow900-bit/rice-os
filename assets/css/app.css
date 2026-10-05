@@ -15362,3 +15362,21 @@ label {
 #screen-home .home-harvest-completed > summary { min-height: 44px; display: flex; align-items: center; gap: 8px; font-size: 13px; color: #356348; cursor: pointer; padding: 8px 0; }
 #screen-home .home-harvest-completed > summary::after { content: ""; width: 8px; height: 8px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(45deg); margin-left: auto; margin-right: 6px; flex: 0 0 8px; }
 #screen-home .home-harvest-completed[open] > summary::after { transform: rotate(225deg); }
+#screen-fields .field-hub-card .harvest-list-badge,
+#screen-annual .annual-field-pick-card .harvest-list-badge {
+  display: inline-block;
+  max-width: 100%;
+  width: fit-content;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: #73591b;
+  background: #faf1ce;
+  overflow-wrap: anywhere;
+}
+#screen-fields .field-hub-card .harvest-list-badge.partial,
+#screen-annual .annual-field-pick-card .harvest-list-badge.partial,
+#screen-fields .field-hub-card .harvest-list-badge.legacy,
+#screen-annual .annual-field-pick-card .harvest-list-badge.legacy { color: #625c45; background: #f1f0e8; }
+#screen-annual .annual-status-badge.harvest { color: #73591b; background: #faf1ce; }
