@@ -28,6 +28,7 @@
   let timelinePointerStart = null;
   let suppressTimelineOpenUntil = 0;
   const pendingHarvestWeather = new Set();
+  const timingThermalRetries = new Map();
 
   const KIND_META = {
     fieldWork: { label: "作業", className: "work", icon: "作" },
@@ -1865,7 +1866,7 @@
         const yieldMissing = !work.harvestReview || work.harvestReview.yieldKg === "" || work.harvestReview.yieldKg == null;
         const busy = thermalRetries.has(`${work.workId}:${field.fieldId}`);
         actions = `${yieldMissing ? `<button type="button" class="secondary" data-annual-harvest-edit="${U.attr(work.workId)}">${(work.fieldIds || []).length > 1 ? "共有収量を入力" : "圃場収量を入力"}</button>` : ""}
-          ${state.completeHarvestThermal(thermal) ? "" : `<button type="button" class="secondary" data-harvest-thermal-retry="${U.attr(work.workId)}" data-harvest-field="${U.attr(field.fieldId)}"${busy ? " disabled" : ""}>${busy ? "積算を取得中…" : "積算温度を再取得"}</button>${busy ? `<button type="button" class="secondary" data-harvest-thermal-cancel="${U.attr(work.workId)}" data-harvest-field="${U.attr(field.fieldId)}">取得を取消</button>` : ""}`}`;
+          ${state.isHarvestThermalComplete(work.workId, field.fieldId) ? "" : `<button type="button" class="secondary" data-harvest-thermal-retry="${U.attr(work.workId)}" data-harvest-field="${U.attr(field.fieldId)}"${busy ? " disabled" : ""}>${busy ? "積算を取得中…" : "積算温度を再取得"}</button>${busy ? `<button type="button" class="secondary" data-harvest-thermal-cancel="${U.attr(work.workId)}" data-harvest-field="${U.attr(field.fieldId)}">取得を取消</button>` : ""}`}`;
       }
     }
     return `<div class="annual-compare-check${harvestStatus.status === "complete" ? " complete" : ""}"><b>${harvestStatus.status === "complete" ? "収穫済み・今年の一区切り" : "収穫後の振り返り（完了区分未確認）"}</b>${metrics}${actions}<details class="annual-harvest-details"><summary>結果・記録の詳細</summary><ul>${facts.map((fact) => `<li>${U.escapeHTML(fact)}</li>`).join("")}</ul></details><button type="button" class="secondary" data-annual-results>品種集計の結果へ</button><button type="button" class="secondary" data-annual-reflection-focus>この年のひとことを入力</button></div>`;
@@ -1935,6 +1936,62 @@
     `;
   }
 
+  function renderHarvestTimingComparison(field) {
+    const records = state.harvestTimingComparisonFor ? state.harvestTimingComparisonFor(field.fieldId) : [];
+    const years = [...new Set(records.map(row => row.season))].sort().reverse();
+    const labels = { early: "早かった", appropriate: "適期", late: "遅かった", pending: "判断保留" };
+    const harvestLabels = { complete: "刈取完了", partial: "一部刈取" };
+    const thermalText = (thermal) => {
+      if (!thermal) return "未保存";
+      if (thermal.status === "unknown") return "計算条件未確認（詳細で確認）";
+      const value = thermal.total !== "" && thermal.total != null && Number.isFinite(Number(thermal.total));
+      return value ? `${Math.round(Number(thermal.total) * 10) / 10}℃${["missing", "partial"].includes(thermal.status) ? "（取得済み分のみ）" : ""}` : "未取得";
+    };
+    const idealText = (row) => {
+      const dates = [...new Set([row.idealStartDate, row.idealEndDate].filter(Boolean))];
+      return dates.length ? dates.map(date => annualRecordDate(date)).join(" ～ ") : row.assessment === "appropriate" ? "刈取日を適期と評価" : "未記録";
+    };
+    const endpointText = (thermal) => {
+      if (!thermal) return "未保存";
+      if (!thermal.current) return "条件変更・再計算待ち";
+      const statuses = { future: "気象実績待ち", "no-heading": "出穂日待ち", "no-location": "地点待ち", "fetch-failed": "取得失敗", "invalid-range": "期間を確認" };
+      return (thermal.endpoints || []).map(endpoint => `${annualRecordDate(endpoint.date)}: ${statuses[endpoint.status] || thermalText(endpoint)}`).join(" / ") || "未保存";
+    };
+    return `<section class="annual-harvest-timing-comparison" data-harvest-timing-comparison aria-label="刈取時期の年別比較">
+      <div class="annual-compare-section-head"><div><span>この圃場の記録</span><h4>刈取時期を年ごとに振り返る</h4></div><small>全年度</small></div>
+      <p class="muted">実際の刈取日と、現場で見立てた適期を分けて表示します。評価未登録の年を自動評価しません。</p>
+      ${years.length ? years.map(year => `<div class="annual-harvest-timing-year"><h5>${U.escapeHTML(year)}年 <small>${records.filter(row => row.season === year).length}件の刈取記録</small></h5>
+        <div class="annual-harvest-timing-grid">${records.filter(row => row.season === year).map(row => `<button type="button" class="annual-harvest-timing-card" data-harvest-timing-comparison-record="${U.attr(row.workId)}" data-annual-record-open-kind="fieldWork" data-annual-record-open-id="${U.attr(row.workId)}" data-annual-record-open-label="稲刈り">
+          <span class="annual-harvest-timing-card-head"><b>稲刈り ${U.escapeHTML(annualRecordDate(row.actualDate))}</b><span class="annual-harvest-timing-assessment ${U.attr(row.assessment || "unrecorded")}">${U.escapeHTML(labels[row.assessment] || "評価未登録")}</span><span aria-hidden="true">›</span></span>
+          <span class="annual-harvest-timing-reference">${U.escapeHTML(harvestLabels[row.harvestStatus] || "完了区分未確認")}</span>
+          <span class="annual-harvest-timing-pair"><span><small>実際の刈取日</small><b>${U.escapeHTML(annualRecordDate(row.actualDate))}</b></span><span><small>見立てた適期</small><b>${U.escapeHTML(idealText(row))}</b></span></span>
+          <span class="annual-harvest-timing-temperature"><small>刈取日の保存済み積算</small><b>${U.escapeHTML(thermalText(row.actualThermal))}</b>${row.actualThermal && row.actualThermal.startDate && row.actualThermal.expectedDays > 0 ? `<small>起点 ${U.escapeHTML(annualRecordDate(row.actualThermal.startDate))} / 取得 ${U.escapeHTML(row.actualThermal.count)} / ${U.escapeHTML(row.actualThermal.expectedDays)}日</small>` : ""}${row.actualThermal && row.actualThermal.source ? `<small>取得元: ${U.escapeHTML(row.actualThermal.source)}</small>` : ""}</span>
+          <span class="annual-harvest-timing-temperature"><small>見立てた適期の積算</small><b>${U.escapeHTML(endpointText(row.idealThermal))}</b>${row.idealThermal && row.idealThermal.current && row.idealThermal.startDate ? `<small>起点 ${U.escapeHTML(annualRecordDate(row.idealThermal.startDate))}（出穂翌日）</small>` : ""}</span>
+          ${row.varietyName ? `<span class="annual-harvest-timing-reference">${row.varietySource === "assessment-current-master" ? "評価入力時の品種情報" : "品種参照（出典未確認）"}: ${U.escapeHTML(row.varietyName)}</span>` : ""}
+          ${row.memo ? `<span class="annual-harvest-timing-memo">${U.escapeHTML(row.memo)}</span>` : ""}
+        </button>`).join("")}</div></div>`).join("") : '<div class="empty">刈取記録はまだありません。稲刈りを残すと、翌年ここで時期を比べられます。</div>'}
+      <p class="muted">見立てた適期の積算は過去気象モデルの参考値です。欠測は取得済み分のみ。取得日数・根拠・再取得は各記録の詳細で確認できます。</p>
+    </section>`;
+  }
+
+  function renderHarvestForecastComparison(field) {
+    const rows = state.harvestForecastComparisonFor ? state.harvestForecastComparisonFor(field.fieldId) : [];
+    const rangeText = range => range ? `${annualRecordDate(range.start)} ～ ${annualRecordDate(range.end)}` : "未保存";
+    const differenceText = value => value ? `${value.label}${value.days ? `: ${Math.abs(value.days)}日${value.days < 0 ? "早い" : "遅い"}` : ""}` : "見立てた適期は未記録";
+    const model = (label, comparison, range) => `<div class="annual-forecast-model"><b>${label}</b><span>${U.escapeHTML(rangeText(range))}</span>${comparison.available ? `<small>実際の刈取: ${U.escapeHTML(differenceText(comparison.actual))}</small><small>現場の見立て: ${U.escapeHTML(differenceText(comparison.ideal))}</small>` : `<small>${U.escapeHTML(comparison.reason)}</small>`}</div>`;
+    const delays = { rain: "雨", surface: "圃場の乾き", machine: "機械", schedule: "作業都合", other: "その他" };
+    return `<details class="annual-harvest-forecast-comparison" data-harvest-forecast-comparison><summary>保存した見通しと実績 <small>${rows.length}件</small></summary><p class="muted">事前に保存した参考幅と、刈取日・現場の見立てを別々に比較します。範囲内でも適期だったと自動判断しません。</p>${rows.slice().reverse().map(row => `<article data-harvest-forecast-record="${U.attr(row.workId)}"><h5>${U.escapeHTML(row.season)}年 / 稲刈り ${U.escapeHTML(annualRecordDate(row.actualDate))}</h5><p>${row.harvestStatus === "partial" ? "一部刈取" : row.harvestStatus === "complete" ? "刈取完了" : "完了区分未確認"}${row.delayReason ? ` / 記録された日程の事情: ${delays[row.delayReason]}` : ""}</p>${row.forecast ? `<small>保存見通しの基準日: ${U.escapeHTML(annualRecordDate(row.forecast.asOf))}</small>${model("日数ベース", row.dayComparison, row.forecast.harvestRange)}${model("積算温度の参考幅", row.thermalComparison, row.forecast.basis && row.forecast.basis.thermalProjection && row.forecast.basis.thermalProjection.range)}` : '<p>事前の見通し記録なし</p>'}${row.exclusions.length ? `<details><summary>比較に使わなかった記録 ${row.exclusions.length}件</summary>${[...new Set(row.exclusions.map(item => item.reason))].map(reason => `<p>${U.escapeHTML(reason)}</p>`).join("")}</details>` : ""}<button type="button" data-annual-record-open-kind="fieldWork" data-annual-record-open-id="${U.attr(row.workId)}" data-annual-record-open-label="稲刈り">刈取記録の詳細 ›</button></article>`).join("") || '<p class="empty">刈取記録が残ると、ここで保存した見通しと比較できます。</p>'}</details>`;
+  }
+
+  function renderHarvestVarietyComparison(field) {
+    const comparison = state.harvestVarietyComparisonFor ? state.harvestVarietyComparisonFor(field.fieldId) : { rows: [], excluded: [] };
+    const labels = { early: "早かった", appropriate: "適期", late: "遅かった" };
+    const delays = { rain: "雨", surface: "圃場の乾き", machine: "機械", schedule: "作業都合", other: "その他" };
+    const dateRange = row => row.idealStartDate ? [...new Set([row.idealStartDate, row.idealEndDate].filter(Boolean))].map(annualRecordDate).join(" ～ ") : "未記録";
+    const dayRange = row => row.idealDaysMin !== "" && row.idealDaysMin != null ? `${row.idealDaysMin}${row.idealDaysMax !== row.idealDaysMin ? ` ～ ${row.idealDaysMax}` : ""}日` : "出穂実測の根拠待ち";
+    return `<details class="annual-harvest-variety-comparison" data-harvest-variety-comparison><summary>同じ品種の刈取記録 <small>${comparison.rows.length}件</small></summary><p class="muted">比較基準: この圃場の現在の品種設定「${U.escapeHTML(comparison.varietyName || "未確認")}」。評価入力時の品種参照が一致する記録です。過去年の栽培品種確定ではありません。</p><p class="muted">圃場ごとの条件差を含む振り返り資料です。他の圃場の評価を予測へ自動採用しません。</p>${comparison.rows.slice().reverse().map(row => `<article data-harvest-variety-record="${U.attr(row.workId)}" data-harvest-variety-field="${U.attr(row.fieldId)}"><div class="annual-variety-record-head"><h5>${U.escapeHTML(row.fieldName)} <small>${U.escapeHTML(row.season)}年${row.currentField ? " / この圃場" : ""}</small></h5><span>${labels[row.assessment]}</span></div><div class="annual-variety-record-pair"><div><small>実際の刈取</small><b>${U.escapeHTML(annualRecordDate(row.actualDate))}</b><small>${row.daysAfterHeading !== "" && row.daysAfterHeading != null ? `出穂から${U.escapeHTML(row.daysAfterHeading)}日` : "出穂実測の根拠待ち"}</small></div><div><small>現場で見立てた適期</small><b>${U.escapeHTML(dateRange(row))}</b><small>${U.escapeHTML(dayRange(row))}${row.idealUsesActualDate ? " / 刈取日を適期と評価" : ""}</small></div></div>${row.delayReason ? `<p>記録された日程の事情: ${U.escapeHTML(delays[row.delayReason])}</p>` : ""}${row.memo ? `<p class="annual-variety-record-memo">${U.escapeHTML(row.memo)}</p>` : ""}<button type="button" data-annual-record-open-kind="fieldWork" data-annual-record-open-id="${U.attr(row.workId)}" data-annual-record-field="${U.attr(row.fieldId)}" data-annual-record-open-label="稲刈り">${U.escapeHTML(row.fieldName)}の刈取記録 ›</button></article>`).join("") || '<p class="empty">比較できる評価付き刈取記録はまだありません。刈取記録に現場の評価を残すと、ここで見比べられます。</p>'}${comparison.excluded.length ? `<details><summary>比較参照に含めなかった記録 ${comparison.excluded.length}件</summary>${comparison.excluded.slice().reverse().map(row => `<p>${U.escapeHTML(row.fieldName)} / ${U.escapeHTML(row.season)}年: ${U.escapeHTML(row.reason)}</p>`).join("")}</details>` : ""}</details>`;
+  }
+
   function renderComparisonExperience(field) {
     const currentYear = reviewYearValue();
     const previousYear = String(Number(currentYear) - 1);
@@ -1953,6 +2010,9 @@
       <section class="annual-compare-experience" aria-label="${U.escapeHTML(field.name)}の今年と前年の比較">
         <div class="annual-compare-experience-head"><button type="button" class="annual-compare-back" data-annual-close-compare aria-label="比較を閉じる">‹</button><div><span>今年と前年を比べる</span><h3>${U.escapeHTML(field.name)}</h3><p>${U.escapeHTML(currentYear)}年と${U.escapeHTML(previousYear)}年 / ${U.escapeHTML(varietyName(field))}</p></div></div>
         <div class="annual-compare-season-status"><article class="current"><span>${U.escapeHTML(currentYear)}年</span><b>${U.escapeHTML(currentPlanting ? `田植え ${U.fd(currentPlanting.date)}` : "田植え未記録")}</b><small>${U.escapeHTML(currentHeading ? `出穂 ${U.fd(currentHeading.date)}` : "出穂記録待ち")}</small></article><i aria-hidden="true">⇄</i><article><span>${U.escapeHTML(previousYear)}年</span><b>${U.escapeHTML(previousPlanting ? `田植え ${U.fd(previousPlanting.date)}` : "田植え未記録")}</b><small>${U.escapeHTML(previousHeading ? `出穂 ${U.fd(previousHeading.date)}` : "出穂記録なし")}</small></article></div>
+        ${renderHarvestTimingComparison(field)}
+        ${renderHarvestForecastComparison(field)}
+        ${renderHarvestVarietyComparison(field)}
         <section class="annual-compare-milestones"><div class="annual-compare-section-head"><div><span>季節の節目</span><h4>今年と前年の歩み</h4></div><small>実績のみ</small></div>${milestones.map(([label, pattern]) => `<article><span>${U.escapeHTML(label)}</span><div>${compareRecordCard(milestoneEntry(currentEntries, pattern), currentYear, field)}${compareRecordCard(milestoneEntry(previousEntries, pattern), previousYear, field)}</div></article>`).join("")}</section>
         <section class="annual-compare-history"><div class="annual-compare-section-head"><div><span>比べたい履歴</span><h4>記録を読み比べる</h4></div><small>${U.escapeHTML(currentYear)}年 ⇄ ${U.escapeHTML(previousYear)}年</small></div><div class="annual-compare-filter-row">${filters.map(([id, label]) => `<button type="button" class="${compareFilter === id ? "active" : ""}" data-annual-compare-filter="${U.attr(id)}">${U.escapeHTML(label)}</button>`).join("")}</div><div class="annual-compare-history-grid"><div><b>${U.escapeHTML(currentYear)}年</b>${history(compareEntriesForFilter(field, currentYear, compareFilter), currentYear)}</div><div><b>${U.escapeHTML(previousYear)}年</b>${history(compareEntriesForFilter(field, previousYear, compareFilter), previousYear)}</div></div></section>
         ${renderAnnualPhotoComparison(field)}
@@ -2107,6 +2167,69 @@
       <section class="annual-record-detail-section"><h3>今回の収穫結果</h3><div class="annual-record-detail-rows">${yieldRows}</div><p class="muted">収量は年間の栽培全体の結果です。落水や雑草だけの影響とは判定できません。測定条件が異なる記録は単純比較できません。</p></section>`;
   }
 
+  function renderHarvestTiming(row, fieldId) {
+    const timing = row.harvestTimingByField && row.harvestTimingByField[fieldId];
+    if (!timing) return "";
+    const labels = { early: "早かった", appropriate: "適期", late: "遅かった", pending: "判断保留" };
+    const colors = { green: "青い籾が多い", mixed: "黄化の途中", mostlyYellow: "ほぼ黄化", unknown: "判断保留" };
+    const reasons = { rain: "雨", surface: "圃場の乾き", machine: "機械", schedule: "作業都合", other: "その他" };
+    const dates = [timing.idealStartDate, timing.idealEndDate].filter(Boolean).map((date) => U.fd(date)).join(" ～ ");
+    const info = [
+      annualRecordInfoRow("作業者の評価", labels[timing.assessment] || "未登録"),
+      annualRecordInfoRow("見立てた適期", dates),
+      annualRecordInfoRow("乾燥前の籾水分", timing.moisturePct !== "" && timing.moisturePct != null ? `${timing.moisturePct}％` : ""),
+      annualRecordInfoRow("水分測定日", timing.moistureDate ? U.fd(timing.moistureDate) : ""),
+      annualRecordInfoRow("籾の色", colors[timing.yellowing]),
+      annualRecordInfoRow("日程がずれた理由", reasons[timing.delayReason]),
+      annualRecordInfoRow("判断の根拠・追記", timing.memo),
+      annualRecordInfoRow("評価入力時の品種情報", timing.varietySource === "assessment-current-master" ? timing.varietyName : "")
+    ].join("");
+    return `<section class="annual-record-detail-section"><h3>刈取時期の評価</h3><div class="annual-record-detail-rows">${info}</div><p class="muted">現場での見立てです。刈取実績日とは区別して保存しています。</p></section>${renderHarvestTimingThermal(row, fieldId, timing)}`;
+  }
+
+  function renderHarvestTimingThermal(row, fieldId, timing) {
+    const thermal = timing.thermal;
+    const busy = timingThermalRetries.has(`${row.workId}:${fieldId}`);
+    const current = thermal && state.harvestTimingThermalIsCurrent && state.harvestTimingThermalIsCurrent(row.workId, fieldId);
+    const labels = { complete: "取得済み", missing: "欠測あり", future: "気象実績待ち（当日・未来日）", "no-heading": "出穂確認の記録待ち", "no-location": "気象地点の設定待ち", "fetch-failed": "取得失敗", "invalid-range": "対象期間を確認" };
+    const endpoints = thermal && Array.isArray(thermal.endpoints) ? thermal.endpoints : [];
+    const rows = endpoints.map((endpoint) => {
+      const hasTotal = endpoint.total !== "" && endpoint.total != null && Number.isFinite(Number(endpoint.total));
+      const number = current && hasTotal && ["complete", "missing"].includes(endpoint.status)
+        ? `${Math.round(Number(endpoint.total) * 10) / 10}℃${endpoint.status === "missing" ? "（取得済み分のみ）" : ""}` : "";
+      const status = !current ? "条件変更・再計算待ち" : labels[endpoint.status] || "未取得";
+      return annualRecordInfoRow(endpoint.date ? U.fd(endpoint.date) : "見立てた適期", [number, status].filter(Boolean).join(" / "))
+        + (current && Number(endpoint.expectedDays) > 0 ? annualRecordInfoRow("気温の取得日数", `${Number(endpoint.count) || 0} / ${Number(endpoint.expectedDays)}日`) : "");
+    }).join("");
+    const hasDate = Boolean(timing.idealStartDate || timing.idealEndDate || timing.assessment === "appropriate");
+    const complete = current && endpoints.length && endpoints.every((endpoint) => endpoint.status === "complete");
+    return `<section class="annual-record-detail-section" data-harvest-timing-thermal><h3>見立てた適期の積算温度</h3>
+      <div class="annual-record-detail-rows">${rows || '<p class="muted">まだ計算していません。</p>'}
+        ${current && thermal.startDate ? annualRecordInfoRow("積算の起点", `${U.fd(thermal.startDate)}（出穂翌日）`) : ""}
+        ${thermal ? annualRecordInfoRow("気象取得元・地点", [thermal.source, thermal.locationLabel].filter(Boolean).join(" / ")) : ""}
+      </div><p class="muted">作業者が見立てた日付の参考値です。過去気象のモデル値を使用し、圃場の実測や未来の予報とは区別します。欠測日は0℃に置き換えません。</p>
+      ${hasDate && !complete && state.retryHarvestTimingThermal ? `<button type="button" class="secondary" data-harvest-timing-thermal-retry data-work-id="${U.attr(row.workId)}" data-field-id="${U.attr(fieldId)}" ${busy ? "disabled" : ""}>${busy ? "積算を取得中…" : "適期の積算温度を取得"}</button>` : hasDate ? "" : '<p class="muted">見立てた適期の日付を記録すると計算できます。「適期」の評価では刈取日を使います。</p>'}
+      ${busy ? `<button type="button" class="secondary" data-harvest-timing-thermal-cancel data-work-id="${U.attr(row.workId)}" data-field-id="${U.attr(fieldId)}">取得を取消</button>` : ""}</section>`;
+  }
+
+  async function fetchHarvestTimingThermal(workId, fieldId) {
+    const key = `${workId}:${fieldId}`;
+    if (!state.retryHarvestTimingThermal || timingThermalRetries.has(key)) return;
+    const controller = new AbortController();
+    timingThermalRetries.set(key, controller);
+    render();
+    try {
+      const result = await state.retryHarvestTimingThermal(workId, fieldId, { signal: controller.signal });
+      if (result && result.status === "not_saved") U.toast("記録や取得条件が変更されたため、更新しませんでした。");
+      else if (result && result.status === "fetch_failed") U.toast("気象を取得できませんでした。保存済みの記録は保持しています。");
+    } catch (error) {
+      U.toast("積算温度を取得できませんでした。記録は保持しています。");
+    } finally {
+      timingThermalRetries.delete(key);
+      if (selectedFieldId === fieldId && recordDetail && recordDetail.id === workId) render();
+    }
+  }
+
   async function fetchHarvestWeather(workId, fieldId) {
     const key = `${workId}:${fieldId}`;
     if (!RiceOS.harvestWeather || pendingHarvestWeather.has(key)) return;
@@ -2158,11 +2281,12 @@
     ].filter(Boolean).join("");
     const error = outlook.errorDays === "" || outlook.errorDays === undefined || outlook.errorDays === null
       ? ""
-      : Number(outlook.errorDays) === 0 ? "見通しどおり"
+      : !Number.isFinite(Number(outlook.errorDays)) ? ""
+        : Number(outlook.errorDays) === 0 ? "保存した目安日と同日"
         : Number(outlook.errorDays) > 0 ? `見通しより${outlook.errorDays}日遅い` : `見通しより${Math.abs(Number(outlook.errorDays))}日早い`;
     const outlookRows = outlook.predictedHarvestDate ? [
       annualRecordInfoRow("直前の収穫目安", `${U.fd(outlook.predictedHarvestDate)}${outlook.predictedAsOf ? `（${U.fd(outlook.predictedAsOf)}時点）` : ""}`),
-      annualRecordInfoRow("実績との差", error || "比較できません")
+      annualRecordInfoRow("保存時の日程差（条件未確認）", error || "比較できません")
     ].filter(Boolean).join("") : annualRecordInfoRow("見通しとの比較", outlook.status || "見通し記録なし");
     const thermalRows = thermal.total !== "" && thermal.total !== undefined && thermal.total !== null ? [
       annualRecordInfoRow("出穂後積算", `${Math.round(Number(thermal.total))}℃${thermal.target !== "" && thermal.target !== undefined && thermal.target !== null ? ` / 目安 ${Math.round(Number(thermal.target))}℃` : ""}`),
@@ -2217,7 +2341,7 @@
     }
     const memo = String(row.memo || row.note || "").trim();
     const photos = annualRecordPhotos(row);
-    const harvestSnapshot = category === "収穫" ? renderHarvestReview(row) + renderHarvestSnapshot(row, field.fieldId) : "";
+    const harvestSnapshot = category === "収穫" ? renderHarvestTiming(row, field.fieldId) + renderHarvestReview(row) + renderHarvestSnapshot(row, field.fieldId) : "";
     return `
       <section class="annual-record-detail" aria-label="${U.attr(title)}の実績詳細">
         <button type="button" class="annual-record-detail-back" data-annual-record-detail-back aria-label="一年の流れへ戻る">‹</button>
@@ -2382,6 +2506,7 @@
   function handleBack() {
     if (recordDetail) {
       if (recordDetail.fromMaterialsTop) selectedFieldId = "";
+      if (recordDetail.returnComparisonField && state.field(recordDetail.returnComparisonField)) selectedFieldId = recordDetail.returnComparisonField;
       recordDetail = null;
       render();
       window.scrollTo({ top: 0, behavior: "smooth" });
@@ -2546,6 +2671,8 @@
     const field = state.field(selectedFieldId);
     if (!field || !RiceOS.screens.results) return;
     const year = reviewYearValue();
+    const results = (state.data().varietyResults || []).filter((row) => String(row.season) === year && row.varietyId === field.varietyId);
+    const existing = results.find((row) => row.fieldId === field.fieldId) || results.find((row) => !row.fieldId);
     const origin = { fieldId: selectedFieldId, tab: selectedTab, review: reviewView,
       year: yearValue(), fromHub: compareFromHub, filter: compareFilter, top: topView };
     if (RiceOS.navigation && RiceOS.navigation.clear) RiceOS.navigation.clear();
@@ -2557,6 +2684,7 @@
     topView = origin.top;
     if (U.$("annualYear")) U.$("annualYear").value = origin.year;
     RiceOS.app.openInput("results", "annual");
+    if (existing && RiceOS.screens.results.editResult && RiceOS.screens.results.editResult(existing.resultId)) return;
     RiceOS.screens.results.resetForm();
     U.$("rSeason").value = year;
     U.$("rVariety").value = field.varietyId;
@@ -2779,6 +2907,13 @@
         });
         return;
       }
+      const timingRetry = event.target.closest("[data-harvest-timing-thermal-retry]");
+      if (timingRetry) { fetchHarvestTimingThermal(timingRetry.dataset.workId, timingRetry.dataset.fieldId); return; }
+      const timingCancel = event.target.closest("[data-harvest-timing-thermal-cancel]");
+      if (timingCancel) {
+        timingThermalRetries.get(`${timingCancel.dataset.workId}:${timingCancel.dataset.fieldId}`)?.abort();
+        return;
+      }
       const harvestWeather = event.target.closest("[data-harvest-weather]");
       if (harvestWeather) {
         void fetchHarvestWeather(harvestWeather.dataset.harvestWeather, harvestWeather.dataset.harvestWeatherField);
@@ -2787,11 +2922,16 @@
       const recordOpen = event.target.closest("[data-annual-record-open-kind]");
       if (recordOpen) {
         if (Date.now() < suppressTimelineOpenUntil) return;
+        const returnComparisonField = selectedFieldId;
+        const comparisonField = recordOpen.dataset.annualRecordField;
+        if (comparisonField && state.field(comparisonField)) selectedFieldId = comparisonField;
         const fromMaterialsTop = Boolean(recordOpen.dataset.annualMaterialField);
         if (fromMaterialsTop) selectedFieldId = recordOpen.dataset.annualMaterialField;
         const opened = openAnnualRecordDetail(recordOpen.dataset.annualRecordOpenKind, recordOpen.dataset.annualRecordOpenId, recordOpen.dataset.annualRecordOpenLabel);
         if (opened && fromMaterialsTop) recordDetail.fromMaterialsTop = true;
+        if (opened && comparisonField) recordDetail.returnComparisonField = returnComparisonField;
         if (!opened && fromMaterialsTop) selectedFieldId = "";
+        if (!opened && comparisonField) selectedFieldId = returnComparisonField;
         return;
       }
       const tab = event.target.closest("[data-annual-tab]");
@@ -2977,7 +3117,7 @@
     });
     U.$("annualTimeline").addEventListener("pointerdown", (event) => {
       const card = event.target.closest("[data-annual-record-open-kind]");
-      if (!card || (event.pointerType === "mouse" && event.button !== 0)) return;
+      if (!card || card.dataset.annualRecordField || (event.pointerType === "mouse" && event.button !== 0)) return;
       clearTimeout(timelineLongPressTimer);
       const record = {
         kind: card.dataset.annualRecordOpenKind,
@@ -3002,6 +3142,7 @@
       const card = event.target.closest("[data-annual-record-open-kind]");
       if (!card) return;
       event.preventDefault();
+      if (card.dataset.annualRecordField) return;
       openTimelineAction({ kind: card.dataset.annualRecordOpenKind, id: card.dataset.annualRecordOpenId, label: card.dataset.annualRecordOpenLabel || "記録" });
     });
     U.$("annualTimeline").addEventListener("input", (event) => {
@@ -3052,7 +3193,8 @@
       const record = waterRecord(kind, id);
       const startDate = String(formData.get("startDate") || "");
       const actualEndDate = String(formData.get("actualEndDate") || "");
-      if (!record || !startDate) return;
+      if (!record) return;
+      if (!startDate) { alert("開始日を入力してください。"); return; }
       if (actualEndDate && actualEndDate < startDate) {
         alert("終了日は開始日以降の日付にしてください。");
         return;

@@ -1615,6 +1615,20 @@
 .outlook-detail-hero span { margin-top: 5px; color: #438099; font-size: 12px; font-weight: 800; }
 .outlook-detail-section { margin: 11px 0; padding: 12px; border: 1px solid #e1e6dc; border-radius: 14px; background: #fffefa; }
 .outlook-detail-section h3 { margin: 0 0 9px; color: #2d4935; font-size: 14px; }
+.outlook-calibration-badge { display: block; margin-top: 8px; font-size: 11px; color: #7b5b22; }
+.outlook-calibration { overflow-wrap: anywhere; }
+.outlook-calibration > p { margin: 8px 0; font-size: 12px; line-height: 1.6; }
+.outlook-calibration-status { color: #6d501d; font-weight: 700; }
+.outlook-calibration-summary { margin: 12px 0; display: grid; gap: 8px; }
+.outlook-calibration-summary > div { display: grid; gap: 3px; }
+.outlook-calibration-summary dt { font-size: 11px; color: #697467; }
+.outlook-calibration-summary dd { margin: 0; font-size: 13px; color: #304635; }
+.outlook-calibration details { padding: 10px 0; border-top: 1px solid #e5e8de; border-bottom: 1px solid #e5e8de; }
+.outlook-calibration summary { cursor: pointer; font-size: 12px; line-height: 1.6; }
+.outlook-calibration h4 { margin: 12px 0 8px; font-size: 12px; }
+.outlook-calibration ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 10px; }
+.outlook-calibration li { display: grid; gap: 3px; padding-left: 10px; border-left: 2px solid #b8ceb0; font-size: 12px; line-height: 1.6; }
+.outlook-calibration-note { color: #62715f; }
 .outlook-detail-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .outlook-detail-grid > div { min-width: 0; padding: 9px; border-radius: 10px; background: #f4f8ef; }
 .outlook-detail-grid small, .outlook-detail-grid b, .outlook-detail-grid span { display: block; }
@@ -11507,6 +11521,24 @@ label {
 #screen-annual .annual-compare-record.harvest { border-color: #eed9ae; border-left-color: #b47732; background: #fff9ec; }
 #screen-annual .annual-compare-record.empty { min-height: 56px; border-style: dashed; border-left-width: 1px; background: #fafbf8; }
 #screen-annual .annual-compare-record.empty b { color: #7c867b; }
+#screen-annual .annual-harvest-timing-comparison { margin: 18px 0; min-width: 0; }
+#screen-annual .annual-harvest-timing-comparison > .muted { font-size: 12px; line-height: 1.6; }
+#screen-annual .annual-harvest-timing-year h5 { display: flex; flex-wrap: wrap; gap: 8px; align-items: baseline; margin: 16px 0 8px; font-size: 16px; color: #57492e; }
+#screen-annual .annual-harvest-timing-year h5 small { font-size: 11px; font-weight: 400; color: #687367; }
+#screen-annual .annual-harvest-timing-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 10px; }
+#screen-annual .annual-harvest-timing-card { display: grid; gap: 10px; min-width: 0; width: 100%; padding: 14px; border: 1px solid #e3dccd; border-left: 3px solid #b47732; border-radius: 8px; background: #fff; color: #304635; font: inherit; text-align: left; cursor: pointer; overflow-wrap: anywhere; }
+#screen-annual .annual-harvest-timing-card:focus-visible { outline: 2px solid #258847; outline-offset: 2px; }
+#screen-annual .annual-harvest-timing-card-head { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+#screen-annual .annual-harvest-timing-card-head > b { flex: 1; font-size: 15px; }
+#screen-annual .annual-harvest-timing-card-head > span:last-child { font-size: 20px; }
+#screen-annual .annual-harvest-timing-assessment { font-size: 11px; padding: 3px 7px; border-radius: 4px; background: #f1f3ef; color: #586458; }
+#screen-annual .annual-harvest-timing-assessment.appropriate { background: #e8f4e8; color: #24663a; }
+#screen-annual .annual-harvest-timing-assessment.early, #screen-annual .annual-harvest-timing-assessment.late { background: #fff2d7; color: #815612; }
+#screen-annual .annual-harvest-timing-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; border-bottom: 1px solid #edf0e9; padding-bottom: 10px; }
+#screen-annual .annual-harvest-timing-pair > span, #screen-annual .annual-harvest-timing-temperature { display: grid; gap: 4px; min-width: 0; }
+#screen-annual .annual-harvest-timing-card small, #screen-annual .annual-harvest-timing-reference { color: #667263; font-size: 11px; line-height: 1.5; }
+#screen-annual .annual-harvest-timing-pair b, #screen-annual .annual-harvest-timing-temperature b { font-size: 13px; line-height: 1.5; }
+#screen-annual .annual-harvest-timing-memo { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; color: #485b4b; font-size: 12px; line-height: 1.6; }
 #screen-annual .annual-compare-filter-row { display: flex; gap: 5px; margin: 0 -2px 9px; padding: 0 2px 2px; overflow-x: auto; scrollbar-width: none; }
 #screen-annual .annual-compare-filter-row::-webkit-scrollbar { display: none; }
 #screen-annual .annual-compare-filter-row button { flex: 0 0 auto; min-height: 40px; padding: 7px 10px; border: 1px solid #dce6da; border-radius: 999px; background: #f8faf7; color: #657365; font: inherit; font-size: 10px; font-weight: 850; }
@@ -15380,3 +15412,39 @@ label {
 #screen-fields .field-hub-card .harvest-list-badge.legacy,
 #screen-annual .annual-field-pick-card .harvest-list-badge.legacy { color: #625c45; background: #f1f0e8; }
 #screen-annual .annual-status-badge.harvest { color: #73591b; background: #faf1ce; }
+
+#fwHarvestTiming .harvest-timing-field { padding: 12px 0; border-top: 1px solid #dce8d8; min-width: 0; }
+#fwHarvestTiming .harvest-timing-field:first-child { border-top: 0; }
+#fwHarvestTiming h4 { margin: 0 0 10px; font-size: 15px; color: #315b37; overflow-wrap: anywhere; }
+#fwHarvestTiming label { display: grid; gap: 6px; min-width: 0; margin-bottom: 10px; }
+#fwHarvestTiming input, #fwHarvestTiming select, #fwHarvestTiming textarea { width: 100%; min-width: 0; box-sizing: border-box; }
+#fwHarvestTiming .form-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+#fwHarvestTiming details summary { font-size: 13px; color: #49664d; padding: 8px 0; }
+
+#screen-outlook .outlook-thermal p { margin: 8px 0; line-height: 1.6; overflow-wrap: anywhere; }
+#screen-outlook .outlook-thermal small { display: block; margin-top: 12px; color: #49664d; line-height: 1.7; overflow-wrap: anywhere; }
+#screen-outlook .outlook-thermal-calibration { margin-top: 14px; padding-top: 10px; border-top: 1px solid #e5e8de; }
+#screen-outlook .outlook-thermal-calibration details { margin-top: 10px; }
+#screen-outlook .outlook-thermal-calibration summary { cursor: pointer; font-size: 12px; line-height: 1.6; }
+#screen-outlook .outlook-thermal-calibration h4 { margin: 12px 0 8px; font-size: 12px; }
+#screen-outlook .outlook-thermal-calibration ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 10px; }
+#screen-outlook .outlook-thermal-calibration li { display: grid; gap: 3px; padding-left: 10px; border-left: 2px solid #b8ceb0; font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
+/* Saved outlook comparisons stay secondary to actual harvest records. */
+.annual-harvest-forecast-comparison { margin: 16px 0; padding: 12px; border: 1px solid #d8e4dc; border-radius: 8px; background: #fff; min-width: 0; }
+.annual-harvest-forecast-comparison summary { cursor: pointer; font-weight: 700; overflow-wrap: anywhere; }
+.annual-harvest-forecast-comparison article { padding: 12px 0; border-top: 1px solid #e3ebe5; min-width: 0; }
+.annual-harvest-forecast-comparison h5 { margin: 0 0 8px; font-size: 15px; }
+.annual-harvest-forecast-comparison p, .annual-harvest-forecast-comparison small { overflow-wrap: anywhere; line-height: 1.6; }
+.annual-forecast-model { display: grid; gap: 4px; padding: 10px 0; }
+.annual-harvest-forecast-comparison button { margin-top: 8px; max-width: 100%; }
+.annual-harvest-variety-comparison { margin: 16px 0; padding: 12px; border: 1px solid #d8e4dc; border-radius: 8px; background: #fff; min-width: 0; }
+.annual-harvest-variety-comparison summary { cursor: pointer; font-weight: 700; overflow-wrap: anywhere; }
+.annual-harvest-variety-comparison article { padding: 12px 0; border-top: 1px solid #e3ebe5; min-width: 0; }
+.annual-harvest-variety-comparison h5 { margin: 0; font-size: 15px; overflow-wrap: anywhere; }
+.annual-harvest-variety-comparison p, .annual-harvest-variety-comparison small { overflow-wrap: anywhere; line-height: 1.6; }
+.annual-variety-record-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px; }
+.annual-variety-record-head > span { color: #326647; font-size: 13px; }
+.annual-variety-record-pair { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; margin-top: 10px; }
+.annual-variety-record-pair > div { display: grid; align-content: start; gap: 4px; min-width: 0; }
+.annual-variety-record-pair b { font-size: 14px; overflow-wrap: anywhere; }
+.annual-harvest-variety-comparison button { margin-top: 8px; max-width: 100%; white-space: normal; }

@@ -12,6 +12,8 @@
   let herbicideChoices = new Map();
   let workInputMode = localStorage.getItem("riceFieldWorkInputMode") || "simple";
   let harvestStatuses = {};
+  let harvestTimingDrafts = {};
+  let harvestTimingSelection = "";
   let legacyHarvestFields = new Set();
   let quickHarvestMounts = null;
   let workFormSession = 0;
@@ -127,6 +129,7 @@
     renderHarvestQuick(active);
     host.hidden = !active;
     host.classList.toggle("hidden", !active);
+    renderHarvestTiming(active);
     Object.values(HARVEST_REVIEW_INPUTS).forEach((id) => {
       const input = U.$(id);
       if (input) input.disabled = !active;
@@ -134,6 +137,8 @@
   }
 
   function loadHarvestReview(work) {
+    harvestTimingDrafts = U.clone(work && work.harvestTimingByField || {});
+    harvestTimingSelection = "";
     harvestStatuses = { ...(work && work.harvestStatusByField || {}) };
     legacyHarvestFields = new Set((work && work.fieldIds || []).filter((id) => !Object.prototype.hasOwnProperty.call(harvestStatuses, id)));
     const review = work && work.harvestReview || {};
@@ -144,6 +149,57 @@
     const host = U.$("fwHarvestReview");
     if (host) host.open = Object.keys(HARVEST_REVIEW_INPUTS).some((key) => String(review[key] ?? "") !== "");
     renderHarvestReview();
+  }
+
+  const TIMING_CHOICES = {
+    assessment: [["", "未登録"], ["early", "早かった"], ["appropriate", "適期"], ["late", "遅かった"], ["pending", "判断保留"]],
+    yellowing: [["", "未登録"], ["green", "青い籾が多い"], ["mixed", "黄化の途中"], ["mostlyYellow", "ほぼ黄化"], ["unknown", "判断保留"]],
+    delayReason: [["", "なし・未登録"], ["rain", "雨"], ["surface", "圃場の乾き"], ["machine", "機械"], ["schedule", "作業都合"], ["other", "その他"]]
+  };
+
+  function timingSelect(key, value) {
+    return `<select data-timing-key="${key}">${TIMING_CHOICES[key].map(([id, label]) => `<option value="${id}" ${id === value ? "selected" : ""}>${label}</option>`).join("")}</select>`;
+  }
+
+  function renderHarvestTiming(active) {
+    const host = U.$("fwHarvestTiming");
+    if (!host) return;
+    host.hidden = !active;
+    host.classList.toggle("hidden", !active);
+    if (host.querySelectorAll) host.querySelectorAll("input, select, textarea").forEach((input) => { input.disabled = !active; });
+    if (!active) { harvestTimingSelection = ""; return; }
+    const ids = selectedFieldIds();
+    const signature = ids.join("|");
+    if (signature === harvestTimingSelection && U.$("fwHarvestTimingFields").children?.length) return;
+    harvestTimingSelection = signature;
+    const input = (key, type, value, extra = "") => `<input type="${type}" data-timing-key="${key}" value="${U.attr(value || "")}" ${extra}>`;
+    U.$("fwHarvestTimingFields").innerHTML = ids.length ? ids.map((id) => {
+      const value = harvestTimingDrafts[id] || {};
+      const name = state.field(id)?.name || id;
+      return `<div class="harvest-timing-field" data-field-id="${U.attr(id)}">
+        <h4>${U.escapeHTML(name)}</h4>
+        <label>今回の刈取時期${timingSelect("assessment", value.assessment || "")}</label>
+        <label>刈取日から何日後・何日前（任意）<input type="number" data-timing-offset min="-365" max="365" step="1" inputmode="numeric" placeholder="3日後は3、3日前は-3"></label>
+        <div class="form-grid dense">
+          <label>見立てた適期・開始${input("idealStartDate", "date", value.idealStartDate)}</label>
+          <label>見立てた適期・終了${input("idealEndDate", "date", value.idealEndDate)}</label>
+        </div>
+        <details><summary>判断材料・メモ</summary>
+          <div class="form-grid dense">
+            <label>乾燥前の籾水分（％）${input("moisturePct", "number", value.moisturePct, 'min="0" max="100" step="0.1" inputmode="decimal"')}</label>
+            <label>水分測定日${input("moistureDate", "date", value.moistureDate)}</label>
+            <label>籾の色${timingSelect("yellowing", value.yellowing || "")}</label>
+            <label>日程がずれた理由${timingSelect("delayReason", value.delayReason || "")}</label>
+          </div>
+          <label>判断の根拠・後から分かったこと<textarea data-timing-key="memo">${U.escapeHTML(value.memo || "")}</textarea></label>
+        </details>
+        <button type="button" class="secondary" data-timing-clear="${U.attr(id)}">この圃場の評価を解除</button>
+      </div>`;
+    }).join("") + (ids.length > 1 ? '<button type="button" class="secondary" data-timing-copy>最初の圃場の評価を全圃場へ反映</button>' : "") : '<p class="muted">対象圃場を選択してください。</p>';
+  }
+
+  function harvestTimingValue(ids) {
+    return Object.fromEntries(ids.filter((id) => harvestTimingDrafts[id]).map((id) => [id, harvestTimingDrafts[id]]));
   }
 
   function harvestReviewValue() {
@@ -193,6 +249,7 @@
   function updateFieldSelectionSummary() {
     renderHerbicidePicker();
     renderHarvestCompletion(targetScope() === "field" && isHarvestWork(U.$("fwName").value));
+    renderHarvestTiming(targetScope() === "field" && isHarvestWork(U.$("fwName").value));
     const summary = U.$("fwFieldSelectionSummary");
     if (!summary) return;
     const ids = selectedFieldIds();
@@ -830,6 +887,9 @@
   async function saveHarvestThermalSnapshots(workId, fieldIds, harvestDate) {
     if (!state.retryHarvestThermal) return;
     for (const fieldId of fieldIds || []) await state.retryHarvestThermal(workId, fieldId);
+    if (state.retryHarvestTimingThermal) {
+      for (const fieldId of fieldIds || []) await state.retryHarvestTimingThermal(workId, fieldId);
+    }
   }
 
   function bind() {
@@ -892,7 +952,42 @@
     });
 
     const bulkTools = U.$("fieldWorkForm");
+    bulkTools.addEventListener("input", (event) => {
+      const offset = event.target.closest("[data-timing-offset]");
+      if (offset) {
+        const field = offset.closest("[data-field-id]");
+        const days = Number(offset.value);
+        const date = U.$("fwDate").value;
+        if (offset.value === "" || !Number.isInteger(days) || Math.abs(days) > 365 || !date || !U.$("fwDate").checkValidity()) return;
+        const idealDate = U.dateAddDays(date, days);
+        const id = field.dataset.fieldId;
+        harvestTimingDrafts[id] = { ...(harvestTimingDrafts[id] || {}), idealStartDate: idealDate, idealEndDate: idealDate };
+        field.querySelector('[data-timing-key="idealStartDate"]').value = idealDate;
+        field.querySelector('[data-timing-key="idealEndDate"]').value = idealDate;
+        return;
+      }
+      const input = event.target.closest("[data-timing-key]");
+      const field = input && input.closest("[data-field-id]");
+      if (!field) return;
+      const id = field.dataset.fieldId;
+      harvestTimingDrafts[id] = { ...(harvestTimingDrafts[id] || {}), [input.dataset.timingKey]: input.value };
+    });
     bulkTools.addEventListener("click", (event) => {
+      const clearTiming = event.target.closest("[data-timing-clear]");
+      const copyTiming = event.target.closest("[data-timing-copy]");
+      if (clearTiming || copyTiming) {
+        if (clearTiming) harvestTimingDrafts[clearTiming.dataset.timingClear] = Object.fromEntries(["assessment", "idealStartDate", "idealEndDate", "moisturePct", "moistureDate", "yellowing", "delayReason", "memo"].map((key) => [key, ""]));
+        else {
+          const ids = selectedFieldIds();
+          const source = harvestTimingDrafts[ids[0]] || {};
+          ids.forEach((id) => {
+            harvestTimingDrafts[id] = Object.fromEntries(["assessment", "idealStartDate", "idealEndDate", "moisturePct", "moistureDate", "yellowing", "delayReason", "memo"].map((key) => [key, source[key] || ""]));
+          });
+        }
+        harvestTimingSelection = "";
+        renderHarvestTiming(true);
+        return;
+      }
       const modeButton = event.target.closest("[data-work-mode-select]");
       if (modeButton) {
         setWorkInputMode(modeButton.dataset.workModeSelect);
@@ -1035,6 +1130,7 @@
         herbicideCategory: !offField && workName === "除草剤" ? U.$("fwHerbicideCategory").value : "",
         herbicidePurpose: !offField && workName === "除草剤" ? U.$("fwHerbicidePurpose").value : "",
         ...(!offField && isHarvestWork(workName) ? { harvestReview: harvestReviewValue() } : {}),
+        ...(!offField && isHarvestWork(workName) && Object.keys(harvestTimingValue(ids)).length ? { harvestTimingByField: harvestTimingValue(ids) } : {}),
         ...(harvestStatusByField !== undefined ? { harvestStatusByField } : {}),
         amount: U.$("fwAmount").value,
         sourceScheduleId: pendingScheduleId,

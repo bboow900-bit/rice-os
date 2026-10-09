@@ -630,6 +630,10 @@
   }
 
   function saveHeadingObservedOnly() {
+    if (!U.$("gDate").value || !U.$("gDate").checkValidity()) {
+      alert("実施日を入力してください。");
+      return;
+    }
     if (!U.$("gField").value) {
       alert("圃場を選んでください。");
       return;
@@ -645,7 +649,7 @@
   function saveHeadingObservedRecords(targets) {
     const records = targets.fields.map((field) => ({
         sourceScheduleId,
-        date: U.$("gDate").value || U.today(),
+        date: U.$("gDate").value,
         fieldId: field.fieldId,
         leafColorScore: U.$("gLeaf").value || "3",
         leafColor: S.leafColorLabel(U.$("gLeaf").value || "3"),
@@ -722,6 +726,10 @@
 
     U.$("growthForm").addEventListener("submit", (event) => {
       event.preventDefault();
+      if (!U.$("gDate").value || !U.$("gDate").checkValidity()) {
+        alert("実施日を入力してください。");
+        return;
+      }
       if (!U.$("gField").value) {
         alert("圃場を選んでください。");
         return;

@@ -638,6 +638,8 @@ assert(harvestSnapshot.water.finalDrainDate === "2026-09-16" && harvestSnapshot.
 assert(harvestSnapshot.outlook.predictedHarvestDate === "2026-09-18" && harvestSnapshot.outlook.errorDays === 2, "収穫見通しとの差を保存できない");
 assert(harvestSnapshot.thermal.status === "気象実績を取得中", "積算温度の初期状態を保存できない");
 assert(harvestSnapshot.thermal.total === "", "未取得の積算温度を0℃として保存してはいけない");
+assert(state.updateWeatherLocation({ latitude: 37, longitude: 140, label: "試験地点" }));
+assert(state.saveGrowthLog({ fieldId: harvestFieldId, date: "2026-08-05", headingObserved: true }));
 assert(state.saveHarvestThermalSnapshots("work_harvest_snapshot", [{
   fieldId: harvestFieldId,
   status: "確定",
@@ -654,7 +656,9 @@ assert(state.saveHarvestThermalSnapshots("work_harvest_snapshot", [{
   source: "Open-Meteo Archive",
   locationLabel: "試験地点",
   retrievedAt: "2026-09-21T00:00:00"
-}]), "収穫時の積算温度を保存できない");
+}], { rowsByField: { [harvestFieldId]: Array.from({ length: 46 }, (_, i) => ({
+  date: RiceOS.utils.dateAddDays("2026-08-06", i), tempMean: 1012.4 / 46, source: "Open-Meteo Archive"
+})) } }), "収穫時の積算温度を保存できない");
 const thermalSnapshot = state.data().fieldWorks.find((row) => row.workId === "work_harvest_snapshot").harvestSnapshots[0].thermal;
 assert(thermalSnapshot.status === "確定" && thermalSnapshot.total === 1012.4 && thermalSnapshot.difference === 12.4, "収穫時の積算温度が保持されない");
 assert(S.normalize(JSON.parse(JSON.stringify(state.data()))).fieldWorks.find((row) => row.workId === "work_harvest_snapshot").harvestSnapshots[0].thermal.total === 1012.4, "収穫スナップショットがJSON正規化で失われた");

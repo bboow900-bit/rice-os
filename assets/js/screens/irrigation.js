@@ -510,7 +510,8 @@
   }
 
   function recordAction(action) {
-    const date = U.$("waterDate").value || U.today();
+    const date = U.$("waterDate").value;
+    if (!date) { alert("実施日を入力してください。"); return; }
     const [key, mode] = String(action || "").split("-");
     const type = typeForKey(key);
     if (!type || !mode) return;
@@ -559,7 +560,8 @@
   }
 
   function recordMovement(action) {
-    const date = U.$("waterDate").value || U.today();
+    const date = U.$("waterDate").value;
+    if (!date) { alert("実施日を入力してください。"); return; }
     const [key, nextPhase] = String(action || "").split("-");
     const type = typeForKey(key);
     if (!supportsMovement(type) || !["flood", "drain", "wait"].includes(nextPhase)) return;
@@ -798,6 +800,7 @@
     });
     U.$("waterEditForm").addEventListener("submit", (event) => {
       event.preventDefault();
+      if (!U.$("waterEditStart").value) { alert("開始日を入力してください。"); return; }
       const manualEnd = Boolean(U.$("waterEditEnd").value) && (manualWaterEndEdited || event.submitter === U.$("waterManualEndConfirm"));
       const type = U.$("waterEditType").value;
       const id = U.$("waterEditId").value;

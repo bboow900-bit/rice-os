@@ -46,7 +46,11 @@ assert.equal(dry().actualEndDate, "");
 assert(harvest({ harvestStatusByField: { a: "complete", b: "partial" } }));
 assert(state.saveIrrigation({ ...irrigation("a"), memo: "edited memo" }));
 assert(irrigation("a").harvestAutoEnd);
-assert(state.saveIrrigation({ ...irrigation("a"), actualEndDate: "2026-09-08" }));
+const conflictingEndBefore = json([state.data(), [...memory]]);
+assert.equal(state.saveIrrigation({ ...irrigation("a"), actualEndDate: "2026-09-08" }), null);
+assert.equal(json([state.data(), [...memory]]), conflictingEndBefore);
+assert(state.saveIrrigation({ ...irrigation("a"), actualEndDate: "2026-09-08",
+  waterMovements: irrigation("a").waterMovements.map(row => ({ ...row, endDate: "2026-09-08" })) }));
 assert(!irrigation("a").harvestAutoEnd);
 assert(state.deleteFieldWork("h"));
 assert.equal(irrigation("a").actualEndDate, "2026-09-08");
@@ -88,7 +92,12 @@ reset(); assert(harvest());
 assert(state.saveIrrigation({ ...irrigation("a"), fieldId: "b" }));
 assert.equal(irrigation("a").actualEndDate, ""); assert(!irrigation("a").harvestAutoEnd);
 reset(); assert(harvest());
-assert(state.saveIrrigation({ ...irrigation("a"), startDate: "2026-09-20", date: "2026-09-20" }));
+const conflictingStartBefore = json([state.data(), [...memory]]);
+assert.equal(state.saveIrrigation({ ...irrigation("a"), startDate: "2026-09-20", date: "2026-09-20" }), null);
+assert.equal(json([state.data(), [...memory]]), conflictingStartBefore);
+reset({ irrigations: [{ irrigationId: "a", fieldId: "a", date: "2026-08-01", startDate: "2026-08-01", method: "間断灌水" }] });
+assert(harvest());
+assert(state.saveIrrigation({ ...irrigation("a"), startDate: "2026-09-20", date: "2026-09-20", actualEndDate: "", harvestEndOverride: true }));
 assert.equal(irrigation("a").actualEndDate, "");
 reset({ fieldWorks: [
   { workId: "legacy", workName: "間断灌水開始", date: "2026-08-01", fieldIds: ["a", "b"] },

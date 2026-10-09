@@ -65,8 +65,11 @@ const os = require("node:os");
       assert.equal((await schedule("qa-harvest-group")).status, "予定", "A mixed group must not finish the whole plan");
       await page.evaluate(({ workId, a, date }) => {
         const R = window.RiceOS;
-        R.state.saveHarvestThermalSnapshots(workId, [{ fieldId: a, headingDate: R.utils.dateAddDays(date, -40),
-          startDate: R.utils.dateAddDays(date, -39), endDate: date, total: 980, status: "保存済み", count: "40", expectedDays: "40" }]);
+        const legacy = JSON.parse(JSON.stringify(R.state.data()));
+        legacy.fieldWorks.find(row => row.workId === workId).harvestSnapshots.find(row => row.fieldId === a).thermal = {
+          headingDate: R.utils.dateAddDays(date, -40), startDate: R.utils.dateAddDays(date, -39),
+          endDate: date, total: 980, status: "保存済み", count: "40", expectedDays: "40" };
+        if (!R.state.replace(legacy)) throw Error("Legacy actual snapshot import failed");
       }, { workId: work.workId, a: fixture.a, date: fixture.date });
       const saved = await stored();
       await page.reload({ waitUntil: "networkidle" });

@@ -89,6 +89,7 @@
   }
 
   function round(value) {
+    if (value === null || value === undefined || typeof value === "string" && !value.trim()) return "";
     const n = Number(value);
     return Number.isFinite(n) ? Math.round(n * 10) / 10 : "";
   }
@@ -286,7 +287,7 @@
       .filter((item) => item.startDate && item.endDate);
     const results = await Promise.allSettled(targets.map((item) => fetchDailyRange(item.startDate, item.endDate, location)));
     const values = results.flatMap((result) => result.status === "fulfilled"
-      ? result.value.rows.map((row) => Number(row.tempMean)).filter(Number.isFinite)
+      ? result.value.rows.filter(row => row.source === "Open-Meteo Archive" && typeof row.tempMean === "number" && Number.isFinite(row.tempMean)).map(row => row.tempMean)
       : []);
     if (!values.length) throw new Error("同時期の平均気温を取得できませんでした。");
     const mean = Math.round(values.reduce((sum, value) => sum + value, 0) / values.length * 10) / 10;
@@ -299,6 +300,48 @@
       source: "Open-Meteo Historical Weather API",
       retrievedAt: U.now()
     };
+  }
+
+  function strictCalendarDate(value) {
+    if (typeof value !== "string" || !/^[1-9]\d{3}-\d{2}-\d{2}$/.test(value)) return false;
+    const time = Date.parse(`${value}T00:00:00Z`);
+    return Number.isFinite(time) && new Date(time).toISOString().slice(0, 10) === value;
+  }
+
+  async function fetchSamePeriodDailyAverage(startDate, endDate, location, years = 3) {
+    if (!strictCalendarDate(startDate) || !strictCalendarDate(endDate) || endDate < startDate
+      || (Date.parse(endDate) - Date.parse(startDate)) / 86400000 >= 120) throw new Error("季節参考の期間は実在する日付で120日以内を指定してください。");
+    if (!location || typeof location.latitude !== "number" || !Number.isFinite(location.latitude) || Math.abs(location.latitude) > 90
+      || typeof location.longitude !== "number" || !Number.isFinite(location.longitude) || Math.abs(location.longitude) > 180) throw new Error("気象取得地点を確認してください。");
+    const count = Math.max(1, Math.min(5, Math.trunc(Number(years) || 3)));
+    const dates = [];
+    for (let date = startDate; date <= endDate; date = addDays(date, 1)) dates.push(date);
+    const targets = Array.from({ length: count }, (_, index) => dates.map(date => {
+      const prior = `${Number(date.slice(0, 4)) - index - 1}-${date.slice(5)}`;
+      return { date, prior: strictCalendarDate(prior) && prior < U.today() ? prior : "" };
+    }));
+    const results = await Promise.allSettled(targets.map(async mappings => {
+      const valid = mappings.map(row => row.prior).filter(Boolean).sort();
+      return valid.length ? fetchDailyRange(valid[0], valid.at(-1), location) : { rows: [] };
+    }));
+    const source = "Open-Meteo prior-year daily seasonal reference (reanalysis/model)";
+    const retrievedAt = U.now();
+    const rows = dates.map(date => {
+      const basedOn = [];
+      const values = targets.flatMap((mappings, index) => {
+        if (results[index].status !== "fulfilled") return [];
+        const prior = mappings.find(row => row.date === date).prior;
+        const matches = results[index].value.rows.filter(row => row.date === prior && strictCalendarDate(row.date)
+          && row.source === "Open-Meteo Archive" && typeof row.tempMean === "number" && Number.isFinite(row.tempMean));
+        if (!prior || matches.length !== 1) return [];
+        const row = matches[0];
+        basedOn.push({ date: row.date, tempMean: row.tempMean, source: row.source, model: row.model || "", timezone: row.timezone || "" });
+        return [row.tempMean];
+      });
+      return { date, tempMean: values.length ? Math.round(values.reduce((sum, value) => sum + value, 0) / values.length * 10) / 10 : "",
+        basis: "seasonal", source, count: values.length, expectedYears: count, basedOn };
+    });
+    return { startDate, endDate, rows, years: count, retrievedAt, source };
   }
 
   function formatSummary(weather) {
@@ -400,6 +443,7 @@
     locationText,
     fetchDailyRange,
     fetchSamePeriodAverage,
+    fetchSamePeriodDailyAverage,
     repairStoredWeatherLabels
   };
 })();

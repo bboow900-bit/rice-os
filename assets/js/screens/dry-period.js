@@ -330,8 +330,10 @@
   function bind() {
     U.$("dryForm").addEventListener("submit", (event) => {
       event.preventDefault();
+      if (!U.$("dryDate").value) { alert("実施日を入力してください。"); return; }
       if (U.$("dryStatus").value === "完了" && !U.$("dryActualEndDate").value) {
-        U.$("dryActualEndDate").value = U.$("dryDate").value || U.today();
+        if (U.$("editDryId").value) { alert("実績終了日を入力してください。"); return; }
+        U.$("dryActualEndDate").value = U.$("dryDate").value;
       }
       const common = {
         dryPeriodId: U.$("editDryId").value,
@@ -398,7 +400,7 @@
 
     ["dryField", "dryDate", "dryActualEndDate", "dryStatus", "dryCrackCm", "drySinkCm", "drySurface", "dryGas"].forEach((id) => U.$(id).addEventListener("change", () => {
       if (id === "dryActualEndDate" && U.$("dryActualEndDate").value) U.$("dryStatus").value = "完了";
-      if (id === "dryStatus" && U.$("dryStatus").value === "完了" && !U.$("dryActualEndDate").value) U.$("dryActualEndDate").value = U.$("dryDate").value || U.today();
+      if (id === "dryStatus" && !U.$("editDryId").value && U.$("dryStatus").value === "完了" && !U.$("dryActualEndDate").value) U.$("dryActualEndDate").value = U.$("dryDate").value;
       renderTargetCompare();
       if (id === "dryField" || id === "dryDate") hydrateDryWeather();
     }));

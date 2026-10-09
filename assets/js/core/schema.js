@@ -5,7 +5,7 @@
   const U = RiceOS.utils;
 
   const SCHEMA_VERSION = 17;
-  const APP_VERSION = "20261005_ver289";
+  const APP_VERSION = "20261009_ver290";
   const STORE_KEY = "rice_os_v8_stable";
   const BACKUP_KEY = "rice_os_v8_stable_backup";
   const RELEASE_BACKUPS_KEY = "rice_os_v8_stable_release_backups";
@@ -458,6 +458,79 @@
     return normalized;
   }
 
+  function normalizeHarvestTimingThermal(input) {
+    if (!input || typeof input !== "object" || Array.isArray(input)) return null;
+    const text = key => typeof input[key] === "string" ? input[key] : "";
+    const statuses = ["complete", "missing", "future", "no-heading", "no-location", "fetch-failed", "invalid-range"];
+    const seen = new Set();
+    const endpoints = ensureArray(input.endpoints).filter(row => row && typeof row.date === "string" && !seen.has(row.date) && seen.add(row.date)).map(row => {
+      const count = Number.isInteger(row.count) && row.count >= 0 ? row.count : 0;
+      const expectedDays = Number.isInteger(row.expectedDays) && row.expectedDays >= 0 ? row.expectedDays : 0;
+      let status = statuses.includes(row.status) ? row.status : "missing";
+      let total = ["complete", "missing"].includes(status) && count > 0 && typeof row.total === "number" && Number.isFinite(row.total) ? row.total : "";
+      const day = value => {
+        if (typeof value !== "string" || !/^[1-9]\d{3}-\d{2}-\d{2}$/.test(value)) return NaN;
+        const time = Date.parse(`${value}T00:00:00Z`);
+        return Number.isFinite(time) && new Date(time).toISOString().slice(0, 10) === value ? time : NaN;
+      };
+      const rangeDays = (day(row.date) - day(input.startDate)) / 86400000 + 1;
+      if (status === "complete" && (!Number.isInteger(rangeDays) || rangeDays <= 0)) { status = "invalid-range"; total = ""; }
+      else if (status === "complete" && rangeDays !== expectedDays) status = "missing";
+      if (status === "complete" && (count !== expectedDays || count === 0 || total === "")) status = "missing";
+      return { date: row.date, total, count, expectedDays, status, source: typeof row.source === "string" ? row.source : "" };
+    });
+    return { headingDate: text("headingDate"), startDate: text("startDate"), asOf: text("asOf"), source: text("source"),
+      locationLabel: text("locationLabel"), retrievedAt: text("retrievedAt"), endpoints,
+      ...(typeof input.locationToken === "string" ? { locationToken: input.locationToken } : {}) };
+  }
+
+  function normalizeHarvestTiming(input, strict = false, workDate = "") {
+    if ((!input || typeof input !== "object" || Array.isArray(input)) && strict) throw new Error("収穫時期評価の形式を確認してください。");
+    const row = input && typeof input === "object" && !Array.isArray(input) ? input : {};
+    const result = {};
+    const choices = {
+      assessment: ["", "early", "appropriate", "late", "pending"],
+      yellowing: ["", "green", "mixed", "mostlyYellow", "unknown"],
+      delayReason: ["", "rain", "surface", "machine", "schedule", "other"]
+    };
+    Object.entries(choices).forEach(([key, values]) => {
+      const value = row[key] === undefined ? "" : row[key];
+      if (strict && !values.includes(value)) throw new Error("収穫時期評価の選択値を確認してください。");
+      result[key] = values.includes(value) ? value : "";
+    });
+    const validDate = value => {
+      if (typeof value !== "string" || !/^[1-9]\d{3}-\d{2}-\d{2}$/.test(value)) return false;
+      const date = new Date(`${value}T00:00:00Z`);
+      return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value;
+    };
+    for (const key of ["idealStartDate", "idealEndDate", "moistureDate", "memo"]) {
+      const value = row[key] === undefined ? "" : row[key];
+      if (strict && (typeof value !== "string" || key !== "memo" && value && !validDate(value))) throw new Error("収穫時期評価の日付・メモを確認してください。");
+      result[key] = typeof value === "string" ? value : "";
+    }
+    const raw = row.moisturePct === undefined ? "" : row.moisturePct;
+    const moisture = typeof raw === "string" || typeof raw === "number" ? String(raw).trim() : null;
+    if (strict && (moisture === null || moisture !== "" && (!Number.isFinite(Number(moisture)) || Number(moisture) < 0 || Number(moisture) > 100))) throw new Error("籾水分は0から100の数値で入力してください。");
+    result.moisturePct = moisture === null ? "" : moisture;
+    if (strict) {
+      const start = result.idealStartDate;
+      const end = result.idealEndDate;
+      if (!validDate(workDate) || start && end && start > end) throw new Error("収穫日と理想の収穫期間を確認してください。");
+      const endpoints = [start, end].filter(Boolean);
+      if (result.assessment === "early" && endpoints.some((value) => value <= workDate)
+        || result.assessment === "late" && endpoints.some((value) => value >= workDate)
+        || result.assessment === "appropriate" && (start && start > workDate || end && end < workDate)) throw new Error("収穫時期の評価と理想の期間が一致しません。");
+    }
+    if (typeof row.evaluatedAt === "string") result.evaluatedAt = row.evaluatedAt;
+    for (const key of ["varietyId", "varietyName", "season"]) {
+      if (row[key] !== undefined) result[key] = String(row[key] ?? "");
+    }
+    if (typeof row.varietySource === "string") result.varietySource = row.varietySource;
+    const thermal = normalizeHarvestTimingThermal(row.thermal);
+    if (thermal) result.thermal = thermal;
+    return result;
+  }
+
   function normalizeFieldWork(input) {
     const w = input || {};
     const offField = w.targetScope === "offField";
@@ -495,6 +568,8 @@
           errorDays: Number.isFinite(errorDays) ? errorDays : ""
         },
         thermal: {
+          ...(thermal.coverageVersion === 1 ? { coverageVersion: 1 } : {}),
+          ...(typeof thermal.locationToken === "string" ? { locationToken: thermal.locationToken } : {}),
           status: String(thermal.status || "未保存"),
           headingDate: String(thermal.headingDate || ""),
           startDate: String(thermal.startDate || ""),
@@ -555,6 +630,10 @@
       ...(!offField && w.harvestStatusByField && typeof w.harvestStatusByField === "object" && !Array.isArray(w.harvestStatusByField)
         ? { harvestStatusByField: Object.fromEntries(Object.entries(w.harvestStatusByField).map(([id, value]) => [id, ["partial", "complete"].includes(value) ? value : ""])) } : {}),
       ...(!offField && w.harvestWaterClosures ? { harvestWaterClosures: normalizeHarvestWaterClosures(w.harvestWaterClosures) } : {}),
+      ...(!offField && /稲刈り|収穫/.test(String(w.workName || w.name || "")) && !/予定|確認|落水/.test(String(w.workName || w.name || ""))
+        && w.harvestTimingByField && typeof w.harvestTimingByField === "object" && !Array.isArray(w.harvestTimingByField)
+        ? { harvestTimingByField: Object.fromEntries(Object.entries(w.harvestTimingByField)
+          .filter(([id]) => ensureArray(w.fieldIds).includes(id)).map(([id, value]) => [id, normalizeHarvestTiming(value)])) } : {}),
       ...(w.harvestReview !== undefined ? { harvestReview: normalizeHarvestReview(w.harvestReview) } : {}),
       weather: String(w.weather || ""),
       weatherAuto: w.weatherAuto && typeof w.weatherAuto === "object" ? w.weatherAuto : null,
@@ -942,7 +1021,9 @@
       category: MACHINE_CATEGORIES.includes(String(row.category || row.type)) ? String(row.category || row.type) : "その他",
       maker: String(row.maker || row.manufacturer || ""),
       model: String(row.model || row.modelNumber || ""),
-      meterHours: String(row.meterHours || row.hourMeter || ""),
+      meterHours: String(row.meterHours ?? row.hourMeter ?? ""),
+      ...(row.meterBaseline !== undefined ? { meterBaseline: String(row.meterBaseline ?? "") } : {}),
+      ...(["manual", "maintenance"].includes(row.meterOrigin) ? { meterOrigin: row.meterOrigin } : {}),
       purchasedAt: String(row.purchasedAt || ""),
       status: ["使用中", "使用停止"].includes(String(row.status)) ? String(row.status) : (row.retiredAt ? "使用停止" : "使用中"),
       retiredAt: String(row.retiredAt || ""),
@@ -963,7 +1044,7 @@
       date,
       kind: String(row.kind || "点検"),
       item: String(row.item || row.title || "整備記録"),
-      meterHours: String(row.meterHours || ""),
+      meterHours: String(row.meterHours ?? ""),
       parts: String(row.parts || ""),
       cost: String(row.cost || ""),
       vendor: String(row.vendor || ""),
@@ -1272,6 +1353,8 @@
     normalize,
     normalizeMachine,
     normalizeHarvestReview,
+    normalizeHarvestTiming,
+    normalizeHarvestTimingThermal,
     normalizeHarvestWeather,
     normalizeMaintenanceRecord,
     normalizeShipment,

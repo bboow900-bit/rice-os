@@ -116,7 +116,10 @@ assert.match(code, /fwHarvestCompletion/); assert.match(code, /fwHarvestStatusFi
 const annualCode = fs.readFileSync(path.resolve(__dirname, "../assets/js/screens/annual.js"), "utf8");
 vm.runInContext(annualCode.replace("RiceOS.screens.annual = {", "RiceOS.harvestSummaryTest = { renderEndSeasonReflection, fieldYearRows }; RiceOS.screens.annual = {"), context);
 reset(); assert(save({ harvestStatusByField: { a: "complete", b: "partial" } }));
-assert(state.saveHarvestThermalSnapshots("h", [{ fieldId: "a", headingDate: "2026-08-01", startDate: "2026-08-02", endDate: date, total: 980, count: "40", expectedDays: "40", status: "saved" }]));
+assert(state.updateWeatherLocation({ latitude: 37, longitude: 140 }));
+assert(state.saveGrowthLog({ fieldId: "a", date: "2026-08-01", headingObserved: true }));
+assert(state.saveHarvestThermalSnapshots("h", [{ fieldId: "a", headingDate: "2026-08-01", startDate: "2026-08-02", endDate: date, total: 980, count: "40", expectedDays: "40", status: "saved" }],
+  { rowsByField: { a: Array.from({ length: 40 }, (_, i) => ({ date: context.RiceOS.utils.dateAddDays("2026-08-02", i), tempMean: 24.5, source: "Open-Meteo Archive" })) } }));
 const savedBefore = JSON.stringify(state.data());
 const renderSummary = context.RiceOS.harvestSummaryTest.renderEndSeasonReflection;
 const summary = renderSummary(state.field("a"), { year: 2026, harvest: date, harvestStatus: status("a") });

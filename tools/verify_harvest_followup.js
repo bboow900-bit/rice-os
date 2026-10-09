@@ -22,7 +22,9 @@ function reset() {
     growthLogs: [{ logId: "g", fieldId: "a", date: "2026-09-01", headingObserved: true }],
     fieldWorks: [{ workId: "h", date: "2026-09-10", workName: "\u7a32\u5208\u308a", fieldIds: ["a","b"],
       harvestStatusByField: { a: "complete", b: "complete" }, harvestSnapshots: [
-        { fieldId: "a", harvestDate: "2026-09-10", savedAt: "old", thermal: { total: 10, count: "1", expectedDays: "9", status: "\u4e00\u90e8\u6b20\u6e2c" } },
+        { fieldId: "a", harvestDate: "2026-09-10", savedAt: "old", thermal: { total: 10, count: "1", expectedDays: "9", status: "\u4e00\u90e8\u6b20\u6e2c",
+          headingDate: "2026-09-01", startDate: "2026-09-02", endDate: "2026-09-10", source: "Open-Meteo Archive", retrievedAt: "2026-09-10T00:00:00Z",
+          coverageVersion: 1, locationToken: JSON.stringify({ latitude: 35, longitude: 139 }) } },
         { fieldId: "b", harvestDate: "2026-09-10", savedAt: "keep", thermal: { total: 999, status: "\u78ba\u5b9a" } }] }] })));
 }
 async function main() {
@@ -45,17 +47,22 @@ async function main() {
   reset();
   const sibling = JSON.stringify(work().harvestSnapshots[1]);
   let calls = 0;
+  const dailyRows = (start, end) => Array.from({ length: Number(U.daysBetween(start, end)) + 1 }, (_, i) => {
+    const date = U.dateAddDays(start, i);
+    return { date, tempMean: 20, source: date < today ? "Open-Meteo Archive" : "Open-Meteo Forecast" };
+  });
   context.RiceOS.weather = { fetchDailyRange: async (start,end) => {
-    calls++; return { total: 200, count: Number(U.daysBetween(start,end))+1, rows: [] };
+    calls++; return { total: 200, count: Number(U.daysBetween(start,end))+1, rows: dailyRows(start, end), retrievedAt: "2026-09-11T00:00:00Z" };
   } };
   assert.equal((await state.retryHarvestThermal("h","a")).status,"saved");
   assert.equal(JSON.stringify(work().harvestSnapshots[1]),sibling);
-  assert.equal((await state.retryHarvestThermal("h","a")).status,"unchanged");
-  assert.equal(calls,1);
+  const partialBefore = unchanged();
+  assert.equal((await state.retryHarvestThermal("h","a")).status,"not_saved");
+  assert.equal(unchanged(), partialBefore); assert.equal(calls,2);
   today = "2026-09-11";
   assert.equal((await state.retryHarvestThermal("h","a")).status,"saved");
   assert.equal(work().harvestSnapshots[0].thermal.status,"\u78ba\u5b9a");
-  assert.equal(calls,2);
+  assert.equal(calls,3);
   assert.equal((await state.retryHarvestThermal("h","a")).status,"unchanged");
   for (const scenario of ["failure","cancel","edit","heading","delete","partial"]) {
     reset(); let resolve;
@@ -67,7 +74,8 @@ async function main() {
     if (scenario === "heading") assert(state.saveGrowthLog({ logId: "g", fieldId: "a", date: "2026-09-02", headingObserved: true }));
     if (scenario === "delete") assert(state.deleteFieldWork("h"));
     const expected = unchanged();
-    if (resolve) resolve({ total: 300, count: scenario === "partial" ? 1 : 9, rows: [] });
+    if (resolve) resolve({ total: 300, count: scenario === "partial" ? 1 : 9,
+      rows: scenario === "partial" ? dailyRows("2026-09-02", "2026-09-02") : dailyRows("2026-09-02", "2026-09-10") });
     assert.notEqual((await pending).status,"saved");
     assert.equal(unchanged(),expected,scenario);
   }
