@@ -130,6 +130,7 @@
         <b>${U.escapeHTML(entry.title)}</b>
         ${entryStatusLabel(entry) ? `<em class="mini-status ${U.attr(entry.tone || entry.kind)}">${U.escapeHTML(entryStatusLabel(entry))}</em>` : ""}
         <span>${U.escapeHTML(entry.subtitle || "")}</span>
+        ${entry.record && entry.record.cropYear && ["work", "other", "schedule", "schedule-completed"].includes(entry.kind) ? `<small>対象年度（年産）: ${U.escapeHTML(entry.record.cropYear)}</small>` : ""}
         ${entry.memo ? `<small>${U.escapeHTML(entry.memo)}</small>` : ""}
         ${entry.hasPhoto ? '<span class="pill info">写真あり</span>' : ""}
         ${entry.kind === "shipment" && entry.record?.shipmentId ? `<button class="secondary" type="button" data-calendar-open-shipment="${U.attr(entry.record.shipmentId)}">出荷の詳細を見る</button>` : ""}

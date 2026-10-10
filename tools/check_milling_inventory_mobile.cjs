@@ -1,0 +1,112 @@
+"use strict";
+const assert = require("node:assert/strict"),path = require("node:path"),os = require("node:os");
+const { chromium } = require(process.env.PLAYWRIGHT_MODULE || "C:/Users/Keisuke/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright");
+(async () => {
+ const browser = await chromium.launch({ headless: true,executablePath: "C:/Program Files/Google/Chrome/Application/chrome.exe" });
+ try { for (const width of [360,390]) {
+  const context = await browser.newContext({ viewport: { width,height: 844 },isMobile: true,hasTouch: true,serviceWorkers: "block" });
+  try {
+   const page = await context.newPage(),errors = []; let accept = false;
+   page.on("pageerror",e => errors.push(e.message)); page.on("dialog",d => accept ? d.accept() : d.dismiss());
+   await page.route("https://**/*",r => r.abort()); await page.goto("http://127.0.0.1:4182/index.html",{ waitUntil: "networkidle" });
+   const f = await page.evaluate(() => {
+    const R = RiceOS,a = R.state.addField("QA milling A"),b = R.state.addField("QA milling B"),v = R.state.varieties()[0].varietyId;
+    const d = R.utils.clone(R.state.data()); for (const id of [a,b]) d.fields.find(r => r.fieldId === id).varietyId = v;
+    d.varietyResults.push({ resultId: "qa-old-yield",season: 2026,varietyId: v,yield: "6000" });
+    if (!R.state.replace(d,"QA isolated milling fixture")) throw Error("Seed failed");
+    if (!R.state.saveMillingRecord || !R.state.saveShipmentIssue) throw Error("Inventory core not ready");
+    return { a,b,v,year: "2026",date: "2026-10-01" };
+   });
+   const raw = () => page.evaluate(() => localStorage.getItem(RiceOS.schema.STORE_KEY));
+   const protectedRows = await page.evaluate(() => JSON.stringify({ results: RiceOS.state.data().varietyResults,works: RiceOS.state.data().fieldWorks,growth: RiceOS.state.data().growthLogs,dry: RiceOS.state.data().dryPeriods,water: RiceOS.state.data().irrigations }));
+   const stock = () => page.evaluate(f => RiceOS.state.riceStockFor(Number(f.year),f.v),f);
+   const rows = () => page.evaluate(() => RiceOS.state.millingRecordsFor({}));
+   const fail = on => page.evaluate(on => {
+    if (on) { window.qaMillingSetItem = Storage.prototype.setItem; Storage.prototype.setItem = function(key,value) { if (key === RiceOS.schema.STORE_KEY) throw Error("QA storage failure"); return window.qaMillingSetItem.call(this,key,value); }; }
+    else { Storage.prototype.setItem = window.qaMillingSetItem; delete window.qaMillingSetItem; }
+   },on);
+   const shot = async label => { assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth),false); const file = path.join(os.tmpdir(),`rice-milling-${label}-${width}.png`); await page.screenshot({ path: file }); console.log(file); };
+   const openResults = async () => {
+    await page.locator('.nav-item[data-screen="home"]:visible').click(); await page.locator("[data-home-quick-record]").click(); await page.locator('[data-sheet-add="result"]').click(); await page.locator("#screen-results.active").waitFor();
+   };
+   const form = async memo => {
+    await page.locator("[data-milling-new]").click(); await page.locator("#millingDate").fill(f.date); await page.locator("#millingSeason").fill(f.year); await page.locator("#millingVariety").selectOption(f.v); await page.locator("#millingMemo").fill(memo);
+   };
+   const save = () => page.locator('#millingForm button[type="submit"]').click();
+   await openResults(); assert.equal(await page.locator("#shipmentIssuesSection").evaluate(el => el.open),false);
+   await form("QA milling single"); await page.locator(`[data-milling-field="${f.a}"]`).check();
+   await page.locator('[data-milling-add-package="30"]').click(); await page.locator("[data-milling-bags]").nth(0).fill("3");
+   await page.locator('[data-milling-add-package="10"]').click(); await page.locator("[data-milling-bags]").nth(1).fill("2"); await page.locator("#millingLooseKg").fill("5");
+   assert.match(await page.locator("#millingTotal").innerText(),/115kg/); await page.locator("#millingForm").scrollIntoViewIfNeeded(); await shot("single-form"); await save();
+   const single = (await rows()).find(r => r.memo === "QA milling single"); assert.ok(single); assert.deepEqual(single.fieldIds,[f.a]); assert.equal((await stock()).receivedKg,115);
+   await form("QA milling multi"); for (const id of [f.a,f.b]) await page.locator(`[data-milling-field="${id}"]`).check();
+   assert.match(await page.locator("#millingScope").innerText(),/合算/); await page.locator('[data-milling-add-package="60"]').click(); await page.locator("[data-milling-bags]").fill("2"); await save();
+   const multi = (await rows()).find(r => r.memo === "QA milling multi"); assert.equal(multi.fieldIds.length,2);
+   await form("QA milling aggregate"); await page.locator("#millingLooseKg").fill("15"); await save();
+   assert.equal((await rows()).find(r => r.memo === "QA milling aggregate").fieldIds.length,0); assert.equal((await stock()).receivedKg,250,"Legacy result yield must not double count");
+   const edit = id => page.locator(`[data-milling-id="${id}"] [data-milling-action="edit"]`).click();
+   const del = id => page.locator(`[data-milling-id="${id}"] [data-milling-action="delete"]`).click();
+   await edit(single.millingId); await page.locator("[data-milling-bags]").nth(0).fill("4"); await save(); assert.equal((await stock()).receivedKg,280); assert.equal((await rows()).length,3);
+   await edit(single.millingId); await page.locator("#millingMemo").fill("Cancelled draft"); const beforeCancel = await raw(); await page.locator("[data-milling-cancel]").click(); assert.equal(await raw(),beforeCancel);
+   await edit(single.millingId); await page.locator("#millingMemo").fill("Retained failed draft"); const beforeFail = await raw(); await fail(true); await save();
+   assert.equal(await raw(),beforeFail); assert.equal(await page.locator("#millingMemo").inputValue(),"Retained failed draft"); assert.equal(await page.locator("#editMillingId").inputValue(),single.millingId);
+   accept = true; await del(multi.millingId); accept = false; assert.equal(await raw(),beforeFail); assert.equal(await page.locator("#millingMemo").inputValue(),"Retained failed draft");
+   await fail(false); await save();
+   await edit(single.millingId); await page.locator("#millingMemo").fill("Unrelated deletion draft"); const beforeDeleteCancel = await raw(); await del(multi.millingId); assert.equal(await raw(),beforeDeleteCancel);
+   accept = true; await del(multi.millingId); accept = false; assert.equal((await stock()).receivedKg,160); assert.equal(await page.locator("#millingMemo").inputValue(),"Unrelated deletion draft");
+   await page.locator("[data-milling-cancel]").click(); await page.locator("#millingSeason").fill(f.year); await page.locator("#millingVariety").selectOption(f.v);
+   await page.locator("#millingStock").scrollIntoViewIfNeeded(); await shot("stock");
+   await page.evaluate(f => { RiceOS.app.openInput("shipments","results"); RiceOS.screens.shipments.openNew(f.date); },f);
+   await page.locator("#shipmentSeason").fill(f.year); await page.locator("#shipmentVariety").selectOption(f.v); await page.locator("#shipmentRecipient").fill("QA inventory buyer"); await page.locator("[data-shipment-bags]").fill("1"); await page.locator('#shipmentForm button[type="submit"]').click();
+   assert.equal((await stock()).dispatchedKg,30); assert.equal((await stock()).remainingKg,130);
+   await page.locator("[data-shipment-edit]").click(); await page.locator("[data-shipment-bags]").fill("2"); await page.locator('#shipmentForm button[type="submit"]').click(); assert.equal((await stock()).remainingKg,100);
+   const shipCancel = await raw(); await page.locator("[data-shipment-delete]").click(); assert.equal(await raw(),shipCancel);
+   accept = true; await page.locator("[data-shipment-delete]").click(); accept = false; assert.equal((await stock()).remainingKg,160);
+   const exclusions = await page.evaluate(f => {
+    const S = RiceOS.state,common = { date: f.date,season: Number(f.year),kind: "shipment",packages: [{ kg: 30,bags: 1 }] };
+    const ids = [S.saveShipment({ ...common,varietyId: f.v,recipient: "QA white excluded",riceType: "white" }),S.saveShipment({ ...common,varietyId: "",recipient: "QA unclassified",riceType: "brown" }),S.saveShipment({ ...common,varietyId: f.v,recipient: "QA negative stock",riceType: "brown",packages: [{ kg: 30,bags: 10 }] })];
+    if (ids.some(r => !r)) throw Error("Stock exclusion fixtures failed");
+    return S.shipments().filter(r => /^QA (white excluded|unclassified|negative stock)$/.test(r.recipient)).map(r => r.shipmentId);
+   },f);
+   await openResults(); await page.locator("#millingSeason").fill(f.year); await page.locator("#millingVariety").selectOption(f.v);
+   assert.equal((await stock()).remainingKg,-140); assert.match(await page.locator("#millingStock").innerText(),/マイナス/); assert.match(await page.locator("#millingStock").innerText(),/白米出荷 1件/); assert.match(await page.locator("#millingStock").innerText(),/品種未分類 1件/);
+   await page.locator("#millingStock").scrollIntoViewIfNeeded(); await shot("stock-negative");
+   await page.evaluate(ids => ids.forEach(id => RiceOS.state.deleteShipment(id)),exclusions); assert.equal((await stock()).remainingKg,160);
+   await form("QA disposable milling"); await page.locator("#millingLooseKg").fill("7"); await save();
+   const disposable = (await rows()).find(r => r.memo === "QA disposable milling"); await edit(disposable.millingId); accept = true; await del(disposable.millingId); accept = false;
+   assert.equal(await page.locator("#editMillingId").inputValue(),""); assert.equal((await stock()).receivedKg,160);
+   await form("QA vanished milling"); await page.locator("#millingLooseKg").fill("7"); await save(); const vanished = (await rows()).find(r => r.memo === "QA vanished milling"); await edit(vanished.millingId);
+   await page.evaluate(id => RiceOS.state.deleteMillingRecord(id),vanished.millingId); const beforeVanished = await raw(); await save();
+   assert.equal(await raw(),beforeVanished); assert.match(await page.locator("#millingError").innerText(),/削除/); assert.equal((await rows()).some(r => r.millingId === vanished.millingId),false);
+   await openResults(); await page.locator("#shipmentIssuesSection > summary").click();
+   await page.locator("#shipmentIssueDate").fill(f.date); await page.locator("#shipmentIssueSeason").fill(f.year); await page.locator("#shipmentIssueVariety").selectOption(f.v); await page.locator("#shipmentIssueReason").fill("籾混入"); await page.locator("#shipmentIssueAction").fill("全量検査"); await page.locator("#shipmentIssueCost").fill("100000");
+   const beforeIssueStock = await stock(); await page.locator('#shipmentIssueForm button[type="submit"]').click();
+   const issue = await page.evaluate(() => RiceOS.state.shipmentIssuesFor({}).find(r => r.reason === "籾混入")); assert.ok(issue);
+   assert.equal((await stock()).remainingKg,beforeIssueStock.remainingKg); assert.match(await page.locator("#shipmentIssueCosts").innerText(),/100,000円/);
+   const issueEdit = () => page.locator(`[data-shipment-issue-id="${issue.issueId}"] [data-shipment-issue-action="edit"]`).click();
+   const issueDel = () => page.locator(`[data-shipment-issue-id="${issue.issueId}"] [data-shipment-issue-action="delete"]`).click();
+   await issueEdit(); await page.locator("#shipmentIssueCost").fill("90000"); const beforeIssueCancel = await raw(); await page.locator("[data-shipment-issue-cancel]").click(); assert.equal(await raw(),beforeIssueCancel);
+   await issueEdit(); await page.locator("#shipmentIssueCost").fill("90000"); const beforeIssueFail = await raw(); await fail(true); await page.locator('#shipmentIssueForm button[type="submit"]').click();
+   assert.equal(await raw(),beforeIssueFail); assert.equal(await page.locator("#shipmentIssueCost").inputValue(),"90000"); assert.equal(await page.locator("#editShipmentIssueId").inputValue(),issue.issueId);
+   accept = true; await issueDel(); accept = false; assert.equal(await raw(),beforeIssueFail); await fail(false);
+   await page.locator('#shipmentIssueForm button[type="submit"]').click(); assert.match(await page.locator("#shipmentIssueCosts").innerText(),/90,000円/);
+   await page.locator("#shipmentIssueForm").scrollIntoViewIfNeeded(); await shot("issue");
+   const beforeIssueDelete = await raw(); await issueDel(); assert.equal(await raw(),beforeIssueDelete); accept = true; await issueDel(); accept = false;
+   assert.equal(await page.evaluate(() => RiceOS.state.shipmentIssuesFor({}).length),0); assert.equal((await stock()).remainingKg,160);
+   await page.locator('.nav-item[data-screen="annual"]:visible').click(); await page.locator("#annualYear").selectOption(f.year); await page.locator(`[data-annual-open-field="${f.a}"]`).click();
+   await page.locator(`[data-annual-record-open-kind="milling"][data-annual-record-open-id="${single.millingId}"]`).click(); await page.locator(".annual-record-detail").waitFor(); assert.match(await page.locator(".annual-record-detail").innerText(),/145kg/);
+   await page.locator("[data-annual-record-detail-back]").click();
+   assert.equal(await page.locator(`[data-annual-record-open-id="${single.millingId}"]`).count(),1);
+   await page.locator(`[data-annual-flow-menu-kind="milling"][data-annual-flow-menu-id="${single.millingId}"]`).click();
+   await page.locator('[data-annual-record-action="edit"]').click(); await page.locator("#screen-results.active").waitFor();
+   assert.equal(await page.locator("#editMillingId").inputValue(),single.millingId);
+   await page.locator("#millingMemo").fill("Annual edit cancel draft"); const annualCancelRaw = await raw();
+   await page.locator("[data-milling-cancel]").click(); await page.locator("#appBackButton").click();
+   await page.locator(`[data-annual-record-open-id="${single.millingId}"]`).waitFor();
+   assert.equal(await page.locator("#annualYear").inputValue(),f.year); assert.equal(await raw(),annualCancelRaw);
+   assert.equal(await page.evaluate(() => JSON.stringify({ results: RiceOS.state.data().varietyResults,works: RiceOS.state.data().fieldWorks,growth: RiceOS.state.data().growthLogs,dry: RiceOS.state.data().dryPeriods,water: RiceOS.state.data().irrigations })),protectedRows);
+   const beforeReload = await raw(); await page.reload({ waitUntil: "networkidle" }); assert.equal(await raw(),beforeReload); assert.equal((await stock()).receivedKg,160); assert.deepEqual(errors,[]);
+   console.log(`PASS milling inventory ${width}`);
+  } finally { await context.close(); }
+ }} finally { await browser.close(); }
+})().catch(e => { console.error(e); process.exitCode = 1; });

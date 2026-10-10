@@ -164,9 +164,19 @@
         ${salesRows.length ? `<div class="shipment-year-sales">${salesHtml(sales)}</div><dl class="shipment-recipient-sales">${recipientNames.map((name) => `<div><dt>${U.escapeHTML(name)}</dt><dd>${salesHtml(salesTotal(salesRows.filter((row) => (row.recipient || "相手先未設定") === name)))}</dd></div>`).join("")}</dl>` : ""}</div>`;
     }).join("")}</section>`;
   }
+  function renderRiceStock() {
+    if (!state.millingRecordsFor || !state.riceStockFor) return "";
+    const harvests = state.millingRecordsFor(filters.season === "all" ? {} : { season: filters.season });
+    const groups = new Map(harvests.map(row => [`${row.season}|${row.varietyId}`, { season: row.season, varietyId: row.varietyId }]));
+    return `<section class="shipment-year-totals" aria-label="玄米の残量"><div class="shipment-list-head"><h3>玄米の残量</h3><button type="button" class="secondary" data-shipment-harvests>収量・対応費</button></div><p class="shipment-total-scope">年産・品種別 / 全相手先・全出荷区分</p>${[...groups.values()].sort((a, b) => Number(b.season) - Number(a.season)).map(group => {
+      const stock = state.riceStockFor(group.season, group.varietyId);
+      return `<div class="shipment-year-total" data-rice-stock="${U.attr(`${group.season}|${group.varietyId}`)}"><div class="shipment-total-head"><b>${U.escapeHTML(group.season)}年産 / ${U.escapeHTML(varietyName(group.varietyId))}</b></div><div class="shipment-size-totals"><span>籾摺り後 <b>${numberText(stock.receivedKg)}kg</b></span><span>出荷・配布 <b>${numberText(stock.dispatchedKg)}kg</b></span><span>残量 <b>${numberText(stock.remainingKg)}kg</b></span></div><p>${numberText(stock.remainingKg / 60)}俵 / 30kg袋換算 ${numberText(stock.remainingKg / 30)}袋</p>${stock.remainingKg < 0 ? '<p class="shipment-error">出荷数量が収量を超えています。収量・品種・年産の記録を確認できます。</p>' : ""}${stock.whiteShipmentCount ? `<p class="shipment-legacy-info">白米出荷 ${stock.whiteShipmentCount}件は玄米残量に未反映</p>` : ""}${stock.unquantifiedCount || stock.unclassifiedCount ? `<p class="shipment-legacy-info">数量不足 ${stock.unquantifiedCount || 0}件 / 品種未設定 ${stock.unclassifiedCount || 0}件は未反映</p>` : ""}${stock.issueCount ? `<p>出荷の対応費（記録分） ${yen(stock.issueCostYen)} / ${stock.issueCount}件${stock.issueUnpricedCount ? ` / 費用未入力 ${stock.issueUnpricedCount}件` : ""}</p>` : ""}</div>`;
+    }).join("") || '<p class="empty">籾摺り後の収量はまだ登録されていません。</p>'}</section>`;
+  }
+
   function renderLedger() {
     const visible = filteredRows();
-    const seasons = Array.from(new Set([U.today().slice(0, 4), filters.season === "all" ? "" : filters.season, ...rows().map((row) => String(row.season))]))
+    const seasons = Array.from(new Set([U.today().slice(0, 4), filters.season === "all" ? "" : filters.season, ...rows().map((row) => String(row.season)), ...(state.millingRecordsFor ? state.millingRecordsFor().map(row => String(row.season)) : [])]))
       .filter(Boolean).sort((a, b) => Number(b) - Number(a));
     return `<div class="shipment-ledger">
       <div class="shipment-list-head"><h3>出荷台帳</h3><button type="button" class="primary" data-shipment-new>＋ 記録を追加</button></div>
@@ -176,6 +186,7 @@
         <label>区分<select id="shipmentFilterKind" data-shipment-filter="kind">${option("all", "すべて", filters.kind)}${Object.entries(KINDS).map(([key, label]) => option(key, label, filters.kind)).join("")}</select></label>
       </div>${suggestions("shipmentFilterRecipients")}
       ${renderPriceSettings()}
+      ${renderRiceStock()}
       ${renderYearTotals(visible)}
       <div class="shipment-ledger-count">${visible.length}件</div>
       <div class="shipment-list">${visible.length ? visible.map((row) => {
@@ -254,7 +265,7 @@
     editorOrigin = "list";
     errorMessage = "";
     const recordDate = typeof date === "string" && date ? date : U.today();
-    draft = { date: recordDate, season: recordDate.slice(0, 4), kind: "shipment", recipient: "", pricePer60Kg: "", varietyId: "", riceType: "brown", packages: [{ kg: "30", bags: "" }], memo: "" };
+    draft = { date: recordDate, season: String(state.defaultShipmentCropYear(recordDate)), kind: "shipment", recipient: "", pricePer60Kg: "", varietyId: "", riceType: "brown", packages: [{ kg: "30", bags: "" }], memo: "" };
     view = "editor";
     render();
   }
@@ -394,6 +405,11 @@
         return;
       }
       if (button.hasAttribute("data-shipment-new")) { openNew(); return; }
+      if (button.hasAttribute("data-shipment-harvests")) {
+        if (RiceOS.navigation) RiceOS.navigation.clear();
+        RiceOS.app.openInput("results", "shipments");
+        return;
+      }
       if (button.hasAttribute("data-shipment-open")) { openDetail(button.dataset.shipmentOpen); return; }
       if (button.hasAttribute("data-shipment-back")) { handleBack(); return; }
       if (button.hasAttribute("data-shipment-edit")) { openEditor(); return; }

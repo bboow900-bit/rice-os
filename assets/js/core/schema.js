@@ -5,7 +5,7 @@
   const U = RiceOS.utils;
 
   const SCHEMA_VERSION = 17;
-  const APP_VERSION = "20261009_ver290";
+  const APP_VERSION = "20261010_ver291";
   const STORE_KEY = "rice_os_v8_stable";
   const BACKUP_KEY = "rice_os_v8_stable_backup";
   const RELEASE_BACKUPS_KEY = "rice_os_v8_stable_release_backups";
@@ -531,6 +531,34 @@
     return result;
   }
 
+  function validCropYear(value) {
+    return ["number", "string"].includes(typeof value) && /^\d{4}$/.test(String(value))
+      && Number(value) >= 1900 && Number(value) <= 2200;
+  }
+
+  function cropYearClosureTime(value) {
+    if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/.test(value)) return NaN;
+    const day = Date.parse(`${value.slice(0, 10)}T00:00:00Z`);
+    if (!Number.isFinite(day) || new Date(day).toISOString().slice(0, 10) !== value.slice(0, 10)
+      || Number(value.slice(11, 13)) > 23 || Number(value.slice(14, 16)) > 59 || Number(value.slice(17, 19)) > 59) return NaN;
+    return Date.parse(value);
+  }
+
+  function normalizeCropYearClosures(input) {
+    return ensureArray(input).filter(row => row && typeof row === "object" && validCropYear(row.year)).map(row => {
+      const history = ensureArray(row.history).filter(event => event && ["closed", "reopened"].includes(event.action)
+        && Number.isFinite(cropYearClosureTime(event.at))).map(event => ({ ...event }))
+        .sort((a, b) => cropYearClosureTime(a.at) - cropYearClosureTime(b.at));
+      let closedAt = Number.isFinite(cropYearClosureTime(row.closedAt)) ? row.closedAt : "";
+      let reopenedAt = Number.isFinite(cropYearClosureTime(row.reopenedAt)) ? row.reopenedAt : "";
+      if (history.length) {
+        closedAt = history.filter(event => event.action === "closed").at(-1)?.at || "";
+        reopenedAt = history.at(-1).action === "reopened" ? history.at(-1).at : "";
+      } else if (closedAt && reopenedAt && cropYearClosureTime(closedAt) > cropYearClosureTime(reopenedAt)) reopenedAt = "";
+      return { ...row, year: Number(row.year), closedAt, reopenedAt, history };
+    });
+  }
+
   function normalizeFieldWork(input) {
     const w = input || {};
     const offField = w.targetScope === "offField";
@@ -593,6 +621,7 @@
       targetScope: offField ? "offField" : "field",
       date,
       season: U.number(w.season, U.season(date)),
+      ...(validCropYear(w.cropYear) ? { cropYear: Number(w.cropYear) } : {}),
       fieldIds: offField ? [] : ensureArray(w.fieldIds).length ? ensureArray(w.fieldIds).map(String) : (w.fieldId ? [String(w.fieldId)] : []),
       orphanedFieldIds: offField ? [] : ensureArray(w.orphanedFieldIds).map(String),
       batchId: offField ? "" : String(w.batchId || ""),
@@ -700,6 +729,7 @@
       type: "otherWork",
       date,
       season: U.number(o.season, U.season(date)),
+      ...(validCropYear(o.cropYear) ? { cropYear: Number(o.cropYear) } : {}),
       workName: String(o.workName || o.name || "その他"),
       varietyIds: ensureArray(o.varietyIds).map(String),
       relatedFieldIds: ensureArray(o.relatedFieldIds || o.fieldIds).map(String),
@@ -765,6 +795,7 @@
       targetScope: offField ? "offField" : "field",
       date,
       season: U.number(s.season, U.season(date)),
+      ...(validCropYear(s.cropYear) ? { cropYear: Number(s.cropYear) } : {}),
       fieldIds: offField ? [] : ensureArray(s.fieldIds).map(String),
       batchId: offField ? "" : String(s.batchId || ""),
       batchFieldIds: offField ? [] : ensureArray(s.batchFieldIds || s.fieldIds).map(String),
@@ -978,6 +1009,7 @@
       recipient,
       varietyId: String(s.varietyId || ""),
       riceType: ["brown", "white"].includes(s.riceType) ? s.riceType : "brown",
+      ...(!["brown", "white"].includes(s.riceType) ? { inventoryRiceTypeUnverified: true } : strict && s.inventoryRiceTypeUnverified ? { inventoryRiceTypeUnverified: false } : {}),
       packages,
       pricePer60Kg: normalizePricePer60Kg(s.pricePer60Kg, strict),
       quantity: String(s.quantity ?? ""),
@@ -986,6 +1018,47 @@
       createdAt: String(s.createdAt || U.now()),
       updatedAt: String(s.updatedAt || U.now())
     };
+  }
+
+  function normalizeInventoryRecord(input, idKey, strict = false) {
+    const row = input && typeof input === "object" && !Array.isArray(input) ? input : {};
+    const date = String(row.date ?? "");
+    const parsed = new Date(`${date}T00:00:00Z`);
+    const season = validCropYear(row.season);
+    if (strict && (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !Number.isFinite(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== date || !validCropYear(date.slice(0, 4)))) throw new Error("有効な日付を入力してください。");
+    if (strict && !season) throw new Error("収穫年度を1900〜2200で入力してください。");
+    if (strict && !String(row.varietyId || "")) throw new Error("品種を選択してください。");
+    return { ...row, [idKey]: String(row[idKey] || U.id(idKey, date)), date, season: season ? Number(row.season) : "", varietyId: String(row.varietyId || ""), memo: String(row.memo ?? ""), createdAt: String(row.createdAt || U.now()), updatedAt: String(row.updatedAt || row.createdAt || U.now()) };
+  }
+
+  function inventoryNumber(value) {
+    return typeof value === "number" || typeof value === "string" && value.trim() ? Number(value) : NaN;
+  }
+
+  function normalizeMillingRecord(input, strict = false) {
+    const row = normalizeInventoryRecord(input, "millingId", strict);
+    if (strict && input.packages !== undefined && !Array.isArray(input.packages)) throw new Error("袋内訳を確認してください。");
+    const packages = ensureArray(row.packages).map(item => {
+      const kg = inventoryNumber(item && item.kg), bags = inventoryNumber(item && item.bags);
+      const valid = Number.isFinite(kg) && kg > 0 && Number.isSafeInteger(bags) && bags > 0 && Number.isFinite(kg * bags);
+      if (strict && !valid) throw new Error("袋重量は正の数、袋数は正の整数で入力してください。");
+      return { kg: valid ? kg : "", bags: valid ? bags : "" };
+    });
+    const loose = row.looseKg == null || row.looseKg === "" ? 0 : inventoryNumber(row.looseKg);
+    const looseKg = Number.isFinite(loose) && loose >= 0 ? loose : "";
+    const total = packages.reduce((sum, item) => sum + Number(item.kg) * Number(item.bags), 0) + Number(looseKg);
+    if (strict && (looseKg === "" || !Number.isFinite(total) || total <= 0)) throw new Error("正の受入重量を入力してください。");
+    if (strict && row.fieldIds !== undefined && !Array.isArray(row.fieldIds)) throw new Error("圃場を確認してください。");
+    return { ...row, fieldIds: Array.from(new Set(ensureArray(row.fieldIds).map(String))), packages, looseKg };
+  }
+
+  function normalizeShipmentIssue(input, strict = false) {
+    const row = normalizeInventoryRecord(input, "issueId", strict);
+    const reason = String(row.reason ?? "").trim();
+    const cost = row.costYen == null || typeof row.costYen === "string" && !row.costYen.trim() ? "" : inventoryNumber(row.costYen);
+    const valid = cost === "" || Number.isSafeInteger(cost) && cost >= 0;
+    if (strict && (!reason || !valid)) throw new Error("理由と0以上の整数の費用を確認してください。");
+    return { ...row, millingId: String(row.millingId || ""), reason, action: String(row.action ?? ""), costYen: valid ? cost : "" };
   }
 
   function normalizeConfirmationCandidate(input) {
@@ -1251,6 +1324,8 @@
       materials,
       varietyResults,
       shipments,
+      millingRecords: dedupeBy(ensureArray(source.millingRecords).map(row => normalizeMillingRecord(row)), "millingId"),
+      shipmentIssues: dedupeBy(ensureArray(source.shipmentIssues).map(row => normalizeShipmentIssue(row)), "issueId"),
       shipmentPrices,
       confirmationCandidates,
       machines,
@@ -1259,6 +1334,9 @@
       workers,
       meta: {
         ...(source.meta || {}),
+        ...(validCropYear(source.meta && source.meta.activeCropYear) ? { activeCropYear: Number(source.meta.activeCropYear) } : {}),
+        ...(source.meta && Object.prototype.hasOwnProperty.call(source.meta, "cropYearClosures")
+          ? { cropYearClosures: normalizeCropYearClosures(source.meta.cropYearClosures) } : {}),
         app: "稲作カルテ",
         appName: "稲作カルテ",
         createdAt: source.meta && source.meta.createdAt || source.createdAt || U.now(),
@@ -1304,6 +1382,8 @@
       materials: [],
       varietyResults: [],
       shipments: [],
+      millingRecords: [],
+      shipmentIssues: [],
       shipmentPrices: [],
       confirmationCandidates: [],
       machines: [],
@@ -1351,6 +1431,9 @@
     leafColorLabel,
     leafColorScoreFromText,
     normalize,
+    validCropYear,
+    cropYearClosureTime,
+    normalizeCropYearClosures,
     normalizeMachine,
     normalizeHarvestReview,
     normalizeHarvestTiming,
@@ -1358,6 +1441,8 @@
     normalizeHarvestWeather,
     normalizeMaintenanceRecord,
     normalizeShipment,
+    normalizeMillingRecord,
+    normalizeShipmentIssue,
     normalizeShipmentPrice,
     normalizeGroupLabel,
     normalizeSeasonNote,

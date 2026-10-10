@@ -9,6 +9,8 @@
   let selectedTab = "karte";
   let topView = "fields";
   let hubNotesOpen = false;
+  let closureOpen = false;
+  let closureYear = "";
   let workArchiveOpen = false;
   let compareFromHub = false;
   let annualSearchValue = "";
@@ -36,7 +38,8 @@
     dry: { label: "中干し", className: "water", icon: "水" },
     irrigation: { label: "水管理", className: "water", icon: "水" },
     schedule: { label: "予定", className: "schedule", icon: "予" },
-    other: { label: "その他", className: "other", icon: "他" }
+    other: { label: "その他", className: "other", icon: "他" },
+    milling: { label: "籾摺り", className: "harvest", icon: "米" }
   };
 
   const WORK_ICONS = [
@@ -318,7 +321,7 @@
       return [makeRow("fieldWork", w, {
       id: w.workId,
       date: w.date,
-      season: w.season,
+      season: state.cropYearForRecord ? state.cropYearForRecord(w) : w.season,
       title: w.workName,
       worker: w.worker || "",
       fieldIds: visibleFieldIds,
@@ -391,7 +394,7 @@
     const schedules = (d.schedules || []).filter((item) => !completedWaterSchedule(item)).map((item) => makeRow("schedule", item, {
       id: item.scheduleId,
       date: item.date,
-      season: item.season,
+      season: state.cropYearForRecord ? state.cropYearForRecord(item) : item.season,
       title: item.title || item.scheduleType || "予定",
       fieldIds: item.fieldIds || [],
       target: item.targetScope === "offField" ? "圃場外" : "",
@@ -401,14 +404,19 @@
     const other = (d.otherWorks || []).map((o) => makeRow("other", o, {
       id: o.otherWorkId,
       date: o.date,
-      season: o.season,
+      season: state.cropYearForRecord ? state.cropYearForRecord(o) : o.season,
       title: o.workName,
       fieldIds: o.relatedFieldIds || [],
       target: (o.relatedFieldIds || []).length ? "" : "圃場外",
       hours: o.hours || "",
       detailParts: [o.quantity ? `数量 ${o.quantity}` : "", o.memo || ""]
     }));
-    return [...fieldWorks, ...growth, ...dry, ...irrigation, ...schedules, ...other]
+    const milling = (d.millingRecords || []).map(row => makeRow("milling", row, {
+      id: row.millingId, date: row.date, season: row.season, title: "籾摺り後の収量",
+      fieldIds: row.fieldIds || [], target: (row.fieldIds || []).length ? "" : "品種集計",
+      detailParts: [state.millingRecordTotals ? (state.millingRecordTotals(row).kg === null ? "数量未確認" : `${state.millingRecordTotals(row).kg}kg`) : "", row.memo || ""]
+    }));
+    return [...fieldWorks, ...growth, ...dry, ...irrigation, ...schedules, ...other, ...milling]
       .sort((a, b) => String(b.date).localeCompare(String(a.date)) || String(a.title).localeCompare(String(b.title)));
   }
 
@@ -698,7 +706,7 @@
   function pickerHarvestStatus(field) {
     const selectedYear = yearValue();
     const year = selectedYear === "all" ? U.today().slice(0, 4) : selectedYear;
-    return state.harvestStatusForField(field.fieldId, year, U.today());
+    return state.harvestStatusForField(field.fieldId, year, U.today(), { cropYear: true });
   }
 
   function renderFieldPickerCard(item) {
@@ -741,11 +749,55 @@
     `;
   }
 
+  function renderCropYearClosure() {
+    const year = Number(closureYear || (yearValue() === "all" ? new Date().getFullYear() : yearValue()));
+    const info = state.cropYearClosureFor(year);
+    if (!info) return "";
+    const dated = (value) => {
+      if (typeof value !== "string") return null;
+      const match = value.match(/^(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2}))?$/);
+      if (!match) return null;
+      const y = Number(match[1]), m = Number(match[2]), d = Number(match[3]);
+      const day = new Date(0);
+      day.setUTCFullYear(y, m - 1, d);
+      if (day.getUTCFullYear() !== y || day.getUTCMonth() !== m - 1 || day.getUTCDate() !== d
+        || match[4] !== undefined && (Number(match[4]) > 23 || Number(match[5]) > 59 || Number(match[6]) > 59)) return null;
+      const time = Date.parse(value);
+      if (!Number.isFinite(time)) return null;
+      const text = match[4] === undefined ? `${y}/${m}/${d}`
+        : new Intl.DateTimeFormat("ja-JP", { timeZone: "Asia/Tokyo", year: "numeric", month: "numeric", day: "numeric" }).format(new Date(time));
+      return { time, text };
+    };
+    const closedDate = dated(info.closedAt);
+    const history = (Array.isArray(info.history) ? info.history : []).flatMap((row, index) => {
+      if (!row || !["closed", "reopened"].includes(row.action)) return [];
+      const date = dated(row.at);
+      return date ? [{ ...date, index, label: row.action === "closed" ? "締め" : "解除" }] : [];
+    }).sort((a, b) => b.time - a.time || b.index - a.index);
+    return `<details data-crop-year-closure ${closureOpen ? "open" : ""}>
+      <summary>年度の締め・次年度</summary>
+      <div class="annual-closure-body">
+        <label>対象年度（年産）<input type="number" min="1900" max="2200" value="${year}" data-crop-year-closure-year></label>
+        <strong>${year}年度 · ${info.closed ? "一区切り済み" : "未締め"}</strong>
+        ${closedDate ? `<small data-crop-year-closed-date>締め日 ${U.escapeHTML(closedDate.text)}</small>` : ""}
+        ${history.length ? `<details data-crop-year-closure-history><summary>締め・解除の履歴</summary>${history.map(row => `<p data-crop-year-history-entry>${U.escapeHTML(row.text)} · ${row.label}</p>`).join("")}</details>` : ""}
+        <p>出荷・販売・配布 ${info.counts.shipments}件 / 収穫作業 ${info.counts.harvestWorks}件</p>
+        <p>締めた後も、この年度の記録は追加・編集できます。</p>
+        ${info.closed ? `<button type="button" data-crop-year-reopen="${year}">締めを解除</button>` : `<label><input type="checkbox" data-crop-year-switch-next checked ${year === 2200 ? "disabled" : ""}>新規作業の対象年度を${year + 1}年度に切り替える</label>
+        <button type="button" data-crop-year-close="${year}" ${info.counts.shipments ? "" : "disabled"}>${year}年度を締める</button>
+        ${info.counts.shipments ? "" : '<p>出荷・販売・配布記録がある年度から締められます。</p><button type="button" data-crop-year-shipment>出荷を記録</button>'}`}
+        <form data-crop-year-active-form><label>新規作業の対象年度<input name="year" type="number" min="1900" max="2200" required value="${info.activeCropYear}"></label><button type="submit">入力年度を変更</button></form>
+        <p>実施日は変更しません。追加出荷は、前年産も選べます。</p>
+      </div>
+    </details>`;
+  }
+
   function renderTop(rows) {
     const fields = topView === "fields" ? filteredFields() : [];
     return `
       <div class="annual-v2-top">
         <div class="annual-hub-tools"><button type="button" data-annual-hub-notes aria-expanded="${hubNotesOpen}" aria-controls="annualHubNotes">来年メモ</button></div>
+        ${renderCropYearClosure()}
         <div class="annual-hub-nav" role="group" aria-label="振り返りの表示">
           ${[["fields", "圃場の一年"], ["work", "作業・資材"], ["compare", "年の比較"]].map(([value, label]) => `<button type="button" data-annual-hub-view="${value}" class="${topView === value ? "active" : ""}" aria-pressed="${topView === value}">${label}</button>`).join("")}
         </div>
@@ -1111,11 +1163,12 @@
   }
 
   function renderWorkTab(field) {
-    const rows = state.fieldWorksFor(field.fieldId, yearValue() === "all" ? undefined : yearValue())
+    const rows = state.data().fieldWorks.filter(row => (row.fieldIds || []).includes(field.fieldId)
+      && (yearValue() === "all" || String(state.cropYearForRecord ? state.cropYearForRecord(row) : row.season) === String(yearValue())))
       .filter((row) => !(state.waterEventForWorkName && state.waterEventForWorkName(row.workName))
         && !(state.isMigratedWaterWork && state.isMigratedWaterWork(row, field.fieldId)))
       .map((row) => makeRow("fieldWork", row, {
-        id: row.workId, date: row.date, season: row.season, title: row.workName,
+        id: row.workId, date: row.date, season: state.cropYearForRecord ? state.cropYearForRecord(row) : row.season, title: row.workName,
         worker: row.worker || "", fieldIds: [field.fieldId], hours: row.hours || "",
         kindIcon: workIcon(row.workName), photoData: row.photoData || "", photo: row.photo || "",
         detailParts: [row.machine ? `機械 ${row.machine}` : "", row.material ? `資材 ${row.material} ${row.amount || ""}` : "", row.memo || ""].filter(Boolean)
@@ -1370,7 +1423,7 @@
     return allRows().filter((row) => {
       const harvest = row.kind === "fieldWork" && state.isActualFieldWork(row.raw)
         && /稲刈り|収穫/.test(String(row.title || "")) && !/落水/.test(String(row.title || ""));
-      const rowYear = harvest ? String(row.date || "").slice(0, 4) : row.season || String(row.date || "").slice(0, 4);
+      const rowYear = harvest && !row.raw.cropYear ? String(row.date || "").slice(0, 4) : row.season || String(row.date || "").slice(0, 4);
       return (row.fieldIds || []).includes(fieldId) && String(rowYear) === String(year);
     });
   }
@@ -1423,7 +1476,7 @@
     const growthSummary = state.growthSummaryFor ? state.growthSummaryFor(field.fieldId, year) : null;
     const heading = growthSummary && growthSummary.headingDate
       || firstDate(growth, (row) => Boolean(row.raw && row.raw.headingObserved));
-    const harvestStatus = state.harvestStatusForField(field.fieldId, year, U.today());
+    const harvestStatus = state.harvestStatusForField(field.fieldId, year, U.today(), { cropYear: true });
     const harvest = harvestStatus.harvested ? harvestStatus.date : "";
     const materialRows = works.filter((row) => String(row.raw && row.raw.material || "").trim());
     const panicle = growthSummary && growthSummary.panicleLog
@@ -1635,6 +1688,12 @@
     const expanded = expandedFlowRecord === key;
     const target = annualRecordTarget(field, entry.editKind, id);
     const row = target && target.row || {};
+    if (entry.editKind === "milling" && row.date && String(row.season) !== row.date.slice(0, 4)) {
+      entry = { ...entry, detail: `${entry.detail || ""} / 籾摺り ${annualRecordDate(row.date)} / ${row.season}年産` };
+    }
+    if (row.cropYear && row.date && String(row.cropYear) !== row.date.slice(0, 4)) {
+      entry = { ...entry, detail: `${entry.detail || ""} / 実施 ${annualRecordDate(row.date)} / 対象${row.cropYear}年度`, stageFact: "" };
+    }
     const facts = [];
     if (entry.days !== "" && entry.days != null) facts.push(`期間 ${entry.days}日間`);
     if (entry.editKind === "fieldWork") {
@@ -1658,7 +1717,7 @@
 
   function fieldYearTimeline(field, year) {
     const sources = state.timelineEntriesForField
-      ? state.timelineEntriesForField(field.fieldId, { year, includePlanned: false })
+      ? state.timelineEntriesForField(field.fieldId, { year, includePlanned: false, cropYear: true })
       : { works: [], headingWorks: [], growth: [], waterPeriods: [], others: [] };
     const { works, headingWorks, growth, waterPeriods, others } = sources;
     const entries = works.map(timelineWorkEntry);
@@ -1728,6 +1787,11 @@
       detail: row.quantity ? `数量 ${row.quantity}` : "その他の記録"
     }));
 
+    if (state.millingRecordsFor) state.millingRecordsFor({ fieldId: field.fieldId, season: year }).forEach(row => {
+      const total = state.millingRecordTotals(row);
+      entries.push({ id: row.millingId, editKind: "milling", date: row.date, label: "籾摺り後の収量", category: "籾摺り", tone: "harvest", lane: "work",
+        detail: total.kg === null ? "数量未確認" : `${total.kg}kg / ${Math.round(total.kg / 60 * 100) / 100}俵${row.fieldIds.length > 1 ? "（複数圃場合算）" : ""}` });
+    });
     return entries
       .filter((entry) => isTimelineDate(entry.date) && entry.id)
       .sort((a, b) => String(a.date).localeCompare(String(b.date)) || (a.lane === "water" && b.lane === "water" ? waterRoleRank(a) - waterRoleRank(b) : 0) || String(a.category).localeCompare(String(b.category)) || String(a.label).localeCompare(String(b.label)));
@@ -1737,7 +1801,7 @@
     const year = reviewYearValue();
     const entries = fieldYearTimeline(field, year);
     const planting = entries.find((entry) => /田植/.test(entry.label))?.date || "";
-    const harvestStatus = state.harvestStatusForField(field.fieldId, year, U.today());
+    const harvestStatus = state.harvestStatusForField(field.fieldId, year, U.today(), { cropYear: true });
     const harvest = harvestStatus.harvested ? harvestStatus.date : "";
     const seasonLength = timelineDays(planting, harvest);
     const seasonText = planting
@@ -1772,7 +1836,7 @@
       // First ID wins, matching the existing detail lookup even for conflicting copies.
       seen.add(work.workId);
       if (!Array.isArray(work.fieldIds) || !work.fieldIds.includes(fieldId)
-        || typeof work.date !== "string" || !isTimelineDate(work.date) || work.date.slice(0, 4) !== String(year)
+        || typeof work.date !== "string" || !isTimelineDate(work.date) || String(work.cropYear || work.date.slice(0, 4)) !== String(year)
         || !["稲刈り", "収穫"].includes(work.workName)) continue;
       const review = work.harvestReview;
       if (!review || typeof review !== "object" || Array.isArray(review)) continue;
@@ -1828,7 +1892,7 @@
   }
 
   function renderEndSeasonReflection(field, snapshot) {
-    const harvestStatus = snapshot.harvestStatus || state.harvestStatusForField(field.fieldId, snapshot.year, U.today());
+    const harvestStatus = snapshot.harvestStatus || state.harvestStatusForField(field.fieldId, snapshot.year, U.today(), { cropYear: true });
     const latestNote = seasonNotesForReview(field.fieldId)[0] || null;
     const carryover = state.carryoverNoteForField(field.fieldId, snapshot.year);
     const legacyCarryover = String(field.nextSeasonMemo || "").trim();
@@ -1905,11 +1969,11 @@
     const year = targetYear || yearValue();
     if (year === "all") {
       const years = unique(state.data().fieldWorks.filter((work) => (work.materialId || String(work.material || "").trim())
-        && (!field || (work.fieldIds || []).includes(field.fieldId))).map((work) => U.dateYear(work.date)))
+        && (!field || (work.fieldIds || []).includes(field.fieldId))).map((work) => state.cropYearForRecord ? state.cropYearForRecord(work) : U.dateYear(work.date)))
         .filter((value) => /^\d{4}$/.test(String(value))).sort().reverse();
       return `<details class="annual-used-materials"><summary>使用した資材 <small>全年度</small></summary>${years.length ? years.map((value) => renderUsedMaterials(field, String(value))).join("") : '<p class="muted">資材使用記録はありません。</p>'}</details>`;
     }
-    const groups = state.materialUsageForYear(year).map((group) => ({
+    const groups = state.materialUsageForYear(year, { cropYear: true }).map((group) => ({
       ...group, works: group.works.filter((work) => !field || (work.fieldIds || []).includes(field.fieldId))
     })).filter((group) => group.works.length);
     return `<details class="annual-used-materials"><summary>使用した資材 <small>${U.escapeHTML(year)}年</small></summary>${groups.length ? groups.map((group) => `<section class="annual-material-group"><h4>${U.escapeHTML(group.name)}${!group.materialId ? '<small>未紐付け</small>' : ""}</h4>${group.works.map((work) => {
@@ -2104,6 +2168,10 @@
     const data = state.data();
     const matchesField = (row, key) => Array.isArray(row && row[key]) && row[key].includes(field.fieldId);
     const same = (value) => String(value || "") === String(id || "");
+    if (kind === "milling") {
+      const row = (data.millingRecords || []).find(item => same(item.millingId) && matchesField(item, "fieldIds"));
+      return row ? { kind, row } : null;
+    }
     if (kind === "fieldWork") {
       const row = (data.fieldWorks || []).find((item) => same(item.workId) && matchesField(item, "fieldIds"));
       return row ? { kind, row } : null;
@@ -2311,8 +2379,8 @@
     const { kind, row } = target;
     const isLegacyWater = kind === "waterReview";
     const isWater = kind === "dry" || kind === "irrigation" || isLegacyWater;
-    const category = isLegacyWater ? "旧作業由来" : isWater ? "水管理" : kind === "growth" ? "生育記録" : kind === "other" ? "その他" : /収穫|稲刈り/.test(String(row.workName || "")) ? "収穫" : "農作業";
-    const title = isLegacyWater ? row.label : kind === "growth" ? (isObservedHeading(row) ? "出穂確認" : U.number(row.panicleLengthMm, 0) > 0 ? "幼穂確認" : row.stageConfirmed && row.observedStage ? "現場ステージ" : "生育記録") : String(row.workName || row.method || "記録");
+    const category = isLegacyWater ? "旧作業由来" : isWater ? "水管理" : kind === "milling" ? "籾摺り" : kind === "growth" ? "生育記録" : kind === "other" ? "その他" : /収穫|稲刈り/.test(String(row.workName || "")) ? "収穫" : "農作業";
+    const title = kind === "milling" ? "籾摺り後の収量" : isLegacyWater ? row.label : kind === "growth" ? (isObservedHeading(row) ? "出穂確認" : U.number(row.panicleLengthMm, 0) > 0 ? "幼穂確認" : row.stageConfirmed && row.observedStage ? "現場ステージ" : "生育記録") : String(row.workName || row.method || "記録");
     const date = isWater ? String(row.startDate || row.date || row.actualEndDate || "") : String(row.date || "");
     const fieldNames = kind === "fieldWork" ? (row.fieldIds || []).map((fieldId) => state.field(fieldId)?.name).filter(Boolean).join("・") : kind === "other" ? (row.relatedFieldIds || row.fieldIds || []).map((fieldId) => state.field(fieldId)?.name).filter(Boolean).join("・") : field.name;
     const info = [];
@@ -2321,6 +2389,16 @@
       info.push(annualRecordInfoRow("終了日", annualRecordDate(row.actualEndDate)));
       if (!isLegacyWater && isTimelineDate(row.startDate || row.date) && isTimelineDate(row.actualEndDate) && String(row.actualEndDate) >= String(row.startDate || row.date)) info.push(annualRecordInfoRow("実績日数", `${timelineDays(row.startDate || row.date, row.actualEndDate)}日間`));
       if (isLegacyWater) info.push(annualRecordInfoRow("元の記録", `旧作業記録 ${(row.sourceWorkIds || []).length}件`));
+    } else if (kind === "milling") {
+      const total = state.millingRecordTotals(row);
+      info.push(annualRecordInfoRow("籾摺り日", annualRecordDate(date)));
+      info.push(annualRecordInfoRow("年産", `${row.season}年産`));
+      info.push(annualRecordInfoRow("品種", state.variety(row.varietyId)?.name || "保存済みの品種"));
+      info.push(annualRecordInfoRow("収量", total.kg === null ? "数量未確認" : `${total.kg}kg / ${Math.round(total.kg / 60 * 100) / 100}俵`));
+      info.push(annualRecordInfoRow("袋数", (row.packages || []).map(pack => `${pack.kg}kg × ${pack.bags}袋`).join("・")));
+      if (row.looseKg > 0) info.push(annualRecordInfoRow("端数", `${row.looseKg}kg`));
+      info.push(annualRecordInfoRow("対象圃場", fieldNameList(row.fieldIds).join("・")));
+      if (row.fieldIds.length > 1) info.push(annualRecordInfoRow("集計範囲", "複数圃場合算。圃場別に配分していません。"));
     } else if (kind === "growth") {
       info.push(annualRecordInfoRow("記録日", annualRecordDate(date)));
       info.push(annualRecordInfoRow("葉数", row.leafCount ? `${row.leafCount}枚` : ""));
@@ -2331,6 +2409,7 @@
       info.push(annualRecordInfoRow("出穂", isObservedHeading(row) ? "確認済み" : ""));
     } else {
       info.push(annualRecordInfoRow("実施日", annualRecordDate(date)));
+      if (target.kind === "fieldWork" || target.kind === "other") info.push(annualRecordInfoRow("対象年度（年産）", `${state.cropYearForRecord(row)}年度`));
       info.push(annualRecordInfoRow("作業者", row.worker));
       info.push(annualRecordInfoRow("作業時間", row.hours || row.totalHours ? U.formatHours(U.parseWorkHours(row.hours || row.totalHours)) : ""));
       info.push(annualRecordInfoRow("機械", row.machine));
@@ -2376,6 +2455,8 @@
 
   function renderOptions() {
     const years = new Set([String(new Date().getFullYear())]);
+    years.add(String(state.defaultCropYear(U.today())));
+    ((state.data().meta || {}).cropYearClosures || []).forEach(row => years.add(String(row.year)));
     allRows().forEach((row) => years.add(String(row.season)));
     if (RiceOS.herbicide) RiceOS.herbicide.assignments().forEach((row) => years.add(String(row.year)));
     const sorted = Array.from(years).sort((a, b) => Number(b) - Number(a));
@@ -2406,6 +2487,22 @@
   }
 
   function editRow(kind, id) {
+    if (kind === "milling" && RiceOS.screens.results?.editMillingRecord) {
+      const origin = { fieldId: selectedFieldId, tab: selectedTab, review: reviewView,
+        year: yearValue(), fromHub: compareFromHub, filter: compareFilter, top: topView, detail: recordDetail };
+      if (RiceOS.navigation) RiceOS.navigation.clear();
+      selectedFieldId = origin.fieldId;
+      selectedTab = origin.tab;
+      reviewView = origin.review;
+      compareFromHub = origin.fromHub;
+      compareFilter = origin.filter;
+      topView = origin.top;
+      recordDetail = origin.detail;
+      if (U.$("annualYear")) U.$("annualYear").value = origin.year;
+      RiceOS.app.openInput("results", "annual");
+      RiceOS.screens.results.editMillingRecord(id);
+      return;
+    }
     if (RiceOS.navigation && RiceOS.navigation.openRecord) {
       const opened = RiceOS.navigation.openRecord(kind, id, {
         fieldId: selectedFieldId,
@@ -2528,6 +2625,13 @@
   }
 
   function deleteRow(kind, id) {
+    if (kind === "milling") {
+      const row = (state.data().millingRecords || []).find(item => item.millingId === id);
+      if (!row || !confirm(`${U.fd(row.date)}の籾摺り後収量を削除しますか？${(row.fieldIds || []).length > 1 ? "複数圃場の合算記録も一覧から消えます。" : ""}出荷記録は残り、残量が再計算されます。`)) return false;
+      const saved = state.deleteMillingRecord(id);
+      if (saved) render();
+      return Boolean(saved);
+    }
     const work = kind === "fieldWork" ? state.data().fieldWorks.find((item) => item.workId === id) : null;
     const growth = kind === "growth" ? state.data().growthLogs.find((item) => item.logId === id) : null;
     const other = kind === "other" ? state.data().otherWorks.find((item) => item.otherWorkId === id) : null;
@@ -2550,7 +2654,8 @@
         : kind === "dry" ? state.deleteDryPeriod(id)
           : kind === "irrigation" ? state.deleteIrrigation(id)
             : kind === "schedule" ? state.deleteSchedule(id)
-              : kind === "other" ? state.deleteOtherWork(id) : false;
+              : kind === "other" ? state.deleteOtherWork(id)
+                : kind === "milling" ? state.deleteMillingRecord(id) : false;
     if (deleted) render();
     return Boolean(deleted);
   }
@@ -2728,10 +2833,22 @@
     const year = U.$("annualYear");
     if (year) year.addEventListener("change", render);
     U.$("annualTimeline").addEventListener("toggle", (event) => {
+      if (event.target.matches("[data-crop-year-closure]")) closureOpen = event.target.open;
       if (event.target.matches("[data-annual-work-list]")) workArchiveOpen = event.target.open;
     }, true);
     U.$("annualTimeline").addEventListener("click", (event) => {
-      if (event.target.closest("[data-annual-shipments]")) {
+      const close = event.target.closest("[data-crop-year-close]");
+      const reopen = event.target.closest("[data-crop-year-reopen]");
+      if (close || reopen) {
+        const targetYear = Number((close || reopen).dataset[close ? "cropYearClose" : "cropYearReopen"]);
+        const switchToNext = Boolean(close && U.$("annualTimeline").querySelector("[data-crop-year-switch-next]:checked:not(:disabled)"));
+        const message = close ? `${targetYear}年度を一区切りにします。記録は残り、追加・編集できます。${switchToNext ? `新規作業の対象年度を${targetYear + 1}年度に切り替えます。` : ""}` : `${targetYear}年度の締めを解除します。新規作業の対象年度は変更しません。`;
+        if (!window.confirm(message)) return;
+        const saved = close ? state.closeCropYear(targetYear, { switchToNext }) : state.reopenCropYear(targetYear);
+        if (!saved) return;
+        renderOptions(); render(); return;
+      }
+      if (event.target.closest("[data-annual-shipments], [data-crop-year-shipment]")) {
         if (RiceOS.navigation) RiceOS.navigation.clear();
         RiceOS.app.openInput("shipments", "annual");
         return;
@@ -3152,6 +3269,11 @@
       }
     });
     U.$("annualTimeline").addEventListener("change", (event) => {
+      if (event.target.matches("[data-crop-year-closure-year]")) {
+        const value = Number(event.target.value);
+        if (!Number.isInteger(value) || value < 1900 || value > 2200) return;
+        closureYear = String(value); render(); return;
+      }
       const ideaToggle = event.target.closest("[data-next-season-idea-toggle]");
       if (ideaToggle && state.toggleNextSeasonIdea) {
         state.toggleNextSeasonIdea(ideaToggle.dataset.nextSeasonIdeaToggle, ideaToggle.checked);
@@ -3175,6 +3297,12 @@
       state.updateField(selectedFieldId, { [key]: value });
     });
     U.$("annualTimeline").addEventListener("submit", (event) => {
+      const activeForm = event.target.closest("[data-crop-year-active-form]");
+      if (activeForm) {
+        event.preventDefault();
+        if (!state.setActiveCropYear(new FormData(activeForm).get("year"))) return;
+        renderOptions(); render(); return;
+      }
       const ideaForm = event.target.closest("[data-next-season-idea-form]");
       if (ideaForm && state.saveNextSeasonIdea) {
         event.preventDefault();

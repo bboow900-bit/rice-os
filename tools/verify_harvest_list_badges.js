@@ -32,12 +32,12 @@ for (const value of ["none","complete","partial","legacy"]) {
   assert(annualHtml.includes('data-annual-open-field="a"'));
 }
 assert.deepEqual(calls[0],["a","2026","2026-10-04"]);
-assert.deepEqual(calls[1],["a","2025","2026-10-04"]);
+assert.deepEqual(JSON.parse(JSON.stringify(calls[1])),["a","2025","2026-10-04",{ cropYear: true }]);
 year = "all"; status = "complete";
 const result = c.fieldStatus(data,{ total: 0, growth: 0 });
 assert.equal(result.label,"\u53ce\u7a6b\u6e08\u307f");
 assert.equal(result.action,undefined);
-assert.deepEqual(calls.at(-1),["a","2026","2026-10-04"]);
+assert.deepEqual(JSON.parse(JSON.stringify(calls.at(-1))),["a","2026","2026-10-04",{ cropYear: true }]);
 // Exercise the production state helper against a future-year complete record.
 const real = vm.createContext({ RiceOS: { storage: { loadData: () => ({ fields: [data], fieldWorks: [{ workId: "future", workName: "\u7a32\u5208\u308a", date: "2027-09-03", fieldIds: ["a"], harvestStatusByField: { a: "complete" } }] }) } },
   document: { getElementById: () => null, querySelectorAll: () => [] } });

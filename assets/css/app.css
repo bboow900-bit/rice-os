@@ -15419,6 +15419,26 @@ label {
 #fwHarvestTiming label { display: grid; gap: 6px; min-width: 0; margin-bottom: 10px; }
 #fwHarvestTiming input, #fwHarvestTiming select, #fwHarvestTiming textarea { width: 100%; min-width: 0; box-sizing: border-box; }
 #fwHarvestTiming .form-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+.milling-content { margin-top: 28px; border-top: 1px solid #d6e2d6; padding-top: 18px; }
+.milling-content .stack-form, .milling-issues .stack-form { margin-bottom: 16px; }
+.milling-fields { border: 1px solid #d6e2d6; border-radius: 8px; padding: 12px; margin: 12px 0; }
+.milling-fields label { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.milling-fields input[type="checkbox"] { width: 18px; height: 18px; min-height: 0; flex: 0 0 18px; margin: 0; padding: 0; accent-color: #25834a; }
+.milling-fields small { display: block; }
+.milling-package-presets { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+.milling-package-presets button { flex: 1 1 80px; }
+.milling-package-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 44px; align-items: end; gap: 8px; margin-bottom: 12px; }
+.milling-package-row input { width: 100%; min-width: 0; }
+.milling-package-row button { width: 44px; min-height: 44px; padding: 0; }
+.milling-total { display: block; font-size: 18px; font-weight: 700; color: #237344; margin: 12px 0; }
+.milling-stock { padding: 16px 0; border-block: 1px solid #d6e2d6; margin-bottom: 18px; }
+.milling-stock-values { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.milling-stock-values small, .milling-stock-values b { display: block; overflow-wrap: anywhere; }
+.milling-stock-values b { font-size: 17px; margin: 6px 0; }
+.milling-warning { color: #9b3030; }
+.milling-issues { border-top: 1px solid #d6e2d6; padding-top: 12px; margin: 22px 0; }
+.milling-issues > summary { min-height: 44px; padding: 12px 0; font-weight: 700; }
 #fwHarvestTiming details summary { font-size: 13px; color: #49664d; padding: 8px 0; }
 
 #screen-outlook .outlook-thermal p { margin: 8px 0; line-height: 1.6; overflow-wrap: anywhere; }
@@ -15448,3 +15468,11 @@ label {
 .annual-variety-record-pair > div { display: grid; align-content: start; gap: 4px; min-width: 0; }
 .annual-variety-record-pair b { font-size: 14px; overflow-wrap: anywhere; }
 .annual-harvest-variety-comparison button { margin-top: 8px; max-width: 100%; white-space: normal; }
+.annual-closure-body { display: grid; gap: 12px; padding: 12px 0; }
+.annual-closure-body p { margin: 0; font-size: 13px; }
+.annual-closure-body label { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.annual-closure-body input[type="number"] { width: 100px; max-width: 100%; }
+.annual-closure-body input[type="checkbox"] { width: 18px; height: 18px; min-height: 0; flex: 0 0 18px; margin: 0; accent-color: #278448; }
+.annual-closure-body form { display: flex; gap: 8px; align-items: end; flex-wrap: wrap; }
+[data-crop-year-closure] { margin: 12px 0; border-bottom: 1px solid #dbe6dc; }
+[data-crop-year-closure] > summary { padding: 12px 0; cursor: pointer; font-weight: 700; }

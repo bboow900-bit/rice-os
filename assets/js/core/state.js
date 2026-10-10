@@ -17,6 +17,121 @@
     return cache;
   }
 
+  function cropYearForRecord(record) {
+    if (!record) return "";
+    if (S.validCropYear(record.cropYear)) return Number(record.cropYear);
+    if (S.validCropYear(record.season)) return Number(record.season);
+    const year = U.dateYear(record.date);
+    return S.validCropYear(year) ? Number(year) : "";
+  }
+
+  function defaultCropYear(date) {
+    const active = (data().meta || {}).activeCropYear;
+    return S.validCropYear(active) ? Number(active) : cropYearForRecord({ date: date || U.today() });
+  }
+
+  function cropYearClosureFor(year) {
+    if (!S.validCropYear(year)) return null;
+    const value = Number(year);
+    const stored = S.normalizeCropYearClosures((data().meta || {}).cropYearClosures).find(row => Number(row.year) === value);
+    const history = stored && Array.isArray(stored.history) ? stored.history : [];
+    const last = history.at(-1);
+    const closed = stored && (last ? last.action === "closed" : Boolean(stored.closedAt && !stored.reopenedAt));
+    const works = data().fieldWorks.filter(row => cropYearForRecord(row) === value);
+    const harvests = works.filter(row => isHarvestWork(row) && isActualFieldWork(row));
+    const shipmentsCount = (data().shipments || []).filter(row => Number(row.season) === value).length;
+    return U.clone({ year: value, closed: Boolean(closed), status: closed ? "closed" : "open", closedAt: stored && stored.closedAt || "",
+      shipmentsCount, activeCropYear: defaultCropYear(U.today()),
+      reopenedAt: stored && stored.reopenedAt || "", history,
+      counts: { shipments: shipmentsCount,
+        fieldWorks: works.length, otherWorks: data().otherWorks.filter(row => cropYearForRecord(row) === value).length,
+        schedules: data().schedules.filter(row => cropYearForRecord(row) === value).length, harvestWorks: harvests.length,
+        completedHarvestFields: new Set(harvests.flatMap(row => (row.fieldIds || []).filter(id => (row.harvestStatusByField || {})[id] === "complete"))).size } });
+  }
+
+  function defaultShipmentCropYear(date) {
+    const actualDate = date || U.today();
+    const fallback = cropYearForRecord({ date: actualDate });
+    const closedYears = S.normalizeCropYearClosures((data().meta || {}).cropYearClosures).filter(row => S.validCropYear(row.year)
+      && cropYearClosureFor(row.year).status === "closed").map(row => Number(row.year));
+    if (!closedYears.length) return fallback;
+    const closedYear = Math.max(...closedYears);
+    const harvestYears = data().fieldWorks.filter(row => isHarvestWork(row) && isActualFieldWork(row)
+      && harvestDateYear(row.date) && row.date <= actualDate
+      && (row.fieldIds || []).some(id => (row.harvestStatusByField || {})[id] === "complete"))
+      .map(row => Number(harvestDateYear(row.date))).filter(year => S.validCropYear(year) && year > closedYear);
+    return harvestYears.length ? Math.max(...harvestYears) : closedYear;
+  }
+
+  function setActiveCropYear(year) {
+    if (S.validCropYear(year) && Number((data().meta || {}).activeCropYear) === Number(year)) return data();
+    return mutate(d => {
+      if (!S.validCropYear(year)) throw new Error("作付年度は1900〜2200年で指定してください。");
+      d.meta.activeCropYear = Number(year);
+    }, "新規作業の作付年度を変更しました");
+  }
+
+  function closeCropYear(year, options = {}) {
+    if (!S.validCropYear(year) || options.switchToNext === true && Number(year) === 2200) {
+      return mutate(() => { throw new Error("締める年度と翌年度を1900〜2200年で指定してください。"); });
+    }
+    if (S.validCropYear(year) && cropYearClosureFor(year).status === "closed") return data();
+    return mutate(d => {
+      if (!S.validCropYear(year) || options.switchToNext === true && Number(year) === 2200) throw new Error("締める年度と翌年度を1900〜2200年で指定してください。");
+      if (!d.shipments.some(row => Number(row.season) === Number(year))) throw new Error("この年度の出荷・販売・配布記録を1件以上保存してから締めてください。");
+      const rows = d.meta.cropYearClosures = S.normalizeCropYearClosures(d.meta.cropYearClosures);
+      let row = rows.find(item => Number(item.year) === Number(year));
+      if (!row) { row = { year: Number(year), closedAt: "", reopenedAt: "", history: [] }; rows.push(row); }
+      row.closedAt = U.now(); row.reopenedAt = "";
+      row.history.push({ action: "closed", at: U.now(), switchToNext: options.switchToNext === true });
+      if (options.switchToNext === true) d.meta.activeCropYear = Number(year) + 1;
+    }, "作付年度を締めました");
+  }
+
+  function reopenCropYear(year) {
+    if (S.validCropYear(year) && cropYearClosureFor(year).status !== "closed") return data();
+    return mutate(d => {
+      if (!S.validCropYear(year)) throw new Error("作付年度は1900〜2200年で指定してください。");
+      d.meta.cropYearClosures = S.normalizeCropYearClosures(d.meta.cropYearClosures);
+      const row = d.meta.cropYearClosures.find(item => Number(item.year) === Number(year));
+      row.reopenedAt = U.now(); row.history.push({ action: "reopened", at: U.now() });
+    }, "作付年度の締めを解除しました");
+  }
+
+  function cropYearForSave(draft, record, previous, date) {
+    if (record.cropYear !== undefined) {
+      if (!S.validCropYear(record.cropYear)) throw new Error("作付年度は1900〜2200年で指定してください。");
+      return { cropYear: Number(record.cropYear) };
+    }
+    if (previous) return S.validCropYear(previous.cropYear) ? { cropYear: Number(previous.cropYear) } : {};
+    const source = record.sourceScheduleId && draft.schedules.find(row => row.scheduleId === record.sourceScheduleId);
+    if (source) {
+      const inherited = cropYearForRecord(source);
+      if (!S.validCropYear(inherited)) throw new Error("元の予定の作付年度を確認してください。");
+      return { cropYear: inherited };
+    }
+    const year = defaultCropYear(date);
+    if (!S.validCropYear(year)) throw new Error("作付年度を確認してください。");
+    return { cropYear: year };
+  }
+
+  function seasonForCropYearSave(record, previous, date) {
+    return previous && previous.date === date && !S.validCropYear(previous.cropYear)
+      && record.cropYear === undefined && S.validCropYear(previous.season)
+      ? previous.season : U.season(date);
+  }
+
+  function setRecordCropYear(kind, id, year) {
+    const table = { fieldWork: ["fieldWorks", "workId"], other: ["otherWorks", "otherWorkId"], schedule: ["schedules", "scheduleId"] }[kind];
+    const current = table && data()[table[0]].find(row => row[table[1]] === id);
+    if (current && S.validCropYear(year) && current.cropYear === Number(year)) return data();
+    return mutate(d => {
+      if (!table || !current) throw new Error("年度を変更する記録が見つかりません。");
+      if (!S.validCropYear(year)) throw new Error("作付年度は1900〜2200年で指定してください。");
+      d[table[0]].find(row => row[table[1]] === id).cropYear = Number(year);
+    }, "記録の作付年度を変更しました");
+  }
+
   // Save APIs return data on success and null on failure.
   function lastSaveError() {
     return lastError;
@@ -289,13 +404,14 @@
     return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day ? String(year) : "";
   }
 
-  function harvestStatusForField(fieldId, year, asOf) {
+  function harvestStatusForField(fieldId, year, asOf, options = {}) {
     const through = asOf === undefined ? U.today() : asOf;
     if (!harvestDateYear(through) || !/^[1-9]\d{3}$/.test(String(year))) {
       return { status: "none", harvested: false, date: "", workIds: [] };
     }
     const rows = data().fieldWorks.filter((work) => isHarvestWork(work)
-      && (work.fieldIds || []).includes(fieldId) && harvestDateYear(work.date) === String(year)
+      && (work.fieldIds || []).includes(fieldId) && harvestDateYear(work.date)
+      && String(options.cropYear === true && S.validCropYear(work.cropYear) ? cropYearForRecord(work) : harvestDateYear(work.date)) === String(year)
       && String(work.date) <= String(through));
     const complete = rows.filter((work) => (work.harvestStatusByField || {})[fieldId] === "complete");
     const partial = rows.filter((work) => (work.harvestStatusByField || {})[fieldId] === "partial");
@@ -926,7 +1042,8 @@
         type: "fieldWork",
         targetScope: targets.targetScope,
         date,
-        season: U.season(date),
+        season: seasonForCropYearSave(record, previous, date),
+        ...cropYearForSave(d, record, previous, date),
         fieldIds: targetFieldIds,
         batchId,
         batchFieldIds: offField ? [] : (record.batchFieldIds || previous && previous.batchFieldIds || targetFieldIds).slice(),
@@ -1846,11 +1963,13 @@
   function saveOtherWork(record) {
     return mutate((d) => {
       const date = record.date || U.today();
+      const previous = record.otherWorkId ? d.otherWorks.find(row => row.otherWorkId === record.otherWorkId) : null;
       const normalized = {
         otherWorkId: record.otherWorkId || U.id("other", date),
         type: "otherWork",
         date,
-        season: U.season(date),
+        season: seasonForCropYearSave(record, previous, date),
+        ...cropYearForSave(d, record, previous, date),
         workName: record.workName || "その他",
         varietyIds: record.varietyIds || [],
         relatedFieldIds: record.relatedFieldIds || [],
@@ -1910,10 +2029,10 @@
     }, "資材を削除しました");
   }
 
-  function materialUsageForYear(year) {
+  function materialUsageForYear(year, options = {}) {
     if (!/^\d{4}$/.test(String(year))) return [];
     const groups = new Map();
-    data().fieldWorks.filter((work) => isInYear(work, year))
+    data().fieldWorks.filter((work) => options.cropYear === true ? String(cropYearForRecord(work)) === String(year) : isInYear(work, year))
       .slice().sort((a, b) => String(a.date).localeCompare(String(b.date)))
       .forEach((work) => {
         const materialId = String(work.materialId || "");
@@ -1987,7 +2106,8 @@
         type: "schedule",
         targetScope: targets.targetScope,
         date,
-        season: U.season(date),
+        season: seasonForCropYearSave(record, previous, date),
+        ...cropYearForSave(d, record, previous, date),
         fieldIds: targets.fieldIds,
         batchId: targets.targetScope === "offField" ? "" : record.batchId || "",
         batchFieldIds: targets.targetScope === "offField" ? [] : record.batchFieldIds || targets.fieldIds,
@@ -2069,6 +2189,7 @@
         type: "fieldWork",
         date,
         season: U.season(date),
+        ...cropYearForSave(d, { ...record, sourceScheduleId: schedule.scheduleId }, null, date),
         fieldIds: schedule.fieldIds || [],
         batchId: (schedule.fieldIds || []).length > 1 ? U.id("batch", date) : "",
         batchFieldIds: (schedule.fieldIds || []).slice(),
@@ -2966,7 +3087,8 @@
     const year = opts.year === undefined || opts.year === null || String(opts.year) === "all" ? undefined : String(opts.year);
     const id = String(fieldId || "");
     if (!id) return { works: [], headingWorks: [], growth: [], waterPeriods: [], others: [] };
-    const allWorks = fieldWorksFor(id, year)
+    const allWorks = fieldWorksFor(id, opts.cropYear === true ? undefined : year)
+      .filter(row => opts.cropYear !== true || !year || String(cropYearForRecord(row)) === year)
       .filter((row) => isActualFieldWork(row))
       .map(displayCopy);
     const headingWorks = allWorks.filter((row) => isHeadingWorkName(row.workName));
@@ -2981,7 +3103,7 @@
       }));
     const others = (data().otherWorks || [])
       .filter((row) => (row.relatedFieldIds || row.fieldIds || []).includes(id))
-      .filter((row) => !year || String(row.season || String(row.date || "").slice(0, 4)) === year)
+      .filter((row) => !year || String(opts.cropYear === true ? cropYearForRecord(row) : row.season || String(row.date || "").slice(0, 4)) === year)
       .filter((row) => isActualFieldWork(row))
       .map(displayCopy);
     return { works, headingWorks, growth, waterPeriods, others };
@@ -3107,6 +3229,101 @@
 
   function lastGrowthLog(fieldId) {
     return growthLogsFor(fieldId).slice().sort((a, b) => String(b.date).localeCompare(String(a.date)))[0] || null;
+  }
+
+  function inventoryRowsFor(collection, filters = {}) {
+    return U.clone((data()[collection] || []).filter(row =>
+      (filters.season === undefined || row.season === Number(filters.season)) &&
+      (filters.varietyId === undefined || row.varietyId === filters.varietyId) &&
+      (filters.fieldId === undefined || (row.fieldIds || []).includes(filters.fieldId)) &&
+      (filters.millingId === undefined || row.millingId === filters.millingId)));
+  }
+
+  function millingRecordsFor(filters = {}) { return inventoryRowsFor("millingRecords", filters); }
+  function shipmentIssuesFor(filters = {}) { return inventoryRowsFor("shipmentIssues", filters); }
+
+  function inventoryPackageTotals(packages) {
+    if (!Array.isArray(packages)) return null;
+    let kg = 0, bags = 0;
+    for (const row of packages) {
+      if (!row || typeof row.kg !== "number" || !Number.isFinite(row.kg) || row.kg <= 0 || !Number.isSafeInteger(row.bags) || row.bags <= 0) return null;
+      kg += row.kg * row.bags; bags += row.bags;
+    }
+    return Number.isFinite(kg) && Number.isSafeInteger(bags) ? { kg, bags } : null;
+  }
+
+  function millingRecordTotals(row) {
+    const totals = inventoryPackageTotals(row && row.packages);
+    const loose = row && row.looseKg;
+    if (!totals || typeof loose !== "number" || !Number.isFinite(loose) || loose < 0 || !Number.isFinite(totals.kg + loose)) return { kg: null, bags: null };
+    return { kg: totals.kg + loose, bags: totals.bags };
+  }
+
+  function saveInventoryRecord(collection, idKey, input, normalize) {
+    input = input || {};
+    try {
+      const previous = (data()[collection] || []).find(row => row[idKey] === input[idKey]);
+      if (input[idKey] && !previous) throw new Error("編集対象の記録が見つかりません。");
+      const defined = Object.fromEntries(Object.entries(input).filter(([, value]) => value !== undefined));
+      const candidate = normalize({ ...previous, ...defined, createdAt: previous ? previous.createdAt : U.now(), updatedAt: previous ? previous.updatedAt : U.now() }, true);
+      const sameReference = previous && candidate.varietyId === previous.varietyId;
+      if (!variety(candidate.varietyId) && !sameReference) throw new Error("登録済みの品種を選択してください。");
+      if (collection === "millingRecords") {
+        const unchangedTargets = sameReference && JSON.stringify(candidate.fieldIds) === JSON.stringify(previous.fieldIds);
+        if (!unchangedTargets && candidate.fieldIds.some(id => !field(id) || field(id).varietyId !== candidate.varietyId)) throw new Error("選択圃場の品種が一致していません。");
+        // Moving a referenced batch would silently change the meaning of its issue history.
+        if (previous && (candidate.season !== previous.season || !sameReference) && (data().shipmentIssues || []).some(row => row.millingId === previous.millingId)) throw new Error("対応記録があるため年度・品種を変更できません。");
+      } else if (candidate.millingId) {
+        const linked = (data().millingRecords || []).find(row => row.millingId === candidate.millingId);
+        const historical = previous && previous.millingId === candidate.millingId && previous.season === candidate.season && sameReference;
+        if (linked ? linked.season !== candidate.season || linked.varietyId !== candidate.varietyId : !historical) throw new Error("籾摺り記録の年度・品種を確認してください。");
+      }
+      if (previous && JSON.stringify(candidate) === JSON.stringify(previous)) return U.clone(previous);
+      candidate.updatedAt = U.now();
+      const saved = mutate(d => {
+        d[collection] = d[collection] || [];
+        const index = d[collection].findIndex(row => row[idKey] === candidate[idKey]);
+        if (index < 0) d[collection].push(candidate); else d[collection][index] = candidate;
+      }, "記録を保存しました");
+      return saved ? U.clone(saved[collection].find(row => row[idKey] === candidate[idKey])) : null;
+    } catch (error) { lastError = error; return null; }
+  }
+
+  function saveMillingRecord(input) { return saveInventoryRecord("millingRecords", "millingId", input, S.normalizeMillingRecord); }
+  function saveShipmentIssue(input) { return saveInventoryRecord("shipmentIssues", "issueId", input, S.normalizeShipmentIssue); }
+  function deleteInventoryRecord(collection, idKey, id) {
+    if (!(data()[collection] || []).some(row => row[idKey] === id)) return null;
+    return mutate(d => { d[collection] = d[collection].filter(row => row[idKey] !== id); }, "記録を削除しました");
+  }
+  function deleteMillingRecord(id) { return deleteInventoryRecord("millingRecords", "millingId", id); }
+  function deleteShipmentIssue(id) { return deleteInventoryRecord("shipmentIssues", "issueId", id); }
+
+  function riceStockFor(season, varietyId) {
+    const result = { receivedKg: 0, dispatchedKg: 0, remainingKg: 0, receivedBags: 0, whiteShipmentCount: 0, unquantifiedCount: 0, unclassifiedCount: 0, hasHarvest: false, issueCostYen: 0, issueCount: 0, issueUnpricedCount: 0 };
+    if (!S.validCropYear(season) || !varietyId) return result;
+    for (const row of millingRecordsFor({ season, varietyId })) {
+      const totals = millingRecordTotals(row);
+      if (totals.kg === null || totals.kg <= 0) { result.unquantifiedCount++; continue; }
+      result.receivedKg += totals.kg; result.receivedBags += totals.bags;
+      result.hasHarvest = true;
+    }
+    for (const row of data().shipments || []) {
+      if (row.season !== Number(season) || !["shipment", "sale", "gift"].includes(row.kind)) continue;
+      if (!row.varietyId) { result.unclassifiedCount++; continue; }
+      if (row.varietyId !== varietyId) continue;
+      if (row.inventoryRiceTypeUnverified) { result.unquantifiedCount++; continue; }
+      if (row.riceType === "white") { result.whiteShipmentCount++; continue; }
+      const totals = inventoryPackageTotals(row.packages);
+      if (row.riceType !== "brown" || !totals || !row.packages.length) { result.unquantifiedCount++; continue; }
+      result.dispatchedKg += totals.kg;
+    }
+    for (const row of shipmentIssuesFor({ season, varietyId })) {
+      result.issueCount++;
+      if (Number.isSafeInteger(row.costYen) && row.costYen >= 0) result.issueCostYen += row.costYen;
+      else result.issueUnpricedCount++;
+    }
+    result.remainingKg = result.receivedKg - result.dispatchedKg;
+    return result;
   }
 
   function shipments() {
@@ -3306,11 +3523,27 @@
 
   RiceOS.state = {
     data,
+    cropYearForRecord,
+    defaultCropYear,
+    defaultShipmentCropYear,
+    cropYearClosureFor,
+    closeCropYear,
+    reopenCropYear,
+    setActiveCropYear,
+    setRecordCropYear,
     lastSaveError,
     save,
     replace,
     mutate,
     shipments,
+    saveMillingRecord,
+    deleteMillingRecord,
+    millingRecordsFor,
+    millingRecordTotals,
+    riceStockFor,
+    saveShipmentIssue,
+    deleteShipmentIssue,
+    shipmentIssuesFor,
     saveShipment,
     deleteShipment,
     shipmentPrices,

@@ -90,10 +90,14 @@ otherWork.bind();
 resetData();
 otherWork.render();
 otherWork.editWork("old");
+assert.equal(Number(element("owCropYear").value), 2026, "Legacy edit inherits its record year");
+element("owCropYear").value = "2027";
+element("owCropYear").handlers.input();
 const before = dataSnapshot();
 otherWork.render();
 otherWork.render();
 assert.equal(dataSnapshot(), before);
+assert.equal(element("owCropYear").value, "2027", "Rerender preserves the year draft");
 assert.deepEqual(selectedIds("owFields"), ["a", "retired"]);
 assert.deepEqual(selectedIds("owVarieties"), ["missing-variety", "v"]);
 element("owMemo").value = "Unsaved edit";
@@ -103,6 +107,7 @@ otherWork.render();
 assert.deepEqual(selectedIds("owFields"), ["b", "retired"]);
 assert.equal(element("owMemo").value, "Unsaved edit");
 element("otherWorkForm").handlers.submit({ preventDefault() {} });
+assert.equal(state.data().otherWorks.find((row) => row.otherWorkId === "old").cropYear, 2027);
 assert.deepEqual(Array.from(state.data().otherWorks.find((row) => row.otherWorkId === "old").relatedFieldIds).sort(), ["b", "retired"]);
 assert.deepEqual(Array.from(state.data().otherWorks.find((row) => row.otherWorkId === "old").varietyIds).sort(), ["missing-variety", "v"]);
 cards.get("owFields").find((row) => row.dataset.id === "b").classList.toggle("selected", true);
@@ -127,13 +132,14 @@ function installListHandler(file, hostId) {
   assert(start >= 0 && stop > start, hostId);
   // Use the production reset and list listener, with only unrelated rendering stubbed.
   const script = `(function () { const U = RiceOS.utils; const state = RiceOS.state;
-    let workFormSession = 0, sourceScheduleId = '', headingSaveApproved = false, pendingScheduleId = '';
+    let workFormSession = 0, sourceScheduleId = '', headingSaveApproved = false, pendingScheduleId = '', cropYearPinned = false, cropYearLegacyEdit = false, cropYearDirty = false;
     function noop() {}
     const setTargetScope = noop, setWorker = noop, loadHerbicideWork = noop,
       loadHarvestReview = noop, renderMaterialPicker = noop, setSelectedFieldIds = noop,
       clearBulkFields = noop, closeHeadingConfirm = noop, renderChoiceControls = noop,
       renderPanicleEntryState = noop, renderPanicleTargets = noop, renderPaniclePanel = noop,
       renderTargetPanel = noop, invalidateWorkWeather = noop;
+    ${code.includes("function setCropYear(") ? extractFunction(code, "setCropYear") : ""}
     ${extractFunction(code, "resetForm")}
     ${code.slice(start, stop + "\n    });".length)}
   })();`;

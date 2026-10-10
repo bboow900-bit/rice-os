@@ -223,6 +223,8 @@
     dryPeriods: "dryPeriodId",
     irrigations: "irrigationId",
     shipments: "shipmentId",
+    millingRecords: "millingId",
+    shipmentIssues: "issueId",
     shipmentPrices: "priceId",
     machines: "machineId",
     maintenanceRecords: "maintenanceId",
@@ -257,6 +259,7 @@
     };
     [
       ...(Array.isArray(data.fieldWorks) ? data.fieldWorks.map((row) => row && (row.fieldIds || row.fieldId)) : []),
+      ...(Array.isArray(data.millingRecords) ? data.millingRecords.map(row => row && row.fieldIds) : []),
       ...(Array.isArray(data.growthLogs) ? data.growthLogs.map((row) => row && row.fieldId) : []),
       ...(Array.isArray(data.dryPeriods) ? data.dryPeriods.map((row) => row && row.fieldId) : []),
       ...(Array.isArray(data.irrigations) ? data.irrigations.map((row) => row && row.fieldId) : []),
@@ -365,6 +368,46 @@
       lastImportMode: "merge",
       lastImportSourceVersion: incoming.appVersion || incoming.meta && incoming.meta.appVersion || ""
     };
+    const closureTime = S.cropYearClosureTime;
+    const closureRows = meta => Array.isArray(meta && meta.cropYearClosures) ? meta.cropYearClosures : [];
+    const byYear = new Map();
+    for (const row of [...closureRows(current.meta), ...closureRows(incoming.meta)]) {
+      if (!row || !S.validCropYear(row.year)) continue;
+      const year = Number(row.year);
+      const previous = byYear.get(year);
+      const existing = previous && previous.history || [];
+      const occurrences = new Map();
+      for (const event of existing) {
+        const key = `${event.action}|${event.at}`;
+        occurrences.set(key, (occurrences.get(key) || 0) + 1);
+      }
+      const incomingOccurrences = new Map();
+      const additions = (Array.isArray(row.history) ? row.history : []).filter(event => {
+        if (!event || !["closed", "reopened"].includes(event.action) || !Number.isFinite(closureTime(event.at))) return false;
+        const key = `${event.action}|${event.at}`;
+        const ordinal = (incomingOccurrences.get(key) || 0) + 1;
+        incomingOccurrences.set(key, ordinal);
+        return ordinal > (occurrences.get(key) || 0);
+      });
+      const history = [...existing, ...additions].sort((a, b) => closureTime(a.at) - closureTime(b.at));
+      const record = { ...row, ...previous, year, history };
+      if (history.length) {
+        const last = history.at(-1);
+        record.closedAt = history.filter(event => event.action === "closed").at(-1)?.at || "";
+        record.reopenedAt = last.action === "reopened" ? last.at : "";
+      } else {
+        record.closedAt = Number.isFinite(closureTime(record.closedAt)) ? record.closedAt : "";
+        record.reopenedAt = Number.isFinite(closureTime(record.reopenedAt)) ? record.reopenedAt : "";
+      }
+      byYear.set(year, record);
+    }
+    if (current.meta && Object.prototype.hasOwnProperty.call(current.meta, "cropYearClosures")
+      || incoming.meta && Object.prototype.hasOwnProperty.call(incoming.meta, "cropYearClosures")) {
+      merged.meta.cropYearClosures = U.clone([...byYear.values()]);
+    }
+    if (!S.validCropYear(current.meta && current.meta.activeCropYear) && S.validCropYear(incoming.meta && incoming.meta.activeCropYear)) {
+      merged.meta.activeCropYear = Number(incoming.meta.activeCropYear);
+    }
     Object.entries({ nextSeasonIdeas: "ideaId", herbicidePrograms: "programId", herbicideAssignments: "assignmentId", herbicideObservations: "observationId" }).forEach(([key, idKey]) => {
       const existing = Array.isArray(current.meta && current.meta[key]) ? current.meta[key] : [];
       const source = Array.isArray(incoming.meta && incoming.meta[key]) ? incoming.meta[key] : [];
@@ -484,6 +527,8 @@
       maintenanceRecords: (d.maintenanceRecords || []).length,
       materials: d.materials.length,
       varietyResults: d.varietyResults.length,
+      millingRecords: (d.millingRecords || []).length,
+      shipmentIssues: (d.shipmentIssues || []).length,
       updatedAt: d.meta && d.meta.updatedAt || "",
       lastJsonExportAt: d.meta && d.meta.lastJsonExportAt || "",
       lastBackupAt: d.meta && d.meta.lastBackupAt || "",

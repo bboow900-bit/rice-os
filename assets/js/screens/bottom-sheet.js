@@ -12,6 +12,8 @@
   let savingSchedule = false;
   let workFieldIds = [];
   let scheduleFieldIds = [];
+  let scheduleCropYearLegacy = false;
+  let scheduleCropYearDirty = false;
 
   function entryId(entry) {
     if (entry.kind === "shipment") return "";
@@ -319,6 +321,11 @@
     const form = U.$("sheetScheduleForm");
     if (!form) return;
     editingScheduleId = record && record.scheduleId || "";
+    scheduleCropYearLegacy = Boolean(record && (record.cropYear === undefined || record.cropYear === null || record.cropYear === ""));
+    scheduleCropYearDirty = false;
+    if (U.$("sheetScheduleCropYear")) U.$("sheetScheduleCropYear").value = record
+      ? state.cropYearForRecord ? state.cropYearForRecord(record) : record.cropYear || record.season || String(record.date || "").slice(0, 4)
+      : state.defaultCropYear ? state.defaultCropYear(selectedDate) : selectedDate.slice(0, 4);
     scheduleFieldIds = record ? record.targetScope === "offField" ? [] : (record.fieldIds || []).slice() : targetFieldIds();
     const mode = U.$("sheetTargetMode").value;
     U.$("sheetScheduleTargetMode").value = record ? record.targetScope === "offField" ? "offField" : "field" : mode === "group" || mode === "offField" ? mode : "field";
@@ -336,6 +343,13 @@
   }
 
   function addScheduleFromForm() {
+    const input = U.$("sheetScheduleCropYear");
+    const cropYear = input ? Number(input.value) : Number(state.defaultCropYear ? state.defaultCropYear(selectedDate) : selectedDate.slice(0, 4));
+    if (!Number.isInteger(cropYear) || cropYear < 1900 || cropYear > 2200) {
+      alert("対象年度（年産）を1900〜2200の整数で入力してください。");
+      if (input) input.focus();
+      return;
+    }
     const title = String(U.$("sheetScheduleTitle").value || "").trim();
     if (!title) {
       alert("予定名を入力してください。");
@@ -367,6 +381,7 @@
       ...(existing || {}),
       scheduleId: existing ? editingScheduleId : undefined,
       date: selectedDate,
+      ...(!scheduleCropYearLegacy || scheduleCropYearDirty ? { cropYear } : {}),
       fieldIds,
       targetScope: offField ? "offField" : "field",
       batchId,
@@ -385,7 +400,7 @@
 
   function openScreen(screen, callback) {
     const fieldIds = targetFieldIds();
-    if (!fieldIds.length && !(screen === "field-work" && U.$("sheetTargetMode").value === "offField")) {
+    if (screen !== "results" && !fieldIds.length && !(screen === "field-work" && U.$("sheetTargetMode").value === "offField")) {
       U.toast("記録する圃場またはグループを選択してください");
       return;
     }
@@ -437,6 +452,7 @@
   }
 
   function bind() {
+    if (U.$("sheetScheduleCropYear")) U.$("sheetScheduleCropYear").addEventListener("input", () => { scheduleCropYearDirty = true; });
     U.$$("#dateSheet [data-sheet-close]").forEach((el) => el.addEventListener("click", close));
     U.$("sheetField").addEventListener("change", () => {
       selectedFieldId = U.$("sheetField").value;

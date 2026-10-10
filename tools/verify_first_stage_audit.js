@@ -74,7 +74,8 @@ Object.assign(RiceOS.utils, {
   $: element, $$: () => [], toast: () => toasted++,
   setOptions(select, options, value) { select.value = options.some((option) => option.value === value) ? value : ""; }
 });
-RiceOS.state = { activeFields: () => fields, field: (id) => fields.find((field) => field.fieldId === id), groupedFields: () => groups };
+RiceOS.state = { activeFields: () => fields, field: (id) => fields.find((field) => field.fieldId === id), groupedFields: () => groups,
+  defaultCropYear: (date) => Number(date.slice(0, 4)), cropYearForRecord: (record) => Number(record.cropYear || record.season || record.date.slice(0, 4)) };
 RiceOS.calendar = { entriesForDate: () => [] };
 RiceOS.app = { currentScreen: () => "home", openInput: (screen) => opened.push(screen) };
 RiceOS.navigation = { clear: () => cleared++ };
@@ -130,6 +131,7 @@ const schedules = [];
 RiceOS.state.saveSchedule = (record) => { schedules.push(record); return record; };
 start();
 element("sheetScheduleTitle").value = "Group schedule";
+element("sheetScheduleCropYear").value = "2026";
 element("sheetScheduleMemo").value = "Keep this draft";
 element("sheetScheduleTargetMode").value = "group";
 let prevented = 0;

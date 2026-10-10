@@ -19,6 +19,20 @@
   let workFormSession = 0;
   let workWeatherSession = 0;
   let pendingWorkWeather = null;
+  let cropYearPinned = false;
+  let cropYearLegacyEdit = false;
+  let cropYearDirty = false;
+
+  function setCropYear(record, newRecord = false) {
+    const input = U.$("fwCropYear");
+    cropYearPinned = Boolean(record);
+    cropYearLegacyEdit = Boolean(record && !newRecord && (record.cropYear === undefined || record.cropYear === null || record.cropYear === ""));
+    cropYearDirty = false;
+    if (!input) return;
+    input.value = record
+      ? state.cropYearForRecord ? state.cropYearForRecord(record) : record.cropYear || record.season || String(record.date || "").slice(0, 4)
+      : state.defaultCropYear ? state.defaultCropYear(U.$("fwDate").value) : U.$("fwDate").value.slice(0, 4);
+  }
 
   function renderHarvestQuick(active) {
     if (!document.createComment) return;
@@ -544,6 +558,7 @@
     U.$("editFieldWorkId").value = "";
     loadHerbicideWork(null);
     U.$("fwDate").value = U.today();
+    setCropYear();
     setWorker("自分");
     U.$("fwName").value = "田植え";
     loadHarvestReview(null);
@@ -578,6 +593,7 @@
   function prefillDate(date, fieldId) {
     resetForm();
     U.$("fwDate").value = date || U.today();
+    setCropYear();
     if (fieldId) setSelectedFieldIds([fieldId]);
   }
 
@@ -585,6 +601,7 @@
     resetForm();
     setTargetScope(options.targetScope);
     U.$("fwDate").value = date || U.today();
+    setCropYear();
     setSelectedFieldIds(fieldIds || []);
   }
 
@@ -603,6 +620,7 @@
     U.$("fieldWorkHeading").textContent = "予定から作業を記録";
     U.$("fwDate").value = U.today();
     loadWorkName(workNameFromSchedule(schedule));
+    setCropYear(schedule, true);
     setSelectedFieldIds(schedule.fieldIds || []);
     applyWorkPreset(U.$("fwName").value);
     if (schedule.memo) {
@@ -635,6 +653,7 @@
     U.$("fieldWorkHeading").textContent = "作業を編集";
     U.$("editFieldWorkId").value = work.workId;
     U.$("fwDate").value = work.date;
+    setCropYear(work);
     loadWorkName(work.workName);
     setWorker(work.worker || "");
     U.$("fwHours").value = work.hours || "";
@@ -689,6 +708,7 @@
       const visual = workVisual(work.workName);
       const weather = compactWeather(work.weather);
       const details = [
+        work.cropYear ? `対象年度（年産）: ${work.cropYear}` : "",
         work.machine ? `機械: ${work.machine}` : "",
         work.material ? `資材: ${work.material}${work.amount ? ` ${work.amount}` : ""}` : "",
         work.weather ? `天気: ${work.weather}` : "",
@@ -1078,14 +1098,23 @@
     });
 
     U.$("fwDate").addEventListener("change", () => {
+      if (!cropYearPinned) setCropYear();
       renderHerbicidePicker();
       U.$("fwWeatherAutoJson").value = "";
       const location = state.data().meta && state.data().meta.weatherLocation;
       if (location && location.latitude !== undefined) fetchWorkWeather(false);
     });
+    if (U.$("fwCropYear")) U.$("fwCropYear").addEventListener("input", () => { cropYearPinned = true; cropYearDirty = true; });
 
     U.$("fieldWorkForm").addEventListener("submit", async (event) => {
       event.preventDefault();
+      const cropYearInput = U.$("fwCropYear");
+      const cropYear = cropYearInput ? Number(cropYearInput.value) : Number(state.defaultCropYear ? state.defaultCropYear(U.$("fwDate").value) : U.$("fwDate").value.slice(0, 4));
+      if (!Number.isInteger(cropYear) || cropYear < 1900 || cropYear > 2200) {
+        alert("対象年度（年産）を1900〜2200の整数で入力してください。");
+        if (cropYearInput) cropYearInput.focus();
+        return;
+      }
       const ids = selectedFieldIds();
       const offField = targetScope() === "offField";
       if (!offField && !ids.length) {
@@ -1118,6 +1147,7 @@
       const saved = state.saveFieldWork({
         workId,
         date,
+        ...(!cropYearLegacyEdit || cropYearDirty ? { cropYear } : {}),
         workName,
         targetScope: targetScope(),
         fieldIds: ids,
@@ -1177,6 +1207,7 @@
         setTargetScope(work.targetScope);
         U.$("fieldWorkHeading").textContent = "作業を複製";
         U.$("fwDate").value = U.today();
+        setCropYear(work, true);
         loadWorkName(work.workName);
         loadHarvestReview(null);
         setWorker(work.worker || "自分");
@@ -1203,6 +1234,7 @@
       pendingScheduleId = work.sourceScheduleId || "";
       U.$("editFieldWorkId").value = work.workId;
       U.$("fwDate").value = work.date;
+      setCropYear(work);
       loadWorkName(work.workName);
       setWorker(work.worker || "");
       U.$("fwHours").value = work.hours || "";

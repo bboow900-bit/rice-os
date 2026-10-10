@@ -5,6 +5,20 @@
   const U = RiceOS.utils;
   const S = RiceOS.schema;
   const state = RiceOS.state;
+  let cropYearPinned = false;
+  let cropYearLegacyEdit = false;
+  let cropYearDirty = false;
+
+  function setCropYear(record) {
+    const input = U.$("owCropYear");
+    cropYearPinned = Boolean(record);
+    cropYearLegacyEdit = Boolean(record && (record.cropYear === undefined || record.cropYear === null || record.cropYear === ""));
+    cropYearDirty = false;
+    if (!input) return;
+    input.value = record
+      ? state.cropYearForRecord ? state.cropYearForRecord(record) : record.cropYear || record.season || String(record.date || "").slice(0, 4)
+      : state.defaultCropYear ? state.defaultCropYear(U.$("owDate").value) : U.$("owDate").value.slice(0, 4);
+  }
 
   function selected(containerId) {
     return U.$$(`#${containerId} .select-card.selected`).map((el) => el.dataset.id);
@@ -39,6 +53,7 @@
     U.$("otherWorkHeading").textContent = "その他作業";
     U.$("editOtherWorkId").value = "";
     U.$("owDate").value = U.today();
+    setCropYear();
     U.$("owName").value = "種籾注文";
     U.$("owQuantity").value = "";
     U.$("owHours").value = "";
@@ -65,6 +80,7 @@
             </div>
           </div>
           <div class="record-body">
+            ${work.cropYear ? `<div>対象年度（年産）: ${U.escapeHTML(work.cropYear)}</div>` : ""}
             ${work.quantity ? `<div>数量: ${U.escapeHTML(work.quantity)}</div>` : ""}
             ${work.memo ? `<div>${U.escapeHTML(work.memo)}</div>` : ""}
           </div>
@@ -87,6 +103,7 @@
     U.$("otherWorkHeading").textContent = "その他作業を編集";
     U.$("editOtherWorkId").value = work.otherWorkId;
     U.$("owDate").value = work.date;
+    setCropYear(work);
     U.$("owName").value = work.workName;
     U.$("owQuantity").value = work.quantity || "";
     U.$("owHours").value = work.hours || "";
@@ -107,12 +124,22 @@
   function bind() {
     bindSelect("owVarieties");
     bindSelect("owFields");
+    if (U.$("owCropYear")) U.$("owCropYear").addEventListener("input", () => { cropYearPinned = true; cropYearDirty = true; });
+    U.$("owDate").addEventListener("change", () => { if (!cropYearPinned) setCropYear(); });
 
     U.$("otherWorkForm").addEventListener("submit", (event) => {
       event.preventDefault();
+      const input = U.$("owCropYear");
+      const cropYear = input ? Number(input.value) : Number(state.defaultCropYear ? state.defaultCropYear(U.$("owDate").value) : U.$("owDate").value.slice(0, 4));
+      if (!Number.isInteger(cropYear) || cropYear < 1900 || cropYear > 2200) {
+        alert("対象年度（年産）を1900〜2200の整数で入力してください。");
+        if (input) input.focus();
+        return;
+      }
       const saved = state.saveOtherWork({
         otherWorkId: U.$("editOtherWorkId").value,
         date: U.$("owDate").value,
+        ...(!cropYearLegacyEdit || cropYearDirty ? { cropYear } : {}),
         workName: U.$("owName").value,
         quantity: U.$("owQuantity").value,
         hours: U.$("owHours").value,

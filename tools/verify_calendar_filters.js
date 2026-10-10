@@ -148,6 +148,7 @@ console.log("PASS calendar stable-ID field/group/offField filters, planned water
       setOptions(select, options, value) { select.value = options.some((option) => option.value === value) ? value : options[0]?.value || ""; }
     },
     state: {
+      defaultCropYear: (date) => Number(date.slice(0, 4)), cropYearForRecord: (record) => Number(record.cropYear || record.season || record.date.slice(0, 4)),
       activeFields: () => liveFields, field: (id) => liveFields.find((field) => field.fieldId === id),
       groupedFields: () => liveGroups.map((group) => ({ ...group, fields: liveFields.filter((field) => field.fieldGroupId === group.fieldGroupId) })),
       variety: () => null, data: () => ({ schedules: [schedule] }), saveSchedule: (record) => { saved.push(record); return record; }
