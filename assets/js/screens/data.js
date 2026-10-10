@@ -38,6 +38,7 @@
       materials: (data.materials || []).length,
       photos: (data.photos || []).length,
       results: (data.varietyResults || []).length,
+      milling: (data.millingRecords || []).length,
       machines: (data.machines || []).filter((item) => item.status !== "使用停止").length
     };
     Object.entries(values).forEach(([key, value]) => {
@@ -191,6 +192,13 @@
   }
 
   function bind() {
+    U.$$("[data-open-milling-ledger]").forEach(button => {
+      button.addEventListener("click", () => {
+        if (RiceOS.navigation) RiceOS.navigation.clear();
+        RiceOS.app.openInput("results", "data");
+        RiceOS.screens.results.openMillingLedger();
+      });
+    });
     const systemSettingsPanel = U.$("systemSettingsPanel");
     U.$$('[data-action="open-system-settings"]').forEach((button) => {
       button.addEventListener("click", () => {

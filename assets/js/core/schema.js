@@ -5,7 +5,7 @@
   const U = RiceOS.utils;
 
   const SCHEMA_VERSION = 17;
-  const APP_VERSION = "20261010_ver291";
+  const APP_VERSION = "20261010_ver292";
   const STORE_KEY = "rice_os_v8_stable";
   const BACKUP_KEY = "rice_os_v8_stable_backup";
   const RELEASE_BACKUPS_KEY = "rice_os_v8_stable_release_backups";

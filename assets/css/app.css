@@ -15476,3 +15476,5 @@ label {
 .annual-closure-body form { display: flex; gap: 8px; align-items: end; flex-wrap: wrap; }
 [data-crop-year-closure] { margin: 12px 0; border-bottom: 1px solid #dbe6dc; }
 [data-crop-year-closure] > summary { padding: 12px 0; cursor: pointer; font-weight: 700; }
+.milling-content .stack-form[hidden],
+.milling-content .milling-stock[hidden] { display: none; }

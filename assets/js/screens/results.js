@@ -11,6 +11,9 @@
   let issueOriginal = null;
   let millingError = "";
   let issueError = "";
+  let millingViewYear = "all";
+  let millingLedgerMode = false;
+  let millingFormVisible = true;
 
   function newLedgerDraft() {
     return { date: U.today(),season: U.today().slice(0, 4),varietyId: "",memo: "" };
@@ -96,11 +99,27 @@
       <p id="millingError" class="milling-warning" role="alert">${U.escapeHTML(millingError)}</p>
       <div class="form-actions"><button type="button" class="secondary" data-milling-cancel>${millingOriginal ? "編集を取消" : "入力をクリア"}</button><button type="submit" class="primary">${millingOriginal ? "変更を保存" : "籾摺り収量を保存"}</button></div></form>
       <section id="millingStock" class="milling-stock"></section>
-      <div id="millingList">${millingRows().slice().sort((a,b) => String(b.date).localeCompare(String(a.date))).map(r => {
-        const kg = quantityKg(r),ids = r.fieldIds || [],v = state.variety(r.varietyId);
-        return `<article class="record" data-milling-id="${U.attr(r.millingId)}"><div class="record-head"><b>${U.escapeHTML(r.date)} / ${U.escapeHTML(r.season)}年産 ${U.escapeHTML(v && v.name || r.varietyId)}</b></div><div class="record-body"><p>${ids.length > 1 ? "選択圃場合算" : ids.length ? "圃場指定" : "品種集計"}${ids.length ? `：${U.escapeHTML(ids.map(id => state.field(id)?.name || id).join("・"))}` : ""}</p><b>${kg === null || kg <= 0 ? "数量未確認" : `${numberText(kg)}kg / ${numberText(kg / 60)}俵（60kg）`}</b>${r.memo ? `<p>${U.escapeHTML(r.memo)}</p>` : ""}</div><div class="record-actions"><button type="button" class="secondary" data-milling-action="edit" data-id="${U.attr(r.millingId)}">編集</button><button type="button" class="danger" data-milling-action="delete" data-id="${U.attr(r.millingId)}">削除</button></div></article>`;
-      }).join("") || '<p class="empty">籾摺り後の収量は未登録です。</p>'}</div>`;
+      ${renderMillingHistory()}`;
+    U.$("millingForm").hidden = !millingFormVisible;
+    U.$("millingStock").hidden = !millingFormVisible;
+    if (millingLedgerMode && !millingFormVisible) host.querySelector(".section-title").after(U.$("millingLedger"));
     renderMillingSummary();
+  }
+
+  function renderMillingHistory() {
+    const all = millingRows();
+    const recordYear = row => Number.isInteger(Number(row.season)) && Number(row.season) >= 1900 && Number(row.season) <= 2200 ? String(Number(row.season)) : "unknown";
+    const years = [...new Set(all.map(recordYear))];
+    if (millingViewYear !== "all" && !years.includes(millingViewYear)) years.push(millingViewYear);
+    years.sort((a,b) => a === "unknown" ? 1 : b === "unknown" ? -1 : Number(b) - Number(a));
+    const rows = all.filter(row => millingViewYear === "all" || recordYear(row) === millingViewYear).sort((a,b) => String(b.date).localeCompare(String(a.date)));
+    const known = rows.map(quantityKg).filter(kg => kg !== null && kg > 0);
+    const total = known.reduce((sum,kg) => sum + kg,0);
+    const yearLabel = value => value === "unknown" ? "年度未確認" : `${value}年産`;
+    return `<section id="millingLedger"><label>履歴の表示年度<select id="millingLedgerYear"><option value="all"${millingViewYear === "all" ? " selected" : ""}>全年度</option>${years.map(year => `<option value="${U.attr(year)}"${millingViewYear === year ? " selected" : ""}>${yearLabel(year)}</option>`).join("")}</select></label><p id="millingLedgerSummary">${millingViewYear === "all" ? "全年度" : yearLabel(millingViewYear)} · ${rows.length}件${known.length ? ` / 確認済み収量 ${numberText(total)}kg（${numberText(total / 60)}俵）` : ""}${rows.length > known.length ? ` / 数量未確認 ${rows.length - known.length}件` : ""}</p><p id="millingLedgerError" class="milling-warning" role="alert">${!millingFormVisible ? U.escapeHTML(millingError) : ""}</p><div id="millingList">${years.filter(year => rows.some(row => recordYear(row) === year)).map(year => `<section data-milling-year-group="${U.attr(year)}"><h4>${yearLabel(year)}</h4>${rows.filter(row => recordYear(row) === year).map(r => {
+      const kg = quantityKg(r),ids = r.fieldIds || [],v = state.variety(r.varietyId);
+      return `<article class="record" data-milling-id="${U.attr(r.millingId)}"><div class="record-head"><b>${U.escapeHTML(r.date)} / ${U.escapeHTML(r.season)}年産 ${U.escapeHTML(v && v.name || r.varietyId)}</b></div><div class="record-body"><p>${ids.length > 1 ? "選択圃場合算" : ids.length ? "圃場指定" : "品種集計"}${ids.length ? `：${U.escapeHTML(ids.map(id => state.field(id)?.name || id).join("・"))}` : ""}</p><b>${kg === null || kg <= 0 ? "数量未確認" : `${numberText(kg)}kg / ${numberText(kg / 60)}俵（60kg）`}</b>${r.memo ? `<p>${U.escapeHTML(r.memo)}</p>` : ""}</div><div class="record-actions"><button type="button" class="secondary" data-milling-action="edit" data-id="${U.attr(r.millingId)}">編集</button><button type="button" class="danger" data-milling-action="delete" data-id="${U.attr(r.millingId)}">削除</button></div></article>`;
+    }).join("")}</section>`).join("") || '<p class="empty">この年度の籾摺り記録はありません。</p>'}</div></section>`;
   }
 
   function readMilling() {
@@ -111,11 +130,19 @@
   function editMillingRecord(id) {
     const record = millingRows().find(r => r.millingId === id);
     if (!record) { alert("この籾摺り記録は見つかりません。"); return false; }
+    millingFormVisible = true;
     millingOriginal = U.clone(record); millingDraft = U.clone(record); millingDraft.fieldIds = (record.fieldIds || []).slice(); millingDraft.packages = U.clone(record.packages || []); millingError = "";
     renderMilling(); U.$("millingForm").scrollIntoView({ block: "start",behavior: "smooth" }); return true;
   }
 
-  function openMilling() { resetMilling(); U.$("millingForm").scrollIntoView({ block: "start",behavior: "smooth" }); }
+  function openMilling() { millingLedgerMode = false; millingFormVisible = true; resetMilling(); U.$("millingForm").scrollIntoView({ block: "start",behavior: "smooth" }); }
+  function openMillingLedger() {
+    millingLedgerMode = true; millingFormVisible = false; renderMilling();
+    U.$("millingContent").scrollIntoView({ block: "start",behavior: "smooth" });
+  }
+  function showMillingForm() {
+    millingLedgerMode = false; millingFormVisible = true; renderMilling();
+  }
   function openShipmentIssues() {
     const section = U.$("shipmentIssuesSection");
     if (!section) return;
@@ -147,8 +174,9 @@
   function bindLedgers() {
     const milling = U.$("millingContent"),issues = U.$("shipmentIssuesContent");
     if (!milling || !issues) return;
-    milling.addEventListener("input",() => { readMilling(); renderMillingSummary(); });
+    milling.addEventListener("input",event => { if (event.target.id === "millingLedgerYear") return; readMilling(); renderMillingSummary(); });
     milling.addEventListener("change",event => {
+      if (event.target.id === "millingLedgerYear") { millingViewYear = event.target.value; renderMilling(); return; }
       readMilling();
       if (event.target.id === "millingVariety") { millingDraft.fieldIds = []; renderMilling(); }
       else if (event.target.matches("[data-milling-field]")) U.$("millingScope").textContent = millingDraft.fieldIds.length > 1 ? "選択圃場の合算（圃場別には分割しません）" : millingDraft.fieldIds.length ? "選択圃場の収量" : "圃場未選択：品種集計";
@@ -156,13 +184,14 @@
     });
     milling.addEventListener("click",event => {
       const button = event.target.closest("button"); if (!button) return;
-      if (button.hasAttribute("data-milling-new") || button.hasAttribute("data-milling-cancel")) { resetMilling(); return; }
+      if (button.hasAttribute("data-milling-new")) { millingFormVisible = true; resetMilling(); return; }
+      if (button.hasAttribute("data-milling-cancel")) { if (millingLedgerMode) millingFormVisible = false; resetMilling(); return; }
       if (button.hasAttribute("data-milling-add-package")) { readMilling(); millingDraft.packages.push({ kg: button.dataset.millingAddPackage,bags: "1" }); renderMilling(); return; }
       if (button.hasAttribute("data-milling-remove-package")) { readMilling(); millingDraft.packages.splice(Number(button.dataset.millingRemovePackage),1); renderMilling(); return; }
       if (button.dataset.millingAction === "edit") { editMillingRecord(button.dataset.id); return; }
       if (button.dataset.millingAction === "delete" && confirm("この籾摺り記録を削除しますか？")) {
         if (typeof state.deleteMillingRecord !== "function" || !state.deleteMillingRecord(button.dataset.id)) { millingError = "削除できませんでした。記録は変更していません。"; renderMilling(); return; }
-        if (millingOriginal && millingOriginal.millingId === button.dataset.id) resetMilling(); else renderMilling();
+        if (millingOriginal && millingOriginal.millingId === button.dataset.id) { if (millingLedgerMode) millingFormVisible = false; resetMilling(); } else renderMilling();
       }
     });
     milling.addEventListener("submit",event => {
@@ -171,6 +200,7 @@
       if (millingOriginal && !current) { millingError = "編集中の記録が削除されています。新規入力に切り替えてください。"; renderMilling(); return; }
       if (typeof state.saveMillingRecord !== "function" || !state.saveMillingRecord({ ...(current || {}),...millingDraft })) { millingError = "保存できませんでした。入力と数量を確認してください。"; renderMilling(); return; }
       const scope = { season: millingDraft.season,varietyId: millingDraft.varietyId };
+      if (millingLedgerMode) millingFormVisible = false;
       resetMilling(); Object.assign(millingDraft,scope); renderMilling();
     });
     issues.addEventListener("input",() => { readIssue(); refreshIssueCosts(); });
@@ -219,6 +249,7 @@
   }
 
   function resetForm() {
+    showMillingForm();
     editingResult = null;
     U.$("rSeason").value = new Date().getFullYear();
     if (state.varieties()[0]) U.$("rVariety").value = state.varieties()[0].varietyId;
@@ -292,6 +323,9 @@
   }
 
   function bind() {
+    if (typeof document.addEventListener === "function") document.addEventListener("click",event => {
+      if (event.target.closest('[data-sheet-add="result"], [data-jump-screen="results"], .nav-item[data-screen="results"]')) showMillingForm();
+    },true);
     bindLedgers();
     U.$("resultForm").addEventListener("submit", (event) => {
       event.preventDefault();
@@ -333,5 +367,5 @@
   }
 
   RiceOS.screens = RiceOS.screens || {};
-  RiceOS.screens.results = { render, bind, resetForm, editResult, editMillingRecord, openMilling, openShipmentIssues };
+  RiceOS.screens.results = { render, bind, resetForm, editResult, editMillingRecord, openMilling, openMillingLedger, openShipmentIssues };
 })();
