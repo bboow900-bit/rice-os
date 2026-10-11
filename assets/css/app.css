@@ -15478,3 +15478,5 @@ label {
 [data-crop-year-closure] > summary { padding: 12px 0; cursor: pointer; font-weight: 700; }
 .milling-content .stack-form[hidden],
 .milling-content .milling-stock[hidden] { display: none; }
+.milling-content #millingLedgerStock .record { padding: 12px; margin: 8px 0; }
+.milling-content #millingLedgerStock .record p { margin: 6px 0 0; overflow-wrap: anywhere; }

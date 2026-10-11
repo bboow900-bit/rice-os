@@ -5,7 +5,7 @@
   const U = RiceOS.utils;
 
   const SCHEMA_VERSION = 17;
-  const APP_VERSION = "20261010_ver292";
+  const APP_VERSION = "20261011_ver293";
   const STORE_KEY = "rice_os_v8_stable";
   const BACKUP_KEY = "rice_os_v8_stable_backup";
   const RELEASE_BACKUPS_KEY = "rice_os_v8_stable_release_backups";
@@ -1047,6 +1047,8 @@
     const loose = row.looseKg == null || row.looseKg === "" ? 0 : inventoryNumber(row.looseKg);
     const looseKg = Number.isFinite(loose) && loose >= 0 ? loose : "";
     const total = packages.reduce((sum, item) => sum + Number(item.kg) * Number(item.bags), 0) + Number(looseKg);
+    const totalBags = packages.reduce((sum, item) => sum + Number(item.bags), 0);
+    if (strict && !Number.isSafeInteger(totalBags)) throw new Error("袋数の合計が安全に集計できる範囲を超えています。");
     if (strict && (looseKg === "" || !Number.isFinite(total) || total <= 0)) throw new Error("正の受入重量を入力してください。");
     if (strict && row.fieldIds !== undefined && !Array.isArray(row.fieldIds)) throw new Error("圃場を確認してください。");
     return { ...row, fieldIds: Array.from(new Set(ensureArray(row.fieldIds).map(String))), packages, looseKg };

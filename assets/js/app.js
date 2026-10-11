@@ -6,6 +6,7 @@
 
   let activeScreen = "home";
   let inputOriginScreen = "";
+  let inputOriginParents = [];
   let bound = false;
   const initialScreens = new Set([
     "home",
@@ -105,7 +106,7 @@
     // source tab so cancelling an input never strands the user on a form.
     if (inputOriginScreen) {
       const origin = inputOriginScreen;
-      inputOriginScreen = "";
+      inputOriginScreen = inputOriginParents.pop() || "";
       show(origin, { skipHistory: true });
       return;
     }
@@ -130,7 +131,9 @@
     }
   }
 
-  function openInput(screenId, originScreen) {
+  function openInput(screenId, originScreen, options) {
+    if (options && options.nested) inputOriginParents.push(inputOriginScreen);
+    else inputOriginParents = [];
     inputOriginScreen = originScreen || activeScreen || "home";
     show(screenId, { skipHistory: true });
     updateBackButton();
@@ -138,6 +141,7 @@
 
   function clearInputOrigin() {
     inputOriginScreen = "";
+    inputOriginParents = [];
     updateBackButton();
   }
 

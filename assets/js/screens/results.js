@@ -14,9 +14,12 @@
   let millingViewYear = "all";
   let millingLedgerMode = false;
   let millingFormVisible = true;
+  let issueViewYear = "all";
+  let savedMillingId = "";
 
   function newLedgerDraft() {
-    return { date: U.today(),season: U.today().slice(0, 4),varietyId: "",memo: "" };
+    const date = U.today();
+    return { date,season: String(state.defaultShipmentCropYear(date)),varietyId: "",memo: "" };
   }
 
   function resetMilling() {
@@ -104,6 +107,19 @@
     U.$("millingStock").hidden = !millingFormVisible;
     if (millingLedgerMode && !millingFormVisible) host.querySelector(".section-title").after(U.$("millingLedger"));
     renderMillingSummary();
+    host.querySelectorAll("[data-milling-id]").forEach(row => {
+      if (row.dataset.millingId === savedMillingId) row.insertAdjacentHTML("afterbegin", '<p role="status">保存しました</p>');
+    });
+  }
+
+  function renderLedgerStock() {
+    if (typeof state.riceStockFor !== "function") return "";
+    const groups = new Map(millingRows().filter(row => millingViewYear === "all" || String(row.season) === millingViewYear).map(row => [`${row.season}|${row.varietyId}`,row]));
+    return `<section id="millingLedgerStock"><h4>年度・品種別の参考在庫</h4><p class="muted">全圃場・全相手先・全出荷区分。白米は重量換算せず除外。</p>${[...groups.values()].map(row => {
+      const stock = state.riceStockFor(Number(row.season),row.varietyId);
+      if (!stock) return "";
+      return `<div class="record"><b>${U.escapeHTML(row.season)}年産 / ${U.escapeHTML(state.variety(row.varietyId)?.name || row.varietyId)}</b><p>登録収量 ${numberText(stock.receivedKg)}kg / 出荷・配布 ${numberText(stock.dispatchedKg)}kg / 差引参考在庫 ${numberText(stock.remainingKg)}kg</p><p class="muted">白米除外 ${numberText(stock.whiteShipmentCount)}件 / 数量不明 ${numberText(stock.unquantifiedCount)}件 / 品種未分類 ${numberText(stock.unclassifiedCount)}件</p>${stock.remainingKg < 0 ? '<p class="milling-warning">差引がマイナスです。記録を確認してください。</p>' : ""}</div>`;
+    }).join("") || '<p class="empty">この年度の収量は未登録です。</p>'}</section>`;
   }
 
   function renderMillingHistory() {
@@ -116,7 +132,7 @@
     const known = rows.map(quantityKg).filter(kg => kg !== null && kg > 0);
     const total = known.reduce((sum,kg) => sum + kg,0);
     const yearLabel = value => value === "unknown" ? "年度未確認" : `${value}年産`;
-    return `<section id="millingLedger"><label>履歴の表示年度<select id="millingLedgerYear"><option value="all"${millingViewYear === "all" ? " selected" : ""}>全年度</option>${years.map(year => `<option value="${U.attr(year)}"${millingViewYear === year ? " selected" : ""}>${yearLabel(year)}</option>`).join("")}</select></label><p id="millingLedgerSummary">${millingViewYear === "all" ? "全年度" : yearLabel(millingViewYear)} · ${rows.length}件${known.length ? ` / 確認済み収量 ${numberText(total)}kg（${numberText(total / 60)}俵）` : ""}${rows.length > known.length ? ` / 数量未確認 ${rows.length - known.length}件` : ""}</p><p id="millingLedgerError" class="milling-warning" role="alert">${!millingFormVisible ? U.escapeHTML(millingError) : ""}</p><div id="millingList">${years.filter(year => rows.some(row => recordYear(row) === year)).map(year => `<section data-milling-year-group="${U.attr(year)}"><h4>${yearLabel(year)}</h4>${rows.filter(row => recordYear(row) === year).map(r => {
+    return `<section id="millingLedger"><label>履歴の表示年度<select id="millingLedgerYear"><option value="all"${millingViewYear === "all" ? " selected" : ""}>全年度</option>${years.map(year => `<option value="${U.attr(year)}"${millingViewYear === year ? " selected" : ""}>${yearLabel(year)}</option>`).join("")}</select></label><p id="millingLedgerSummary">${millingViewYear === "all" ? "全年度" : yearLabel(millingViewYear)} · ${rows.length}件${known.length ? ` / 登録収量合計 ${numberText(total)}kg（${numberText(total / 60)}俵）` : ""}${rows.length > known.length ? ` / 数量未確認 ${rows.length - known.length}件` : ""}</p><p id="millingLedgerError" class="milling-warning" role="alert">${!millingFormVisible ? U.escapeHTML(millingError) : ""}</p>${renderLedgerStock()}<div id="millingList">${years.filter(year => rows.some(row => recordYear(row) === year)).map(year => `<section data-milling-year-group="${U.attr(year)}"><h4>${yearLabel(year)}</h4>${rows.filter(row => recordYear(row) === year).map(r => {
       const kg = quantityKg(r),ids = r.fieldIds || [],v = state.variety(r.varietyId);
       return `<article class="record" data-milling-id="${U.attr(r.millingId)}"><div class="record-head"><b>${U.escapeHTML(r.date)} / ${U.escapeHTML(r.season)}年産 ${U.escapeHTML(v && v.name || r.varietyId)}</b></div><div class="record-body"><p>${ids.length > 1 ? "選択圃場合算" : ids.length ? "圃場指定" : "品種集計"}${ids.length ? `：${U.escapeHTML(ids.map(id => state.field(id)?.name || id).join("・"))}` : ""}</p><b>${kg === null || kg <= 0 ? "数量未確認" : `${numberText(kg)}kg / ${numberText(kg / 60)}俵（60kg）`}</b>${r.memo ? `<p>${U.escapeHTML(r.memo)}</p>` : ""}</div><div class="record-actions"><button type="button" class="secondary" data-milling-action="edit" data-id="${U.attr(r.millingId)}">編集</button><button type="button" class="danger" data-milling-action="delete" data-id="${U.attr(r.millingId)}">削除</button></div></article>`;
     }).join("")}</section>`).join("") || '<p class="empty">この年度の籾摺り記録はありません。</p>'}</div></section>`;
@@ -157,7 +173,14 @@
     const costs = rows.filter(r => Number(r.season) === Number(d.season) && r.varietyId === d.varietyId);
     const known = costs.filter(r => r.costYen !== "" && r.costYen != null && Number.isSafeInteger(Number(r.costYen)) && Number(r.costYen) >= 0);
     const sum = known.reduce((n,r) => n + Number(r.costYen),0);
-    host.innerHTML = `<form id="shipmentIssueForm" class="stack-form"><input id="editShipmentIssueId" type="hidden" value="${U.attr(issueOriginal && issueOriginal.issueId || "")}"><h4>${issueOriginal ? "出荷できなかった記録を編集" : "出荷できなかった記録を登録"}</h4><div class="form-grid dense"><label>日付<input id="shipmentIssueDate" type="date" value="${U.attr(d.date)}" required></label><label>年産<input id="shipmentIssueSeason" type="number" min="1900" max="2200" step="1" value="${U.attr(d.season)}" required></label><label class="wide">品種<select id="shipmentIssueVariety" required>${ledgerVarieties(d.varietyId)}</select></label></div><label>理由<input id="shipmentIssueReason" value="${U.attr(d.reason || "")}" required></label><label>対応<input id="shipmentIssueAction" value="${U.attr(d.action || "")}"></label><label>対応費用（円・任意）<input id="shipmentIssueCost" type="number" min="0" step="1" value="${U.attr(d.costYen ?? "")}"></label><label>メモ<textarea id="shipmentIssueMemo">${U.escapeHTML(d.memo || "")}</textarea></label><p id="shipmentIssueError" class="milling-warning" role="alert">${U.escapeHTML(issueError)}</p><div class="form-actions"><button type="button" class="secondary" data-shipment-issue-cancel>${issueOriginal ? "編集を取消" : "入力をクリア"}</button><button type="submit" class="primary">保存</button></div></form><p id="shipmentIssueCosts">${d.varietyId ? `${U.escapeHTML(d.season)}年産・選択品種の参考対応費用：${Number.isSafeInteger(sum) ? numberText(sum) : "集計範囲外"}円 / 費用未登録 ${costs.length - known.length}件` : "年度と品種を選択してください。"}</p><p class="muted">対応費用は利益ではありません。出荷数量・在庫からは差し引きません。</p><div id="shipmentIssueList">${rows.slice().sort((a,b) => String(b.date).localeCompare(String(a.date))).map(r => `<article class="record" data-shipment-issue-id="${U.attr(r.issueId)}"><div class="record-head"><b>${U.escapeHTML(r.date)} / ${U.escapeHTML(r.season)}年産 ${U.escapeHTML(state.variety(r.varietyId)?.name || r.varietyId)}</b></div><div class="record-body"><p>${U.escapeHTML(r.reason)}</p>${r.action ? `<p>対応：${U.escapeHTML(r.action)}</p>` : ""}<p>対応費用：${r.costYen === "" || r.costYen == null ? "未登録" : `${numberText(Number(r.costYen))}円`}</p>${r.memo ? `<p>${U.escapeHTML(r.memo)}</p>` : ""}</div><div class="record-actions"><button type="button" class="secondary" data-shipment-issue-action="edit" data-id="${U.attr(r.issueId)}">編集</button><button type="button" class="danger" data-shipment-issue-action="delete" data-id="${U.attr(r.issueId)}">削除</button></div></article>`).join("") || '<p class="empty">記録はありません。</p>'}</div>`;
+    host.innerHTML = `${renderIssueFilter()}<form id="shipmentIssueForm" class="stack-form"><input id="editShipmentIssueId" type="hidden" value="${U.attr(issueOriginal && issueOriginal.issueId || "")}"><h4>${issueOriginal ? "出荷できなかった記録を編集" : "出荷できなかった記録を登録"}</h4><div class="form-grid dense"><label>日付<input id="shipmentIssueDate" type="date" value="${U.attr(d.date)}" required></label><label>年産<input id="shipmentIssueSeason" type="number" min="1900" max="2200" step="1" value="${U.attr(d.season)}" required></label><label class="wide">品種<select id="shipmentIssueVariety" required>${ledgerVarieties(d.varietyId)}</select></label></div><label>理由<input id="shipmentIssueReason" value="${U.attr(d.reason || "")}" required></label><label>対応<input id="shipmentIssueAction" value="${U.attr(d.action || "")}"></label><label>対応費用（円・任意）<input id="shipmentIssueCost" type="number" min="0" step="1" value="${U.attr(d.costYen ?? "")}"></label><label>メモ<textarea id="shipmentIssueMemo">${U.escapeHTML(d.memo || "")}</textarea></label><p id="shipmentIssueError" class="milling-warning" role="alert">${U.escapeHTML(issueError)}</p><div class="form-actions"><button type="button" class="secondary" data-shipment-issue-cancel>${issueOriginal ? "編集を取消" : "入力をクリア"}</button><button type="submit" class="primary">保存</button></div></form><p id="shipmentIssueCosts">${d.varietyId ? `${U.escapeHTML(d.season)}年産・選択品種の参考対応費用：${Number.isSafeInteger(sum) ? numberText(sum) : "集計範囲外"}円 / 費用未登録 ${costs.length - known.length}件` : "年度と品種を選択してください。"}</p><p class="muted">対応費用は利益ではありません。出荷数量・在庫からは差し引きません。</p><div id="shipmentIssueList">${rows.filter(row => issueViewYear === "all" || String(row.season) === issueViewYear).slice().sort((a,b) => String(b.date).localeCompare(String(a.date))).map(r => `<article class="record" data-shipment-issue-id="${U.attr(r.issueId)}"><div class="record-head"><b>${U.escapeHTML(r.date)} / ${U.escapeHTML(r.season)}年産 ${U.escapeHTML(state.variety(r.varietyId)?.name || r.varietyId)}</b></div><div class="record-body"><p>${U.escapeHTML(r.reason)}</p>${r.action ? `<p>対応：${U.escapeHTML(r.action)}</p>` : ""}<p>対応費用：${r.costYen === "" || r.costYen == null ? "未登録" : `${numberText(Number(r.costYen))}円`}</p>${r.memo ? `<p>${U.escapeHTML(r.memo)}</p>` : ""}</div><div class="record-actions"><button type="button" class="secondary" data-shipment-issue-action="edit" data-id="${U.attr(r.issueId)}">編集</button><button type="button" class="danger" data-shipment-issue-action="delete" data-id="${U.attr(r.issueId)}">削除</button></div></article>`).join("") || '<p class="empty">記録はありません。</p>'}</div>`;
+  }
+
+  function renderIssueFilter() {
+    const years = [...new Set(issueRows().map(row => String(row.season)))];
+    if (issueViewYear !== "all" && !years.includes(issueViewYear)) years.push(issueViewYear);
+    years.sort((a,b) => Number(b) - Number(a));
+    return `<label>対応履歴の表示年度<select id="shipmentIssueViewYear"><option value="all"${issueViewYear === "all" ? " selected" : ""}>全年度</option>${years.map(year => `<option value="${U.attr(year)}"${issueViewYear === year ? " selected" : ""}>${U.escapeHTML(year)}年産</option>`).join("")}</select></label><p class="muted">対応費用の集計は入力欄の年度・品種が対象です。履歴フィルターとは別です。</p>`;
   }
 
   function readIssue() {
@@ -184,7 +207,7 @@
     });
     milling.addEventListener("click",event => {
       const button = event.target.closest("button"); if (!button) return;
-      if (button.hasAttribute("data-milling-new")) { millingFormVisible = true; resetMilling(); return; }
+      if (button.hasAttribute("data-milling-new")) { millingFormVisible = true; savedMillingId = ""; resetMilling(); if (millingLedgerMode && /^\d{4}$/.test(millingViewYear)) { millingDraft.season = millingViewYear; renderMilling(); } return; }
       if (button.hasAttribute("data-milling-cancel")) { if (millingLedgerMode) millingFormVisible = false; resetMilling(); return; }
       if (button.hasAttribute("data-milling-add-package")) { readMilling(); millingDraft.packages.push({ kg: button.dataset.millingAddPackage,bags: "1" }); renderMilling(); return; }
       if (button.hasAttribute("data-milling-remove-package")) { readMilling(); millingDraft.packages.splice(Number(button.dataset.millingRemovePackage),1); renderMilling(); return; }
@@ -198,13 +221,17 @@
       event.preventDefault(); readMilling();
       const current = millingOriginal && millingRows().find(r => r.millingId === millingOriginal.millingId);
       if (millingOriginal && !current) { millingError = "編集中の記録が削除されています。新規入力に切り替えてください。"; renderMilling(); return; }
-      if (typeof state.saveMillingRecord !== "function" || !state.saveMillingRecord({ ...(current || {}),...millingDraft })) { millingError = "保存できませんでした。入力と数量を確認してください。"; renderMilling(); return; }
+      const saved = typeof state.saveMillingRecord === "function" && state.saveMillingRecord({ ...(current || {}),...millingDraft });
+      if (!saved) { millingError = "保存できませんでした。入力と数量を確認してください。"; renderMilling(); return; }
+      millingViewYear = String(saved.season); savedMillingId = saved.millingId;
       const scope = { season: millingDraft.season,varietyId: millingDraft.varietyId };
       if (millingLedgerMode) millingFormVisible = false;
       resetMilling(); Object.assign(millingDraft,scope); renderMilling();
+      const savedRow = [...U.$("millingList").querySelectorAll("[data-milling-id]")].find(row => row.dataset.millingId === savedMillingId);
+      if (savedRow) savedRow.scrollIntoView({ block: "center",behavior: "smooth" });
     });
-    issues.addEventListener("input",() => { readIssue(); refreshIssueCosts(); });
-    issues.addEventListener("change",() => { readIssue(); refreshIssueCosts(); });
+    issues.addEventListener("input",event => { if (event.target.id !== "shipmentIssueViewYear") { readIssue(); refreshIssueCosts(); } });
+    issues.addEventListener("change",event => { if (event.target.id === "shipmentIssueViewYear") { issueViewYear = event.target.value; renderIssues(); return; } readIssue(); refreshIssueCosts(); });
     issues.addEventListener("click",event => {
       const button = event.target.closest("button"); if (!button) return;
       if (button.hasAttribute("data-shipment-issue-cancel")) { resetIssue(); return; }
@@ -221,7 +248,9 @@
       event.preventDefault(); readIssue();
       const current = issueOriginal && issueRows().find(r => r.issueId === issueOriginal.issueId);
       if (issueOriginal && !current) { issueError = "編集中の記録が削除されています。新規入力に切り替えてください。"; renderIssues(); return; }
-      if (typeof state.saveShipmentIssue !== "function" || !state.saveShipmentIssue({ ...(current || {}),...issueDraft })) { issueError = "保存できませんでした。入力内容を確認してください。"; renderIssues(); return; }
+      const saved = typeof state.saveShipmentIssue === "function" && state.saveShipmentIssue({ ...(current || {}),...issueDraft });
+      if (!saved) { issueError = "保存できませんでした。入力内容を確認してください。"; renderIssues(); return; }
+      issueViewYear = String(saved.season);
       const scope = { season: issueDraft.season,varietyId: issueDraft.varietyId }; resetIssue(); Object.assign(issueDraft,scope); renderIssues();
     });
   }
@@ -367,5 +396,5 @@
   }
 
   RiceOS.screens = RiceOS.screens || {};
-  RiceOS.screens.results = { render, bind, resetForm, editResult, editMillingRecord, openMilling, openMillingLedger, openShipmentIssues };
+  RiceOS.screens.results = { render, bind, resetForm, editResult, editMillingRecord, openMilling, openMillingLedger, showMillingForm, openShipmentIssues };
 })();

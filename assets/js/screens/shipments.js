@@ -26,8 +26,8 @@
     return Array.isArray(row.packages) && row.packages.length > 0 && row.packages.every((item) =>
       Number.isFinite(Number(item.kg)) && Number(item.kg) > 0 && Number.isSafeInteger(Number(item.bags)) && Number(item.bags) > 0);
   }
-  function numberText(value) { return Number(value).toLocaleString("ja-JP", { maximumFractionDigits: 6, useGrouping: false }); }
-  function yen(value) { return `¥${Number(value).toLocaleString("ja-JP")}`; }
+  function numberText(value) { return value == null || !Number.isFinite(Number(value)) ? "集計範囲外" : Number(value).toLocaleString("ja-JP", { maximumFractionDigits: 6, useGrouping: false }); }
+  function yen(value) { return value == null || !Number.isSafeInteger(Number(value)) ? "集計範囲外" : `¥${Number(value).toLocaleString("ja-JP")}`; }
   function salesFor(row) {
     const result = { amount: 0, priced: 0, missing: 0, missingBags: 0, legacy: 0 };
     if (row.kind === "gift") return result;
@@ -170,7 +170,8 @@
     const groups = new Map(harvests.map(row => [`${row.season}|${row.varietyId}`, { season: row.season, varietyId: row.varietyId }]));
     return `<section class="shipment-year-totals" aria-label="玄米の残量"><div class="shipment-list-head"><h3>玄米の残量</h3><button type="button" class="secondary" data-shipment-harvests>収量・対応費</button></div><p class="shipment-total-scope">年産・品種別 / 全相手先・全出荷区分</p>${[...groups.values()].sort((a, b) => Number(b.season) - Number(a.season)).map(group => {
       const stock = state.riceStockFor(group.season, group.varietyId);
-      return `<div class="shipment-year-total" data-rice-stock="${U.attr(`${group.season}|${group.varietyId}`)}"><div class="shipment-total-head"><b>${U.escapeHTML(group.season)}年産 / ${U.escapeHTML(varietyName(group.varietyId))}</b></div><div class="shipment-size-totals"><span>籾摺り後 <b>${numberText(stock.receivedKg)}kg</b></span><span>出荷・配布 <b>${numberText(stock.dispatchedKg)}kg</b></span><span>残量 <b>${numberText(stock.remainingKg)}kg</b></span></div><p>${numberText(stock.remainingKg / 60)}俵 / 30kg袋換算 ${numberText(stock.remainingKg / 30)}袋</p>${stock.remainingKg < 0 ? '<p class="shipment-error">出荷数量が収量を超えています。収量・品種・年産の記録を確認できます。</p>' : ""}${stock.whiteShipmentCount ? `<p class="shipment-legacy-info">白米出荷 ${stock.whiteShipmentCount}件は玄米残量に未反映</p>` : ""}${stock.unquantifiedCount || stock.unclassifiedCount ? `<p class="shipment-legacy-info">数量不足 ${stock.unquantifiedCount || 0}件 / 品種未設定 ${stock.unclassifiedCount || 0}件は未反映</p>` : ""}${stock.issueCount ? `<p>出荷の対応費（記録分） ${yen(stock.issueCostYen)} / ${stock.issueCount}件${stock.issueUnpricedCount ? ` / 費用未入力 ${stock.issueUnpricedCount}件` : ""}</p>` : ""}</div>`;
+      const remainingUnits = stock.remainingKg == null ? "残量は集計範囲外" : `${numberText(stock.remainingKg / 60)}俵 / 30kg袋換算 ${numberText(stock.remainingKg / 30)}袋`;
+      return `<div class="shipment-year-total" data-rice-stock="${U.attr(`${group.season}|${group.varietyId}`)}"><div class="shipment-total-head"><b>${U.escapeHTML(group.season)}年産 / ${U.escapeHTML(varietyName(group.varietyId))}</b></div><div class="shipment-size-totals"><span>籾摺り後 <b>${numberText(stock.receivedKg)}kg</b></span><span>出荷・配布 <b>${numberText(stock.dispatchedKg)}kg</b></span><span>残量 <b>${numberText(stock.remainingKg)}kg</b></span></div><p>${remainingUnits}</p>${stock.remainingKg < 0 ? '<p class="shipment-error">出荷数量が収量を超えています。収量・品種・年産の記録を確認できます。</p>' : ""}${stock.whiteShipmentCount ? `<p class="shipment-legacy-info">白米出荷 ${stock.whiteShipmentCount}件は玄米残量に未反映</p>` : ""}${stock.unquantifiedCount || stock.unclassifiedCount ? `<p class="shipment-legacy-info">数量不足 ${stock.unquantifiedCount || 0}件 / 品種未設定 ${stock.unclassifiedCount || 0}件は未反映</p>` : ""}${stock.issueCount ? `<p>出荷の対応費（記録分） ${yen(stock.issueCostYen)} / ${stock.issueCount}件${stock.issueUnpricedCount ? ` / 費用未入力 ${stock.issueUnpricedCount}件` : ""}</p>` : ""}</div>`;
     }).join("") || '<p class="empty">籾摺り後の収量はまだ登録されていません。</p>'}</section>`;
   }
 
@@ -406,8 +407,8 @@
       }
       if (button.hasAttribute("data-shipment-new")) { openNew(); return; }
       if (button.hasAttribute("data-shipment-harvests")) {
-        if (RiceOS.navigation) RiceOS.navigation.clear();
-        RiceOS.app.openInput("results", "shipments");
+        RiceOS.app.openInput("results", "shipments", { nested: true });
+        if (RiceOS.screens.results.showMillingForm) RiceOS.screens.results.showMillingForm();
         return;
       }
       if (button.hasAttribute("data-shipment-open")) { openDetail(button.dataset.shipmentOpen); return; }

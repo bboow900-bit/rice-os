@@ -3299,12 +3299,20 @@
   function deleteShipmentIssue(id) { return deleteInventoryRecord("shipmentIssues", "issueId", id); }
 
   function riceStockFor(season, varietyId) {
-    const result = { receivedKg: 0, dispatchedKg: 0, remainingKg: 0, receivedBags: 0, whiteShipmentCount: 0, unquantifiedCount: 0, unclassifiedCount: 0, hasHarvest: false, issueCostYen: 0, issueCount: 0, issueUnpricedCount: 0 };
+    const result = { receivedKg: 0, dispatchedKg: 0, remainingKg: 0, receivedBags: 0, whiteShipmentCount: 0, unquantifiedCount: 0, unclassifiedCount: 0, hasHarvest: false, issueCostYen: 0, issueCount: 0, issueUnpricedCount: 0, aggregateInvalidFields: [] };
     if (!S.validCropYear(season) || !varietyId) return result;
+    const add = (key, value, integer = false) => {
+      if (result[key] === null) return;
+      const sum = result[key] + value;
+      if (!Number.isFinite(sum) || integer && !Number.isSafeInteger(sum)) {
+        result[key] = null;
+        result.aggregateInvalidFields.push(key);
+      } else result[key] = sum;
+    };
     for (const row of millingRecordsFor({ season, varietyId })) {
       const totals = millingRecordTotals(row);
       if (totals.kg === null || totals.kg <= 0) { result.unquantifiedCount++; continue; }
-      result.receivedKg += totals.kg; result.receivedBags += totals.bags;
+      add("receivedKg", totals.kg); add("receivedBags", totals.bags, true);
       result.hasHarvest = true;
     }
     for (const row of data().shipments || []) {
@@ -3315,14 +3323,17 @@
       if (row.riceType === "white") { result.whiteShipmentCount++; continue; }
       const totals = inventoryPackageTotals(row.packages);
       if (row.riceType !== "brown" || !totals || !row.packages.length) { result.unquantifiedCount++; continue; }
-      result.dispatchedKg += totals.kg;
+      add("dispatchedKg", totals.kg);
     }
     for (const row of shipmentIssuesFor({ season, varietyId })) {
       result.issueCount++;
-      if (Number.isSafeInteger(row.costYen) && row.costYen >= 0) result.issueCostYen += row.costYen;
+      if (Number.isSafeInteger(row.costYen) && row.costYen >= 0) add("issueCostYen", row.costYen, true);
       else result.issueUnpricedCount++;
     }
-    result.remainingKg = result.receivedKg - result.dispatchedKg;
+    if (result.receivedKg === null || result.dispatchedKg === null) {
+      result.remainingKg = null;
+      result.aggregateInvalidFields.push("remainingKg");
+    } else result.remainingKg = result.receivedKg - result.dispatchedKg;
     return result;
   }
 
