@@ -227,7 +227,7 @@
         <label>日付<input id="shipmentDate" name="date" type="date" value="${U.attr(draft.date)}" required></label>
         <label>収穫年（年産）<input id="shipmentSeason" name="season" type="number" inputmode="numeric" min="1900" max="2200" step="1" value="${U.attr(draft.season)}" required></label>
         <label>区分<select id="shipmentKind" name="kind">${Object.entries(KINDS).map(([key, label]) => option(key, label, draft.kind)).join("")}</select></label>
-        <label>相手先<input id="shipmentRecipient" name="recipient" list="shipmentRecipients" value="${U.attr(draft.recipient)}" required></label>
+        <label>出荷先・配布先<input id="shipmentRecipient" name="recipient" list="shipmentRecipients" value="${U.attr(draft.recipient)}" placeholder="例：販売先、親戚・知人の名前" required></label>
         <label class="shipment-price-label${draft.kind === "gift" ? " hidden" : ""}" data-shipment-price-label${draft.kind === "gift" ? " hidden" : ""}>1俵（60kg）の価格（円）<input id="shipmentPricePer60Kg" name="pricePer60Kg" type="number" inputmode="numeric" min="0" step="1" value="${U.attr(draft.pricePer60Kg ?? "")}"></label>
         <label>品種<select id="shipmentVariety" name="varietyId">${option("", "未設定", draft.varietyId)}${draft.varietyId && !varieties.some((item) => item.varietyId === draft.varietyId) ? option(draft.varietyId, "保存済みの品種", draft.varietyId) : ""}${varieties.map((item) => option(item.varietyId, item.name, draft.varietyId)).join("")}</select></label>
         <label>米の種類<select id="shipmentRiceType" name="riceType">${Object.entries(RICE_TYPES).map(([key, label]) => option(key, label, draft.riceType)).join("")}</select></label>
@@ -308,7 +308,7 @@
     const parsed = new Date(`${date}T00:00:00Z`);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !Number.isFinite(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== date) { showError("有効な日付を入力してください。", "shipmentDate"); return null; }
     if (!/^\d{4}$/.test(String(draft.season)) || Number(draft.season) < 1900 || Number(draft.season) > 2200) { showError("収穫年を1900〜2200の整数で入力してください。", "shipmentSeason"); return null; }
-    if (!draft.recipient.trim()) { showError("相手先を入力してください。", "shipmentRecipient"); return null; }
+    if (!draft.recipient.trim()) { showError("出荷先・配布先を入力してください。", "shipmentRecipient"); return null; }
     if (!Object.hasOwn(KINDS, draft.kind) || !Object.hasOwn(RICE_TYPES, draft.riceType)) { showError("区分と米の種類を選択してください。"); return null; }
     if (!draft.packages.length) { showError("袋の内訳を追加してください。"); return null; }
     const packages = [];

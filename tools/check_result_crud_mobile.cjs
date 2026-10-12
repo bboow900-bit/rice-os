@@ -39,7 +39,8 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || "C:/Users/Keisuke/
         assert.ok(await page.evaluate(() => RiceOS.state.data().fieldWorks.find(w => w.workId === "qa-result-harvest").harvestSnapshots.length),"Snapshot fixture must survive normalization");
         const management = async () => {
           await page.locator('.nav-item[data-screen="data"]:visible').click();
-          await page.locator('[data-jump-screen="results"]').click();
+          await page.locator('[data-open-milling-ledger]').click();
+          await page.locator('#legacyHarvestResults > summary').click();
         };
         const action = (id,kind) => page.locator(`#resultList [data-result-action="${kind}"][data-id="${id}"]`);
         const dialog = async (locator,accept) => {

@@ -153,10 +153,12 @@
 
   function openMilling() { millingLedgerMode = false; millingFormVisible = true; resetMilling(); U.$("millingForm").scrollIntoView({ block: "start",behavior: "smooth" }); }
   function openMillingLedger() {
+    if (U.$("legacyHarvestResults")) U.$("legacyHarvestResults").open = false;
     millingLedgerMode = true; millingFormVisible = false; renderMilling();
     U.$("millingContent").scrollIntoView({ block: "start",behavior: "smooth" });
   }
   function showMillingForm() {
+    if (U.$("legacyHarvestResults")) U.$("legacyHarvestResults").open = true;
     millingLedgerMode = false; millingFormVisible = true; renderMilling();
   }
   function openShipmentIssues() {
@@ -298,6 +300,7 @@
   function editResult(resultId) {
     const record = state.data().varietyResults.find((row) => row.resultId === resultId);
     if (!record) { alert("この結果は見つかりません。一覧を確認してください。"); return false; }
+    if (U.$("legacyHarvestResults")) U.$("legacyHarvestResults").open = true;
     editingResult = U.clone(record);
     const inputs = { rSeason: "season", rVariety: "varietyId", rAreaA: "areaA", rYield: "yield", rYieldPer10a: "yieldPer10a",
       rFirstGradeRate: "firstGradeRate", rShipped: "shippedQuantity", rSales: "salesAmount", rSalesPer10a: "salesPer10a", rQuality: "quality", rReflection: "reflection" };
