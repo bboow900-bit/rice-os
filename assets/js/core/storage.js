@@ -225,6 +225,7 @@
     shipments: "shipmentId",
     millingRecords: "millingId",
     shipmentIssues: "issueId",
+    harvestYearReviews: "reviewId",
     shipmentPrices: "priceId",
     machines: "machineId",
     maintenanceRecords: "maintenanceId",
@@ -260,6 +261,7 @@
     [
       ...(Array.isArray(data.fieldWorks) ? data.fieldWorks.map((row) => row && (row.fieldIds || row.fieldId)) : []),
       ...(Array.isArray(data.millingRecords) ? data.millingRecords.map(row => row && row.fieldIds) : []),
+      ...(Array.isArray(data.harvestYearReviews) ? data.harvestYearReviews.map(row => row && row.fieldIds) : []),
       ...(Array.isArray(data.growthLogs) ? data.growthLogs.map((row) => row && row.fieldId) : []),
       ...(Array.isArray(data.dryPeriods) ? data.dryPeriods.map((row) => row && row.fieldId) : []),
       ...(Array.isArray(data.irrigations) ? data.irrigations.map((row) => row && row.fieldId) : []),
@@ -337,7 +339,7 @@
     const skipped = {};
     Object.entries(COLLECTION_IDS).forEach(([key, idKey]) => {
       const existingIds = new Set((merged[key] || []).map((row) => String(row[idKey] || "")));
-      const additions = (incoming[key] || []).filter((row) => !existingIds.has(String(row[idKey] || "")));
+      const additions = (incoming[key] || []).filter((row) => !existingIds.has(String(row[idKey] || "")) && (key !== "harvestYearReviews" || !(merged[key] || []).some(existing => existing.season === row.season && existing.varietyId === row.varietyId)));
       merged[key] = [...(merged[key] || []), ...additions];
       added[key] = additions.length;
       skipped[key] = (incoming[key] || []).length - additions.length;
@@ -529,6 +531,7 @@
       varietyResults: d.varietyResults.length,
       millingRecords: (d.millingRecords || []).length,
       shipmentIssues: (d.shipmentIssues || []).length,
+      harvestYearReviews: (d.harvestYearReviews || []).length,
       updatedAt: d.meta && d.meta.updatedAt || "",
       lastJsonExportAt: d.meta && d.meta.lastJsonExportAt || "",
       lastBackupAt: d.meta && d.meta.lastBackupAt || "",

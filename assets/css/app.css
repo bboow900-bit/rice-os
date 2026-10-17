@@ -15480,3 +15480,34 @@ label {
 .milling-content .milling-stock[hidden] { display: none; }
 .milling-content #millingLedgerStock .record { padding: 12px; margin: 8px 0; }
 .milling-content #millingLedgerStock .record p { margin: 6px 0 0; overflow-wrap: anywhere; }
+.hp-toolbar { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; margin-bottom: 12px; }
+.hp-toolbar label { flex: 1 1 110px; min-width: 0; }
+.hp-toolbar button { flex: 1 1 160px; }
+.hp-card { background: #fff; border: 1px solid #d5e4d8; border-radius: 8px; padding: 16px; margin: 16px 0; min-width: 0; }
+.hp-card header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; }
+.hp-card h3, .hp-card h4 { margin: 0; font-size: 16px; }
+.hp-card h4 { font-size: 14px; }
+.hp-status { font-size: 12px; padding: 3px 7px; background: #fff2d8; color: #78520f; }
+.hp-status[data-hp-status="complete"] { background: #e6f4e8; color: #216139; }
+.hp-primary { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; margin: 14px 0; }
+.hp-primary strong { font-size: 30px; color: #20653b; overflow-wrap: anywhere; }
+.hp-primary span { font-size: 14px; }
+.hp-metrics { margin: 0; display: grid; gap: 8px; }
+.hp-metrics div { display: grid; gap: 3px; }
+.hp-metrics dt, .hp-muted { color: #53655b; font-size: 13px; line-height: 1.5; }
+.hp-metrics dd { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
+.hp-delta, .hp-trend, .hp-review { border-top: 1px solid #dce6de; margin-top: 14px; padding-top: 12px; }
+.hp-delta p { margin: 5px 0; font-size: 14px; }
+.hp-trend-row { display: grid; grid-template-columns: 74px minmax(30px, 1fr) 100px; gap: 6px; align-items: center; min-height: 36px; font-size: 12px; }
+.hp-trend-row > span:last-child { text-align: right; overflow-wrap: anywhere; }
+.hp-trend-track { height: 10px; background: #edf1ed; overflow: hidden; }
+.hp-trend-bar { height: 100%; background: #4a955c; }
+.hp-trend-partial { background: #d7ad4a; }
+.hp-memo { padding-left: 10px; border-left: 3px solid #b89237; overflow-wrap: anywhere; white-space: pre-wrap; }
+.hp-review summary { cursor: pointer; font-weight: 600; font-size: 14px; }
+.hp-review form { display: grid; gap: 12px; padding-top: 12px; }
+.hp-completed { display: flex; gap: 10px; align-items: flex-start; font-size: 14px; }
+.hp-completed input { flex: 0 0 20px; width: 20px; height: 20px; margin: 0; }
+.hp-editor-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.hp-error { color: #a02c24; font-size: 13px; }
+#harvestPerformanceContent { padding-bottom: calc(100px + env(safe-area-inset-bottom)); }

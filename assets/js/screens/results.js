@@ -152,6 +152,19 @@
   }
 
   function openMilling() { millingLedgerMode = false; millingFormVisible = true; resetMilling(); U.$("millingForm").scrollIntoView({ block: "start",behavior: "smooth" }); }
+  function openMillingForYear(season, varietyId) {
+    if (!RiceOS.schema.validCropYear(season) || varietyId && !state.variety(varietyId)) return false;
+    const hasDraft = millingDraft && (millingOriginal || millingDraft.varietyId || millingDraft.packages.length || Number(millingDraft.looseKg) > 0 || String(millingDraft.memo || "").trim());
+    if (hasDraft && !confirm("入力中の籾摺り記録があります。新しい収量入力へ切り替えますか？")) return false;
+    millingLedgerMode = false;
+    millingFormVisible = true;
+    resetMilling();
+    millingDraft.season = String(season);
+    millingDraft.varietyId = varietyId || "";
+    millingViewYear = String(season);
+    renderMilling();
+    return true;
+  }
   function openMillingLedger() {
     if (U.$("legacyHarvestResults")) U.$("legacyHarvestResults").open = false;
     millingLedgerMode = true; millingFormVisible = false; renderMilling();
@@ -399,5 +412,5 @@
   }
 
   RiceOS.screens = RiceOS.screens || {};
-  RiceOS.screens.results = { render, bind, resetForm, editResult, editMillingRecord, openMilling, openMillingLedger, showMillingForm, openShipmentIssues };
+  RiceOS.screens.results = { render, bind, resetForm, editResult, editMillingRecord, openMilling, openMillingForYear, openMillingLedger, showMillingForm, openShipmentIssues };
 })();

@@ -796,6 +796,7 @@
     const fields = topView === "fields" ? filteredFields() : [];
     return `
       <div class="annual-v2-top">
+        <button type="button" class="annual-shipment-entry" data-annual-harvest-performance><b>年産別の収穫成績</b><span>品種ごとの収量・面積を振り返る ›</span></button>
         <div class="annual-hub-tools"><button type="button" data-annual-hub-notes aria-expanded="${hubNotesOpen}" aria-controls="annualHubNotes">来年メモ</button></div>
         ${renderCropYearClosure()}
         <div class="annual-hub-nav" role="group" aria-label="振り返りの表示">
@@ -2837,6 +2838,13 @@
       if (event.target.matches("[data-annual-work-list]")) workArchiveOpen = event.target.open;
     }, true);
     U.$("annualTimeline").addEventListener("click", (event) => {
+      if (event.target.closest("[data-annual-harvest-performance]")) {
+        if (RiceOS.screens.harvestPerformance) {
+          RiceOS.screens.harvestPerformance.open(yearValue());
+          RiceOS.app.openInput("harvest-performance", "annual");
+        }
+        return;
+      }
       const close = event.target.closest("[data-crop-year-close]");
       const reopen = event.target.closest("[data-crop-year-reopen]");
       if (close || reopen) {

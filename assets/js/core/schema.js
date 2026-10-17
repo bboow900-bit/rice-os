@@ -5,7 +5,7 @@
   const U = RiceOS.utils;
 
   const SCHEMA_VERSION = 17;
-  const APP_VERSION = "20261012_ver294";
+  const APP_VERSION = "20261017_ver295";
   const STORE_KEY = "rice_os_v8_stable";
   const BACKUP_KEY = "rice_os_v8_stable_backup";
   const RELEASE_BACKUPS_KEY = "rice_os_v8_stable_release_backups";
@@ -1054,6 +1054,14 @@
     return { ...row, fieldIds: Array.from(new Set(ensureArray(row.fieldIds).map(String))), packages, looseKg };
   }
 
+  function normalizeHarvestYearReview(input, strict = false) {
+    const row = input && typeof input === "object" && !Array.isArray(input) ? input : {};
+    const area = row.areaA == null || row.areaA === "" ? null : inventoryNumber(row.areaA);
+    const validArea = area === null || Number.isFinite(area) && area > 0;
+    if (strict && (!validCropYear(row.season) || !String(row.varietyId || "") || !validArea || row.completed !== undefined && typeof row.completed !== "boolean" || row.fieldIds !== undefined && !Array.isArray(row.fieldIds))) throw new Error("年産・品種・正の面積・完了区分を確認してください。");
+    return { ...row, reviewId: String(row.reviewId || U.id("harvest_review", U.today())), season: validCropYear(row.season) ? Number(row.season) : "", varietyId: String(row.varietyId || ""), areaA: validArea ? area : null, completed: row.completed === true, memo: String(row.memo ?? ""), ...(Array.isArray(row.fieldIds) ? { fieldIds: Array.from(new Set(row.fieldIds.map(String))) } : {}), createdAt: String(row.createdAt || U.now()), updatedAt: String(row.updatedAt || row.createdAt || U.now()) };
+  }
+
   function normalizeShipmentIssue(input, strict = false) {
     const row = normalizeInventoryRecord(input, "issueId", strict);
     const reason = String(row.reason ?? "").trim();
@@ -1328,6 +1336,7 @@
       shipments,
       millingRecords: dedupeBy(ensureArray(source.millingRecords).map(row => normalizeMillingRecord(row)), "millingId"),
       shipmentIssues: dedupeBy(ensureArray(source.shipmentIssues).map(row => normalizeShipmentIssue(row)), "issueId"),
+      harvestYearReviews: dedupeBy(ensureArray(source.harvestYearReviews).map(row => normalizeHarvestYearReview(row)), "reviewId").filter((row, index, rows) => rows.findIndex(other => other.season === row.season && other.varietyId === row.varietyId) === index),
       shipmentPrices,
       confirmationCandidates,
       machines,
@@ -1386,6 +1395,7 @@
       shipments: [],
       millingRecords: [],
       shipmentIssues: [],
+      harvestYearReviews: [],
       shipmentPrices: [],
       confirmationCandidates: [],
       machines: [],
@@ -1445,6 +1455,7 @@
     normalizeShipment,
     normalizeMillingRecord,
     normalizeShipmentIssue,
+    normalizeHarvestYearReview,
     normalizeShipmentPrice,
     normalizeGroupLabel,
     normalizeSeasonNote,

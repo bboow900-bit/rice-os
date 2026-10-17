@@ -25,6 +25,7 @@
     "recipes",
     "photos",
     "results",
+    "harvest-performance",
     "shipments",
     "other-work"
   ]);
@@ -68,7 +69,7 @@
     U.$$(".screen").forEach((section) => {
       section.classList.toggle("active", section.id === `screen-${screenId}`);
     });
-    const navScreen = screenId === "machines" ? "data" : screenId === "shipments" ? "annual" : screenId;
+    const navScreen = screenId === "machines" ? "data" : ["shipments", "harvest-performance"].includes(screenId) ? "annual" : screenId;
     U.$$(".nav-item").forEach((button) => {
       button.classList.toggle("active", button.dataset.screen === navScreen);
     });

@@ -20,6 +20,7 @@
     varietyResults: "結果",
     millingRecords: "籾摺り収量",
     shipmentIssues: "出荷の対応記録",
+    harvestYearReviews: "年産別の収穫成績",
     confirmationCandidates: "確認候補"
   };
 
@@ -84,6 +85,7 @@
       ["資材/結果", `${info.materials}/${info.varietyResults}`],
       ["籾摺り収量", `${info.millingRecords || 0}件`],
       ["出荷の対応記録", `${info.shipmentIssues || 0}件`],
+      ["年産別の収穫成績", `${info.harvestYearReviews || 0}件`],
       ["最終JSON保存", info.lastJsonExportAt ? U.fd(String(info.lastJsonExportAt).slice(0, 10)) : "記録なし"],
       ["最終自動退避", info.lastBackupAt ? U.fd(String(info.lastBackupAt).slice(0, 10)) : "記録なし"]
     ].map(([label, value]) => `

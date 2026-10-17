@@ -3231,6 +3231,86 @@
     return growthLogsFor(fieldId).slice().sort((a, b) => String(b.date).localeCompare(String(a.date)))[0] || null;
   }
 
+  function harvestYearReviewFor(season, varietyId) {
+    if (!S.validCropYear(season)) return null;
+    return U.clone((data().harvestYearReviews || []).find(row => row.season === Number(season) && row.varietyId === varietyId) || null);
+  }
+
+  function harvestQuantityBasis(season, varietyId) {
+    return JSON.stringify(millingRecordsFor({ season, varietyId }).map(row => ({ millingId: row.millingId, date: row.date, season: row.season, varietyId: row.varietyId, packages: row.packages, looseKg: row.looseKg })).sort((a, b) => a.millingId.localeCompare(b.millingId)));
+  }
+
+  function saveHarvestYearReview(input) {
+    try {
+      input = input || {};
+      const byId = (data().harvestYearReviews || []).find(row => row.reviewId === input.reviewId);
+      if (input.reviewId && !byId) throw new Error("編集対象が見つかりません。");
+      const defined = Object.fromEntries(Object.entries(input).filter(([, value]) => value !== undefined));
+      let row = S.normalizeHarvestYearReview({ ...byId, ...defined }, true);
+      const byKey = harvestYearReviewFor(row.season, row.varietyId);
+      if (byId && byKey && byKey.reviewId !== byId.reviewId) throw new Error("同じ年産・品種の確認が既にあります。");
+      const previous = byId || byKey;
+      row = S.normalizeHarvestYearReview({ ...previous, ...defined, reviewId: previous ? previous.reviewId : row.reviewId, createdAt: previous ? previous.createdAt : row.createdAt, updatedAt: previous ? previous.updatedAt : row.updatedAt }, true);
+      row.quantityBasis = row.completed ? defined.completed === true ? harvestQuantityBasis(row.season, row.varietyId) : previous && previous.quantityBasis || "" : "";
+      if (!variety(row.varietyId) && !(previous && previous.varietyId === row.varietyId)) throw new Error("登録済み品種を選択してください。");
+      const unchangedTargets = previous && previous.varietyId === row.varietyId && JSON.stringify(previous.fieldIds) === JSON.stringify(row.fieldIds);
+      if (!unchangedTargets && (row.fieldIds || []).some(id => !field(id) || field(id).varietyId !== row.varietyId)) throw new Error("圃場の品種を確認してください。");
+      if (previous && JSON.stringify(row) === JSON.stringify(previous)) return U.clone(previous);
+      row.updatedAt = U.now();
+      const saved = mutate(d => {
+        d.harvestYearReviews = d.harvestYearReviews || [];
+        const index = d.harvestYearReviews.findIndex(r => r.reviewId === row.reviewId);
+        if (index < 0) d.harvestYearReviews.push(row); else d.harvestYearReviews[index] = row;
+      }, "収穫年の確認を保存しました");
+      return saved ? U.clone(saved.harvestYearReviews.find(r => r.reviewId === row.reviewId)) : null;
+    } catch (error) { lastError = error; return null; }
+  }
+
+  function deleteHarvestYearReview(id) { return deleteInventoryRecord("harvestYearReviews", "reviewId", id); }
+
+  function harvestPerformanceRow(season, varietyId) {
+    const review = harvestYearReviewFor(season, varietyId);
+    const records = millingRecordsFor({ season, varietyId });
+    let total = 0, validCount = 0, missing = 0, overflow = false;
+    records.forEach(record => {
+      const kg = millingRecordTotals(record).kg;
+      if (kg === null || kg <= 0) { missing++; return; }
+      validCount++;
+      total += kg;
+      if (!Number.isFinite(total)) overflow = true;
+    });
+    const knownKg = validCount && !overflow ? total : null;
+    const totalKg = missing ? null : knownKg;
+    const totalBales = totalKg === null ? null : totalKg / 60;
+    const areaA = review && Number.isFinite(review.areaA) && review.areaA > 0 ? review.areaA : null;
+    const rate = areaA !== null && totalBales !== null ? totalBales / areaA * 10 : null;
+    const completed = Boolean(review && review.completed);
+    const quantityBasis = harvestQuantityBasis(season, varietyId);
+    const status = !records.length ? "missing" : totalKg !== null && completed && review.quantityBasis === quantityBasis ? "complete" : "partial";
+    return { season: Number(season), varietyId, quantityBasis, totalKg, knownKg, totalBales, areaA, balesPer10a: Number.isFinite(rate) ? rate : null, recordCount: records.length, missingQuantityCount: missing, completed, status, memo: review ? review.memo : "", reviewId: review ? review.reviewId : "" };
+  }
+
+  function harvestPerformanceFor(season) {
+    if (!S.validCropYear(season)) return [];
+    const ids = new Set([...(data().millingRecords || []), ...(data().harvestYearReviews || [])].filter(row => row.season === Number(season) && row.varietyId).map(row => row.varietyId));
+    return Array.from(ids).map(id => {
+      const row = harvestPerformanceRow(season, id);
+      const prior = harvestPerformanceRow(Number(season) - 1, id);
+      const previous = prior.recordCount || prior.reviewId ? Object.fromEntries(["season", "totalKg", "totalBales", "areaA", "balesPer10a", "completed", "status"].map(key => [key, prior[key]])) : null;
+      const comparable = row.status === "complete" && previous && previous.status === "complete";
+      const delta = (key) => { const value = comparable && row[key] !== null && previous[key] !== null ? row[key] - previous[key] : null; return Number.isFinite(value) ? value : null; };
+      return { ...row, previous, deltaBalesPer10a: delta("balesPer10a"), deltaTotalBales: delta("totalBales"), deltaAreaA: delta("areaA") };
+    });
+  }
+
+  function harvestPerformanceHistory(varietyId, season, limit = 5) {
+    if (!S.validCropYear(season) || !varietyId || !Number.isSafeInteger(limit) || limit < 1 || limit > 301) return [];
+    return Array.from({ length: Math.min(limit, Number(season) - 1899) }, (_, index) => {
+      const year = Number(season) - Math.min(limit, Number(season) - 1899) + 1 + index;
+      return harvestPerformanceFor(year).find(row => row.varietyId === varietyId) || { ...harvestPerformanceRow(year, varietyId), previous: null, deltaBalesPer10a: null, deltaTotalBales: null, deltaAreaA: null };
+    });
+  }
+
   function inventoryRowsFor(collection, filters = {}) {
     return U.clone((data()[collection] || []).filter(row =>
       (filters.season === undefined || row.season === Number(filters.season)) &&
@@ -3550,6 +3630,11 @@
     saveMillingRecord,
     deleteMillingRecord,
     millingRecordsFor,
+    harvestYearReviewFor,
+    saveHarvestYearReview,
+    deleteHarvestYearReview,
+    harvestPerformanceFor,
+    harvestPerformanceHistory,
     millingRecordTotals,
     riceStockFor,
     saveShipmentIssue,

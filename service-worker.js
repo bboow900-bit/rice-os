@@ -1,5 +1,5 @@
-const CACHE_NAME = "rice-karte-20261012-294";
-const APP_VERSION = "20261012_ver294";
+const CACHE_NAME = "rice-karte-20261017-295";
+const APP_VERSION = "20261017_ver295";
 const CACHE_PREFIX = "rice-karte-";
 const RETAINED_APP_CACHES = 2;
 
@@ -91,6 +91,7 @@ const APP_SHELL = [
   `./assets/js/screens/herbicide.js?v=${APP_VERSION}`,
   `./assets/js/screens/materials.js?v=${APP_VERSION}`,
   `./assets/js/screens/results.js?v=${APP_VERSION}`,
+  `./assets/js/screens/harvest-performance.js?v=${APP_VERSION}`,
   `./assets/js/screens/notices.js?v=${APP_VERSION}`,
   `./assets/js/screens/outlook.js?v=${APP_VERSION}`,
   `./assets/js/screens/machines.js?v=${APP_VERSION}`,
