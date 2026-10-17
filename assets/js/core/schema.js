@@ -5,7 +5,7 @@
   const U = RiceOS.utils;
 
   const SCHEMA_VERSION = 17;
-  const APP_VERSION = "20261017_ver295";
+  const APP_VERSION = "20261017_ver296";
   const STORE_KEY = "rice_os_v8_stable";
   const BACKUP_KEY = "rice_os_v8_stable_backup";
   const RELEASE_BACKUPS_KEY = "rice_os_v8_stable_release_backups";
@@ -1059,7 +1059,12 @@
     const area = row.areaA == null || row.areaA === "" ? null : inventoryNumber(row.areaA);
     const validArea = area === null || Number.isFinite(area) && area > 0;
     if (strict && (!validCropYear(row.season) || !String(row.varietyId || "") || !validArea || row.completed !== undefined && typeof row.completed !== "boolean" || row.fieldIds !== undefined && !Array.isArray(row.fieldIds))) throw new Error("年産・品種・正の面積・完了区分を確認してください。");
-    return { ...row, reviewId: String(row.reviewId || U.id("harvest_review", U.today())), season: validCropYear(row.season) ? Number(row.season) : "", varietyId: String(row.varietyId || ""), areaA: validArea ? area : null, completed: row.completed === true, memo: String(row.memo ?? ""), ...(Array.isArray(row.fieldIds) ? { fieldIds: Array.from(new Set(row.fieldIds.map(String))) } : {}), createdAt: String(row.createdAt || U.now()), updatedAt: String(row.updatedAt || row.createdAt || U.now()) };
+    const target = row.targetBalesPer10a === undefined ? 10 : inventoryNumber(row.targetBalesPer10a);
+    if (strict && (!Number.isFinite(target) || target <= 0 || row.areaMode !== undefined && !["auto", "manual"].includes(row.areaMode) || row.followUpOutcome !== undefined && !["", "improved", "same", "uncertain"].includes(row.followUpOutcome))) throw new Error("面積方式・目標・振り返り区分を確認してください。");
+    const plans = row.plans && typeof row.plans === "object" ? row.plans : {};
+    const refs = ensureArray(row.evidenceRefs).filter(ref => ref && ["fieldWork", "growth", "dry", "irrigation", "milling"].includes(ref.kind) && typeof ref.id === "string" && ref.id).map(ref => ({ kind: ref.kind, id: ref.id }));
+    if (strict && row.evidenceRefs !== undefined && (!Array.isArray(row.evidenceRefs) || refs.length !== row.evidenceRefs.length)) throw new Error("実績の参照を確認してください。");
+    return { ...row, reviewId: String(row.reviewId || U.id("harvest_review", U.today())), season: validCropYear(row.season) ? Number(row.season) : "", varietyId: String(row.varietyId || ""), areaA: validArea ? area : null, areaMode: row.areaMode === "auto" ? "auto" : row.areaMode === "manual" || area !== null && validArea ? "manual" : "auto", ...(Array.isArray(row.areaSnapshot) ? { areaSnapshot: row.areaSnapshot.filter(item => item && typeof item.fieldId === "string").map(item => ({ fieldId: item.fieldId, name: String(item.name || ""), varietyId: String(item.varietyId || ""), areaA: typeof item.areaA === "number" && Number.isFinite(item.areaA) && item.areaA > 0 ? item.areaA : null })) } : {}), targetBalesPer10a: Number.isFinite(target) && target > 0 ? target : 10, conditions: String(row.conditions ?? ""), plans: { continue: String(plans.continue ?? ""), change: String(plans.change ?? ""), undecided: String(plans.undecided ?? "") }, evidenceRefs: refs, followUpOutcome: ["improved", "same", "uncertain"].includes(row.followUpOutcome) ? row.followUpOutcome : "", followUpMemo: String(row.followUpMemo ?? ""), completed: row.completed === true, memo: String(row.memo ?? ""), ...(Array.isArray(row.fieldIds) ? { fieldIds: Array.from(new Set(row.fieldIds.map(String))) } : {}), createdAt: String(row.createdAt || U.now()), updatedAt: String(row.updatedAt || row.createdAt || U.now()) };
   }
 
   function normalizeShipmentIssue(input, strict = false) {
@@ -1368,6 +1373,7 @@
         // field's individual carryover note.
         nextSeasonIdeas: ensureArray(source.meta && source.meta.nextSeasonIdeas)
           .map((item, index) => ({
+            ...(item && item.reviewId ? { sourceSeason: validCropYear(item.sourceSeason) ? Number(item.sourceSeason) : "", targetSeason: validCropYear(item.targetSeason) ? Number(item.targetSeason) : "", varietyId: String(item.varietyId || ""), reviewId: String(item.reviewId), category: String(item.category || ""), reason: String(item.reason || ""), evidenceRefs: ensureArray(item.evidenceRefs).filter(ref => ref && typeof ref.kind === "string" && typeof ref.id === "string").map(ref => ({ kind: ref.kind, id: ref.id })) } : {}),
             ideaId: String(item && item.ideaId || `next-season-idea-import-${index + 1}`),
             text: String(item && item.text || "").trim(),
             done: Boolean(item && item.done),

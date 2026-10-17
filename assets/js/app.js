@@ -319,6 +319,16 @@
     const options = route.options || {};
     if (options.destination === "annual-history" && RiceOS.screens.annual && RiceOS.screens.annual.openField) {
       show("annual", { skipHistory: true });
+      const yearSelect = U.$("annualYear");
+      if (yearSelect && RiceOS.schema.validCropYear(options.season)) {
+        const year = String(Number(options.season));
+        if (![...yearSelect.options].some(option => option.value === year)) {
+          const option = document.createElement("option");
+          option.value = year; option.textContent = `${year}年`;
+          yearSelect.add(option);
+        }
+        yearSelect.value = year;
+      }
       RiceOS.screens.annual.openField(fieldId, options.tab || "karte");
       return true;
     }
@@ -370,12 +380,21 @@
     // Annual history can be opened from a field detail even when that detail
     // was reached without a navigation-stack entry. Keep the return target
     // deterministic instead of reopening the annual history view.
-    if (options.destination === "annual-history" && leaving && leaving.fieldId && RiceOS.screens.fields && RiceOS.screens.fields.openField) {
+    if (options.destination === "annual-history" && options.originScreen !== "harvest-performance" && leaving && leaving.fieldId && RiceOS.screens.fields && RiceOS.screens.fields.openField) {
       show("fields", { skipHistory: true });
       RiceOS.screens.fields.openField(leaving.fieldId);
       return true;
     }
     const origin = options.originScreen || "annual";
+    if (origin === "harvest-performance") {
+      if (options.destination === "annual-history" && RiceOS.screens.annual?.resetNavigation) {
+        RiceOS.screens.annual.resetNavigation({ preserveHub: true });
+        const yearSelect = U.$("annualYear");
+        if (yearSelect && RiceOS.schema.validCropYear(options.returnAnnualYear)) yearSelect.value = String(Number(options.returnAnnualYear));
+      }
+      show("harvest-performance", { skipHistory: true });
+      return true;
+    }
     if (origin === "calendar") {
       if (RiceOS.screens.fields && RiceOS.screens.fields.resetNavigation) RiceOS.screens.fields.resetNavigation();
       show("calendar", { skipHistory: true });

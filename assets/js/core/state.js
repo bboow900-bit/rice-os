@@ -3240,18 +3240,94 @@
     return JSON.stringify(millingRecordsFor({ season, varietyId }).map(row => ({ millingId: row.millingId, date: row.date, season: row.season, varietyId: row.varietyId, packages: row.packages, looseKg: row.looseKg })).sort((a, b) => a.millingId.localeCompare(b.millingId)));
   }
 
+  function harvestReviewArea(season, varietyId, review, capture = false) {
+    const mode = review && review.areaMode || "auto";
+    let source = "missing", snapshot = [], areaA = null;
+    if (mode === "manual") {
+      areaA = review && Number.isFinite(review.areaA) && review.areaA > 0 ? review.areaA : null;
+      source = areaA === null ? "missing" : "manual";
+    } else if ((!capture || Number(season) !== Number(U.today().slice(0, 4))) && review && Array.isArray(review.areaSnapshot) && review.areaSnapshot.length) {
+      snapshot = U.clone(review.areaSnapshot); source = review.areaSource || "saved-snapshot";
+    } else if (Number(season) === Number(U.today().slice(0, 4))) {
+      const eligible = id => { const f = field(id); return f && f.varietyId === varietyId && !/休耕|休止|終了/.test(f.status || ""); };
+      let ids = Array.from(new Set((data().fieldWorks || []).filter(work => isActualFieldWork(work) && harvestDateYear(work.date) && work.date <= U.today() && cropYearForRecord(work) === Number(season) && isPlantingWorkName(work.workName)).flatMap(work => work.fieldIds || []))).filter(eligible);
+      source = "planting";
+      if (!ids.length) { ids = Array.from(new Set(millingRecordsFor({ season, varietyId }).filter(row => harvestDateYear(row.date) && row.date <= U.today()).flatMap(row => row.fieldIds || []))).filter(eligible); source = "milling"; }
+      if (review && (review.fieldIds || []).length) { ids = review.fieldIds; source = "selected-fields"; }
+      if (!ids.length) { ids = activeFields().filter(f => f.varietyId === varietyId && !/休耕|休止|終了/.test(f.status || "")).map(f => f.fieldId); source = "current-fields-unconfirmed"; }
+      snapshot = Array.from(new Set(ids)).map(id => field(id)).filter(f => f && f.varietyId === varietyId && !/休耕|休止|終了/.test(f.status || "")).map(f => ({ fieldId: f.fieldId, name: f.name, varietyId: f.varietyId, areaA: Number.isFinite(f.areaA) && f.areaA > 0 ? f.areaA : null }));
+    }
+    if (snapshot.length && source !== "current-fields-unconfirmed" && snapshot.every(f => Number.isFinite(f.areaA) && f.areaA > 0)) { const sum = snapshot.reduce((n, f) => n + f.areaA, 0); areaA = Number.isFinite(sum) ? sum : null; }
+    const fieldIds = snapshot.length ? snapshot.map(f => f.fieldId) : review && review.fieldIds || [];
+    const areaBasis = JSON.stringify({ mode, source, areaA, snapshot, fieldIds });
+    return { areaMode: mode, areaSource: source, areaA, areaSnapshot: snapshot, areaFieldCount: fieldIds.length, fieldIds: U.clone(fieldIds), areaBasis };
+  }
+
+  function harvestReviewEvidenceFor(season, varietyId) {
+    if (!S.validCropYear(season) || !varietyId) return [];
+    const review = harvestYearReviewFor(season, varietyId);
+    const ids = new Set([...(review && review.fieldIds || []), ...(review && review.areaSnapshot || []).map(f => f.fieldId), ...millingRecordsFor({ season, varietyId }).flatMap(r => r.fieldIds || [])]);
+    if (Number(season) === Number(U.today().slice(0, 4))) fields().filter(f => f.varietyId === varietyId).forEach(f => ids.add(f.fieldId));
+    const rows = [];
+    const add = (kind, id, date, label, detail, targets) => {
+      if (!id || !harvestDateYear(date) || date > U.today() || !targets.some(target => ids.has(target))) return;
+      rows.push({ kind, id, date, label: String(label || "記録"), detail: String(detail || ""), fieldIds: Array.from(new Set(targets)) });
+    };
+    (data().fieldWorks || []).filter(w => cropYearForRecord(w) === Number(season) && isActualFieldWork(w)).forEach(w => add("fieldWork", w.workId, w.date, w.workName, w.memo, w.fieldIds || []));
+    (data().growthLogs || []).filter(r => harvestDateYear(r.date) === Number(season).toString()).forEach(r => add("growth", r.logId, r.date, "生育記録", r.memo, [r.fieldId]));
+    for (const [collection, kind, key] of [["dryPeriods", "dry", "dryPeriodId"], ["irrigations", "irrigation", "irrigationId"]]) (data()[collection] || []).forEach(r => {
+      const date = r.startDate || r.date;
+      if (harvestDateYear(date) === Number(season).toString() && !/予定|planned/.test(`${r.status || ""} ${r.periodStatus || ""}`) && (r.startDate || !r.plannedStartDate)) add(kind, r[key], date, r.method || "水管理", r.memo, r.fieldIds || [r.fieldId]);
+    });
+    millingRecordsFor({ season, varietyId }).forEach(r => { if (harvestDateYear(r.date) && r.date <= U.today()) rows.push({ kind: "milling", id: r.millingId, date: r.date, label: "籾摺り後の収量", detail: r.memo, fieldIds: U.clone(r.fieldIds) }); });
+    return U.clone(rows.sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id)));
+  }
+
+  function saveHarvestNextSeasonIdea(input) {
+    try {
+      input = input || {};
+      const review = (data().harvestYearReviews || []).find(r => r.reviewId === input.reviewId);
+      const text = String(input.text || "").trim();
+      if (!review || !S.validCropYear(review.season) || review.season >= 2200 || !["continue", "change", "undecided"].includes(input.category) || !text) throw new Error("振り返り・区分・内容を確認してください。");
+      const available = harvestReviewEvidenceFor(review.season, review.varietyId);
+      const refs = input.evidenceRefs === undefined ? review.evidenceRefs || [] : input.evidenceRefs;
+      if (!Array.isArray(refs) || refs.some(ref => !ref || ![...available, ...(review.evidenceRefs || [])].some(r => r.kind === ref.kind && r.id === ref.id))) throw new Error("実績の参照を確認してください。");
+      const ideaId = `harvest-plan:${review.reviewId}:${input.category}`;
+      const previous = nextSeasonIdeas().find(r => r.ideaId === ideaId);
+      const row = { ...previous, ideaId, text, done: Boolean(previous && previous.done), sourceSeason: review.season, targetSeason: review.season + 1, varietyId: review.varietyId, reviewId: review.reviewId, category: input.category, reason: String(input.reason ?? review.memo ?? ""), evidenceRefs: U.clone(refs), createdAt: previous ? previous.createdAt : U.now(), updatedAt: previous ? previous.updatedAt : U.now() };
+      if (previous && JSON.stringify(previous) === JSON.stringify(row)) return U.clone(previous);
+      row.updatedAt = U.now();
+      const saved = mutate(d => { d.meta = d.meta || {}; const items = d.meta.nextSeasonIdeas || []; const i = items.findIndex(r => r.ideaId === ideaId); if (i < 0) items.push(row); else items[i] = row; d.meta.nextSeasonIdeas = items; }, "来年の計画を保存しました");
+      return saved ? U.clone(saved.meta.nextSeasonIdeas.find(r => r.ideaId === ideaId)) : null;
+    } catch (error) { lastError = error; return null; }
+  }
+
   function saveHarvestYearReview(input) {
     try {
       input = input || {};
       const byId = (data().harvestYearReviews || []).find(row => row.reviewId === input.reviewId);
       if (input.reviewId && !byId) throw new Error("編集対象が見つかりません。");
       const defined = Object.fromEntries(Object.entries(input).filter(([, value]) => value !== undefined));
+      delete defined.refreshArea;
       let row = S.normalizeHarvestYearReview({ ...byId, ...defined }, true);
       const byKey = harvestYearReviewFor(row.season, row.varietyId);
       if (byId && byKey && byKey.reviewId !== byId.reviewId) throw new Error("同じ年産・品種の確認が既にあります。");
       const previous = byId || byKey;
       row = S.normalizeHarvestYearReview({ ...previous, ...defined, reviewId: previous ? previous.reviewId : row.reviewId, createdAt: previous ? previous.createdAt : row.createdAt, updatedAt: previous ? previous.updatedAt : row.updatedAt }, true);
       row.quantityBasis = row.completed ? defined.completed === true ? harvestQuantityBasis(row.season, row.varietyId) : previous && previous.quantityBasis || "" : "";
+      if (row.areaMode === "auto") {
+        const sameScope = previous && previous.season === row.season && previous.varietyId === row.varietyId;
+        row.areaSnapshot = sameScope && Array.isArray(previous.areaSnapshot) ? U.clone(previous.areaSnapshot) : [];
+        row.areaSource = sameScope ? previous.areaSource || "" : "";
+      }
+      const area = harvestReviewArea(row.season, row.varietyId, row, input.refreshArea === true);
+      if (row.areaMode === "auto") { row.areaSnapshot = area.areaSnapshot; row.areaSource = area.areaSource; row.areaA = area.areaA; }
+      row.reviewBasis = row.completed ? defined.completed === true ? area.areaBasis : previous && (previous.reviewBasis || harvestReviewArea(previous.season, previous.varietyId, previous).areaBasis) || "" : "";
+      if (defined.evidenceRefs !== undefined || previous && (previous.season !== row.season || previous.varietyId !== row.varietyId)) {
+        const available = harvestReviewEvidenceFor(row.season, row.varietyId);
+        const historical = previous && previous.season === row.season && previous.varietyId === row.varietyId ? previous.evidenceRefs || [] : [];
+        if (row.evidenceRefs.some(ref => ![...available, ...historical].some(r => r.kind === ref.kind && r.id === ref.id))) throw new Error("参照先の実績が見つかりません。");
+      }
       if (!variety(row.varietyId) && !(previous && previous.varietyId === row.varietyId)) throw new Error("登録済み品種を選択してください。");
       const unchangedTargets = previous && previous.varietyId === row.varietyId && JSON.stringify(previous.fieldIds) === JSON.stringify(row.fieldIds);
       if (!unchangedTargets && (row.fieldIds || []).some(id => !field(id) || field(id).varietyId !== row.varietyId)) throw new Error("圃場の品種を確認してください。");
@@ -3282,17 +3358,22 @@
     const knownKg = validCount && !overflow ? total : null;
     const totalKg = missing ? null : knownKg;
     const totalBales = totalKg === null ? null : totalKg / 60;
-    const areaA = review && Number.isFinite(review.areaA) && review.areaA > 0 ? review.areaA : null;
+    const area = harvestReviewArea(season, varietyId, review);
+    const areaA = area.areaA;
     const rate = areaA !== null && totalBales !== null ? totalBales / areaA * 10 : null;
     const completed = Boolean(review && review.completed);
     const quantityBasis = harvestQuantityBasis(season, varietyId);
-    const status = !records.length ? "missing" : totalKg !== null && completed && review.quantityBasis === quantityBasis ? "complete" : "partial";
-    return { season: Number(season), varietyId, quantityBasis, totalKg, knownKg, totalBales, areaA, balesPer10a: Number.isFinite(rate) ? rate : null, recordCount: records.length, missingQuantityCount: missing, completed, status, memo: review ? review.memo : "", reviewId: review ? review.reviewId : "" };
+    const status = !records.length ? "missing" : totalKg !== null && completed && review.quantityBasis === quantityBasis && (!review.reviewBasis || review.reviewBasis === area.areaBasis) && area.areaSource !== "current-fields-unconfirmed" ? "complete" : "partial";
+    const target = review ? review.targetBalesPer10a : 10;
+    const achievement = Number.isFinite(rate) ? rate / target * 100 : null;
+    const previousReview = harvestYearReviewFor(Number(season) - 1, varietyId);
+    return { season: Number(season), varietyId, ...area, quantityBasis, totalKg, knownKg, totalBales, balesPer10a: Number.isFinite(rate) ? rate : null, targetBalesPer10a: target, achievementPercent: Number.isFinite(achievement) ? achievement : null, targetRemaining: Number.isFinite(rate) ? Math.max(0, target - rate) : null, evaluation: review ? review.memo : "", conditions: review ? review.conditions : "", plans: review ? U.clone(review.plans) : { continue: "", change: "", undecided: "" }, evidenceRefs: review ? U.clone(review.evidenceRefs) : [], followUpOutcome: review ? review.followUpOutcome : "", followUpMemo: review ? review.followUpMemo : "", previousPlans: previousReview ? U.clone(previousReview.plans) : null, recordCount: records.length, missingQuantityCount: missing, completed, status, memo: review ? review.memo : "", reviewId: review ? review.reviewId : "" };
   }
 
   function harvestPerformanceFor(season) {
     if (!S.validCropYear(season)) return [];
     const ids = new Set([...(data().millingRecords || []), ...(data().harvestYearReviews || [])].filter(row => row.season === Number(season) && row.varietyId).map(row => row.varietyId));
+    (data().harvestYearReviews || []).filter(row => row.season === Number(season) - 1 && row.varietyId && ["continue", "change", "undecided"].some(key => String(row.plans && row.plans[key] || "").trim())).forEach(row => ids.add(row.varietyId));
     return Array.from(ids).map(id => {
       const row = harvestPerformanceRow(season, id);
       const prior = harvestPerformanceRow(Number(season) - 1, id);
@@ -3631,6 +3712,8 @@
     deleteMillingRecord,
     millingRecordsFor,
     harvestYearReviewFor,
+    harvestReviewEvidenceFor,
+    saveHarvestNextSeasonIdea,
     saveHarvestYearReview,
     deleteHarvestYearReview,
     harvestPerformanceFor,

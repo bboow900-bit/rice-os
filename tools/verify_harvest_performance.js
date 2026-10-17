@@ -10,14 +10,14 @@ function reject(fn){const before=raw();assert.equal(fn(),null);assert.equal(raw(
 const milling=(season,bags=100)=>S.saveMillingRecord({date:"2026-10-01",season,varietyId:"v",fieldIds:["a","b"],packages:[{kg:30,bags}],looseKg:0});
 const a=milling(2025,80),b=milling(2026);assert(a&&b);
 const oldResult=JSON.stringify(S.data().varietyResults);
-let row=S.harvestPerformanceFor(2026)[0];assert.equal(row.totalKg,3000);assert.equal(row.totalBales,50);assert.equal(row.areaA,null);assert.equal(row.status,"partial");assert.equal(row.balesPer10a,null);
+let row=S.harvestPerformanceFor(2026)[0];assert.equal(row.totalKg,3000);assert.equal(row.totalBales,50);assert.equal(row.areaA,300);assert.equal(row.status,"partial");assert.equal(row.balesPer10a,50/300*10);
 const prev=S.saveHarvestYearReview({season:2025,varietyId:"v",areaA:100,completed:true,memo:"prior"});assert(prev);
 const review=S.saveHarvestYearReview({season:2026,varietyId:"v",areaA:125,completed:true,memo:"current",fieldIds:["a","b"]});assert(review);
 row=S.harvestPerformanceFor(2026)[0];assert.equal(row.status,"complete");assert.equal(row.balesPer10a,4);assert.equal(row.previous.balesPer10a,4);assert.equal(row.deltaBalesPer10a,0);assert.equal(row.deltaTotalBales,10);assert.equal(row.deltaAreaA,25);assert.equal(row.recordCount,1);
 const confirmedBasis=row.quantityBasis;assert.equal(typeof confirmedBasis,"string");assert.equal(confirmedBasis,review.quantityBasis);
 assert(S.saveMillingRecord({millingId:b.millingId,memo:"memo only"}));row=S.harvestPerformanceFor(2026)[0];assert.equal(row.quantityBasis,confirmedBasis);assert.equal(row.status,"complete");assert.equal(S.harvestPerformanceHistory("v",2026)[4].quantityBasis,confirmedBasis);
 let before=raw();assert(S.saveHarvestYearReview({season:2026,varietyId:"v",areaA:125,completed:true,memo:"current"}));assert.equal(raw(),before);assert.equal(S.harvestYearReviewFor(2026,"v").reviewId,review.reviewId);
-assert(S.saveHarvestYearReview({reviewId:review.reviewId,areaA:"",memo:"no area"}));row=S.harvestPerformanceFor(2026)[0];assert.equal(row.areaA,null);assert.equal(row.balesPer10a,null);assert.equal(row.status,"complete");assert.equal(row.deltaTotalBales,10);assert.equal(row.deltaBalesPer10a,null);
+assert(S.saveHarvestYearReview({reviewId:review.reviewId,areaA:"",memo:"no area"}));row=S.harvestPerformanceFor(2026)[0];assert.equal(row.areaA,null);assert.equal(row.balesPer10a,null);assert.equal(row.status,"partial");assert.equal(row.deltaTotalBales,null);assert.equal(row.deltaBalesPer10a,null);
 assert(S.saveHarvestYearReview({reviewId:review.reviewId,areaA:125}));
 assert(S.replace({...S.data(),fields:S.data().fields.map(f=>({...f,areaA:99999}))}));assert.equal(S.harvestPerformanceFor(2026)[0].areaA,125);
 const untouched=raw();const clone=S.harvestYearReviewFor(2026,"v");clone.areaA=1;S.harvestPerformanceFor(2026);const history=S.harvestPerformanceHistory("v",2026);assert.equal(history.length,5);assert.equal(history[0].season,2022);assert.equal(history[0].status,"missing");history[4].areaA=1;assert.equal(raw(),untouched);

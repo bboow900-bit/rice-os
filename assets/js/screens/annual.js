@@ -866,7 +866,7 @@
       <section class="next-season-ideas" aria-label="来年やりたいこと">
         <div class="next-season-ideas-head"><div><span>全体メモ</span><h3>来年やりたいこと</h3><small>${openCount ? `未完了 ${openCount}件` : "思いついたことを残しておけます"}</small></div><button type="button" class="secondary" data-next-season-idea-add>${nextSeasonIdeaDraft ? "閉じる" : "追加"}</button></div>
         ${nextSeasonIdeaDraft ? `<form class="next-season-idea-editor" data-next-season-idea-form><textarea name="text" placeholder="例: 田植え機の爪を交換する。来年はこの圃場の中干しを2日早める。" autofocus></textarea><button type="submit" class="primary">追加する</button></form>` : ""}
-        <div class="next-season-idea-list">${ideas.length ? ideas.map((idea) => `<article class="${idea.done ? "done" : ""}"><label><input type="checkbox" data-next-season-idea-toggle="${U.attr(idea.ideaId)}" ${idea.done ? "checked" : ""}><span>${U.escapeHTML(idea.text)}</span></label><button type="button" class="danger" data-next-season-idea-delete="${U.attr(idea.ideaId)}" aria-label="削除">×</button></article>`).join("") : '<p>来年に試したいこと、直したいことを気軽に残せます。圃場ごとの内容は、各圃場の「来年に引き継ぐメモ」に残します。</p>'}</div>
+        <div class="next-season-idea-list">${ideas.length ? ideas.map((idea) => `<article class="${idea.done ? "done" : ""}"><label><input type="checkbox" data-next-season-idea-toggle="${U.attr(idea.ideaId)}" ${idea.done ? "checked" : ""}><span>${U.escapeHTML(idea.text)}${idea.reviewId && idea.sourceSeason ? `<small>出典：${U.escapeHTML(idea.sourceSeason)}年産 / ${U.escapeHTML(state.variety(idea.varietyId)?.name || idea.varietyId || "品種未設定")} / ${U.escapeHTML({continue:"続ける",change:"変える",undecided:"保留・未決定"}[idea.category] || "方針")} → ${U.escapeHTML(idea.targetSeason)}年</small>` : ""}</span></label><button type="button" class="danger" data-next-season-idea-delete="${U.attr(idea.ideaId)}" aria-label="削除">×</button></article>`).join("") : '<p>来年に試したいこと、直したいことを気軽に残せます。圃場ごとの内容は、各圃場の「来年に引き継ぐメモ」に残します。</p>'}</div>
       </section>
     `;
   }
@@ -2170,7 +2170,7 @@
     const matchesField = (row, key) => Array.isArray(row && row[key]) && row[key].includes(field.fieldId);
     const same = (value) => String(value || "") === String(id || "");
     if (kind === "milling") {
-      const row = (data.millingRecords || []).find(item => same(item.millingId) && matchesField(item, "fieldIds"));
+      const row = (data.millingRecords || []).find(item => same(item.millingId) && (field ? matchesField(item, "fieldIds") : !(item.fieldIds || []).length));
       return row ? { kind, row } : null;
     }
     if (kind === "fieldWork") {
@@ -2383,7 +2383,7 @@
     const category = isLegacyWater ? "旧作業由来" : isWater ? "水管理" : kind === "milling" ? "籾摺り" : kind === "growth" ? "生育記録" : kind === "other" ? "その他" : /収穫|稲刈り/.test(String(row.workName || "")) ? "収穫" : "農作業";
     const title = kind === "milling" ? "籾摺り後の収量" : isLegacyWater ? row.label : kind === "growth" ? (isObservedHeading(row) ? "出穂確認" : U.number(row.panicleLengthMm, 0) > 0 ? "幼穂確認" : row.stageConfirmed && row.observedStage ? "現場ステージ" : "生育記録") : String(row.workName || row.method || "記録");
     const date = isWater ? String(row.startDate || row.date || row.actualEndDate || "") : String(row.date || "");
-    const fieldNames = kind === "fieldWork" ? (row.fieldIds || []).map((fieldId) => state.field(fieldId)?.name).filter(Boolean).join("・") : kind === "other" ? (row.relatedFieldIds || row.fieldIds || []).map((fieldId) => state.field(fieldId)?.name).filter(Boolean).join("・") : field.name;
+    const fieldNames = kind === "fieldWork" ? (row.fieldIds || []).map((fieldId) => state.field(fieldId)?.name).filter(Boolean).join("・") : kind === "other" ? (row.relatedFieldIds || row.fieldIds || []).map((fieldId) => state.field(fieldId)?.name).filter(Boolean).join("・") : field?.name || "品種集計（圃場指定なし）";
     const info = [];
     if (isWater) {
       info.push(annualRecordInfoRow("開始日", annualRecordDate(row.startDate || row.date)));
@@ -2425,7 +2425,7 @@
     return `
       <section class="annual-record-detail" aria-label="${U.attr(title)}の実績詳細">
         <button type="button" class="annual-record-detail-back" data-annual-record-detail-back aria-label="一年の流れへ戻る">‹</button>
-        <header class="annual-record-detail-head"><span>${U.escapeHTML(category)}</span><h2>${U.escapeHTML(title)}</h2><p>${U.escapeHTML(fieldNames || field.name)} / ${U.escapeHTML(annualRecordDate(date))}</p></header>
+        <header class="annual-record-detail-head"><span>${U.escapeHTML(category)}</span><h2>${U.escapeHTML(title)}</h2><p>${U.escapeHTML(fieldNames || field?.name || "品種集計")} / ${U.escapeHTML(annualRecordDate(date))}</p></header>
         <section class="annual-record-detail-summary ${U.attr(isWater ? "water" : kind === "growth" ? "growth" : category === "収穫" ? "harvest" : "work")}" ><b>${U.escapeHTML(title)}</b><span>${U.escapeHTML(isLegacyWater ? "旧作業記録からの照合候補。水管理としては未確定です" : `${category}として登録された実績です`)}</span></section>
         <section class="annual-record-detail-section"><h3>記録内容</h3><div class="annual-record-detail-rows">${info.filter(Boolean).join("") || '<p class="annual-record-detail-empty">記録内容はありません。</p>'}</div></section>
         ${harvestSnapshot}
@@ -2480,9 +2480,10 @@
     renderOptions();
     const field = selectedFieldId && state.field(selectedFieldId);
     const rows = rowsForYear(allRows());
+    const fieldlessMilling = recordDetail?.returnToHarvestPerformance && recordDetail.kind === "milling" && !selectedFieldId;
     const screen = U.$("screen-annual");
-    if (screen) screen.classList.toggle("annual-detail-mode", Boolean(field));
-    U.$("annualTimeline").innerHTML = field ? `${renderAnnualFieldSwitcher(field)}${recordDetail ? renderAnnualRecordDetail(field, recordDetail) : renderFieldDetail(field)}${renderTimelineActionSheet()}` : renderTop(rows);
+    if (screen) screen.classList.toggle("annual-detail-mode", Boolean(field || fieldlessMilling));
+    U.$("annualTimeline").innerHTML = fieldlessMilling ? renderAnnualRecordDetail(null,recordDetail) : field ? `${renderAnnualFieldSwitcher(field)}${recordDetail ? renderAnnualRecordDetail(field, recordDetail) : renderFieldDetail(field)}${renderTimelineActionSheet()}` : renderTop(rows);
     renderSortOptions();
     if (RiceOS.app && RiceOS.app.syncBackButton) RiceOS.app.syncBackButton();
   }
@@ -2603,6 +2604,20 @@
 
   function handleBack() {
     if (recordDetail) {
+      if (recordDetail.returnToHarvestPerformance) {
+        const origin = recordDetail.performanceContext;
+        recordDetail = null; expandedFlowRecord = ""; reviewView = "overview";
+        RiceOS.app.back();
+        if (origin) {
+          selectedFieldId = origin.fieldId; selectedTab = origin.tab; topView = origin.top;
+          compareFromHub = origin.fromHub; reviewView = origin.review; compareFilter = origin.filter;
+          recordDetail = origin.detail; expandedFlowRecord = origin.expanded;
+          waterEditDraft = origin.waterDraft; timelineActionRecord = origin.action;
+          if (U.$("annualYear")) U.$("annualYear").value = origin.year;
+        }
+        render();
+        return true;
+      }
       if (recordDetail.fromMaterialsTop) selectedFieldId = "";
       if (recordDetail.returnComparisonField && state.field(recordDetail.returnComparisonField)) selectedFieldId = recordDetail.returnComparisonField;
       recordDetail = null;
@@ -2732,6 +2747,20 @@
     render();
     if (RiceOS.app && RiceOS.app.syncBackButton) RiceOS.app.syncBackButton();
     window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function openPerformanceEvidence(kind, id, fieldId, year) {
+    const field = state.field(fieldId), value = Number(year);
+    if ((!field && (fieldId || kind !== "milling")) || !Number.isInteger(value) || value < 1900 || value > 2200 || !annualRecordTarget(field || null,kind,id)) return false;
+    const origin = { fieldId:selectedFieldId,tab:selectedTab,top:topView,fromHub:compareFromHub,review:reviewView,filter:compareFilter,detail:recordDetail,expanded:expandedFlowRecord,waterDraft:waterEditDraft,action:timelineActionRecord,year:yearValue() };
+    if (U.$("annualYear")) U.$("annualYear").value = String(value);
+    openField(fieldId,"karte");
+    if (field) { if (!openAnnualRecordDetail(kind,id,KIND_META[kind]?.label || "実績")) return false; }
+    else recordDetail = {kind,id,label:"籾摺り"};
+    recordDetail.returnToHarvestPerformance = true;
+    recordDetail.performanceContext = origin;
+    render();
+    return true;
   }
 
   function switchFieldWithinAnnual(fieldId) {
@@ -3358,6 +3387,7 @@
     render,
     bind,
     openField,
+    openPerformanceEvidence,
     openWaterEditor,
     handleBack,
     canHandleBack,

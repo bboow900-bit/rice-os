@@ -26,7 +26,7 @@ const {chromium} = require(process.env.PLAYWRIGHT_MODULE || "C:/Users/Keisuke/.c
       const raw = () => page.evaluate(() => localStorage.getItem(RiceOS.schema.STORE_KEY));
       const card = id => page.locator(`[data-hp-variety="${id}"]`);
       const form = id => page.locator(`[data-hp-form="${id}"]`);
-      const review = async id => { const el = card(id).locator("[data-hp-review]"); if (!await el.evaluate(node => node.open)) await el.locator("summary").click(); };
+      const review = async id => { const el = card(id).locator("[data-hp-review]"); if (!await el.evaluate(node => node.open)) await el.locator(":scope > summary").click(); };
       const shot = async name => {
         assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth),false);
         const file = path.join(os.tmpdir(),`rice-harvest-performance-${name}-${width}.png`); await page.screenshot({path:file}); console.log(file);
@@ -78,6 +78,8 @@ const {chromium} = require(process.env.PLAYWRIGHT_MODULE || "C:/Users/Keisuke/.c
       await review(f.v); await form(f.v).locator('[name="memo"]').fill("Keep draft across quantity edit");
       await page.evaluate(row => { if (!RiceOS.state.saveMillingRecord({...row,looseKg:1260})) throw Error("Quantity edit failed"); RiceOS.screens.harvestPerformance.render(); },f.current);
       assert.equal(await card(f.v).locator("[data-hp-status]").getAttribute("data-hp-status"),"partial");
+      const history = card(f.v).locator('[data-hp-section="history"]');
+      if (!await history.evaluate(el => el.open)) await history.locator(":scope > summary").click();
       assert.match(await card(f.v).locator('[data-hp-trend-year="2026"]').innerText(),/途中/);
       assert.equal(await card(f.v).locator('[data-hp-trend-year="2026"] .hp-trend-partial').count(),1);
       assert.match(await card(f.v).locator(".hp-delta").innerText(),/比較対象なし/);
