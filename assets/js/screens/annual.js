@@ -2414,6 +2414,17 @@
       info.push(annualRecordInfoRow("作業者", row.worker));
       info.push(annualRecordInfoRow("作業時間", row.hours || row.totalHours ? U.formatHours(U.parseWorkHours(row.hours || row.totalHours)) : ""));
       info.push(annualRecordInfoRow("機械", row.machine));
+      const tractor = row.tractorSettingsSnapshot;
+      if (tractor && tractor.settings) {
+        info.push(annualRecordInfoRow("使用時のトラクター設定", tractor.profileName));
+        info.push(annualRecordInfoRow("トラクター", [tractor.machineName, tractor.machineMaker, tractor.machineModel].filter(Boolean).join(" / ")));
+        (RiceOS.schema.TRACTOR_SETTING_FIELDS || []).forEach(setting => {
+          const value = tractor.settings[setting.key];
+          if (value !== "" && value !== undefined && value !== null) info.push(annualRecordInfoRow(setting.label, `${value}${setting.unit ? ` ${setting.unit}` : ""}`));
+        });
+        info.push(annualRecordInfoRow("設定の適用条件", tractor.conditions));
+        info.push(annualRecordInfoRow("設定メモ", tractor.memo));
+      }
       info.push(annualRecordInfoRow("資材", row.material));
       info.push(annualRecordInfoRow("除草の処理区分", row.herbicideCategory));
       info.push(annualRecordInfoRow("この時期に使った理由", row.herbicidePurpose));

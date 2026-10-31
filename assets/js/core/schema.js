@@ -5,7 +5,7 @@
   const U = RiceOS.utils;
 
   const SCHEMA_VERSION = 17;
-  const APP_VERSION = "20261017_ver296";
+  const APP_VERSION = "20261031_ver297";
   const STORE_KEY = "rice_os_v8_stable";
   const BACKUP_KEY = "rice_os_v8_stable_backup";
   const RELEASE_BACKUPS_KEY = "rice_os_v8_stable_release_backups";
@@ -641,6 +641,8 @@
       hours: String(w.hours || ""),
       machine: String(w.machine || w.machineName || ""),
       machineId: String(w.machineId || ""),
+      ...(w.tractorProfileId !== undefined ? { tractorProfileId: String(w.tractorProfileId || "") } : {}),
+      ...(normalizeTractorSnapshot(w.tractorSettingsSnapshot) ? { tractorSettingsSnapshot: normalizeTractorSnapshot(w.tractorSettingsSnapshot) } : {}),
       material: String(w.material || ""),
       materialId: String(w.materialId || ""),
       herbicideLinks: (offField ? [] : ensureArray(w.herbicideLinks)).filter((link) => link && link.fieldId && link.assignmentId && link.stepId).map((link) => ({ fieldId: String(link.fieldId), assignmentId: String(link.assignmentId), stepId: String(link.stepId) })),
@@ -1100,6 +1102,65 @@
     };
   }
 
+  const TRACTOR_WORK_TYPES = [
+    { value: "autumnTillage", label: "秋起こし" },
+    { value: "ridgePlastering", label: "くろぬり（畦塗り）" },
+    { value: "puddling", label: "代掻き" }
+  ];
+  const TRACTOR_SETTING_FIELDS = [
+    ["attachmentMaker", "作業機メーカー", "text", ""], ["attachmentModel", "作業機型式", "text", ""],
+    ["engineRpm", "エンジン回転数", "number", "rpm"], ["ptoGear", "PTO段", "text", ""], ["ptoRpm", "PTO軸回転数", "number", "rpm"],
+    ["mainGear", "主変速", "text", ""], ["subGear", "副変速", "text", ""], ["speedKmh", "作業速度", "number", "km/h"],
+    ["depthControl", "耕深制御", "text", ""], ["levelControl", "水平制御", "text", ""],
+    ["depthCm", "作業深さ", "number", "cm", ["autumnTillage", "puddling"]], ["depthDial", "深さダイヤル", "text", "", ["autumnTillage", "puddling"]],
+    ["rotorGear", "ロータリー変速", "text", "", ["autumnTillage"]], ["rearCover", "後部カバー", "text", "", ["autumnTillage"]],
+    ["passes", "回数", "number", "回", ["autumnTillage", "puddling"]], ["strawFinish", "わらの仕上がり", "text", "", ["autumnTillage"]],
+    ["ridgeHeightCm", "畦高さ", "number", "cm", ["ridgePlastering"]], ["ridgeWidthCm", "畦幅", "number", "cm", ["ridgePlastering"]],
+    ["offsetCm", "オフセット", "number", "cm", ["ridgePlastering"]], ["pretreatmentDepthCm", "前処理深さ", "number", "cm", ["ridgePlastering"]],
+    ["rollerSetting", "ローラー設定", "text", "", ["ridgePlastering"]], ["diskSetting", "ディスク設定", "text", "", ["ridgePlastering"]],
+    ["soilMoisture", "土の湿り", "text", "", ["ridgePlastering"]], ["finish", "仕上がり", "text", "", ["ridgePlastering", "puddling"]],
+    ["passType", "工程", "text", "", ["puddling"]], ["waterLevel", "水位", "text", "", ["puddling"]],
+    ["soilExposure", "土の露出", "text", "", ["puddling"]], ["levelBoard", "均平板", "text", "", ["puddling"]],
+    ["soilPull", "土の引き具合", "text", "", ["puddling"]], ["strawFloat", "わら浮き", "text", "", ["puddling"]]
+  ].map(([key, label, type, unit, workTypes]) => ({ key, label, type, unit, ...(workTypes ? { workTypes } : {}), ...(type === "number" ? { ...(key === "offsetCm" ? {} : { min: key === "passes" ? 1 : 0 }), step: key === "passes" ? 1 : "any" } : {}) }));
+
+  function normalizeTractorSettings(input, workType, strict = false) {
+    if (strict && (!input || typeof input !== "object" || Array.isArray(input))) throw new Error("トラクター設定の形式を確認してください。");
+    const raw = input && typeof input === "object" && !Array.isArray(input) ? input : {};
+    const fields = TRACTOR_SETTING_FIELDS.filter(f => !f.workTypes || f.workTypes.includes(workType));
+    if (strict && Object.keys(raw).some(key => !fields.some(f => f.key === key) && raw[key] !== "" && raw[key] != null)) throw new Error("この作業では使わない設定が含まれています。");
+    return Object.fromEntries(fields.map(f => {
+      const value = raw[f.key];
+      if (value == null || typeof value === "string" && !value.trim()) return [f.key, ""];
+      if (f.type === "text") {
+        if (strict && !["string", "number"].includes(typeof value)) throw new Error(`${f.label}を確認してください。`);
+        return [f.key, ["string", "number"].includes(typeof value) ? String(value) : ""];
+      }
+      const number = inventoryNumber(value);
+      const valid = Number.isFinite(number) && (f.key === "offsetCm" || number >= 0) && (f.key !== "passes" || Number.isSafeInteger(number) && number > 0);
+      if (strict && !valid) throw new Error(`${f.label}の数値を確認してください。`);
+      return [f.key, valid ? number : ""];
+    }));
+  }
+
+  function normalizeTractorProfile(input, strict = false) {
+    const row = input && typeof input === "object" && !Array.isArray(input) ? input : {};
+    const name = String(row.name || "").trim(), machineId = String(row.machineId || "");
+    const workType = String(row.workType || "");
+    if (strict && (!name || !machineId || !TRACTOR_WORK_TYPES.some(t => t.value === workType))) throw new Error("機械・設定名・作業種別を確認してください。");
+    return { profileId: String(row.profileId || U.id("tractor_profile", U.today())), machineId, name, workType, settings: normalizeTractorSettings(row.settings === undefined ? {} : row.settings, workType, strict), conditions: String(row.conditions ?? ""), memo: String(row.memo ?? ""), createdAt: String(row.createdAt || U.now()), updatedAt: String(row.updatedAt || row.createdAt || U.now()) };
+  }
+
+  function normalizeTractorSnapshot(input, strict = false) {
+    if (!input || typeof input !== "object" || Array.isArray(input)) {
+      if (strict) throw new Error("作業時のトラクター設定を確認してください。");
+      return null;
+    }
+    const row = input;
+    if (strict && (!row.profileId || !row.machineId || !TRACTOR_WORK_TYPES.some(t => t.value === row.workType))) throw new Error("トラクター設定の機械・作業種別を確認してください。");
+    return { profileId: String(row.profileId || ""), profileName: String(row.profileName || ""), machineId: String(row.machineId || ""), machineName: String(row.machineName || ""), machineMaker: String(row.machineMaker || ""), machineModel: String(row.machineModel || ""), workType: String(row.workType || ""), settings: normalizeTractorSettings(row.settings === undefined ? {} : row.settings, row.workType, strict), conditions: String(row.conditions ?? ""), memo: String(row.memo ?? ""), capturedAt: String(row.capturedAt || "") };
+  }
+
   function normalizeMachine(input, index) {
     const row = input || {};
     const createdAt = String(row.createdAt || U.now());
@@ -1345,6 +1406,7 @@
       shipmentPrices,
       confirmationCandidates,
       machines,
+      tractorProfiles: dedupeBy(ensureArray(source.tractorProfiles).map(row => normalizeTractorProfile(row)), "profileId"),
       maintenanceRecords,
       photos: ensureArray(source.photos),
       workers,
@@ -1406,6 +1468,7 @@
       confirmationCandidates: [],
       machines: [],
       maintenanceRecords: [],
+      tractorProfiles: [],
       workers: U.clone(WORKERS)
     });
   }
@@ -1453,6 +1516,10 @@
     cropYearClosureTime,
     normalizeCropYearClosures,
     normalizeMachine,
+    TRACTOR_WORK_TYPES,
+    TRACTOR_SETTING_FIELDS,
+    normalizeTractorProfile,
+    normalizeTractorSnapshot,
     normalizeHarvestReview,
     normalizeHarvestTiming,
     normalizeHarvestTimingThermal,

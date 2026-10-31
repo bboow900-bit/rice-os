@@ -21,6 +21,7 @@
     millingRecords: "籾摺り収量",
     shipmentIssues: "出荷の対応記録",
     harvestYearReviews: "年産別の収穫成績",
+    tractorProfiles: "トラクター設定",
     confirmationCandidates: "確認候補"
   };
 
@@ -43,7 +44,8 @@
       results: (data.varietyResults || []).length,
       milling: (data.millingRecords || []).length,
       shipments: (data.shipments || []).length,
-      machines: (data.machines || []).filter((item) => item.status !== "使用停止").length
+      machines: (data.machines || []).filter((item) => item.status !== "使用停止").length,
+      tractorProfiles: (data.tractorProfiles || []).length
     };
     Object.entries(values).forEach(([key, value]) => {
       U.$$(`[data-master-count="${key}"]`).forEach((el) => {
@@ -81,6 +83,7 @@
       ["生育ログ", `${info.growthLogs}件`],
       ["水管理", `${info.dryPeriods || 0}/${info.irrigations || 0}`],
       ["機械/整備", `${info.machines || 0}/${info.maintenanceRecords || 0}`],
+      ["トラクター設定", `${info.tractorProfiles || 0}件`],
       ["予定", `${info.schedules || 0}件`],
       ["資材/結果", `${info.materials}/${info.varietyResults}`],
       ["籾摺り収量", `${info.millingRecords || 0}件`],

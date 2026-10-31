@@ -22,6 +22,41 @@
   let cropYearPinned = false;
   let cropYearLegacyEdit = false;
   let cropYearDirty = false;
+  let tractorDraft = null;
+  let tractorTouched = false;
+  let tractorHadSnapshot = false;
+
+  function loadTractorSettings(work) {
+    tractorDraft = work && work.tractorSettingsSnapshot ? U.clone(work.tractorSettingsSnapshot) : null;
+    tractorHadSnapshot = Boolean(tractorDraft || work && work.tractorProfileId);
+    tractorTouched = false;
+    renderTractorSettings();
+  }
+
+  function renderTractorSettings() {
+    const form = U.$("fieldWorkForm"), module = RiceOS.screens?.tractorSettings;
+    if (!form || !module || typeof state.tractorWorkTypeForName !== "function") return;
+    let host = U.$("fwTractorSettings");
+    if (!host) {
+      host = document.createElement("section"); host.id = "fwTractorSettings"; host.className = "ts-work-settings";
+      const basic = form.querySelector("details.form-section");
+      if (basic) basic.after(host); else form.appendChild(host);
+    }
+    const type = targetScope() === "field" ? state.tractorWorkTypeForName(U.$("fwName").value) : "";
+    if (tractorDraft && tractorDraft.workType !== type) { tractorDraft = null; tractorTouched = true; }
+    host.hidden = !type; host.classList.toggle("hidden",!type);
+    if (!type) { host.innerHTML = ""; return; }
+    const profiles = state.tractorProfilesFor({workType:type}).filter(row => { const machine = state.machine(row.machineId); return machine && machine.category === "トラクター" && machine.status !== "使用停止"; });
+    const options = profiles.filter(row => row.profileId !== tractorDraft?.profileId).map(row => `<option value="${U.attr(row.profileId)}">${U.escapeHTML(row.name)} / ${U.escapeHTML(state.machine(row.machineId)?.name || "")}</option>`);
+    if (tractorDraft) options.unshift(`<option value="${U.attr(tractorDraft.profileId)}" selected>${U.escapeHTML(tractorDraft.profileName)} / ${U.escapeHTML(tractorDraft.machineName)}（実績用の保存値）</option>`);
+    host.innerHTML = `<h3>トラクターの実施設定</h3><label>設定（任意）<select id="fwTractorProfile"><option value=""${tractorDraft ? "" : " selected"}>設定を使わない</option>${options.join("")}</select></label>${tractorDraft ? `<p>${U.escapeHTML([tractorDraft.machineMaker,tractorDraft.machineName,tractorDraft.machineModel].filter(Boolean).join(" / "))}</p>${module.settingsFields(type,tractorDraft.settings,"fwTractor")}<label>実施時の条件<input id="fwTractorConditions" value="${U.attr(tractorDraft.conditions || "")}"></label><label>設定メモ<textarea id="fwTractorMemo">${U.escapeHTML(tractorDraft.memo || "")}</textarea></label>` : ""}<p id="fwTractorError" class="ts-error" role="alert"></p>`;
+  }
+
+  function tractorWorkPayload() {
+    const type = targetScope() === "field" && state.tractorWorkTypeForName ? state.tractorWorkTypeForName(U.$("fwName").value) : "";
+    if (tractorDraft && tractorDraft.workType === type) return {machineId:tractorDraft.machineId,tractorProfileId:tractorDraft.profileId,tractorSettingsSnapshot:U.clone(tractorDraft)};
+    return tractorTouched || tractorHadSnapshot ? {machineId:"",tractorProfileId:"",tractorSettingsSnapshot:null} : {};
+  }
 
   function setCropYear(record, newRecord = false) {
     const input = U.$("fwCropYear");
@@ -99,6 +134,7 @@
 
   function loadWorkName(name) {
     const custom = targetScope() === "offField" && (name === "その他" || !S.OTHER_WORK_NAMES.includes(name));
+    if (targetScope() === "field" && name && !S.FIELD_WORK_NAMES.includes(name)) U.setOptions(U.$("fwName"),[...S.FIELD_WORK_NAMES,name],name);
     U.$("fwName").value = custom ? "その他" : name;
     U.$("fwCustomName").value = custom ? name : "";
     renderCustomWorkName();
@@ -107,7 +143,9 @@
   function setTargetScope(scope) {
     U.$("fwTargetScope").value = scope === "offField" ? "offField" : "field";
     const offField = targetScope() === "offField";
-    U.setOptions(U.$("fwName"), offField ? S.OTHER_WORK_NAMES : S.FIELD_WORK_NAMES, U.$("fwName").value);
+    const selectedName = U.$("fwName").value;
+    const workNames = offField ? S.OTHER_WORK_NAMES : selectedName && !S.FIELD_WORK_NAMES.includes(selectedName) ? [...S.FIELD_WORK_NAMES,selectedName] : S.FIELD_WORK_NAMES;
+    U.setOptions(U.$("fwName"), workNames, selectedName);
     U.$("fwFields").closest("details").hidden = offField;
     U.$("fwTemplatePicks").parentElement.hidden = offField;
     U.$("fwWeatherStatus").closest(".weather-panel").hidden = offField;
@@ -151,6 +189,7 @@
   }
 
   function loadHarvestReview(work) {
+    if (typeof loadTractorSettings === "function") loadTractorSettings(work);
     harvestTimingDrafts = U.clone(work && work.harvestTimingByField || {});
     harvestTimingSelection = "";
     harvestStatuses = { ...(work && work.harvestStatusByField || {}) };
@@ -436,6 +475,7 @@
     setAutoValue("fwMachine", preset.machine || learned.machine || "");
     setAutoValue("fwMaterial", recommendedMaterial(workName) || learned.material || "");
     setAutoValue("fwAmount", learned.amount || "");
+    if (typeof renderTractorSettings === "function") renderTractorSettings();
   }
 
   function templateMaterial(template) {
@@ -551,6 +591,7 @@
 
   function resetForm() {
     workFormSession += 1;
+    if (typeof loadTractorSettings === "function") loadTractorSettings(null);
     invalidateWorkWeather();
     setTargetScope("field");
     U.$("fwCustomName").value = "";
@@ -647,6 +688,7 @@
     workFormSession += 1;
     const work = state.data().fieldWorks.find((item) => item.workId === workId);
     if (!work) return;
+    if (typeof loadTractorSettings === "function") loadTractorSettings(null);
     invalidateWorkWeather();
     setTargetScope(work.targetScope);
     pendingScheduleId = work.sourceScheduleId || "";
@@ -655,6 +697,7 @@
     U.$("fwDate").value = work.date;
     setCropYear(work);
     loadWorkName(work.workName);
+    if (typeof loadTractorSettings === "function") loadTractorSettings(work);
     setWorker(work.worker || "");
     U.$("fwHours").value = work.hours || "";
     U.$("fwMachine").value = work.machine || "";
@@ -734,6 +777,7 @@
   }
 
   function render() {
+    if (typeof renderTractorSettings === "function") renderTractorSettings();
     renderHerbicidePicker();
     renderMaterialPicker();
     setTargetScope(targetScope());
@@ -913,6 +957,22 @@
   }
 
   function bind() {
+    U.$("fieldWorkForm").addEventListener("input",event => {
+      if (!tractorDraft || !event.target.closest("#fwTractorSettings")) return;
+      if (event.target.hasAttribute("data-tractor-setting")) tractorDraft.settings[event.target.dataset.tractorSetting] = event.target.value;
+      if (event.target.id === "fwTractorConditions") tractorDraft.conditions = event.target.value;
+      if (event.target.id === "fwTractorMemo") tractorDraft.memo = event.target.value;
+      tractorTouched = true;
+    });
+    U.$("fieldWorkForm").addEventListener("change",event => {
+      if (event.target.id === "fwTractorProfile") {
+        const id = event.target.value;
+        const snapshot = id ? state.buildTractorSettingsSnapshot(id) : null;
+        if (id && !snapshot) { renderTractorSettings(); U.$("fwTractorError").textContent = "設定を読み込めませんでした。入力は保持しています。"; return; }
+        tractorDraft = snapshot; tractorTouched = true; renderTractorSettings();
+      }
+      if (event.target.id === "fwName" || event.target.id === "fwTargetScope") renderTractorSettings();
+    });
     U.$("fieldWorkForm").addEventListener("input", invalidateWorkWeather, true);
     U.$("fieldWorkForm").addEventListener("change", invalidateWorkWeather, true);
     U.$("fieldWorkForm").addEventListener("click", (event) => {
@@ -1154,6 +1214,7 @@
         worker: U.$("fwWorker") ? U.$("fwWorker").value : "",
         hours: U.$("fwHours").value,
         machine: U.$("fwMachine").value,
+        ...(typeof tractorWorkPayload === "function" ? tractorWorkPayload() : {}),
         material: U.$("fwMaterial").value,
         materialId: U.$("fwMaterial").value === linkedMaterialName ? U.$("fwMaterialId").value : "",
         herbicideLinks: !offField && workName === "除草剤" ? herbicideLinks : [],
@@ -1226,6 +1287,7 @@
         }
         U.$("fwMemo").value = work.memo || "";
         setSelectedFieldIds(work.fieldIds || []);
+        if (typeof loadTractorSettings === "function") loadTractorSettings(work);
         window.scrollTo({ top: 0, behavior: "smooth" });
         return;
       }

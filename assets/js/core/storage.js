@@ -228,6 +228,7 @@
     harvestYearReviews: "reviewId",
     shipmentPrices: "priceId",
     machines: "machineId",
+    tractorProfiles: "profileId",
     maintenanceRecords: "maintenanceId",
     confirmationCandidates: "candidateId"
   };
@@ -294,6 +295,7 @@
     const machineIds = new Set((Array.isArray(parsed.machines) ? parsed.machines : []).map((row) => String(row && (row.machineId || row.id) || "")).filter(Boolean));
     const brokenMachineIds = [
       ...(Array.isArray(parsed.fieldWorks) ? parsed.fieldWorks.map((row) => row && row.machineId) : []),
+      ...(Array.isArray(parsed.tractorProfiles) ? parsed.tractorProfiles.map(row => row && row.machineId) : []),
       ...(Array.isArray(parsed.maintenanceRecords) ? parsed.maintenanceRecords.map((row) => row && row.machineId) : [])
     ].map(String).filter((id) => id && !machineIds.has(id));
     if (brokenMachineIds.length) warnings.push(`元JSONに参照先のない機械IDが${new Set(brokenMachineIds).size}件あります。機械台帳で照合してください。`);
@@ -526,6 +528,7 @@
       schedules: (d.schedules || []).length,
       otherWorks: d.otherWorks.length,
       machines: (d.machines || []).length,
+      tractorProfiles: (d.tractorProfiles || []).length,
       maintenanceRecords: (d.maintenanceRecords || []).length,
       materials: d.materials.length,
       varietyResults: d.varietyResults.length,

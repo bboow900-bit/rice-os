@@ -957,6 +957,7 @@
       const previous = record.workId ? d.fieldWorks.find((work) => work.workId === record.workId) : null;
       const targets = workTargets(d, record, previous);
       const offField = targets.targetScope === "offField";
+      const tractor = tractorSnapshotForWork(record, previous, offField);
       if (offField && previous && targetScope(previous) === "field"
         && ((previous.fieldIds || []).length || (previous.orphanedFieldIds || []).length)
         && (isPlantingWorkName(previous.workName) || isHeadingWorkName(previous.workName)
@@ -1051,14 +1052,15 @@
         timeAccounting,
         totalHours,
         fieldAllocatedHours,
-        workName: record.workName || "その他",
+        workName: record.workName || (tractor.tractorSettingsSnapshot && previous && previous.workName) || "その他",
         worker: record.worker || "",
         hours: record.hours || "",
-        machine: record.machine || "",
+        machine: record.machine === undefined && tractor.tractorSettingsSnapshot && previous ? previous.machine : record.machine || "",
         // The visible machine name remains the established record field.
         // Keep an optional master reference for a later picker without
         // rewriting historical work records.
         machineId: record.machineId === undefined ? (previous && previous.machineId || "") : String(record.machineId || ""),
+        ...tractor,
         material: record.material || "",
         materialId: record.materialId === undefined
           ? (previous && String(previous.material || "") === String(record.material || "") ? previous.materialId || "" : "")
@@ -3575,6 +3577,80 @@
     return (data().machines || []).find((row) => row.machineId === machineId) || null;
   }
 
+  function tractorWorkTypeForName(name) {
+    const text = String(name || "");
+    if (/予定|計画|確認候補/.test(text)) return "";
+    if (/代かき|代掻/.test(text)) return "puddling";
+    if (/畦塗|畦ぬり|くろぬり|くろ塗り|あぜ塗り|畔塗り/.test(text)) return "ridgePlastering";
+    if (/秋耕|秋起こし|秋起し|耕起|田起こし|田起し/.test(text)) return "autumnTillage";
+    return "";
+  }
+
+  function tractorProfilesFor(filters = {}) {
+    return U.clone((data().tractorProfiles || []).filter(row => (filters.machineId === undefined || row.machineId === filters.machineId) && (filters.workType === undefined || row.workType === filters.workType)));
+  }
+
+  function saveTractorProfile(input) {
+    try {
+      input = input || {};
+      const previous = (data().tractorProfiles || []).find(row => row.profileId === input.profileId);
+      if (input.profileId && !previous) throw new Error("編集対象の設定が見つかりません。");
+      const defined = Object.fromEntries(Object.entries(input).filter(([, value]) => value !== undefined));
+      const merged = { ...previous, ...defined, settings: input.settings === undefined ? previous && previous.settings || {} : { ...(previous && previous.workType === (input.workType || previous.workType) ? previous.settings : {}), ...input.settings }, createdAt: previous ? previous.createdAt : U.now(), updatedAt: previous ? previous.updatedAt : U.now() };
+      if (input.settings !== undefined && (!input.settings || typeof input.settings !== "object" || Array.isArray(input.settings))) throw new Error("設定の形式を確認してください。");
+      const row = S.normalizeTractorProfile(merged, true);
+      const target = machine(row.machineId);
+      const historical = previous && previous.machineId === row.machineId;
+      if (!historical && (!target || target.category !== "トラクター" || target.status === "使用停止")) throw new Error("使用中のトラクターを選択してください。");
+      if (target && target.category !== "トラクター" && !historical) throw new Error("トラクターを選択してください。");
+      if (previous && JSON.stringify(row) === JSON.stringify(previous)) return U.clone(previous);
+      row.updatedAt = U.now();
+      const saved = mutate(d => { d.tractorProfiles = d.tractorProfiles || []; const index = d.tractorProfiles.findIndex(r => r.profileId === row.profileId); if (index < 0) d.tractorProfiles.push(row); else d.tractorProfiles[index] = row; }, "トラクター設定を保存しました");
+      return saved ? U.clone(saved.tractorProfiles.find(r => r.profileId === row.profileId)) : null;
+    } catch (error) { lastError = error; return null; }
+  }
+
+  function deleteTractorProfile(id) { return deleteInventoryRecord("tractorProfiles", "profileId", id); }
+
+  function buildTractorSettingsSnapshot(profileId, settingsOverride) {
+    try {
+      const profile = (data().tractorProfiles || []).find(row => row.profileId === profileId);
+      const target = profile && machine(profile.machineId);
+      if (!profile || !target || target.category !== "トラクター" || target.status === "使用停止") throw new Error("使用中のトラクター設定を選択してください。");
+      if (settingsOverride !== undefined && (!settingsOverride || typeof settingsOverride !== "object" || Array.isArray(settingsOverride))) throw new Error("実施時の設定を確認してください。");
+      return U.clone(S.normalizeTractorSnapshot({ profileId: profile.profileId, profileName: profile.name, machineId: target.machineId, machineName: target.name, machineMaker: target.maker, machineModel: target.model, workType: profile.workType, settings: { ...profile.settings, ...settingsOverride }, conditions: profile.conditions, memo: profile.memo, capturedAt: U.now() }, true));
+    } catch (error) { lastError = error; return null; }
+  }
+
+  function tractorSnapshotForWork(record, previous, offField) {
+    const supplied = record.tractorSettingsSnapshot !== undefined;
+    const old = previous && previous.tractorSettingsSnapshot;
+    const snapshot = supplied ? record.tractorSettingsSnapshot : old;
+    const profileId = record.tractorProfileId === undefined ? previous && previous.tractorProfileId || snapshot && snapshot.profileId || "" : String(record.tractorProfileId || "");
+    if (snapshot == null) {
+      if (profileId) throw new Error("作業時のトラクター設定を選択してください。");
+      return previous && (old || previous.tractorProfileId !== undefined) || supplied || record.tractorProfileId !== undefined ? { tractorProfileId: "", tractorSettingsSnapshot: null } : {};
+    }
+    const workType = tractorWorkTypeForName(record.workName === undefined ? previous && previous.workName : record.workName);
+    const machineId = record.machineId === undefined ? previous && previous.machineId || "" : String(record.machineId || "");
+    const normalized = supplied ? S.normalizeTractorSnapshot(snapshot, true) : U.clone(snapshot);
+    if (offField || !workType || normalized.workType !== workType || normalized.machineId !== machineId || normalized.profileId !== profileId) throw new Error("トラクター設定と機械・作業種別が一致しません。");
+    const historical = old && old.profileId === normalized.profileId && old.machineId === normalized.machineId && old.workType === normalized.workType;
+    if (!historical) {
+      const profile = (data().tractorProfiles || []).find(row => row.profileId === profileId);
+      const target = machine(machineId);
+      if (!profile || profile.machineId !== machineId || profile.workType !== workType || !target || target.category !== "トラクター" || target.status === "使用停止") throw new Error("使用中のトラクター設定を選択してください。");
+      Object.assign(normalized, { profileName: profile.name, machineName: target.name, machineMaker: target.maker, machineModel: target.model, capturedAt: U.now() });
+    }
+    return { tractorProfileId: profileId, tractorSettingsSnapshot: normalized };
+  }
+
+  function deleteMachine(machineId) {
+    if (!machine(machineId)) return null;
+    if (Object.entries(data()).some(([key, value]) => key !== "machines" && hasMasterReference(value, "machineId", machineId))) { lastError = new Error("記録・設定で参照されている機械は削除できません。使用停止をご利用ください。"); return null; }
+    return mutate(d => { d.machines = d.machines.filter(row => row.machineId !== machineId); }, "機械を削除しました");
+  }
+
   function maintenanceRecordsFor(machineId) {
     return (data().maintenanceRecords || []).filter((row) => row.machineId === machineId)
       .slice().sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")) || String(b.updatedAt || "").localeCompare(String(a.updatedAt || "")));
@@ -3823,6 +3899,12 @@
     machine,
     maintenanceRecordsFor,
     saveMachine,
+    deleteMachine,
+    tractorWorkTypeForName,
+    tractorProfilesFor,
+    saveTractorProfile,
+    deleteTractorProfile,
+    buildTractorSettingsSnapshot,
     retireMachine,
     saveMaintenanceRecord,
     deleteMaintenanceRecord
