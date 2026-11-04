@@ -195,7 +195,7 @@
   const MASTER_MENU = [
     { key: "field-master", group: "マスター", label: "圃場マスター", sub: "土質・面積", icon: "field-master.png", screen: "fields", tone: "green" },
     { key: "recipe", group: "マスター", label: "栽培レシピ", sub: "品種単位", icon: "recipe.png", screen: "recipes", tone: "green" },
-    { key: "transplanter", group: "マスター", label: "田植え機", sub: "株間・本数", icon: "transplanter.png", screen: "recipes", tone: "amber" },
+    { key: "transplanter", group: "マスター", label: "田植え機", sub: "年度別の設定", icon: "transplanter.png", screen: "transplanter-settings", tone: "amber" },
     { key: "materials", group: "マスター", label: "資材管理", sub: "在庫・使用", icon: "materials.png", screen: "materials", tone: "amber" },
     { key: "irrigation", group: "記録・確認", label: "水管理", sub: "中干し・深水・間断", icon: "irrigation.png", screen: "irrigation", tone: "water" },
     { key: "photos", group: "記録・確認", label: "写真", sub: "比較素材", icon: "photos.png", screen: "photos", tone: "" },

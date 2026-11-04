@@ -17,6 +17,7 @@
     "data",
     "machines",
     "tractor-settings",
+    "transplanter-settings",
     "calendar",
     "field-work",
     "materials",
@@ -70,7 +71,7 @@
     U.$$(".screen").forEach((section) => {
       section.classList.toggle("active", section.id === `screen-${screenId}`);
     });
-    const navScreen = ["machines", "tractor-settings"].includes(screenId) ? "data" : ["shipments", "harvest-performance"].includes(screenId) ? "annual" : screenId;
+    const navScreen = ["machines", "tractor-settings", "transplanter-settings"].includes(screenId) ? "data" : ["shipments", "harvest-performance"].includes(screenId) ? "annual" : screenId;
     U.$$(".nav-item").forEach((button) => {
       button.classList.toggle("active", button.dataset.screen === navScreen);
     });

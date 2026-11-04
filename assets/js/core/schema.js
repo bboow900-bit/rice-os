@@ -5,7 +5,7 @@
   const U = RiceOS.utils;
 
   const SCHEMA_VERSION = 17;
-  const APP_VERSION = "20261031_ver297";
+  const APP_VERSION = "20261103_ver298";
   const STORE_KEY = "rice_os_v8_stable";
   const BACKUP_KEY = "rice_os_v8_stable_backup";
   const RELEASE_BACKUPS_KEY = "rice_os_v8_stable_release_backups";
@@ -559,6 +559,28 @@
     });
   }
 
+  const WORK_TIMING_REASONS = ["rain", "surface", "machine", "labor", "schedule", "intentional", "material", "other"];
+  function normalizeScheduleSnapshot(input, strict = false) {
+    if (input == null) return null;
+    const r = input && typeof input === "object" && !Array.isArray(input) ? input : {};
+    const date = String(r.date || ""), parsed = Date.parse(`${date}T00:00:00Z`);
+    const valid = r.scheduleId && /^\d{4}-\d{2}-\d{2}$/.test(date) && Number.isFinite(parsed) && new Date(parsed).toISOString().slice(0, 10) === date && validCropYear(r.cropYear);
+    if (!valid) { if (strict) throw new Error("予定の保存情報を確認してください。"); return null; }
+    if (strict && r.latestPlannedDate !== undefined) {
+      const latest = Date.parse(`${r.latestPlannedDate}T00:00:00Z`);
+      if (typeof r.latestPlannedDate !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(r.latestPlannedDate) || !Number.isFinite(latest) || new Date(latest).toISOString().slice(0, 10) !== r.latestPlannedDate) throw new Error("直近の予定日を確認してください。");
+    }
+    return { scheduleId: String(r.scheduleId), title: String(r.title || ""), date, cropYear: Number(r.cropYear), capturedAt: String(r.capturedAt || ""), ...(typeof r.latestPlannedDate === "string" ? { latestPlannedDate: r.latestPlannedDate } : {}), ...(["recorded", "legacy-first-observed"].includes(r.originalDateSource) ? { originalDateSource: r.originalDateSource } : {}) };
+  }
+  function normalizeTimingReview(input, strict = false) {
+    if (input == null) return null;
+    const r = input && typeof input === "object" && !Array.isArray(input) ? input : {};
+    const date = String(r.plannedDate || ""), parsed = Date.parse(`${date}T00:00:00Z`);
+    const validDate = !date || /^\d{4}-\d{2}-\d{2}$/.test(date) && Number.isFinite(parsed) && new Date(parsed).toISOString().slice(0, 10) === date;
+    if (strict && (!validDate || r.reason && !WORK_TIMING_REASONS.includes(r.reason) || typeof input !== "object" || Array.isArray(input))) throw new Error("予定日と実施理由を確認してください。");
+    return { plannedDate: validDate ? date : "", reason: WORK_TIMING_REASONS.includes(r.reason) ? r.reason : "", memo: String(r.memo || "") };
+  }
+
   function normalizeFieldWork(input) {
     const w = input || {};
     const offField = w.targetScope === "offField";
@@ -641,8 +663,13 @@
       hours: String(w.hours || ""),
       machine: String(w.machine || w.machineName || ""),
       machineId: String(w.machineId || ""),
+      ...(normalizeScheduleSnapshot(w.scheduleSnapshot) ? { scheduleSnapshot: normalizeScheduleSnapshot(w.scheduleSnapshot) } : {}),
+      ...(normalizeTimingReview(w.timingReview) ? { timingReview: normalizeTimingReview(w.timingReview) } : {}),
+      ...(w.seedlingBoxesActual !== undefined ? { seedlingBoxesActual: typeof w.seedlingBoxesActual === "number" && Number.isFinite(w.seedlingBoxesActual) && w.seedlingBoxesActual >= 0 ? w.seedlingBoxesActual : null } : {}),
       ...(w.tractorProfileId !== undefined ? { tractorProfileId: String(w.tractorProfileId || "") } : {}),
       ...(normalizeTractorSnapshot(w.tractorSettingsSnapshot) ? { tractorSettingsSnapshot: normalizeTractorSnapshot(w.tractorSettingsSnapshot) } : {}),
+      ...(w.transplanterProfileId !== undefined ? { transplanterProfileId: String(w.transplanterProfileId || "") } : {}),
+      ...(normalizeTransplanterSnapshot(w.transplanterSettingsSnapshot) ? { transplanterSettingsSnapshot: normalizeTransplanterSnapshot(w.transplanterSettingsSnapshot) } : {}),
       material: String(w.material || ""),
       materialId: String(w.materialId || ""),
       herbicideLinks: (offField ? [] : ensureArray(w.herbicideLinks)).filter((link) => link && link.fieldId && link.assignmentId && link.stepId).map((link) => ({ fieldId: String(link.fieldId), assignmentId: String(link.assignmentId), stepId: String(link.stepId) })),
@@ -793,6 +820,8 @@
     const date = String(s.date || U.today());
     return {
       scheduleId: String(s.scheduleId || s.id || U.id("schedule", date)),
+      ...(s.initialPlannedDate !== undefined ? { initialPlannedDate: String(s.initialPlannedDate), originalDateSource: s.originalDateSource === "recorded" ? "recorded" : "legacy-first-observed" } : {}),
+      ...(Array.isArray(s.dateRevisions) ? { dateRevisions: s.dateRevisions.filter(r => r && typeof r.from === "string" && typeof r.to === "string").map(r => ({ from: r.from, to: r.to, at: String(r.at || "") })) } : {}),
       type: "schedule",
       targetScope: offField ? "offField" : "field",
       date,
@@ -1102,6 +1131,50 @@
     };
   }
 
+  const TRANSPLANTER_SETTING_FIELDS = [
+    ["rowSpacing", "条間", "text", ""], ["plantSpacing", "株間", "text", ""], ["plantsPerHill", "植付本数", "text", ""],
+    ["plantsPerTsubo", "坪あたり株数", "text", ""], ["seedlingBoxesPer10a", "10a箱数目安", "text", ""],
+    ["seedlingScrapeAmount", "かき取り量", "text", ""], ["transplanterSetting", "田植機設定メモ", "text", ""],
+    ["depthCm", "植付深さ", "number", "cm"], ["speedKmh", "作業速度", "number", "km/h"],
+    ["fertilizerName", "側条施肥の肥料名", "text", ""], ["fertilizerRateKg10a", "側条施肥量", "number", "kg/10a"]
+  ].map(([key, label, type, unit]) => ({ key, label, type, unit, ...(type === "number" ? { min: 0, step: "any" } : {}) }));
+
+  function normalizeTransplanterSettings(input, strict = false) {
+    if (strict && (!input || typeof input !== "object" || Array.isArray(input))) throw new Error("田植機設定の形式を確認してください。");
+    const raw = input && typeof input === "object" && !Array.isArray(input) ? input : {};
+    if (strict && Object.keys(raw).some(key => !TRANSPLANTER_SETTING_FIELDS.some(f => f.key === key) && raw[key] !== "" && raw[key] != null)) throw new Error("未対応の田植機設定が含まれています。");
+    return Object.fromEntries(TRANSPLANTER_SETTING_FIELDS.map(f => {
+      const value = raw[f.key];
+      if (value == null || typeof value === "string" && !value.trim()) return [f.key, ""];
+      if (f.type === "text") {
+        if (strict && !["number", "string"].includes(typeof value)) throw new Error(`${f.label}を確認してください。`);
+        return [f.key, ["number", "string"].includes(typeof value) ? String(value) : ""];
+      }
+      const numeric = inventoryNumber(value), valid = Number.isFinite(numeric) && numeric >= 0;
+      if (strict && !valid) throw new Error(`${f.label}は0以上の数値で入力してください。`);
+      return [f.key, valid ? numeric : ""];
+    }));
+  }
+
+  function carryoverMetadata(row) {
+    if (!row || typeof row !== "object") return {};
+    const source = row.carryoverSource;
+    return { ...(validCropYear(row.cropYear) ? { cropYear: Number(row.cropYear) } : {}), ...(validCropYear(row.sourceSeason) ? { sourceSeason: Number(row.sourceSeason) } : {}), ...(validCropYear(row.targetSeason) ? { targetSeason: Number(row.targetSeason) } : {}), ...(source && typeof source.key === "string" ? { carryoverSource: { key: source.key, kind: String(source.kind || ""), sourceId: String(source.sourceId || ""), sourceYear: validCropYear(source.sourceYear) ? Number(source.sourceYear) : null, targetYear: validCropYear(source.targetYear) ? Number(source.targetYear) : null } } : {}) };
+  }
+  function normalizeTransplanterProfile(input, strict = false) { return { ...normalizeTransplanterProfileBase(input, strict), ...carryoverMetadata(input) }; }
+  function normalizeTransplanterProfileBase(input, strict = false) {
+    const row = input && typeof input === "object" && !Array.isArray(input) ? input : {};
+    if (strict && (!validCropYear(row.cropYear) || !String(row.varietyId || "") || !String(row.name || "").trim())) throw new Error("作付年度・品種・設定名を確認してください。");
+    return { profileId: String(row.profileId || U.id("transplanter_profile", U.today())), cropYear: validCropYear(row.cropYear) ? Number(row.cropYear) : "", machineId: String(row.machineId || ""), varietyId: String(row.varietyId || ""), name: String(row.name || "").trim(), settings: normalizeTransplanterSettings(row.settings === undefined ? {} : row.settings, strict), intent: String(row.intent ?? ""), memo: String(row.memo ?? ""), createdAt: String(row.createdAt || U.now()), updatedAt: String(row.updatedAt || row.createdAt || U.now()) };
+  }
+
+  function normalizeTransplanterSnapshot(input, strict = false) {
+    if (!input || typeof input !== "object" || Array.isArray(input)) { if (strict) throw new Error("田植機の実施設定を確認してください。"); return null; }
+    const row = input;
+    if (strict && (!row.profileId || !row.varietyId || !validCropYear(row.cropYear))) throw new Error("田植機設定の年度・品種を確認してください。");
+    return { profileId: String(row.profileId || ""), profileName: String(row.profileName || ""), cropYear: validCropYear(row.cropYear) ? Number(row.cropYear) : "", machineId: String(row.machineId || ""), machineName: String(row.machineName || ""), machineMaker: String(row.machineMaker || ""), machineModel: String(row.machineModel || ""), varietyId: String(row.varietyId || ""), varietyName: String(row.varietyName || ""), settings: normalizeTransplanterSettings(row.settings === undefined ? {} : row.settings, strict), intent: String(row.intent ?? ""), memo: String(row.memo ?? ""), capturedAt: String(row.capturedAt || "") };
+  }
+
   const TRACTOR_WORK_TYPES = [
     { value: "autumnTillage", label: "秋起こし" },
     { value: "ridgePlastering", label: "くろぬり（畦塗り）" },
@@ -1144,6 +1217,10 @@
   }
 
   function normalizeTractorProfile(input, strict = false) {
+    if (strict && input && input.cropYear !== undefined && !validCropYear(input.cropYear)) throw new Error("作付年度を確認してください。");
+    return { ...normalizeTractorProfileBase(input, strict), ...carryoverMetadata(input) };
+  }
+  function normalizeTractorProfileBase(input, strict = false) {
     const row = input && typeof input === "object" && !Array.isArray(input) ? input : {};
     const name = String(row.name || "").trim(), machineId = String(row.machineId || "");
     const workType = String(row.workType || "");
@@ -1407,6 +1484,7 @@
       confirmationCandidates,
       machines,
       tractorProfiles: dedupeBy(ensureArray(source.tractorProfiles).map(row => normalizeTractorProfile(row)), "profileId"),
+      transplanterProfiles: dedupeBy(ensureArray(source.transplanterProfiles).map(row => normalizeTransplanterProfile(row)), "profileId"),
       maintenanceRecords,
       photos: ensureArray(source.photos),
       workers,
@@ -1435,6 +1513,7 @@
         // field's individual carryover note.
         nextSeasonIdeas: ensureArray(source.meta && source.meta.nextSeasonIdeas)
           .map((item, index) => ({
+            ...carryoverMetadata(item),
             ...(item && item.reviewId ? { sourceSeason: validCropYear(item.sourceSeason) ? Number(item.sourceSeason) : "", targetSeason: validCropYear(item.targetSeason) ? Number(item.targetSeason) : "", varietyId: String(item.varietyId || ""), reviewId: String(item.reviewId), category: String(item.category || ""), reason: String(item.reason || ""), evidenceRefs: ensureArray(item.evidenceRefs).filter(ref => ref && typeof ref.kind === "string" && typeof ref.id === "string").map(ref => ({ kind: ref.kind, id: ref.id })) } : {}),
             ideaId: String(item && item.ideaId || `next-season-idea-import-${index + 1}`),
             text: String(item && item.text || "").trim(),
@@ -1469,6 +1548,7 @@
       machines: [],
       maintenanceRecords: [],
       tractorProfiles: [],
+      transplanterProfiles: [],
       workers: U.clone(WORKERS)
     });
   }
@@ -1519,7 +1599,13 @@
     TRACTOR_WORK_TYPES,
     TRACTOR_SETTING_FIELDS,
     normalizeTractorProfile,
+    WORK_TIMING_REASONS,
+    normalizeScheduleSnapshot,
+    normalizeTimingReview,
     normalizeTractorSnapshot,
+    TRANSPLANTER_SETTING_FIELDS,
+    normalizeTransplanterProfile,
+    normalizeTransplanterSnapshot,
     normalizeHarvestReview,
     normalizeHarvestTiming,
     normalizeHarvestTimingThermal,

@@ -40,13 +40,49 @@
     const works = data().fieldWorks.filter(row => cropYearForRecord(row) === value);
     const harvests = works.filter(row => isHarvestWork(row) && isActualFieldWork(row));
     const shipmentsCount = (data().shipments || []).filter(row => Number(row.season) === value).length;
+    const settlementSnapshot = history.filter(event => event.action === "closed" && event.settlement).at(-1)?.settlement || null;
+    const settlementChanged = settlementSnapshot ? settlementSnapshot.fingerprint !== cropYearSettlementFor(value).fingerprint : null;
     return U.clone({ year: value, closed: Boolean(closed), status: closed ? "closed" : "open", closedAt: stored && stored.closedAt || "",
       shipmentsCount, activeCropYear: defaultCropYear(U.today()),
-      reopenedAt: stored && stored.reopenedAt || "", history,
+      reopenedAt: stored && stored.reopenedAt || "", history, settlementSnapshot, settlementChanged,
       counts: { shipments: shipmentsCount,
         fieldWorks: works.length, otherWorks: data().otherWorks.filter(row => cropYearForRecord(row) === value).length,
         schedules: data().schedules.filter(row => cropYearForRecord(row) === value).length, harvestWorks: harvests.length,
         completedHarvestFields: new Set(harvests.flatMap(row => (row.fieldIds || []).filter(id => (row.harvestStatusByField || {})[id] === "complete"))).size } });
+  }
+
+  function cropYearSettlementFor(year) {
+    if (!S.validCropYear(year)) return null;
+    const value = Number(year);
+    const milling = (data().millingRecords || []).filter(r => r.season === value);
+    const shipments = (data().shipments || []).filter(r => r.season === value);
+    const issues = (data().shipmentIssues || []).filter(r => r.season === value);
+    const ids = Array.from(new Set([...milling, ...shipments].map(r => r.varietyId).filter(Boolean))).sort();
+    const stock = ids.map(id => riceStockFor(value, id));
+    const sum = (rows, key) => { if (rows.some(r => r[key] === null)) return null; const total = rows.reduce((n, r) => n + r[key], 0); return Number.isFinite(total) ? total : null; };
+    const missingMilling = milling.some(r => !r.varietyId || millingRecordTotals(r).kg === null || millingRecordTotals(r).kg <= 0);
+    const receivedKg = !milling.length || missingMilling ? null : sum(stock, "receivedKg");
+    const missingDispatch = shipments.some(r => ["shipment", "sale", "gift"].includes(r.kind) && r.riceType !== "white" && (!r.varietyId || r.inventoryRiceTypeUnverified || r.riceType !== "brown" || !inventoryPackageTotals(r.packages) || !r.packages.length));
+    const dispatchedKg = missingDispatch ? null : sum(stock, "dispatchedKg");
+    const quantity = { receivedKg, dispatchedKg, remainingKg: receivedKg === null || dispatchedKg === null ? null : receivedKg - dispatchedKg, whiteShipmentCount: shipments.filter(r => r.riceType === "white" && !r.inventoryRiceTypeUnverified).length, unquantifiedCount: stock.reduce((n, r) => n + r.unquantifiedCount, 0) + milling.filter(r => !r.varietyId).length, unclassifiedCount: shipments.filter(r => !r.varietyId).length };
+    const sales = { amountYen: 0, pricedCount: 0, unpricedCount: 0, unquantifiedCount: 0 };
+    const costs = { amountYen: 0, recordedCount: issues.length, unpricedCount: 0, source: "shipmentIssues" };
+    const addYen = (row, amount) => { if (row.amountYen !== null) { const sum = row.amountYen + amount; row.amountYen = Number.isSafeInteger(sum) ? sum : null; } };
+    shipments.filter(r => ["shipment", "sale"].includes(r.kind)).forEach(r => {
+      const totals = inventoryPackageTotals(r.packages);
+      if (!totals || !r.packages.length) { sales.unquantifiedCount++; return; }
+      if (!Number.isSafeInteger(r.pricePer60Kg) || r.pricePer60Kg < 0) { sales.unpricedCount++; return; }
+      const amount = Math.round(totals.kg * r.pricePer60Kg / 60);
+      if (!Number.isSafeInteger(amount)) { sales.unpricedCount++; return; }
+      sales.pricedCount++; addYen(sales, amount);
+    });
+    issues.forEach(r => { if (Number.isSafeInteger(r.costYen) && r.costYen >= 0) addYen(costs, r.costYen); else costs.unpricedCount++; });
+    if (!sales.pricedCount) sales.amountYen = null;
+    if (costs.recordedCount === costs.unpricedCount) costs.amountYen = null;
+    const difference = sales.pricedCount > 0 && costs.recordedCount > 0 && sales.amountYen !== null && costs.amountYen !== null && !sales.unpricedCount && !sales.unquantifiedCount && !costs.unpricedCount ? sales.amountYen - costs.amountYen : null;
+    const pick = (rows, key, keys) => rows.map(r => Object.fromEntries(keys.map(k => [k, r[k] === undefined ? null : r[k]]))).sort((a, b) => String(a[key]).localeCompare(String(b[key])));
+    const fingerprint = JSON.stringify({ version: 1, year: value, milling: pick(milling, "millingId", ["millingId", "date", "season", "varietyId", "fieldIds", "packages", "looseKg"]), shipments: pick(shipments, "shipmentId", ["shipmentId", "date", "season", "varietyId", "recipient", "kind", "riceType", "inventoryRiceTypeUnverified", "packages", "pricePer60Kg"]), issues: pick(issues, "issueId", ["issueId", "date", "season", "varietyId", "millingId", "reason", "action", "costYen"]) });
+    return U.clone({ year: value, quantity, sales, costs, differenceYen: Number.isSafeInteger(difference) ? difference : null, omissions: ["費用は登録済みの出荷対応費のみ。資材費・整備費などは含みません。", "差額は登録分の差額であり、利益ではありません。", "入金管理対象外。入金済みかどうかは判定していません。", "白米は玄米重量へ換算せず、玄米残量から控除しません。"], fingerprint });
   }
 
   function defaultShipmentCropYear(date) {
@@ -75,16 +111,20 @@
     if (!S.validCropYear(year) || options.switchToNext === true && Number(year) === 2200) {
       return mutate(() => { throw new Error("締める年度と翌年度を1900〜2200年で指定してください。"); });
     }
-    if (S.validCropYear(year) && cropYearClosureFor(year).status === "closed") return data();
+    const closure = cropYearClosureFor(year);
+    const settlement = cropYearSettlementFor(year);
+    const note = options.note === undefined ? closure.settlementSnapshot && closure.settlementSnapshot.note || "" : String(options.note);
+    if (closure.status === "closed" && (options.refresh !== true || closure.settlementSnapshot && !closure.settlementChanged && closure.settlementSnapshot.note === note)) return data();
     return mutate(d => {
       if (!S.validCropYear(year) || options.switchToNext === true && Number(year) === 2200) throw new Error("締める年度と翌年度を1900〜2200年で指定してください。");
-      if (!d.shipments.some(row => Number(row.season) === Number(year))) throw new Error("この年度の出荷・販売・配布記録を1件以上保存してから締めてください。");
+      if (closure.status !== "closed" && !d.shipments.some(row => Number(row.season) === Number(year))) throw new Error("この年度の出荷・販売・配布記録を1件以上保存してから締めてください。");
+      const backup = storage.createYearClosureBackup(year);
       const rows = d.meta.cropYearClosures = S.normalizeCropYearClosures(d.meta.cropYearClosures);
       let row = rows.find(item => Number(item.year) === Number(year));
       if (!row) { row = { year: Number(year), closedAt: "", reopenedAt: "", history: [] }; rows.push(row); }
       row.closedAt = U.now(); row.reopenedAt = "";
-      row.history.push({ action: "closed", at: U.now(), switchToNext: options.switchToNext === true });
-      if (options.switchToNext === true) d.meta.activeCropYear = Number(year) + 1;
+      row.history.push({ eventId: U.id("cropyear_close", String(year)), action: "closed", at: U.now(), backupId: backup.backupId, switchToNext: options.switchToNext === true && closure.status !== "closed", settlement: { ...settlement, capturedAt: U.now(), note, backupId: backup.backupId } });
+      if (options.switchToNext === true && closure.status !== "closed") d.meta.activeCropYear = Number(year) + 1;
     }, "作付年度を締めました");
   }
 
@@ -94,7 +134,7 @@
       if (!S.validCropYear(year)) throw new Error("作付年度は1900〜2200年で指定してください。");
       d.meta.cropYearClosures = S.normalizeCropYearClosures(d.meta.cropYearClosures);
       const row = d.meta.cropYearClosures.find(item => Number(item.year) === Number(year));
-      row.reopenedAt = U.now(); row.history.push({ action: "reopened", at: U.now() });
+      row.reopenedAt = U.now(); row.history.push({ eventId: U.id("cropyear_reopen", String(year)), action: "reopened", at: U.now() });
     }, "作付年度の締めを解除しました");
   }
 
@@ -402,6 +442,52 @@
     const [year, month, day] = value.split("-").map(Number);
     const date = new Date(Date.UTC(year, month - 1, day));
     return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day ? String(year) : "";
+  }
+
+  function annualWorkTimingComparisonFor(fieldId, year) {
+    const validYear = S.validCropYear(year);
+    const result = { year: validYear ? Number(year) : null, previousYear: validYear ? Number(year) - 1 : null, rows: [], excluded: [], dateBasis: "crop-year-365-day-feb29-as-feb28" };
+    if (!validYear || !fieldId) return result;
+    const aliases = [
+      ["autumnTillage", "秋起こし", ["秋起こし", "秋起し", "秋耕", "秋耕起"]],
+      ["ridgePlastering", "畦塗り", ["畦塗", "畦塗り", "畦ぬり", "くろぬり", "くろ塗り", "あぜ塗り", "畔塗り", "畦塗り・畦管理"]],
+      ["puddling", "代掻き", ["代掻き", "代掻", "代かき"]],
+      ["planting", "田植え", ["田植え", "田植"]],
+      ["harvest", "稲刈り", ["稲刈り", "稲刈", "収穫"]]
+    ];
+    const groups = new Map();
+    for (const work of data().fieldWorks || []) {
+      if (!(work.fieldIds || []).includes(fieldId) || !isActualFieldWork(work) || /計画/.test(String(work.workName || ""))) continue;
+      const cropYear = cropYearForRecord(work);
+      if (cropYear !== result.year && cropYear !== result.previousYear) continue;
+      if (!harvestDateYear(work.date) || work.date > U.today()) {
+        result.excluded.push({ workId: work.workId, date: work.date, reason: !harvestDateYear(work.date) ? "日付が不正です" : "未来日のため実績比較から除外" });
+        continue;
+      }
+      const name = String(work.workName || "");
+      const alias = aliases.find(([, , names]) => names.includes(name));
+      const key = alias ? alias[0] : `name:${name}`;
+      if (!groups.has(key)) groups.set(key, { key, label: alias ? alias[1] : name || "名称未登録", current: [], previous: [] });
+      groups.get(key)[cropYear === result.year ? "current" : "previous"].push({ workId: work.workId, date: work.date, workName: name });
+    }
+    const side = records => {
+      if (!records.length) return null;
+      records.sort((a, b) => a.date.localeCompare(b.date) || String(a.workId).localeCompare(String(b.workId)));
+      return { firstDate: records[0].date, lastDate: records.at(-1).date, count: records.length, records };
+    };
+    // Compare calendar positions relative to each crop year, removing all leap days.
+    const ordinal = (date, cropYear) => {
+      const [actualYear, month, day] = date.split("-").map(Number);
+      const monthStarts = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334];
+      return (actualYear - cropYear) * 365 + monthStarts[month - 1] + (month === 2 && day === 29 ? 28 : day) - 1;
+    };
+    result.rows = Array.from(groups.values()).map(group => {
+      const current = side(group.current), previous = side(group.previous);
+      const delta = key => current && previous ? ordinal(current[key], result.year) - ordinal(previous[key], result.previousYear) : null;
+      return { key: group.key, label: group.label, current, previous, firstDeltaDays: delta("firstDate"), lastDeltaDays: delta("lastDate") };
+    }).sort((a, b) => a.label.localeCompare(b.label, "ja") || a.key.localeCompare(b.key));
+    result.excluded.sort((a, b) => String(a.date).localeCompare(String(b.date)) || String(a.workId).localeCompare(String(b.workId)));
+    return U.clone(result);
   }
 
   function harvestStatusForField(fieldId, year, asOf, options = {}) {
@@ -951,13 +1037,56 @@
     }));
   }
 
+  function buildScheduleSnapshot(input) {
+    const s = typeof input === "string" ? (data().schedules || []).find(r => r.scheduleId === input) : input;
+    if (!s || !harvestDateYear(s.date)) return null;
+    const initial = harvestDateYear(s.initialPlannedDate) ? s.initialPlannedDate : s.date;
+    return U.clone(S.normalizeScheduleSnapshot({ scheduleId: s.scheduleId, title: s.title, date: initial, latestPlannedDate: s.date, originalDateSource: s.originalDateSource || "legacy-first-observed", cropYear: cropYearForRecord(s), capturedAt: U.now() }));
+  }
+
+  function workTimingFor(work) {
+    const w = typeof work === "string" ? (data().fieldWorks || []).find(r => r.workId === work) || {} : work || {};
+    const snapshot = S.normalizeScheduleSnapshot(w.scheduleSnapshot);
+    const review = S.normalizeTimingReview(w.timingReview) || {};
+    const plannedDate = snapshot ? snapshot.date : review.plannedDate || "";
+    const actualDate = harvestDateYear(w.date) ? w.date : "";
+    const deltaDays = harvestDateYear(plannedDate) && actualDate ? (Date.parse(`${actualDate}T00:00:00Z`) - Date.parse(`${plannedDate}T00:00:00Z`)) / 86400000 : null;
+    return U.clone({ plannedDate, actualDate, deltaDays, reason: review.reason || "", memo: review.memo || "", source: snapshot ? "schedule" : plannedDate ? "manual" : "none", scheduleId: snapshot ? snapshot.scheduleId : "", title: snapshot ? snapshot.title : "", latestPlannedDate: snapshot && snapshot.latestPlannedDate || plannedDate, originalDateSource: snapshot && snapshot.originalDateSource || (snapshot ? "legacy-first-observed" : "") });
+  }
+
+  function workScheduleSnapshot(d, record, previous, normalized) {
+    if (record.scheduleSnapshot === null) return null;
+    if (previous && previous.scheduleSnapshot) {
+      if (record.scheduleSnapshot !== undefined && JSON.stringify(S.normalizeScheduleSnapshot(record.scheduleSnapshot, true)) !== JSON.stringify(previous.scheduleSnapshot)) throw new Error("保存済みの予定情報は変更できません。解除してから選び直してください。");
+      return U.clone(previous.scheduleSnapshot);
+    }
+    const supplied = record.scheduleSnapshot === undefined ? null : S.normalizeScheduleSnapshot(record.scheduleSnapshot, true);
+    const source = (d.schedules || []).find(s => s.scheduleId === normalized.sourceScheduleId);
+    const sameTargets = s => targetScope(s) === targetScope(normalized) && JSON.stringify([...(s.fieldIds || [])].sort()) === JSON.stringify([...(normalized.fieldIds || [])].sort()) && cropYearForRecord(s) === cropYearForRecord(normalized);
+    let selected;
+    const sourceCompatible = source && targetScope(source) === targetScope(normalized) && cropYearForRecord(source) === cropYearForRecord(normalized) && (normalized.fieldIds || []).every(id => (source.fieldIds || []).includes(id)) && scheduleMatchesWork({ ...source, status: "予定" }, normalized, { explicitSource: true, partialTargets: true });
+    if (sourceCompatible) selected = source;
+    if (!selected && !previous && !normalized.sourceScheduleId && record.scheduleSnapshot === undefined) {
+      const candidates = (d.schedules || []).filter(s => sameTargets(s) && s.date === normalized.date && s.title === normalized.workName && !s.completedAt && !["実施済み", "手動完了"].includes(s.status));
+      if (candidates.length === 1) selected = candidates[0];
+    }
+    if (supplied) {
+      if (source && !sourceCompatible || supplied.scheduleId !== normalized.sourceScheduleId || supplied.cropYear !== cropYearForRecord(normalized)) throw new Error("予定情報と作業の年度・元予定が一致しません。");
+      return supplied;
+    }
+    if (previous && record.sourceScheduleId === undefined || previous && previous.sourceScheduleId === normalized.sourceScheduleId) return null;
+    if (!selected || !harvestDateYear(selected.date)) return null;
+    return buildScheduleSnapshot(selected);
+  }
+
   function saveFieldWork(record) {
     return mutate((d) => {
-      const date = record.date || U.today();
       const previous = record.workId ? d.fieldWorks.find((work) => work.workId === record.workId) : null;
+      const date = record.date || (record.date === undefined && previous && previous.transplanterSettingsSnapshot ? previous.date : U.today());
       const targets = workTargets(d, record, previous);
       const offField = targets.targetScope === "offField";
       const tractor = tractorSnapshotForWork(record, previous, offField);
+      const transplanter = transplanterSnapshotForWork(d, record, previous, targets, date);
       if (offField && previous && targetScope(previous) === "field"
         && ((previous.fieldIds || []).length || (previous.orphanedFieldIds || []).length)
         && (isPlantingWorkName(previous.workName) || isHeadingWorkName(previous.workName)
@@ -1052,15 +1181,16 @@
         timeAccounting,
         totalHours,
         fieldAllocatedHours,
-        workName: record.workName || (tractor.tractorSettingsSnapshot && previous && previous.workName) || "その他",
+        workName: record.workName || ((tractor.tractorSettingsSnapshot || transplanter.transplanterSettingsSnapshot) && previous && previous.workName) || "その他",
         worker: record.worker || "",
         hours: record.hours || "",
-        machine: record.machine === undefined && tractor.tractorSettingsSnapshot && previous ? previous.machine : record.machine || "",
+        machine: record.machine === undefined && (tractor.tractorSettingsSnapshot || transplanter.transplanterSettingsSnapshot) && previous ? previous.machine : record.machine || "",
         // The visible machine name remains the established record field.
         // Keep an optional master reference for a later picker without
         // rewriting historical work records.
         machineId: record.machineId === undefined ? (previous && previous.machineId || "") : String(record.machineId || ""),
         ...tractor,
+        ...transplanter,
         material: record.material || "",
         materialId: record.materialId === undefined
           ? (previous && String(previous.material || "") === String(record.material || "") ? previous.materialId || "" : "")
@@ -1093,6 +1223,14 @@
         updatedAt: U.now()
       };
       const index = d.fieldWorks.findIndex((w) => w.workId === normalized.workId);
+      const snapshot = workScheduleSnapshot(d, record, previous, normalized);
+      if (snapshot || record.scheduleSnapshot === null) normalized.scheduleSnapshot = snapshot;
+      if (record.timingReview !== undefined) normalized.timingReview = S.normalizeTimingReview(record.timingReview, true);
+      if (record.seedlingBoxesActual !== undefined) {
+        const boxes = record.seedlingBoxesActual === null || typeof record.seedlingBoxesActual === "string" && !record.seedlingBoxesActual.trim() ? null : Number(record.seedlingBoxesActual);
+        if (boxes !== null && (!["number", "string"].includes(typeof record.seedlingBoxesActual) || !Number.isFinite(boxes) || boxes < 0)) throw new Error("実際の苗箱数を確認してください。");
+        normalized.seedlingBoxesActual = boxes;
+      }
       if (index >= 0) d.fieldWorks[index] = { ...d.fieldWorks[index], ...normalized };
       else d.fieldWorks.push(normalized);
       if (!offField && /稲刈り|収穫/.test(String(normalized.workName || ""))) {
@@ -2103,8 +2241,13 @@
       const date = record.date || U.today();
       const previous = record.scheduleId ? d.schedules.find((schedule) => schedule.scheduleId === record.scheduleId) : null;
       const targets = workTargets(d, record, previous);
+      const initialPlannedDate = previous ? previous.initialPlannedDate || previous.date : date;
+      const originalDateSource = previous ? previous.originalDateSource || "legacy-first-observed" : "recorded";
+      const dateRevisions = U.clone(previous && previous.dateRevisions || []);
+      if (previous && previous.date !== date) dateRevisions.push({ from: previous.date, to: date, at: U.now() });
       const normalized = {
         scheduleId: record.scheduleId || U.id("schedule", date),
+        initialPlannedDate, originalDateSource, dateRevisions,
         type: "schedule",
         targetScope: targets.targetScope,
         date,
@@ -3233,6 +3376,94 @@
     return growthLogsFor(fieldId).slice().sort((a, b) => String(b.date).localeCompare(String(a.date)))[0] || null;
   }
 
+  function annualReadinessFor(year) {
+    const result = { year: S.validCropYear(year) ? Number(year) : null, items: [], ready: true };
+    if (result.year === null) return result;
+    const y = result.year;
+    const works = (data().fieldWorks || []).filter(w => cropYearForRecord(w) === y && isActualFieldWork(w) && harvestDateYear(w.date) && w.date <= U.today());
+    const add = (code, kind, id, fieldId, label, detail = "", extra = {}) => result.items.push({ key: `${code}:${kind}:${id || fieldId || y}`, code, kind, id: id || "", fieldId: fieldId || "", label, detail, ...extra });
+    const harvest = works.filter(isHarvestWork);
+    const milling = millingRecordsFor({ season: y });
+    if (harvest.length && !milling.length) add("missing-milling", "milling", "", harvest[0].fieldIds[0], "籾摺り後の収量が未登録です");
+    milling.forEach(r => { if (millingRecordTotals(r).kg === null) add("invalid-milling", "milling", r.millingId, r.fieldIds[0], "籾摺り数量を確認してください", "", { varietyId: r.varietyId }); });
+    (data().shipments || []).filter(r => r.season === y && ["sale", "shipment"].includes(r.kind)).forEach(r => {
+      if (!Number.isSafeInteger(r.pricePer60Kg) || r.pricePer60Kg < 0 || !inventoryPackageTotals(r.packages) || !r.packages.length) add("shipment-incomplete", "shipment", r.shipmentId, "", "出荷の数量・保存単価を確認してください");
+    });
+    shipmentIssuesFor({ season: y }).filter(r => !Number.isSafeInteger(r.costYen)).forEach(r => add("cost-missing", "shipmentIssue", r.issueId, "", "出荷対応費が未入力です"));
+    const planted = new Set(works.filter(w => isPlantingWorkName(w.workName)).flatMap(w => w.fieldIds || []));
+    planted.forEach(id => { const status = harvestStatusForField(id, y, U.today(), { cropYear: true }); if (status.status !== "complete") add("harvest-incomplete", "fieldWork", works.filter(w => isHarvestWork(w) && w.fieldIds.includes(id)).at(-1)?.workId, id, status.status === "legacy" ? "収穫完了区分が未確認です" : "田植え実績の圃場で収穫完了が未確認です"); });
+    const waterIds = new Set([...(data().dryPeriods || []), ...(data().irrigations || [])].map(r => r.fieldId).concat(works.flatMap(w => w.fieldIds || [])).filter(Boolean));
+    waterIds.forEach(id => resolvedWaterPeriodsFor(id, { year: y, throughDate: U.today() }).filter(p => p.startDate && !p.actualEndDate && !p.planned).forEach(p => add("water-open", p.source === "direct" ? p.kind === "dry" ? "dry" : "irrigation" : "fieldWork", p.directId || p.sourceWorkIds[0], id, "水管理の終了が未確認です", p.label)));
+    result.ready = !result.items.length;
+    return U.clone(result);
+  }
+
+  function carryoverCandidatesFor(year, options = {}) {
+    const y = S.validCropYear(year) ? Number(year) : null, target = options.targetYear === undefined && y !== null ? y + 1 : Number(options.targetYear);
+    const result = { year: y, targetYear: S.validCropYear(target) ? target : null, items: [] };
+    if (y === null || result.targetYear === null || target <= y) return result;
+    const add = (type, row, id, label, eligible, detail = "", unspecified = false) => {
+      const key = `${type}:${id}`;
+      const collection = type === "transplanter" ? data().transplanterProfiles || [] : type === "tractor" ? data().tractorProfiles || [] : type === "herbicide" ? data().meta.herbicideAssignments || [] : nextSeasonIdeas();
+      const provenanceKey = `${y}:${target}:${key}`;
+      const alreadyCopied = collection.some(r => r.carryoverSource && r.carryoverSource.key === provenanceKey || type === "herbicide" && Number(r.year) === target && r.fieldId === row.fieldId && r.active !== false || type === "transplanter" && r.cropYear === target && r.varietyId === row.varietyId && r.machineId === row.machineId && r.name === row.name || type === "idea" && Number(r.targetSeason) === target && r.text === row.text);
+      result.items.push({ key, type, kind: type, id, label, detail, eligible, alreadyCopied, yearUnspecified: unspecified });
+    };
+    transplanterProfilesFor({ cropYear: y }).forEach(r => { const m = r.machineId && machine(r.machineId); add("transplanter", r, r.profileId, r.name, Boolean(variety(r.varietyId)) && (!r.machineId || Boolean(m && m.category === "田植機" && m.status !== "使用停止")), "田植機設定を新しいIDでコピー"); });
+    tractorProfilesFor().filter(r => r.cropYear === undefined || r.cropYear === y).forEach(r => { const m = machine(r.machineId); add("tractor", r, r.profileId, r.name, Boolean(m && m.category === "トラクター" && m.status !== "使用停止"), "元の共通設定は変更せず年産付き設定を作成"); });
+    (data().meta.herbicideAssignments || []).filter(r => Number(r.year) === y && r.active !== false).forEach(r => add("herbicide", r, r.assignmentId, r.name || "除草体系", Boolean(field(r.fieldId) && (data().meta.herbicidePrograms || []).some(p => p.programId === r.programId)), "実施・観察記録を含めず計画工程だけコピー"));
+    nextSeasonIdeas().filter(r => !r.done && (Number(r.targetSeason || r.cropYear) === y || !r.targetSeason && !r.cropYear)).forEach(r => add("idea", r, r.ideaId, r.text, true, r.targetSeason || r.cropYear ? "未完了メモを翌年へコピー" : "年度未指定：選択した場合だけ翌年へコピー", !r.targetSeason && !r.cropYear));
+    return U.clone(result);
+  }
+
+  function carryoverToNextYear(year, selectedKeys, options = {}) {
+    try {
+      const candidates = carryoverCandidatesFor(year, options);
+      if (candidates.year === null || candidates.targetYear === null || candidates.targetYear <= candidates.year || !Array.isArray(selectedKeys)) throw new Error("繰越年度・選択項目を確認してください。");
+      const selected = Array.from(new Set(selectedKeys)).map(key => { const item = candidates.items.find(r => r.key === key); if (!item || !item.eligible) throw new Error("繰越できない項目が含まれています。"); return item; }).filter(r => !r.alreadyCopied);
+      if (!selected.length) return data();
+      return mutate(d => {
+        for (const item of selected) {
+          const source = item.type === "transplanter" ? d.transplanterProfiles.find(r => r.profileId === item.id) : item.type === "tractor" ? d.tractorProfiles.find(r => r.profileId === item.id) : item.type === "herbicide" ? d.meta.herbicideAssignments.find(r => r.assignmentId === item.id) : d.meta.nextSeasonIdeas.find(r => r.ideaId === item.id);
+          const carryoverSource = { key: `${candidates.year}:${candidates.targetYear}:${item.key}`, kind: item.type, sourceId: item.id, sourceYear: item.yearUnspecified ? null : candidates.year, targetYear: candidates.targetYear };
+          if (item.type === "transplanter" || item.type === "tractor") {
+            const row = { ...U.clone(source), profileId: U.id(item.type, U.today()), cropYear: candidates.targetYear, name: item.type === "tractor" ? `${source.name}（${candidates.targetYear}年産）` : source.name, carryoverSource, createdAt: U.now(), updatedAt: U.now() };
+            d[item.type === "tractor" ? "tractorProfiles" : "transplanterProfiles"].push(row);
+          } else if (item.type === "herbicide") {
+            const keys = ["id", "category", "materialId", "materialName", "registrationNumber", "plannedTiming", "purpose"];
+            d.meta.herbicideAssignments.push({ assignmentId: U.id("herbicide-assignment", U.today()), fieldId: source.fieldId, year: candidates.targetYear, programId: source.programId, name: source.name, revision: source.revision, reviewYears: source.reviewYears, active: true, steps: (source.steps || []).map(step => Object.fromEntries(keys.filter(k => step[k] !== undefined).map(k => [k, step[k]]))), carryoverSource, createdAt: U.now() });
+          } else d.meta.nextSeasonIdeas.push({ ...U.clone(source), ideaId: U.id("next-season-idea", U.today()), done: false, sourceSeason: item.yearUnspecified ? undefined : candidates.year, targetSeason: candidates.targetYear, carryoverSource, createdAt: U.now(), updatedAt: U.now() });
+        }
+      }, "選択した設定・計画を繰り越しました");
+    } catch (error) { lastError = error; return null; }
+  }
+
+  function settingExperimentFor(year) {
+    const result = { year: S.validCropYear(year) ? Number(year) : null, items: [] };
+    if (result.year === null) return result;
+    const works = (data().fieldWorks || []).filter(w => cropYearForRecord(w) === result.year && isActualFieldWork(w) && harvestDateYear(w.date) && w.date <= U.today());
+    const groups = new Map();
+    works.forEach(w => { for (const [kind, s] of [["transplanter", w.transplanterSettingsSnapshot], ["tractor", w.tractorSettingsSnapshot]]) {
+      if (!s) continue;
+      const intent = s.intent || s.conditions || "";
+      const key = `${kind}:${s.profileId}:${JSON.stringify([s.settings, intent])}`;
+      if (!groups.has(key)) groups.set(key, { key, kind, profileId: s.profileId, label: s.profileName, intent, fieldIds: [], works: [], harvestWorks: [], millingRecords: [], settings: U.clone(s.settings), seedlingBoxesActual: 0, missingSeedlingBoxesCount: 0 });
+      const group = groups.get(key); group.fieldIds = Array.from(new Set([...group.fieldIds, ...(w.fieldIds || [])]));
+      const boxes = typeof w.seedlingBoxesActual === "number" && Number.isFinite(w.seedlingBoxesActual) ? w.seedlingBoxesActual : null;
+      group.works.push({ workId: w.workId, date: w.date, workName: w.workName, memo: w.memo || "", fieldIds: U.clone(w.fieldIds), seedlingBoxesActual: boxes });
+      if (boxes === null) group.missingSeedlingBoxesCount++; else group.seedlingBoxesActual += boxes;
+    } });
+    result.items = Array.from(groups.values()).map(g => {
+      g.works.sort((a, b) => a.date.localeCompare(b.date) || a.workId.localeCompare(b.workId));
+      g.count = g.works.length; g.firstDate = g.works[0].date; g.lastDate = g.works.at(-1).date;
+      if (g.missingSeedlingBoxesCount || !Number.isFinite(g.seedlingBoxesActual)) g.seedlingBoxesActual = null;
+      g.harvestWorks = works.filter(w => isHarvestWork(w) && (w.fieldIds || []).some(id => g.fieldIds.includes(id))).map(w => ({ workId: w.workId, date: w.date, fieldIds: U.clone(w.fieldIds) }));
+      g.millingRecords = millingRecordsFor({ season: result.year }).filter(r => r.fieldIds.some(id => g.fieldIds.includes(id))).map(r => ({ millingId: r.millingId, date: r.date, fieldIds: r.fieldIds, totalKg: millingRecordTotals(r).kg, shared: r.fieldIds.length > 1 }));
+      return g;
+    });
+    return U.clone(result);
+  }
+
   function harvestYearReviewFor(season, varietyId) {
     if (!S.validCropYear(season)) return null;
     return U.clone((data().harvestYearReviews || []).find(row => row.season === Number(season) && row.varietyId === varietyId) || null);
@@ -3577,6 +3808,69 @@
     return (data().machines || []).find((row) => row.machineId === machineId) || null;
   }
 
+  function isTransplantingWorkName(name) { return isPlantingWorkName(name) && !/予定|計画|確認候補/.test(String(name || "")); }
+
+  function transplanterProfilesFor(filters = {}) {
+    return U.clone((data().transplanterProfiles || []).filter(row => (filters.cropYear === undefined || row.cropYear === Number(filters.cropYear)) && (filters.machineId === undefined || row.machineId === filters.machineId) && (filters.varietyId === undefined || row.varietyId === filters.varietyId)));
+  }
+
+  function saveTransplanterProfile(input) {
+    try {
+      input = input || {};
+      const previous = (data().transplanterProfiles || []).find(row => row.profileId === input.profileId);
+      if (input.profileId && !previous) throw new Error("編集対象の田植機設定が見つかりません。");
+      if (input.settings !== undefined && (!input.settings || typeof input.settings !== "object" || Array.isArray(input.settings))) throw new Error("田植機設定の形式を確認してください。");
+      const defined = Object.fromEntries(Object.entries(input).filter(([, value]) => value !== undefined));
+      const row = S.normalizeTransplanterProfile({ ...previous, ...defined, settings: { ...(previous && previous.settings || {}), ...(input.settings || {}) }, createdAt: previous ? previous.createdAt : U.now(), updatedAt: previous ? previous.updatedAt : U.now() }, true);
+      if (!variety(row.varietyId) && !(previous && previous.varietyId === row.varietyId)) throw new Error("登録済み品種を選択してください。");
+      const target = row.machineId && machine(row.machineId);
+      if (row.machineId && !(previous && previous.machineId === row.machineId) && (!target || target.category !== "田植機" || target.status === "使用停止")) throw new Error("使用中の田植機を選択してください。");
+      if (previous && JSON.stringify(previous) === JSON.stringify(row)) return U.clone(previous);
+      row.updatedAt = U.now();
+      const saved = mutate(d => { d.transplanterProfiles = d.transplanterProfiles || []; const i = d.transplanterProfiles.findIndex(r => r.profileId === row.profileId); if (i < 0) d.transplanterProfiles.push(row); else d.transplanterProfiles[i] = row; }, "田植機設定を保存しました");
+      return saved ? U.clone(saved.transplanterProfiles.find(r => r.profileId === row.profileId)) : null;
+    } catch (error) { lastError = error; return null; }
+  }
+
+  function deleteTransplanterProfile(id) { return deleteInventoryRecord("transplanterProfiles", "profileId", id); }
+
+  function buildTransplanterSettingsSnapshot(profileId, settingsOverride) {
+    try {
+      const p = (data().transplanterProfiles || []).find(row => row.profileId === profileId);
+      const m = p && p.machineId ? machine(p.machineId) : null;
+      const v = p && variety(p.varietyId);
+      if (!p || !S.validCropYear(p.cropYear) || !v || p.machineId && (!m || m.category !== "田植機" || m.status === "使用停止")) throw new Error("使用可能な田植機設定を選択してください。");
+      if (settingsOverride !== undefined && (!settingsOverride || typeof settingsOverride !== "object" || Array.isArray(settingsOverride))) throw new Error("実施時の設定を確認してください。");
+      return U.clone(S.normalizeTransplanterSnapshot({ profileId: p.profileId, profileName: p.name, cropYear: p.cropYear, machineId: p.machineId, machineName: m && m.name || "", machineMaker: m && m.maker || "", machineModel: m && m.model || "", varietyId: p.varietyId, varietyName: v.name, settings: { ...p.settings, ...settingsOverride }, intent: p.intent, memo: p.memo, capturedAt: U.now() }, true));
+    } catch (error) { lastError = error; return null; }
+  }
+
+  function transplanterSnapshotForWork(d, record, previous, targets, date) {
+    const supplied = record.transplanterSettingsSnapshot !== undefined;
+    const old = previous && previous.transplanterSettingsSnapshot;
+    const snapshot = supplied ? record.transplanterSettingsSnapshot : old;
+    const profileId = record.transplanterProfileId === undefined ? previous && previous.transplanterProfileId || snapshot && snapshot.profileId || "" : String(record.transplanterProfileId || "");
+    if (snapshot == null) {
+      if (profileId) throw new Error("田植機の実施設定を指定してください。");
+      return old || supplied || record.transplanterProfileId !== undefined || previous && previous.transplanterProfileId !== undefined ? { transplanterProfileId: "", transplanterSettingsSnapshot: null } : {};
+    }
+    const normalized = supplied ? S.normalizeTransplanterSnapshot(snapshot, true) : U.clone(snapshot);
+    const cropYear = cropYearForRecord({ ...previous, ...record, date, season: seasonForCropYearSave(record, previous, date), ...cropYearForSave(d, record, previous, date) });
+    const machineId = record.machineId === undefined ? previous && previous.machineId || "" : String(record.machineId || "");
+    const name = record.workName === undefined ? previous && previous.workName : record.workName;
+    if (targets.targetScope !== "field" || !isTransplantingWorkName(name) || normalized.profileId !== profileId || normalized.cropYear !== cropYear || normalized.machineId !== machineId) throw new Error("田植機設定と作業名・作付年度・機械が一致しません。");
+    const historical = old && old.profileId === profileId && old.cropYear === cropYear && old.machineId === machineId && old.varietyId === normalized.varietyId;
+    const sameFields = historical && JSON.stringify([...(previous.fieldIds || [])].sort()) === JSON.stringify([...targets.fieldIds].sort());
+    if (!sameFields && (!targets.fieldIds.length || targets.fieldIds.some(id => !field(id) || field(id).varietyId !== normalized.varietyId))) throw new Error("田植機設定の品種と対象圃場が一致しません。");
+    if (!historical) {
+      const p = (data().transplanterProfiles || []).find(r => r.profileId === profileId);
+      const m = machineId && machine(machineId), v = variety(normalized.varietyId);
+      if (!p || p.cropYear !== cropYear || p.machineId !== machineId || p.varietyId !== normalized.varietyId || !v || machineId && (!m || m.category !== "田植機" || m.status === "使用停止")) throw new Error("対象年度の使用可能な田植機設定を選択してください。");
+      Object.assign(normalized, { profileName: p.name, machineName: m && m.name || "", machineMaker: m && m.maker || "", machineModel: m && m.model || "", varietyName: v.name, capturedAt: U.now() });
+    }
+    return { transplanterProfileId: profileId, transplanterSettingsSnapshot: normalized };
+  }
+
   function tractorWorkTypeForName(name) {
     const text = String(name || "");
     if (/予定|計画|確認候補/.test(text)) return "";
@@ -3772,9 +4066,17 @@
   RiceOS.state = {
     data,
     cropYearForRecord,
+    workTimingFor,
+    buildScheduleSnapshot,
+    annualReadinessFor,
+    carryoverCandidatesFor,
+    carryoverToNextYear,
+    settingExperimentFor,
+    annualWorkTimingComparisonFor,
     defaultCropYear,
     defaultShipmentCropYear,
     cropYearClosureFor,
+    cropYearSettlementFor,
     closeCropYear,
     reopenCropYear,
     setActiveCropYear,
@@ -3905,6 +4207,11 @@
     saveTractorProfile,
     deleteTractorProfile,
     buildTractorSettingsSnapshot,
+    isTransplantingWorkName,
+    transplanterProfilesFor,
+    saveTransplanterProfile,
+    deleteTransplanterProfile,
+    buildTransplanterSettingsSnapshot,
     retireMachine,
     saveMaintenanceRecord,
     deleteMaintenanceRecord

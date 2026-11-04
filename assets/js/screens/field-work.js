@@ -25,8 +25,101 @@
   let tractorDraft = null;
   let tractorTouched = false;
   let tractorHadSnapshot = false;
+  let transplanterDraft = null;
+  let transplanterTouched = false;
+  let transplanterHadSnapshot = false;
+  let timingReviewDraft = {plannedDate:"",reason:"",memo:""};
+  let timingScheduleSnapshot = null;
+  let timingReviewPresent = false;
+  let timingDisableAutoCapture = false;
+  let timingReviewOpen = false;
+  const TIMING_REASONS = {rain:"雨",surface:"圃場の状態・乾き",machine:"機械",labor:"人手",schedule:"作業日程",intentional:"意図して変更",material:"資材",other:"その他"};
+
+  function loadTimingReview(work, schedule) {
+    timingReviewDraft = {plannedDate:"",reason:"",memo:"",...(work?.timingReview || {})};
+    timingReviewPresent = Boolean(work?.timingReview);
+    timingScheduleSnapshot = work?.scheduleSnapshot ? U.clone(work.scheduleSnapshot) : schedule && typeof state.buildScheduleSnapshot === "function" ? state.buildScheduleSnapshot(schedule) : null;
+    timingDisableAutoCapture = false;
+    const timing = typeof state.workTimingFor === "function" ? state.workTimingFor({date:work?.date || U.$("fwDate")?.value,timingReview:timingReviewDraft,scheduleSnapshot:timingScheduleSnapshot}) : null;
+    timingReviewOpen = Boolean(timingScheduleSnapshot && Number.isFinite(timing?.deltaDays) && timing.deltaDays !== 0);
+    renderTimingReview();
+  }
+
+  function clearDuplicateTimingReview() {
+    loadTimingReview(null);
+    timingDisableAutoCapture = true;
+    renderTimingReview();
+  }
+
+  function timingWorkPayload() {
+    const populated = timingReviewPresent || Object.values(timingReviewDraft).some(value => value !== "");
+    return {
+      ...(timingScheduleSnapshot ? {scheduleSnapshot:U.clone(timingScheduleSnapshot)} : timingDisableAutoCapture ? {scheduleSnapshot:null} : {}),
+      ...(populated ? {timingReview:U.clone(timingReviewDraft)} : timingDisableAutoCapture ? {timingReview:null} : {})
+    };
+  }
+
+  function updateTimingSummary() {
+    const host = U.$("fwTimingSummary"); if (!host) return;
+    const timing = typeof state.workTimingFor === "function" ? state.workTimingFor({date:U.$("fwDate").value,timingReview:timingReviewDraft,scheduleSnapshot:timingScheduleSnapshot}) : null;
+    const parts = [];
+    if (timingScheduleSnapshot) {
+      parts.push(`${timingScheduleSnapshot.originalDateSource === "recorded" ? "当初の予定日" : "最初に確認できた予定日"}：${timingScheduleSnapshot.date}${timingScheduleSnapshot.title ? ` / ${timingScheduleSnapshot.title}` : ""}（保持した予定）`);
+      if (timingScheduleSnapshot.latestPlannedDate && timingScheduleSnapshot.latestPlannedDate !== timingScheduleSnapshot.date) parts.push(`入力開始時の最新予定日：${timingScheduleSnapshot.latestPlannedDate}`);
+    }
+    if (timing?.plannedDate) parts.push(`比較する予定日：${timing.plannedDate}${timing.source === "manual" ? "（手入力）" : ""}`);
+    if (timing?.deltaDays !== null && timing?.deltaDays !== undefined && Number.isFinite(timing.deltaDays)) parts.push(timing.deltaDays === 0 ? "予定日と同日" : `予定日より${Math.abs(timing.deltaDays)}日${timing.deltaDays > 0 ? "後" : "前"}に実施`);
+    else parts.push("予定日と実施日が揃うと日数差を表示します。");
+    host.textContent = parts.join(" / ");
+  }
+
+  function renderTimingReview() {
+    const form = U.$("fieldWorkForm"); if (!form) return;
+    let host = U.$("fwTimingReview");
+    if (!host) {
+      host = document.createElement("details"); host.id = "fwTimingReview"; host.className = "work-timing-review ts-work-settings";
+      const basic = form.querySelector("details.form-section"); if (basic) basic.after(host); else form.appendChild(host);
+    }
+    host.open = timingReviewOpen;
+    host.innerHTML = `<summary>予定日と実施時期の振り返り（任意）</summary><p id="fwTimingSummary"></p><label>予定日（元の予定がない場合のみ手入力）<input id="fwTimingPlannedDate" type="date" value="${U.attr(timingScheduleSnapshot?.date || timingReviewDraft.plannedDate)}"${timingScheduleSnapshot ? " readonly" : ""}></label><label>時期が変わった事情<select id="fwTimingReason"><option value="">未選択</option>${Object.entries(TIMING_REASONS).map(([value,label]) => `<option value="${value}"${timingReviewDraft.reason === value ? " selected" : ""}>${U.escapeHTML(label)}</option>`).join("")}</select></label><label>振り返りメモ<textarea id="fwTimingMemo">${U.escapeHTML(timingReviewDraft.memo)}</textarea></label>`;
+    updateTimingSummary();
+  }
+
+  function loadTransplanterSettings(work) {
+    transplanterDraft = work?.transplanterSettingsSnapshot ? U.clone(work.transplanterSettingsSnapshot) : null;
+    transplanterHadSnapshot = Boolean(transplanterDraft || work?.transplanterProfileId);
+    transplanterTouched = false;
+    renderTransplanterSettings();
+  }
+
+  function renderTransplanterSettings() {
+    const form = U.$("fieldWorkForm"), module = RiceOS.screens?.transplanterSettings;
+    if (!form || !module || typeof state.isTransplantingWorkName !== "function") return;
+    let host = U.$("fwTransplanterSettings");
+    if (!host) {
+      host = document.createElement("section"); host.id = "fwTransplanterSettings"; host.className = "ts-work-settings";
+      const basic = form.querySelector("details.form-section"); if (basic) basic.after(host); else form.appendChild(host);
+    }
+    const active = targetScope() === "field" && state.isTransplantingWorkName(U.$("fwName").value);
+    if (!active && transplanterDraft) { transplanterDraft = null; transplanterTouched = true; }
+    host.hidden = !active; host.classList.toggle("hidden",!active);
+    if (!active) { host.innerHTML = ""; return; }
+    const year = Number(U.$("fwCropYear")?.value);
+    const varieties = [...new Set(selectedFieldIds().map(id => state.field(id)?.varietyId).filter(Boolean))];
+    const profiles = varieties.length === 1 ? state.transplanterProfilesFor({cropYear:year,varietyId:varieties[0]}).filter(row => !row.machineId || state.machine(row.machineId)?.category === "田植機" && state.machine(row.machineId)?.status !== "使用停止") : [];
+    const options = profiles.filter(row => row.profileId !== transplanterDraft?.profileId).map(row => `<option value="${U.attr(row.profileId)}">${U.escapeHTML(row.name)} / ${U.escapeHTML(row.machineId ? state.machine(row.machineId)?.name || "保存済み機械" : "機械未指定")}</option>`);
+    if (transplanterDraft) options.unshift(`<option selected value="${U.attr(transplanterDraft.profileId)}">${U.escapeHTML(transplanterDraft.profileName)}（実績用の保存値）</option>`);
+    const mismatch = transplanterDraft && Number(transplanterDraft.cropYear) !== year;
+    host.innerHTML = `<h3>田植え機の実施設定</h3><label>対象年産・品種の設定（任意）<select id="fwTransplanterProfile"><option value=""${transplanterDraft ? "" : " selected"}>設定を使わない</option>${options.join("")}</select></label>${varieties.length !== 1 ? '<p>同じ品種の対象圃場を選ぶと設定を選択できます。</p>' : ""}${transplanterDraft ? `<p>${U.escapeHTML(transplanterDraft.cropYear)}年産 / ${U.escapeHTML(transplanterDraft.varietyName)} / ${U.escapeHTML([transplanterDraft.machineMaker,transplanterDraft.machineName,transplanterDraft.machineModel].filter(Boolean).join(" / ") || "機械未指定")}</p>${module.settingsFields(transplanterDraft.settings,"fwTransplanter")}<label>実施時の意図・条件<textarea id="fwTransplanterIntent">${U.escapeHTML(transplanterDraft.intent || "")}</textarea></label><label>設定メモ<textarea id="fwTransplanterMemo">${U.escapeHTML(transplanterDraft.memo || "")}</textarea></label>` : ""}<p id="fwTransplanterError" class="ts-error" role="alert">${mismatch ? "設定の年産と作業の対象年度が異なります。対象年度の設定を選んでください。" : ""}</p>`;
+  }
+
+  function transplanterWorkPayload() {
+    if (transplanterDraft && targetScope() === "field" && state.isTransplantingWorkName(U.$("fwName").value)) return {machineId:transplanterDraft.machineId,transplanterProfileId:transplanterDraft.profileId,transplanterSettingsSnapshot:U.clone(transplanterDraft)};
+    return transplanterTouched || transplanterHadSnapshot ? {transplanterProfileId:"",transplanterSettingsSnapshot:null} : {};
+  }
 
   function loadTractorSettings(work) {
+    if (typeof loadTransplanterSettings === "function") loadTransplanterSettings(work);
     tractorDraft = work && work.tractorSettingsSnapshot ? U.clone(work.tractorSettingsSnapshot) : null;
     tractorHadSnapshot = Boolean(tractorDraft || work && work.tractorProfileId);
     tractorTouched = false;
@@ -34,6 +127,7 @@
   }
 
   function renderTractorSettings() {
+    if (typeof renderTransplanterSettings === "function") renderTransplanterSettings();
     const form = U.$("fieldWorkForm"), module = RiceOS.screens?.tractorSettings;
     if (!form || !module || typeof state.tractorWorkTypeForName !== "function") return;
     let host = U.$("fwTractorSettings");
@@ -300,6 +394,7 @@
   }
 
   function updateFieldSelectionSummary() {
+    if (typeof renderTransplanterSettings === "function") renderTransplanterSettings();
     renderHerbicidePicker();
     renderHarvestCompletion(targetScope() === "field" && isHarvestWork(U.$("fwName").value));
     renderHarvestTiming(targetScope() === "field" && isHarvestWork(U.$("fwName").value));
@@ -591,6 +686,7 @@
 
   function resetForm() {
     workFormSession += 1;
+    if (typeof loadTimingReview === "function") loadTimingReview(null);
     if (typeof loadTractorSettings === "function") loadTractorSettings(null);
     invalidateWorkWeather();
     setTargetScope("field");
@@ -668,6 +764,7 @@
       U.$("fwMemo").value = schedule.memo;
       U.$("fwMemo").dataset.templateFilled = "1";
     }
+    if (typeof loadTimingReview === "function") loadTimingReview(null,schedule);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
@@ -718,6 +815,7 @@
     setSelectedFieldIds(work.fieldIds || []);
     loadHerbicideWork(work);
     loadHarvestReview(work);
+    if (typeof loadTimingReview === "function") loadTimingReview(work);
     const deleteButton = U.$("deleteFieldWorkButton");
     if (deleteButton) deleteButton.classList.remove("hidden");
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -777,6 +875,7 @@
   }
 
   function render() {
+    if (typeof renderTimingReview === "function") renderTimingReview();
     if (typeof renderTractorSettings === "function") renderTractorSettings();
     renderHerbicidePicker();
     renderMaterialPicker();
@@ -957,6 +1056,33 @@
   }
 
   function bind() {
+    U.$("fieldWorkForm").addEventListener("click",event => { if (event.target.closest("#fwTimingReview > summary")) timingReviewOpen = !U.$("fwTimingReview").open; });
+    U.$("fieldWorkForm").addEventListener("toggle",event => { if (event.target.id === "fwTimingReview") timingReviewOpen = event.target.open; },true);
+    const captureTiming = event => {
+      if (["fwTimingPlannedDate","fwTimingReason","fwTimingMemo"].includes(event.target.id)) {
+        timingReviewPresent = true;
+        timingReviewDraft = {plannedDate:timingScheduleSnapshot ? timingReviewDraft.plannedDate : U.$("fwTimingPlannedDate").value,reason:U.$("fwTimingReason").value,memo:U.$("fwTimingMemo").value};
+      }
+      if (["fwTimingPlannedDate","fwTimingReason","fwTimingMemo","fwDate"].includes(event.target.id)) updateTimingSummary();
+    };
+    U.$("fieldWorkForm").addEventListener("input",captureTiming);
+    U.$("fieldWorkForm").addEventListener("change",captureTiming);
+    U.$("fieldWorkForm").addEventListener("input",event => {
+      if (event.target.id === "fwCropYear") renderTransplanterSettings();
+      if (!transplanterDraft || !event.target.closest("#fwTransplanterSettings")) return;
+      if (event.target.hasAttribute("data-transplanter-setting")) transplanterDraft.settings[event.target.dataset.transplanterSetting] = event.target.value;
+      if (event.target.id === "fwTransplanterIntent") transplanterDraft.intent = event.target.value;
+      if (event.target.id === "fwTransplanterMemo") transplanterDraft.memo = event.target.value;
+      transplanterTouched = true;
+    });
+    U.$("fieldWorkForm").addEventListener("change",event => {
+      if (event.target.id === "fwTransplanterProfile") {
+        const id = event.target.value, snapshot = id ? state.buildTransplanterSettingsSnapshot(id) : null;
+        if (id && !snapshot) { renderTransplanterSettings(); U.$("fwTransplanterError").textContent = "設定を読み込めませんでした。入力は保持しています。"; return; }
+        transplanterDraft = snapshot; transplanterTouched = true; renderTransplanterSettings();
+      }
+      if (["fwName","fwTargetScope","fwCropYear"].includes(event.target.id)) renderTransplanterSettings();
+    });
     U.$("fieldWorkForm").addEventListener("input",event => {
       if (!tractorDraft || !event.target.closest("#fwTractorSettings")) return;
       if (event.target.hasAttribute("data-tractor-setting")) tractorDraft.settings[event.target.dataset.tractorSetting] = event.target.value;
@@ -1215,6 +1341,7 @@
         hours: U.$("fwHours").value,
         machine: U.$("fwMachine").value,
         ...(typeof tractorWorkPayload === "function" ? tractorWorkPayload() : {}),
+        ...(typeof transplanterWorkPayload === "function" ? transplanterWorkPayload() : {}),
         material: U.$("fwMaterial").value,
         materialId: U.$("fwMaterial").value === linkedMaterialName ? U.$("fwMaterialId").value : "",
         herbicideLinks: !offField && workName === "除草剤" ? herbicideLinks : [],
@@ -1225,6 +1352,7 @@
         ...(harvestStatusByField !== undefined ? { harvestStatusByField } : {}),
         amount: U.$("fwAmount").value,
         sourceScheduleId: pendingScheduleId,
+        ...(typeof timingWorkPayload === "function" ? timingWorkPayload() : {}),
         weather: offField ? "" : U.$("fwWeather").value,
         weatherAuto: offField ? null : weatherAutoValue(),
         photo: U.$("fwPhoto") ? U.$("fwPhoto").value : "",
@@ -1265,6 +1393,7 @@
       }
       if (button.dataset.workAction === "duplicate") {
         resetForm();
+        if (typeof clearDuplicateTimingReview === "function") clearDuplicateTimingReview();
         setTargetScope(work.targetScope);
         U.$("fieldWorkHeading").textContent = "作業を複製";
         U.$("fwDate").value = U.today();
@@ -1318,6 +1447,7 @@
       setSelectedFieldIds(work.fieldIds || []);
       loadHerbicideWork(work);
       loadHarvestReview(work);
+      if (typeof loadTimingReview === "function") loadTimingReview(work);
       const deleteButton = U.$("deleteFieldWorkButton");
       if (deleteButton) deleteButton.classList.remove("hidden");
       window.scrollTo({ top: 0, behavior: "smooth" });

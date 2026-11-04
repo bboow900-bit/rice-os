@@ -229,6 +229,7 @@
     shipmentPrices: "priceId",
     machines: "machineId",
     tractorProfiles: "profileId",
+    transplanterProfiles: "profileId",
     maintenanceRecords: "maintenanceId",
     confirmationCandidates: "candidateId"
   };
@@ -296,6 +297,7 @@
     const brokenMachineIds = [
       ...(Array.isArray(parsed.fieldWorks) ? parsed.fieldWorks.map((row) => row && row.machineId) : []),
       ...(Array.isArray(parsed.tractorProfiles) ? parsed.tractorProfiles.map(row => row && row.machineId) : []),
+      ...(Array.isArray(parsed.transplanterProfiles) ? parsed.transplanterProfiles.map(row => row && row.machineId) : []),
       ...(Array.isArray(parsed.maintenanceRecords) ? parsed.maintenanceRecords.map((row) => row && row.machineId) : [])
     ].map(String).filter((id) => id && !machineIds.has(id));
     if (brokenMachineIds.length) warnings.push(`元JSONに参照先のない機械IDが${new Set(brokenMachineIds).size}件あります。機械台帳で照合してください。`);
@@ -373,6 +375,7 @@
       lastImportSourceVersion: incoming.appVersion || incoming.meta && incoming.meta.appVersion || ""
     };
     const closureTime = S.cropYearClosureTime;
+    const closureEventKey = event => typeof event.eventId === "string" && event.eventId ? `id:${event.eventId}` : JSON.stringify([event.action, event.at, event.settlement && event.settlement.fingerprint || "", event.settlement && event.settlement.note || ""]);
     const closureRows = meta => Array.isArray(meta && meta.cropYearClosures) ? meta.cropYearClosures : [];
     const byYear = new Map();
     for (const row of [...closureRows(current.meta), ...closureRows(incoming.meta)]) {
@@ -382,13 +385,13 @@
       const existing = previous && previous.history || [];
       const occurrences = new Map();
       for (const event of existing) {
-        const key = `${event.action}|${event.at}`;
+        const key = closureEventKey(event);
         occurrences.set(key, (occurrences.get(key) || 0) + 1);
       }
       const incomingOccurrences = new Map();
       const additions = (Array.isArray(row.history) ? row.history : []).filter(event => {
         if (!event || !["closed", "reopened"].includes(event.action) || !Number.isFinite(closureTime(event.at))) return false;
-        const key = `${event.action}|${event.at}`;
+        const key = closureEventKey(event);
         const ordinal = (incomingOccurrences.get(key) || 0) + 1;
         incomingOccurrences.set(key, ordinal);
         return ordinal > (occurrences.get(key) || 0);
@@ -482,6 +485,59 @@
     }
   }
 
+  const YEAR_CLOSURE_BACKUPS_KEY = `${S.STORE_KEY}:year_closure_backups`;
+
+  function validYearBackupRaw(raw) {
+    const parsed = safeParse(raw);
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) && Array.isArray(parsed.fields);
+  }
+
+  function readYearClosureBackups() {
+    const raw = readRequiredRaw(YEAR_CLOSURE_BACKUPS_KEY);
+    if (raw === null) return [];
+    const rows = JSON.parse(raw);
+    if (!Array.isArray(rows) || rows.some(row => !row || !row.backupId || !S.validCropYear(row.year)
+      || typeof row.raw !== "string" || !validYearBackupRaw(row.raw))) throw new Error("年度締めバックアップを読み取れませんでした。既存のバックアップは変更していません。");
+    return rows;
+  }
+
+  function createYearClosureBackup(year) {
+    if (!S.validCropYear(year)) throw new Error("バックアップ対象年度を確認してください。");
+    const raw = readRequiredRaw(S.STORE_KEY);
+    if (!raw || !validYearBackupRaw(raw)) throw new Error("現在の保存データを確認できないため、年度締めを中断しました。");
+    if (hasObservedRaw && raw !== observedRaw) throw new Error("別の画面でデータが更新されたため、年度締めを中断しました。再読み込みして確認してください。");
+    const rows = readYearClosureBackups();
+    let entry = rows.find(row => row.year === Number(year) && row.raw === raw);
+    if (!entry) {
+      entry = { backupId: U.id("year_closure_backup", String(year)), year: Number(year), capturedAt: U.now(), bytes: byteSize(raw), raw };
+      const next = JSON.stringify([entry, ...rows]);
+      try {
+        writeRaw(YEAR_CLOSURE_BACKUPS_KEY, next);
+        if (readRequiredRaw(YEAR_CLOSURE_BACKUPS_KEY) !== next) throw new Error("Backup read-back failed");
+      } catch (error) { throw new Error("年度締め前の全データ保存に失敗しました。締めは行っていません。JSON保存と保存領域を確認してください。"); }
+    }
+    const { raw: payload, ...metadata } = entry;
+    return metadata;
+  }
+
+  function yearClosureBackupInfo(year) {
+    return readYearClosureBackups().filter(row => year === undefined || Number(year) === row.year)
+      .map(({ raw, ...metadata }) => ({ ...metadata }));
+  }
+
+  function exportYearClosureBackup(backupId) {
+    const row = readYearClosureBackups().find(item => item.backupId === backupId);
+    if (!row) throw new Error("年度締め前のバックアップが見つかりません。");
+    U.download(`rice_karte_before_close_${row.year}_${String(row.capturedAt).replace(/[^0-9]/g, "")}.json`, row.raw, "application/json;charset=utf-8");
+    return { backupId: row.backupId, year: row.year };
+  }
+
+  function yearClosureBackupData(backupId) {
+    const row = readYearClosureBackups().find(item => item.backupId === backupId);
+    if (!row) throw new Error("年度締め前のバックアップが見つかりません。");
+    return JSON.parse(row.raw);
+  }
+
   function exportJson(data) {
     const normalized = S.normalize(data);
     const exportId = U.id("export", U.today());
@@ -529,6 +585,7 @@
       otherWorks: d.otherWorks.length,
       machines: (d.machines || []).length,
       tractorProfiles: (d.tractorProfiles || []).length,
+      transplanterProfiles: (d.transplanterProfiles || []).length,
       maintenanceRecords: (d.maintenanceRecords || []).length,
       materials: d.materials.length,
       varietyResults: d.varietyResults.length,
@@ -722,6 +779,10 @@
     backupData,
     releaseBackupInfo,
     backupBeforeAppUpdate,
+    createYearClosureBackup,
+    yearClosureBackupInfo,
+    exportYearClosureBackup,
+    yearClosureBackupData,
     exportJson,
     exportCsv,
     findLegacy,

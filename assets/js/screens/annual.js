@@ -11,6 +11,10 @@
   let hubNotesOpen = false;
   let closureOpen = false;
   let closureYear = "";
+  let closureDraft = null;
+  const carryoverSelection = new Map();
+  let carryoverMessage = "";
+  let carryoverOpen = false;
   let workArchiveOpen = false;
   let compareFromHub = false;
   let annualSearchValue = "";
@@ -749,6 +753,103 @@
     `;
   }
 
+  const WORK_REASON_LABELS = { rain: "雨・天候", surface: "圃場の乾き・状態", machine: "機械", labor: "人手", schedule: "作業都合", intentional: "意図的な変更", material: "資材", other: "その他" };
+
+  function renderAnnualReadiness(year) {
+    const result = state.annualReadinessFor?.(year);
+    if (!result) return "";
+    return `<details class="annual-year-review" data-annual-readiness><summary>締め前に確認 ${result.items.length}件</summary><p>未確認があっても締められます。登録済みの記録から確認できる項目です。</p>${result.items.map(item => `<button type="button" class="annual-year-review-link" data-readiness-key="${U.attr(item.key)}" data-readiness-year="${year}"><b>${U.escapeHTML(item.label)}</b><span>${U.escapeHTML([state.field(item.fieldId)?.name, item.kind === "shipment" ? state.data().shipments.find(row => row.shipmentId === item.id)?.recipient : "", item.detail].filter(Boolean).join(" / "))}</span><i aria-hidden="true">›</i></button>`).join("") || '<p>登録済み記録の確認候補はありません。全作業の完了や記録の網羅を保証するものではありません。</p>'}</details>`;
+  }
+
+  function renderWorkTimingReviews(field, year) {
+    if (!state.workTimingFor) return "";
+    const rows = state.data().fieldWorks.filter(row => state.cropYearForRecord(row) === Number(year)
+      && (!field || (row.fieldIds || []).includes(field.fieldId)) && (row.scheduleSnapshot || row.timingReview))
+      .map(row => ({ row, timing: state.workTimingFor(row) })).sort((a,b) => String(a.row.date).localeCompare(String(b.row.date)));
+    return `<details class="annual-year-review" data-planned-work-review><summary>予定と実績・時期がずれた理由 ${rows.length}件</summary>${rows.map(({row,timing}) => `<article><h5>${U.escapeHTML(row.workName)} / ${U.escapeHTML(row.date)}</h5><p>予定 ${U.escapeHTML(timing.plannedDate || "未記録")} → 実施 ${U.escapeHTML(timing.actualDate || row.date)}</p><b>${timing.deltaDays == null ? "予定との差は未計算" : timing.deltaDays === 0 ? "予定どおり" : `${Math.abs(timing.deltaDays)}日${timing.deltaDays > 0 ? "遅い" : "早い"}`}</b><p>${U.escapeHTML(WORK_REASON_LABELS[timing.reason] || "理由未記録")}${timing.memo ? `：${U.escapeHTML(timing.memo)}` : ""}</p><button type="button" class="secondary" data-year-review-work="${U.attr(row.workId)}">実績・理由を確認 ›</button></article>`).join("") || '<p>予定日と実施日を残すと、ずれた理由をここで振り返れます。過去の予定日は推測で補いません。</p>'}</details>`;
+  }
+
+  function renderCarryover(year) {
+    const result = state.carryoverCandidatesFor?.(year);
+    if (!result) return "";
+    const selected = carryoverSelection.get(Number(year)) || new Set();
+    return `<details class="annual-year-review" data-annual-carryover ${carryoverOpen ? "open" : ""}><summary>${result.targetYear || "翌年"}年産への引き継ぎ</summary><p>必要な設定・計画・メモだけを選びます。作業・生育・水管理・収量の実績はコピーしません。</p>${result.items.map(item => `<label class="annual-carryover-option"><input type="checkbox" data-carryover-choice="${U.attr(item.key)}" data-carryover-year="${year}" ${selected.has(item.key) ? "checked" : ""} ${item.alreadyCopied || !item.eligible ? "disabled" : ""}><span><b>${U.escapeHTML(item.label)}</b><small>${U.escapeHTML(item.detail || "")}${item.alreadyCopied ? " / 引き継ぎ済み" : !item.eligible ? " / 参照先の設定を確認してください" : ""}</small></span></label>`).join("") || '<p>引き継げる設定・計画・メモはまだありません。</p>'}<button type="button" class="primary" data-carryover-save="${year}" ${selected.size ? "" : "disabled"}>選んだ内容を翌年へ保存</button>${carryoverMessage ? `<p role="status">${U.escapeHTML(carryoverMessage)}</p>` : ""}</details>`;
+  }
+
+  function renderSettingExperiments(field, year) {
+    const result = state.settingExperimentFor?.(year);
+    if (!result) return "";
+    const items = result.items.filter(item => !field || item.fieldIds.includes(field.fieldId));
+    const renderItem = item => {
+      const definitions = item.kind === "tractor" ? RiceOS.schema.TRACTOR_SETTING_FIELDS : RiceOS.schema.TRANSPLANTER_SETTING_FIELDS;
+      const settings = (definitions || []).filter(setting => item.settings[setting.key] !== "" && item.settings[setting.key] != null);
+      return `<article><h5>${U.escapeHTML(item.label)}</h5>
+        <p>${U.escapeHTML(item.intent || "設定の狙いは未記録")}</p>
+        <p>対象：${U.escapeHTML(item.fieldIds.map(id => state.field(id)?.name || "保存済み圃場").join("・"))} / ${item.works.length}件の作業実績</p>
+        <details><summary>使用時の設定値</summary><dl class="annual-settlement-values">${settings.map(setting => `<div><dt>${U.escapeHTML(setting.label)}</dt><dd>${U.escapeHTML(item.settings[setting.key])}${U.escapeHTML(setting.unit || "")}</dd></div>`).join("")}</dl></details>
+        ${item.kind === "transplanter" ? `<p>苗箱実使用数：${item.seedlingBoxesActual == null ? "未記録（目安箱数では補いません）" : `${U.escapeHTML(item.seedlingBoxesActual)}箱`}</p>` : ""}
+        ${item.works.map(work => `<button type="button" class="annual-year-review-link" data-year-review-work="${U.attr(work.workId)}"><b>${U.escapeHTML(work.date)} ${U.escapeHTML(work.workName)}</b><span>${U.escapeHTML(work.memo || "感想・メモ未記録")}</span><i aria-hidden="true">›</i></button>`).join("")}
+        ${item.harvestWorks.map(work => `<button type="button" class="secondary" data-year-review-work="${U.attr(work.workId)}">収穫実績 ${U.escapeHTML(work.date)} ›</button>`).join("") || '<p>関連する収穫実績はまだありません。</p>'}
+        ${(item.millingRecords || []).map(record => `<button type="button" class="annual-year-review-link" data-year-review-milling="${U.attr(record.millingId)}"><b>籾摺り収量 ${record.totalKg == null ? "未集計" : `${U.escapeHTML(record.totalKg)}kg`}</b><span>${U.escapeHTML(record.date)}${record.shared ? " / 複数圃場合算・圃場別に配分していません" : ""}</span><i aria-hidden="true">›</i></button>`).join("")}
+      </article>`;
+    };
+    return `<details class="annual-year-review" data-setting-experiments><summary>設定変更の検証 ${items.length}件</summary><p>作業時に保存した設定と記録をつなぎます。収量差を設定だけの効果とは判断しません。</p>${items.map(renderItem).join("") || '<p>設定を使用した作業実績が残ると、ここで振り返れます。</p>'}</details>`;
+  }
+
+  function renderYearClosureBackups(year) {
+    try {
+      const rows = RiceOS.storage.yearClosureBackupInfo?.(year) || [];
+      return `<details class="annual-year-backups"><summary>締め前の全データバックアップ ${rows.length}件</summary><p>この端末内の保存です。端末故障に備えてJSON保存もできます。復元すると、この年度だけでなく全年度のデータが保存時点へ戻ります。</p>${rows.map(row => `<div><b>${U.escapeHTML(row.capturedAt)}</b><span>${Math.ceil(row.bytes / 1024)}KB</span><div class="ts-actions"><button type="button" class="secondary" data-year-backup-export="${U.attr(row.backupId)}">復元用JSON保存</button><button type="button" class="secondary" data-year-backup-restore="${U.attr(row.backupId)}" data-year-backup-year="${year}">この時点へ復元</button></div></div>`).join("")}</details>`;
+    } catch (error) { return '<p class="annual-settlement-warning">年度締め前のバックアップを読み取れません。元の保存内容は変更していません。</p>'; }
+  }
+
+  function renderCropYearSettlement(info, scope) {
+    if (!state.cropYearSettlementFor) return "";
+    const current = state.cropYearSettlementFor(info.year);
+    if (!current) return "";
+    const num = (value, suffix) => value === null || value === undefined || !Number.isFinite(Number(value))
+      ? "未集計" : `${Number(value).toLocaleString("ja-JP", { maximumFractionDigits: 2 })}${suffix}`;
+    const summary = (value) => {
+      const q = value.quantity || {}, sales = value.sales || {}, costs = value.costs || {};
+      return `<dl class="annual-settlement-values">
+        ${scope !== "finance" ? `<div><dt>籾摺り収量</dt><dd>${num(q.receivedKg, "kg")}</dd></div>
+        <div><dt>玄米の出荷・配布</dt><dd>${num(q.dispatchedKg, "kg")}</dd></div>
+        <div><dt>玄米残量（記録分）</dt><dd>${num(q.remainingKg, "kg")}</dd></div>` : ""}
+        ${scope !== "quantity" ? `<div><dt>売上（単価記録分）</dt><dd>${sales.pricedCount ? num(sales.amountYen, "円") : "単価付き記録なし"}</dd></div>
+        <div><dt>対応費用（記録分）</dt><dd>${costs.recordedCount > costs.unpricedCount ? num(costs.amountYen, "円") : "費用記録なし"}</dd></div>
+        <div><dt>売上 − 対応費用</dt><dd>${num(value.differenceYen, "円")}</dd></div>` : ""}
+      </dl>`;
+    };
+    return `<section class="annual-settlement" data-annual-settlement>
+      <h4>数量・収支の確認</h4>${summary(current)}
+      ${scope !== "quantity" ? '<p>生産原価全体ではなく、登録分の差額です。利益・入金済み額を示すものではありません。</p>' : ""}
+      ${scope !== "quantity" ? `<p>費用の集計対象は出荷対応費のみです。資材購入費・整備費は含みません。</p>` : ""}
+      ${(current.sales?.unpricedCount || current.sales?.unquantifiedCount || current.costs?.unpricedCount) ? `<p class="annual-settlement-warning">未計算：売上 ${(current.sales?.unpricedCount || 0) + (current.sales?.unquantifiedCount || 0)}件 / 対応費用 ${current.costs?.unpricedCount || 0}件</p>` : ""}
+      ${(current.quantity?.whiteShipmentCount || current.quantity?.unquantifiedCount || current.quantity?.unclassifiedCount) ? '<p class="annual-settlement-warning">白米出荷・数量不足・品種未設定の記録は、玄米残量に未反映のものがあります。</p>' : ""}
+      ${info.settlementChanged ? '<p class="annual-settlement-warning" data-settlement-changed>締め後に変更あり。現在の集計を確認して再締めできます。</p>' : ""}
+      ${info.settlementSnapshot ? `<details data-saved-settlement><summary>締め時点の集計</summary>${summary(info.settlementSnapshot)}${info.settlementSnapshot.note ? `<p class="annual-close-note">${U.escapeHTML(info.settlementSnapshot.note)}</p>` : ""}</details>` : info.closed ? '<p>この年度の旧締めには集計保存がありません。</p>' : ""}
+    </section>`;
+  }
+
+  function renderClosureWizard(info) {
+    if (!closureDraft || closureDraft.year !== info.year) return "";
+    const draft = closureDraft, labels = ["数量", "売上・費用", "振り返り", "最終確認"];
+    const nextYear = draft.year + 1;
+    return `<section class="annual-close-wizard" data-close-wizard aria-label="年度締めの確認">
+      <header><small>${draft.year}年度の締め / ${draft.step + 1}・4</small><h3>${draft.step === 3 ? "最終確認" : `${labels[draft.step]}を確認`}</h3></header>
+      <ol class="annual-close-steps">${labels.map((label, index) => `<li ${index === draft.step ? 'aria-current="step"' : ""}>${index + 1}. ${label}</li>`).join("")}</ol>
+      ${draft.step < 2 ? renderCropYearSettlement({ ...info, settlementSnapshot: null }, draft.step === 0 ? "quantity" : "finance") : ""}
+      ${draft.step === 0 ? renderAnnualReadiness(draft.year) : ""}
+      ${draft.step === 0 ? '<p>残量があっても締められます。数量が合わない場合は、確定前に記録を確認できます。</p><button type="button" class="secondary" data-close-open-shipments>出荷・配布の記録を確認</button>' : ""}
+      ${draft.step === 1 ? '<p>単価・費用が未登録の分は未計算です。ここでの確認は、入金や全費用の確認を意味しません。</p>' : ""}
+      ${draft.step === 2 ? `<label>今年の振り返り・来年への引き継ぎ<textarea data-close-note rows="4">${U.escapeHTML(draft.note)}</textarea></label><p>任意のメモです。既存の圃場ごとのメモは変更しません。</p><button type="button" class="secondary" data-close-open-compare>前年と作業時期を見比べる</button>` : ""}
+      ${draft.step === 3 ? `${renderCropYearSettlement({ ...info, settlementSnapshot: null })}<p class="annual-close-note">${U.escapeHTML(draft.note || "振り返りメモなし")}</p><label><input type="checkbox" data-close-switch ${draft.switchToNext ? "checked" : ""} ${nextYear > 2200 ? "disabled" : ""}>新規作業の対象年度を${nextYear}年度に切り替える</label><p>保存済みの実施日・設定・履歴は変更しません。</p><label><input type="checkbox" data-close-confirm ${draft.confirmed ? "checked" : ""}>表示内容を確認しました</label>` : ""}
+      ${draft.error ? `<p role="alert" class="annual-settlement-warning">${U.escapeHTML(draft.error)}</p>` : ""}
+      ${!info.closed && !info.counts.shipments ? '<p class="annual-settlement-warning">初めて年度を締めるには、出荷・販売・配布の記録が1件以上必要です。途中の確認は進められます。</p>' : ""}
+      <div class="annual-close-actions"><button type="button" class="secondary" data-close-cancel>中止</button>${draft.step > 0 ? '<button type="button" class="secondary" data-close-prev>戻る</button>' : ""}${draft.step < 3 ? '<button type="button" class="primary" data-close-next>確認して次へ</button>' : `<button type="button" class="primary" data-close-save ${!draft.confirmed || !info.closed && !info.counts.shipments ? "disabled" : ""}>確認内容を保存して締める</button>`}</div>
+    </section>`;
+  }
+
   function renderCropYearClosure() {
     const year = Number(closureYear || (yearValue() === "all" ? new Date().getFullYear() : yearValue()));
     const info = state.cropYearClosureFor(year);
@@ -774,7 +875,9 @@
       const date = dated(row.at);
       return date ? [{ ...date, index, label: row.action === "closed" ? "締め" : "解除" }] : [];
     }).sort((a, b) => b.time - a.time || b.index - a.index);
-    return `<details data-crop-year-closure ${closureOpen ? "open" : ""}>
+    return `<section class="annual-close-entry"><button type="button" class="primary annual-close-start" data-close-start="${year}"><b>${year}年度を締める・清算する</b><span>数量・売上・振り返りを順に確認 ›</span></button>
+      ${typeof renderClosureWizard === "function" ? renderClosureWizard(info) : ""}
+      <details data-crop-year-closure ${closureOpen ? "open" : ""}>
       <summary>年度の締め・次年度</summary>
       <div class="annual-closure-body">
         <label>対象年度（年産）<input type="number" min="1900" max="2200" value="${year}" data-crop-year-closure-year></label>
@@ -782,14 +885,17 @@
         ${closedDate ? `<small data-crop-year-closed-date>締め日 ${U.escapeHTML(closedDate.text)}</small>` : ""}
         ${history.length ? `<details data-crop-year-closure-history><summary>締め・解除の履歴</summary>${history.map(row => `<p data-crop-year-history-entry>${U.escapeHTML(row.text)} · ${row.label}</p>`).join("")}</details>` : ""}
         <p>出荷・販売・配布 ${info.counts.shipments}件 / 収穫作業 ${info.counts.harvestWorks}件</p>
+        ${typeof renderCropYearSettlement === "function" ? renderCropYearSettlement(info) : ""}
+        ${typeof renderYearClosureBackups === "function" ? renderYearClosureBackups(year) : ""}
+        ${typeof renderCarryover === "function" ? renderCarryover(year) : ""}
         <p>締めた後も、この年度の記録は追加・編集できます。</p>
-        ${info.closed ? `<button type="button" data-crop-year-reopen="${year}">締めを解除</button>` : `<label><input type="checkbox" data-crop-year-switch-next checked ${year === 2200 ? "disabled" : ""}>新規作業の対象年度を${year + 1}年度に切り替える</label>
+        ${info.closed ? `${info.settlementChanged || !info.settlementSnapshot ? `<button type="button" data-crop-year-close="${year}" data-crop-year-refresh>現在の集計で再締め</button>` : ""}<button type="button" data-crop-year-reopen="${year}">締めを解除</button>` : `<label><input type="checkbox" data-crop-year-switch-next checked ${year === 2200 ? "disabled" : ""}>新規作業の対象年度を${year + 1}年度に切り替える</label>
         <button type="button" data-crop-year-close="${year}" ${info.counts.shipments ? "" : "disabled"}>${year}年度を締める</button>
         ${info.counts.shipments ? "" : '<p>出荷・販売・配布記録がある年度から締められます。</p><button type="button" data-crop-year-shipment>出荷を記録</button>'}`}
         <form data-crop-year-active-form><label>新規作業の対象年度<input name="year" type="number" min="1900" max="2200" required value="${info.activeCropYear}"></label><button type="submit">入力年度を変更</button></form>
         <p>実施日は変更しません。追加出荷は、前年産も選べます。</p>
       </div>
-    </details>`;
+    </details></section>`;
   }
 
   function renderTop(rows) {
@@ -799,6 +905,9 @@
         <button type="button" class="annual-shipment-entry" data-annual-harvest-performance><b>年産別の収穫成績</b><span>品種ごとの収量・面積を振り返る ›</span></button>
         <div class="annual-hub-tools"><button type="button" data-annual-hub-notes aria-expanded="${hubNotesOpen}" aria-controls="annualHubNotes">来年メモ</button></div>
         ${renderCropYearClosure()}
+        ${!closureDraft ? renderAnnualReadiness(Number(yearValue() === "all" ? new Date().getFullYear() : yearValue())) : ""}
+        ${renderWorkTimingReviews(null, Number(yearValue() === "all" ? new Date().getFullYear() : yearValue()))}
+        ${renderSettingExperiments(null, Number(yearValue() === "all" ? new Date().getFullYear() : yearValue()))}
         <div class="annual-hub-nav" role="group" aria-label="振り返りの表示">
           ${[["fields", "圃場の一年"], ["work", "作業・資材"], ["compare", "年の比較"]].map(([value, label]) => `<button type="button" data-annual-hub-view="${value}" class="${topView === value ? "active" : ""}" aria-pressed="${topView === value}">${label}</button>`).join("")}
         </div>
@@ -2057,6 +2166,25 @@
     return `<details class="annual-harvest-variety-comparison" data-harvest-variety-comparison><summary>同じ品種の刈取記録 <small>${comparison.rows.length}件</small></summary><p class="muted">比較基準: この圃場の現在の品種設定「${U.escapeHTML(comparison.varietyName || "未確認")}」。評価入力時の品種参照が一致する記録です。過去年の栽培品種確定ではありません。</p><p class="muted">圃場ごとの条件差を含む振り返り資料です。他の圃場の評価を予測へ自動採用しません。</p>${comparison.rows.slice().reverse().map(row => `<article data-harvest-variety-record="${U.attr(row.workId)}" data-harvest-variety-field="${U.attr(row.fieldId)}"><div class="annual-variety-record-head"><h5>${U.escapeHTML(row.fieldName)} <small>${U.escapeHTML(row.season)}年${row.currentField ? " / この圃場" : ""}</small></h5><span>${labels[row.assessment]}</span></div><div class="annual-variety-record-pair"><div><small>実際の刈取</small><b>${U.escapeHTML(annualRecordDate(row.actualDate))}</b><small>${row.daysAfterHeading !== "" && row.daysAfterHeading != null ? `出穂から${U.escapeHTML(row.daysAfterHeading)}日` : "出穂実測の根拠待ち"}</small></div><div><small>現場で見立てた適期</small><b>${U.escapeHTML(dateRange(row))}</b><small>${U.escapeHTML(dayRange(row))}${row.idealUsesActualDate ? " / 刈取日を適期と評価" : ""}</small></div></div>${row.delayReason ? `<p>記録された日程の事情: ${U.escapeHTML(delays[row.delayReason])}</p>` : ""}${row.memo ? `<p class="annual-variety-record-memo">${U.escapeHTML(row.memo)}</p>` : ""}<button type="button" data-annual-record-open-kind="fieldWork" data-annual-record-open-id="${U.attr(row.workId)}" data-annual-record-field="${U.attr(row.fieldId)}" data-annual-record-open-label="稲刈り">${U.escapeHTML(row.fieldName)}の刈取記録 ›</button></article>`).join("") || '<p class="empty">比較できる評価付き刈取記録はまだありません。刈取記録に現場の評価を残すと、ここで見比べられます。</p>'}${comparison.excluded.length ? `<details><summary>比較参照に含めなかった記録 ${comparison.excluded.length}件</summary>${comparison.excluded.slice().reverse().map(row => `<p>${U.escapeHTML(row.fieldName)} / ${U.escapeHTML(row.season)}年: ${U.escapeHTML(row.reason)}</p>`).join("")}</details>` : ""}</details>`;
   }
 
+  function renderWorkTimingComparison(field, year) {
+    if (!state.annualWorkTimingComparisonFor) return "";
+    const comparison = state.annualWorkTimingComparisonFor(field.fieldId, year);
+    if (!comparison) return "";
+    const delta = days => days === null || days === undefined || !Number.isFinite(days)
+      ? "両年の実績がそろっていないため比較できません" : days === 0 ? "前年と同じ時期" : `前年より${Math.abs(days)}日${days > 0 ? "遅い" : "早い"}`;
+    const period = (side, cropYear) => {
+      if (!side || !side.count) return `<div class="annual-work-timing-side"><small>${cropYear}年産</small><b>実績なし</b></div>`;
+      return `<div class="annual-work-timing-side"><small>${cropYear}年産 / ${side.count}件</small><b>${U.escapeHTML(side.firstDate)}</b>${side.lastDate !== side.firstDate ? `<span>～ ${U.escapeHTML(side.lastDate)}</span>` : ""}</div>`;
+    };
+    return `<section class="annual-work-timing" data-annual-work-timing>
+      <header><h4>作業時期を前年と比べる</h4><small>実施日で比較・対象年産で分類</small></header>
+      <p>締め日では区切りません。複数回の作業は初回と最終日を比べます。時期の早い・遅いは良し悪しの評価ではありません。</p>
+      <small>日数差は年産に対する暦上の位置で比較します。うるう日は除き、2/29は2/28と同じ位置として扱います。</small>
+      ${(comparison.excluded || []).length ? `<p>${comparison.excluded.length}件は日付不正・未来日のため比較対象外です。元の記録は変更していません。</p>` : ""}
+      ${(comparison.rows || []).map(row => `<article data-work-timing="${U.attr(row.key)}"><h5>${U.escapeHTML(row.label)}</h5><div class="annual-work-timing-pair">${period(row.previous, comparison.previousYear)}${period(row.current, comparison.year)}</div><p class="annual-work-timing-delta">初回：${U.escapeHTML(delta(row.firstDeltaDays))}${(row.current?.count > 1 || row.previous?.count > 1) ? `<br>最終：${U.escapeHTML(delta(row.lastDeltaDays))}` : ""}</p><details><summary>元の作業記録を確認</summary>${[[comparison.year,row.current],[comparison.previousYear,row.previous]].map(([cropYear,side]) => (side?.records || []).map(record => `<button type="button" class="annual-work-timing-record" data-annual-record-open-kind="fieldWork" data-annual-record-open-id="${U.attr(record.workId)}" data-annual-record-open-label="${U.attr(record.workName)}"><span>${cropYear}年産 / ${U.escapeHTML(record.date)}</span><b>${U.escapeHTML(record.workName)}</b><span aria-hidden="true">›</span></button>`).join("")).join("")}</details></article>`).join("") || '<p class="muted">比較できる作業実績はまだありません。実施日と対象年産を残すと、ここで比べられます。</p>'}
+    </section>`;
+  }
+
   function renderComparisonExperience(field) {
     const currentYear = reviewYearValue();
     const previousYear = String(Number(currentYear) - 1);
@@ -2075,6 +2203,9 @@
       <section class="annual-compare-experience" aria-label="${U.escapeHTML(field.name)}の今年と前年の比較">
         <div class="annual-compare-experience-head"><button type="button" class="annual-compare-back" data-annual-close-compare aria-label="比較を閉じる">‹</button><div><span>今年と前年を比べる</span><h3>${U.escapeHTML(field.name)}</h3><p>${U.escapeHTML(currentYear)}年と${U.escapeHTML(previousYear)}年 / ${U.escapeHTML(varietyName(field))}</p></div></div>
         <div class="annual-compare-season-status"><article class="current"><span>${U.escapeHTML(currentYear)}年</span><b>${U.escapeHTML(currentPlanting ? `田植え ${U.fd(currentPlanting.date)}` : "田植え未記録")}</b><small>${U.escapeHTML(currentHeading ? `出穂 ${U.fd(currentHeading.date)}` : "出穂記録待ち")}</small></article><i aria-hidden="true">⇄</i><article><span>${U.escapeHTML(previousYear)}年</span><b>${U.escapeHTML(previousPlanting ? `田植え ${U.fd(previousPlanting.date)}` : "田植え未記録")}</b><small>${U.escapeHTML(previousHeading ? `出穂 ${U.fd(previousHeading.date)}` : "出穂記録なし")}</small></article></div>
+        ${renderWorkTimingComparison(field, currentYear)}
+        ${renderWorkTimingReviews(field, currentYear)}
+        ${renderSettingExperiments(field, currentYear)}
         ${renderHarvestTimingComparison(field)}
         ${renderHarvestForecastComparison(field)}
         ${renderHarvestVarietyComparison(field)}
@@ -2414,6 +2545,15 @@
       info.push(annualRecordInfoRow("作業者", row.worker));
       info.push(annualRecordInfoRow("作業時間", row.hours || row.totalHours ? U.formatHours(U.parseWorkHours(row.hours || row.totalHours)) : ""));
       info.push(annualRecordInfoRow("機械", row.machine));
+      const timingReview = state.workTimingFor?.(row);
+      if (timingReview && (row.scheduleSnapshot || row.timingReview)) {
+        info.push(annualRecordInfoRow("予定日（保存した記録）", timingReview.plannedDate || "未記録"));
+        if (timingReview.latestPlannedDate && timingReview.latestPlannedDate !== timingReview.plannedDate) info.push(annualRecordInfoRow("変更後の予定日", timingReview.latestPlannedDate));
+        if (timingReview.source === "schedule") info.push(annualRecordInfoRow("予定日の根拠", timingReview.originalDateSource === "recorded" ? "予定登録時に保存" : "確認できた時点の予定日。過去の変更履歴は未確認"));
+        info.push(annualRecordInfoRow("予定と実施日の差", timingReview.deltaDays == null ? "未計算" : timingReview.deltaDays === 0 ? "予定どおり" : `${Math.abs(timingReview.deltaDays)}日${timingReview.deltaDays > 0 ? "遅い" : "早い"}`));
+        info.push(annualRecordInfoRow("日程変更の理由", WORK_REASON_LABELS[timingReview.reason] || "未記録"));
+        info.push(annualRecordInfoRow("日程変更の事情", timingReview.memo));
+      }
       const tractor = row.tractorSettingsSnapshot;
       if (tractor && tractor.settings) {
         info.push(annualRecordInfoRow("使用時のトラクター設定", tractor.profileName));
@@ -2424,6 +2564,18 @@
         });
         info.push(annualRecordInfoRow("設定の適用条件", tractor.conditions));
         info.push(annualRecordInfoRow("設定メモ", tractor.memo));
+      }
+      const transplanter = row.transplanterSettingsSnapshot;
+      if (transplanter && transplanter.settings) {
+        info.push(annualRecordInfoRow("使用時の田植え機設定", `${transplanter.cropYear}年産 / ${transplanter.profileName}`));
+        info.push(annualRecordInfoRow("田植機", [transplanter.machineName, transplanter.machineMaker, transplanter.machineModel].filter(Boolean).join(" / ")));
+        info.push(annualRecordInfoRow("設定の品種", transplanter.varietyName));
+        (RiceOS.schema.TRANSPLANTER_SETTING_FIELDS || []).forEach(setting => {
+          const value = transplanter.settings[setting.key];
+          if (value !== "" && value !== undefined && value !== null) info.push(annualRecordInfoRow(setting.label, `${value}${setting.unit ? ` ${setting.unit}` : ""}`));
+        });
+        info.push(annualRecordInfoRow("設定の意図・条件", transplanter.intent));
+        info.push(annualRecordInfoRow("設定メモ", transplanter.memo));
       }
       info.push(annualRecordInfoRow("資材", row.material));
       info.push(annualRecordInfoRow("除草の処理区分", row.herbicideCategory));
@@ -2610,10 +2762,15 @@
   }
 
   function canHandleBack() {
-    return Boolean(recordDetail || expandedFlowRecord || selectedFieldId || reviewView === "compare");
+    return Boolean(closureDraft || recordDetail || expandedFlowRecord || selectedFieldId || reviewView === "compare");
   }
 
   function handleBack() {
+    if (closureDraft && !selectedFieldId && !recordDetail) {
+      if (closureDraft.step > 0) { closureDraft.step -= 1; closureDraft.confirmed = false; }
+      else closureDraft = null;
+      render(); return true;
+    }
     if (recordDetail) {
       if (recordDetail.returnToHarvestPerformance) {
         const origin = recordDetail.performanceContext;
@@ -2796,6 +2953,7 @@
 
   function resetNavigation(options) {
     if (!options || !options.preserveHub) {
+      closureDraft = null;
       topView = "fields";
       hubNotesOpen = false;
       workArchiveOpen = false;
@@ -2870,14 +3028,125 @@
   function bind() {
     U.$("annualTimeline").addEventListener("input", (event) => {
       if (event.target.matches("[data-carryover-text]") && carryoverDraft) carryoverDraft.text = event.target.value;
+      if (event.target.matches("[data-close-note]") && closureDraft) closureDraft.note = event.target.value;
+    });
+    U.$("annualTimeline").addEventListener("change", (event) => {
+      if (event.target.matches("[data-carryover-choice]")) {
+        const year = Number(event.target.dataset.carryoverYear), selected = carryoverSelection.get(year) || new Set();
+        if (event.target.checked) selected.add(event.target.dataset.carryoverChoice); else selected.delete(event.target.dataset.carryoverChoice);
+        carryoverSelection.set(year, selected);
+        const button = U.$("annualTimeline").querySelector(`[data-carryover-save="${year}"]`);
+        if (button) button.disabled = !selected.size;
+      }
+      if (!closureDraft) return;
+      if (event.target.matches("[data-close-switch]")) closureDraft.switchToNext = event.target.checked;
+      if (event.target.matches("[data-close-confirm]")) {
+        closureDraft.confirmed = event.target.checked;
+        const button = U.$("annualTimeline").querySelector("[data-close-save]");
+        const info = state.cropYearClosureFor(closureDraft.year);
+        if (button) button.disabled = !closureDraft.confirmed || !info?.closed && !info?.counts.shipments;
+      }
     });
     const year = U.$("annualYear");
     if (year) year.addEventListener("change", render);
     U.$("annualTimeline").addEventListener("toggle", (event) => {
       if (event.target.matches("[data-crop-year-closure]")) closureOpen = event.target.open;
+      if (event.target.matches("[data-annual-carryover]")) carryoverOpen = event.target.open;
       if (event.target.matches("[data-annual-work-list]")) workArchiveOpen = event.target.open;
     }, true);
     U.$("annualTimeline").addEventListener("click", (event) => {
+      const reviewWork = event.target.closest("[data-year-review-work], [data-year-review-milling]");
+      if (reviewWork) {
+        const kind = reviewWork.hasAttribute("data-year-review-milling") ? "milling" : "fieldWork";
+        const id = kind === "milling" ? reviewWork.dataset.yearReviewMilling : reviewWork.dataset.yearReviewWork;
+        const work = kind === "milling" ? state.data().millingRecords.find(row => row.millingId === id) : state.data().fieldWorks.find(row => row.workId === id);
+        if (!work) return;
+        const fieldId = (work.fieldIds || []).find(id => state.field(id));
+        if (fieldId) {
+          const fromHub = !selectedFieldId;
+          selectedFieldId = fieldId;
+          if (openAnnualRecordDetail(kind, id, kind === "milling" ? "籾摺り収量" : work.workName) && fromHub) recordDetail.fromMaterialsTop = true;
+        } else editRow(kind, id);
+        return;
+      }
+      const readiness = event.target.closest("[data-readiness-key]");
+      if (readiness) {
+        const year = Number(readiness.dataset.readinessYear);
+        const item = state.annualReadinessFor(year)?.items.find(row => row.key === readiness.dataset.readinessKey);
+        if (!item) return;
+        if (["dry", "irrigation"].includes(item.kind) && item.id) { openWaterEditor(item.kind, item.id); return; }
+        if (item.kind === "fieldWork" && item.id) { editRow("fieldWork", item.id); return; }
+        if (item.kind === "fieldWork" && item.fieldId) {
+          openStatusInput("work", item.fieldId);
+          U.$("fwName").value = "稲刈り"; U.$("fwName").dispatchEvent(new Event("change", { bubbles: true }));
+          U.$("fwCropYear").value = String(year); U.$("fwCropYear").dispatchEvent(new Event("change", { bubbles: true })); return;
+        }
+        if (item.kind === "shipment") { RiceOS.app.openInput("shipments", "annual"); RiceOS.screens.shipments.openDetail(item.id); return; }
+        if (item.kind === "shipmentIssue") { RiceOS.app.openInput("results", "annual"); RiceOS.screens.results.openShipmentIssues(); return; }
+        RiceOS.app.openInput("results", "annual");
+        if (item.kind === "milling" && item.id) { RiceOS.screens.results.editMillingRecord(item.id); return; }
+        RiceOS.screens.results.openMillingForYear(year, item.varietyId || ""); return;
+      }
+      const carryover = event.target.closest("[data-carryover-save]");
+      if (carryover) {
+        const year = Number(carryover.dataset.carryoverSave), keys = [...(carryoverSelection.get(year) || [])];
+        if (!keys.length || !confirm(`${keys.length}件を${year + 1}年産の設定・計画として保存します。実績はコピーせず、既存の翌年設定も上書きしません。続けますか？`)) return;
+        if (state.carryoverToNextYear(year, keys)) { carryoverSelection.delete(year); carryoverMessage = `${year + 1}年産へ保存しました。実績は変更していません。`; }
+        else carryoverMessage = "保存できませんでした。選択内容は保持しています。";
+        render(); return;
+      }
+      const backupExport = event.target.closest("[data-year-backup-export]");
+      if (backupExport) {
+        try { RiceOS.storage.exportYearClosureBackup(backupExport.dataset.yearBackupExport); } catch (error) { U.toast(error.message); }
+        return;
+      }
+      const backupRestore = event.target.closest("[data-year-backup-restore]");
+      if (backupRestore) {
+        if (!confirm("全年度のデータを、この締め前の保存時点へ戻します。現在の全データも先に自動バックアップします。復元しますか？")) return;
+        try {
+          const savedData = RiceOS.storage.yearClosureBackupData(backupRestore.dataset.yearBackupRestore);
+          RiceOS.storage.createYearClosureBackup(Number(backupRestore.dataset.yearBackupYear));
+          if (state.replace(savedData, "年度締め前のデータへ復元しました")) { closureDraft = null; closureOpen = true; render(); }
+        } catch (error) { U.toast(error.message); }
+        return;
+      }
+      const startClosure = event.target.closest("[data-close-start]");
+      if (startClosure) {
+        const year = Number(startClosure.dataset.closeStart);
+        const info = state.cropYearClosureFor(year);
+        closureDraft = { year, step: 0, note: info?.settlementSnapshot?.note || "", switchToNext: !info?.closed && year < 2200, confirmed: false, error: "" };
+        closureYear = String(year); render();
+        U.$("annualTimeline").querySelector("[data-close-wizard]")?.scrollIntoView({ block: "start", behavior: "smooth" });
+        return;
+      }
+      if (event.target.closest("[data-close-cancel]")) { closureDraft = null; render(); return; }
+      if (closureDraft && event.target.closest("[data-close-open-compare]")) {
+        renderOptions();
+        const yearSelect = U.$("annualYear");
+        if (!Array.from(yearSelect.options).some(option => option.value === String(closureDraft.year))) { U.toast("対象年度の実績はまだありません"); return; }
+        yearSelect.value = String(closureDraft.year); topView = "compare"; render();
+        U.$("annualTimeline").querySelector(".annual-hub-compare")?.scrollIntoView({ block: "start", behavior: "smooth" }); return;
+      }
+      if (event.target.closest("[data-close-open-shipments]")) {
+        if (RiceOS.navigation) RiceOS.navigation.clear();
+        RiceOS.app.openInput("shipments", "annual"); return;
+      }
+      if (closureDraft && event.target.closest("[data-close-next], [data-close-prev]")) {
+        closureDraft.step += event.target.closest("[data-close-next]") ? 1 : -1;
+        closureDraft.confirmed = false;
+        if (closureDraft.step === 3 && state.cropYearSettlementFor) closureDraft.fingerprint = state.cropYearSettlementFor(closureDraft.year)?.fingerprint;
+        render(); U.$("annualTimeline").querySelector("[data-close-wizard]")?.scrollIntoView({ block: "start", behavior: "smooth" }); return;
+      }
+      if (closureDraft && event.target.closest("[data-close-save]")) {
+        if (!closureDraft.confirmed || closureDraft.step !== 3) return;
+        const current = state.cropYearSettlementFor?.(closureDraft.year);
+        if (current && current.fingerprint !== closureDraft.fingerprint) {
+          closureDraft.step = 0; closureDraft.confirmed = false; closureDraft.error = "確認中に記録が変わりました。最新の内容をもう一度確認できます。"; render(); return;
+        }
+        const saved = state.closeCropYear(closureDraft.year, { switchToNext: closureDraft.switchToNext, refresh: true, note: closureDraft.note });
+        if (!saved) { closureDraft.error = state.lastSaveError?.() || "保存できませんでした。確認内容は残しています。"; render(); return; }
+        closureDraft = null; closureOpen = true; renderOptions(); render(); return;
+      }
       if (event.target.closest("[data-annual-harvest-performance]")) {
         if (RiceOS.screens.harvestPerformance) {
           RiceOS.screens.harvestPerformance.open(yearValue());
@@ -2889,6 +3158,10 @@
       const reopen = event.target.closest("[data-crop-year-reopen]");
       if (close || reopen) {
         const targetYear = Number((close || reopen).dataset[close ? "cropYearClose" : "cropYearReopen"]);
+        if (close) {
+          closureDraft = { year: targetYear, step: 0, note: state.cropYearClosureFor(targetYear)?.settlementSnapshot?.note || "", switchToNext: !close.hasAttribute("data-crop-year-refresh") && targetYear < 2200, confirmed: false, error: "" };
+          render(); return;
+        }
         const switchToNext = Boolean(close && U.$("annualTimeline").querySelector("[data-crop-year-switch-next]:checked:not(:disabled)"));
         const message = close ? `${targetYear}年度を一区切りにします。記録は残り、追加・編集できます。${switchToNext ? `新規作業の対象年度を${targetYear + 1}年度に切り替えます。` : ""}` : `${targetYear}年度の締めを解除します。新規作業の対象年度は変更しません。`;
         if (!window.confirm(message)) return;
@@ -3404,6 +3677,6 @@
     canHandleBack,
     resetNavigation,
     isRecordDetailOpen: () => Boolean(recordDetail),
-    hasTransientBackState: () => Boolean(recordDetail || expandedFlowRecord || reviewView === "compare")
+    hasTransientBackState: () => Boolean(closureDraft || recordDetail || expandedFlowRecord || reviewView === "compare")
   };
 })();

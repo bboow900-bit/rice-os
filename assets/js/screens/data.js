@@ -22,6 +22,7 @@
     shipmentIssues: "出荷の対応記録",
     harvestYearReviews: "年産別の収穫成績",
     tractorProfiles: "トラクター設定",
+    transplanterProfiles: "年度別の田植え機設定",
     confirmationCandidates: "確認候補"
   };
 
@@ -36,7 +37,7 @@
     const values = {
       fields: state.activeFields ? state.activeFields().length : (data.fields || []).length,
       varieties: (data.varieties || []).length,
-      transplanter: (data.varieties || []).filter((item) => item.rowSpacing || item.plantSpacing || item.seedlingScrapeAmount).length,
+      transplanter: (data.transplanterProfiles || []).length,
       dryPeriods: (data.dryPeriods || []).length,
       irrigations: (data.irrigations || []).length,
       materials: (data.materials || []).length,
@@ -84,6 +85,7 @@
       ["水管理", `${info.dryPeriods || 0}/${info.irrigations || 0}`],
       ["機械/整備", `${info.machines || 0}/${info.maintenanceRecords || 0}`],
       ["トラクター設定", `${info.tractorProfiles || 0}件`],
+      ["年度別の田植え機設定", `${(state.data().transplanterProfiles || []).length}件`],
       ["予定", `${info.schedules || 0}件`],
       ["資材/結果", `${info.materials}/${info.varietyResults}`],
       ["籾摺り収量", `${info.millingRecords || 0}件`],

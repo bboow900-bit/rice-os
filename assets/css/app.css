@@ -15556,7 +15556,62 @@ button.hp-trend-row:hover, button.hp-trend-row:focus-visible { background: #edf5
 .ts-error { color: #a02c24; font-size: 13px; overflow-wrap: anywhere; }
 #tractorSettingsContent, #fwTractorSettings { min-width: 0; }
 #tractorSettingsContent { padding-bottom: calc(100px + env(safe-area-inset-bottom)); }
-#fwTractorSettings { padding: 14px 0; margin: 12px 0; border-top: 1px solid #d5e4d8; border-bottom: 1px solid #d5e4d8; }
-#fwTractorSettings h3 { font-size: 16px; margin: 0 0 10px; }
+#fwTractorSettings, #fwTransplanterSettings { padding: 14px 0; margin: 12px 0; border-top: 1px solid #d5e4d8; border-bottom: 1px solid #d5e4d8; }
+#fwTractorSettings h3, #fwTransplanterSettings h3 { font-size: 16px; margin: 0 0 10px; }
 #fwTractorSettings[hidden] { display: none; }
 @media (max-width: 370px) { .ts-toolbar { gap: 10px; } .ts-fields { column-gap: 10px; } }
+.annual-close-start { display: grid; gap: 6px; width: 100%; min-height: 76px; padding: 16px; text-align: left; margin: 14px 0; white-space: normal; }
+.annual-close-start b { font-size: 17px; }
+.annual-close-start span { font-size: 13px; font-weight: 400; }
+.annual-close-wizard { padding: 16px 0; margin: 16px 0; border-block: 2px solid #87ae90; scroll-margin-top: 85px; }
+.annual-close-wizard h3 { font-size: 19px; margin: 8px 0 12px; }
+.annual-close-wizard p { font-size: 13px; line-height: 1.7; overflow-wrap: anywhere; }
+.annual-close-wizard label { display: block; margin: 14px 0; font-size: 14px; line-height: 1.7; }
+.annual-close-wizard textarea { width: 100%; box-sizing: border-box; }
+.annual-close-wizard input[type="checkbox"] { width: 20px; min-height: 20px; height: 20px; margin-right: 8px; vertical-align: middle; }
+.annual-close-steps { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; list-style: none; padding: 0; margin: 12px 0 20px; }
+.annual-close-steps li { font-size: 12px; border-bottom: 3px solid #dbe6dc; padding-bottom: 8px; overflow-wrap: anywhere; }
+.annual-close-steps li[aria-current] { border-color: #287d45; color: #216139; font-weight: 700; }
+.annual-settlement h4 { margin: 12px 0; font-size: 16px; }
+.annual-settlement-values { margin: 0; }
+.annual-settlement-values > div { display: flex; justify-content: space-between; gap: 12px; border-bottom: 1px solid #e1e9e2; padding: 12px 0; }
+.annual-settlement-values dt { font-size: 13px; flex: 1; }
+.annual-settlement-values dd { font-size: 16px; margin: 0; font-weight: 700; text-align: right; overflow-wrap: anywhere; max-width: 55%; }
+.annual-settlement-warning { color: #915719; }
+.annual-close-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; padding-right: 72px; padding-bottom: 24px; }
+.annual-close-actions button { flex: 1 1 90px; min-height: 48px; white-space: normal; }
+.annual-close-actions .primary { flex: 2 1 160px; }
+.annual-close-note { white-space: pre-wrap; border-left: 3px solid #82a68a; padding-left: 12px; }
+#transplanterSettingsContent { min-width: 0; padding-bottom: calc(100px + env(safe-area-inset-bottom)); }
+#fwTransplanterSettings[hidden] { display: none; }
+.annual-work-timing { border-block: 1px solid #d5e4d8; padding: 16px 0; margin: 18px 0; min-width: 0; }
+.annual-work-timing header { display: grid; gap: 6px; }
+.annual-work-timing h4 { margin: 0; font-size: 16px; }
+.annual-work-timing p, .annual-work-timing small { font-size: 13px; line-height: 1.65; color: #526459; overflow-wrap: anywhere; }
+.annual-work-timing article { border-top: 1px solid #e0e9e2; margin-top: 14px; padding-top: 14px; }
+.annual-work-timing h5 { margin: 0 0 10px; font-size: 15px; }
+.annual-work-timing-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.annual-work-timing-side { display: grid; gap: 4px; min-width: 0; font-size: 14px; }
+.annual-work-timing-side b, .annual-work-timing-side span { overflow-wrap: anywhere; }
+.annual-work-timing-delta { border-left: 3px solid #74a281; padding-left: 10px; }
+.annual-work-timing summary { cursor: pointer; min-height: 40px; padding: 10px 0; font-size: 13px; }
+.annual-work-timing-record { display: grid; grid-template-columns: minmax(0, 1fr) 20px; gap: 4px 8px; width: 100%; text-align: left; padding: 12px; margin-bottom: 8px; white-space: normal; }
+.annual-work-timing-record span:first-child { grid-column: 1 / -1; font-size: 12px; }
+.annual-year-review, .annual-year-backups { margin: 14px 0; padding: 12px 0; border-block: 1px solid #d9e4db; min-width: 0; }
+.annual-year-review > summary, .annual-year-backups > summary { min-height: 44px; padding: 10px 0; font-size: 15px; font-weight: 700; cursor: pointer; overflow-wrap: anywhere; }
+.annual-year-review p, .annual-year-backups p { font-size: 13px; line-height: 1.7; overflow-wrap: anywhere; }
+.annual-year-review article, .annual-year-backups > div { padding: 12px 0; border-top: 1px solid #e2e9e3; }
+.annual-year-review h5 { font-size: 15px; margin: 8px 0; }
+.annual-year-review-link { display: grid; grid-template-columns: minmax(0, 1fr) 20px; gap: 6px; width: 100%; text-align: left; white-space: normal; padding: 14px; margin: 8px 0; border-radius: 8px; }
+.annual-year-review-link b, .annual-year-review-link span { grid-column: 1; overflow-wrap: anywhere; }
+.annual-year-review-link span { font-size: 13px; font-weight: 400; }
+.annual-year-review-link i { grid-column: 2; grid-row: 1 / 3; align-self: center; font-style: normal; }
+.annual-carryover-option { display: flex !important; align-items: start !important; gap: 10px; padding: 12px 0; }
+.annual-carryover-option input { width: 20px; height: 20px; min-height: 20px; flex: 0 0 20px; margin: 3px 0 0; }
+.annual-carryover-option small { display: block; font-size: 12px; font-weight: 400; line-height: 1.6; color: #526459; }
+.annual-year-backups > div > b { display: block; font-size: 13px; overflow-wrap: anywhere; }
+#fwTimingReview { padding: 12px 0; margin: 12px 0; border-block: 1px solid #d5e4d8; min-width: 0; }
+#fwTimingReview > summary { font-size: 15px; font-weight: 700; min-height: 44px; padding: 10px 0; cursor: pointer; overflow-wrap: anywhere; }
+#fwTimingReview p { font-size: 13px; line-height: 1.7; overflow-wrap: anywhere; }
+#fwTimingReview label { display: block; margin: 12px 0; }
+#fwTimingReview textarea { width: 100%; box-sizing: border-box; }

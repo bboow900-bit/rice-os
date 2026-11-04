@@ -1,7 +1,7 @@
 "use strict";
 const assert = require("node:assert/strict"), fs = require("node:fs"), vm = require("node:vm"), path = require("node:path");
 const memory = new Map(); let writes = 0, fail = false;
-const c = vm.createContext({ console, navigator: {}, alert() {}, dispatchEvent() {}, CustomEvent: class {},
+const c = vm.createContext({ console, Blob, navigator: {}, alert() {}, dispatchEvent() {}, CustomEvent: class {},
   document: { getElementById: () => null, querySelectorAll: () => [] },
   localStorage: { getItem: k => memory.get(k) || null, setItem(k,v) { if (fail) throw Error("failure"); writes++; memory.set(k,String(v)); }, removeItem: k => memory.delete(k) } });
 c.window = c;

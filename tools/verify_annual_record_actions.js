@@ -37,7 +37,7 @@ assert(
   "Record detail must have an in-page return path to the annual flow"
 );
 assert(
-  /hasTransientBackState: \(\) => Boolean\(recordDetail \|\| expandedFlowRecord \|\| reviewView === "compare"\)/.test(annual) && /activeScreen === "annual"[\s\S]*hasTransientBackState\(\)/.test(app),
+  /hasTransientBackState: \(\) => Boolean\(closureDraft \|\| recordDetail \|\| expandedFlowRecord \|\| reviewView === "compare"\)/.test(annual) && /activeScreen === "annual"[\s\S]*hasTransientBackState\(\)/.test(app),
   "The shared back button must close annual detail and inline summaries before a prior route"
 );
 assert(
