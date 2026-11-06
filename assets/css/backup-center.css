@@ -1,0 +1,10 @@
+#screen-data .backup-center { margin: 8px 0 20px; padding: 14px 0; border-block: 1px solid #bcd8c6; color: #254d37; min-width: 0; }
+#screen-data .backup-center-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+#screen-data .backup-center-heading h3 { font-size: 17px; line-height: 1.5; margin: 3px 0; overflow-wrap: anywhere; }
+#screen-data .backup-center-heading > span { color: #7b5c21; font-size: 12px; }
+#screen-data .backup-center p { font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
+#screen-data .backup-center small { font-size: 12px; line-height: 1.7; color: #516658; }
+#screen-data .backup-center-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
+#screen-data .backup-center-actions button { min-height: 44px; border-radius: 8px; }
+#screen-data .backup-center-message:empty { display: none; }
+#screen-data .backup-center-message { border-left: 3px solid #5d9d7b; padding-left: 9px; }

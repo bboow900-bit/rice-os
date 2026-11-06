@@ -6,6 +6,45 @@
   const storage = RiceOS.storage;
   const state = RiceOS.state;
   const APP_VERSION_LABEL = `Ver2.0 / ${RiceOS.schema.APP_VERSION || ""}`;
+  let sharingBackup = false;
+  let backupMessage = "";
+
+  function downloadBackup() {
+    try {
+      storage.exportJson(state.data());
+    } catch (_) {
+      backupMessage = "JSONのダウンロードを開始できませんでした。記録は変更していません。再度お試しください。";
+      renderBackupCenter(storage.info(state.data()));
+      return false;
+    }
+    const marked = state.markJsonExported();
+    backupMessage = marked
+      ? "JSONのダウンロードを開始しました。端末外の保存先へ移したことを確認してください。"
+      : "JSONのダウンロードを開始しましたが、出力日時を記録できませんでした。保存先を確認してください。";
+    renderBackupCenter(storage.info(state.data()));
+    return true;
+  }
+
+  function renderBackupCenter(info) {
+    const host = U.$("dataBackupCenter");
+    if (!host) return;
+    const date = info.lastJsonExportAt ? String(info.lastJsonExportAt).slice(0, 10) : "";
+    const age = date ? U.daysBetween(date, U.today()) : null;
+    const reminder = age === null ? "端末外へのバックアップを残しましょう" : Number.isFinite(age) && age >= 7 ? "前回のJSON出力から7日以上経過" : "JSONの保存先も確認しましょう";
+    host.innerHTML = `<div class="backup-center-heading"><div><small>データの保護</small><h3>田んぼの記録を、端末の外にも</h3></div><span>クラウド自動保存：未接続</span></div><p>${U.escapeHTML(reminder)}</p><div class="backup-center-actions"><button type="button" class="primary" id="dataBackupShare" ${sharingBackup ? "disabled" : ""}>${sharingBackup ? "共有先を選択中…" : "端末外へ保存・共有"}</button><button type="button" class="secondary" id="dataBackupDownload">JSONダウンロード</button></div><p id="dataBackupMessage" class="backup-center-message" role="status">${U.escapeHTML(backupMessage)}</p><small>自動退避は同じブラウザ内です。端末故障・サイトデータ削除には、別端末やクラウドに保存したJSONが必要です。JSONには写真・メモも含まれます。</small>`;
+    U.$("dataBackupDownload").onclick = downloadBackup;
+    U.$("dataBackupShare").onclick = async () => {
+      if (sharingBackup) return;
+      sharingBackup = true;
+      U.$("dataBackupShare").disabled = true;
+      let result;
+      try { result = await RiceOS.backupExport.share(state.data()); }
+      catch (_) { result = {status:"error",message:"共有を開始できませんでした。JSONダウンロードをご利用ください。"}; }
+      sharingBackup = false;
+      backupMessage = result.message;
+      renderBackupCenter(storage.info(state.data()));
+    };
+  }
   const IMPORT_LABELS = {
     varieties: "栽培レシピ",
     fields: "圃場",
@@ -58,6 +97,7 @@
 
   function render() {
     const info = storage.info(state.data());
+    renderBackupCenter(info);
     renderMasterCounts();
     const exportDate = info.lastJsonExportAt ? String(info.lastJsonExportAt).slice(0, 10) : "";
     const exportDays = exportDate ? U.daysBetween(exportDate, U.today()) : "";
@@ -92,7 +132,7 @@
       ["籾摺り収量", `${info.millingRecords || 0}件`],
       ["出荷の対応記録", `${info.shipmentIssues || 0}件`],
       ["年産別の収穫成績", `${info.harvestYearReviews || 0}件`],
-      ["最終JSON保存", info.lastJsonExportAt ? U.fd(String(info.lastJsonExportAt).slice(0, 10)) : "記録なし"],
+      ["最終JSON出力開始", info.lastJsonExportAt ? U.fd(String(info.lastJsonExportAt).slice(0, 10)) : "記録なし"],
       ["最終自動退避", info.lastBackupAt ? U.fd(String(info.lastBackupAt).slice(0, 10)) : "記録なし"]
     ].map(([label, value]) => `
       <div class="kpi">
@@ -235,10 +275,7 @@
         systemSettingsPanel.setAttribute("aria-hidden", "true");
       });
     });
-    document.querySelector('[data-action="export-json"]').addEventListener("click", () => {
-      storage.exportJson(state.data());
-      state.markJsonExported();
-    });
+    document.querySelector('[data-action="export-json"]').addEventListener("click", downloadBackup);
     document.querySelector('[data-action="export-csv"]').addEventListener("click", () => {
       storage.exportCsv(state.data());
     });
