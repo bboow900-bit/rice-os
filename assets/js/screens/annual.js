@@ -152,6 +152,10 @@
   function iconSvg(name, className) {
     const cls = `svg-icon ${className || ""}`.trim();
     const iconName = String(name || "");
+    if (iconName === "planter" || iconName === "harvest") {
+      const image = iconName === "planter" ? "rice-transplanter" : "rice-combine";
+      return `<img class="${cls} annual-pop-machine" src="assets/images/ui-pop/${image}.png" alt="${iconName === "planter" ? "田植え機" : "コンバイン"}" width="32" height="32" decoding="async">`;
+    }
     if (iconName === "rice" || iconName.startsWith("rice-")) {
       return riceSvg(iconName === "rice" ? "panicle" : iconName.slice(5), cls);
     }
@@ -902,6 +906,7 @@
     const fields = topView === "fields" ? filteredFields() : [];
     return `
       <div class="annual-v2-top">
+        <header class="annual-pop-heading"><div><p class="annual-pop-kicker">一年を振り返る</p><h2>${yearValue() === "all" ? "これまでの記録" : Number(yearValue()) === Number(U.today().slice(0, 4)) ? "今年の記録" : `${U.escapeHTML(yearValue())}年の記録`}</h2></div><img class="annual-pop-rice" src="assets/images/ui-pop/harvest-rice.png" width="144" height="144" alt="" decoding="async"></header>
         <button type="button" class="annual-shipment-entry" data-annual-harvest-performance><b>年産別の収穫成績</b><span>品種ごとの収量・面積を振り返る ›</span></button>
         <div class="annual-hub-tools"><button type="button" data-annual-hub-notes aria-expanded="${hubNotesOpen}" aria-controls="annualHubNotes">来年メモ</button></div>
         ${renderCropYearClosure()}

@@ -6662,7 +6662,7 @@ label {
   overflow: hidden;
 }
 
-.form-section summary {
+.form-section > summary {
   min-height: 46px;
   padding: 13px 14px;
   color: #274330;
@@ -6671,18 +6671,18 @@ label {
   list-style: none;
 }
 
-.form-section summary::-webkit-details-marker {
+.form-section > summary::-webkit-details-marker {
   display: none;
 }
 
-.form-section summary::before {
+.form-section > summary::before {
   content: "▼";
   margin-right: 7px;
   color: var(--primary-dark);
   font-size: 12px;
 }
 
-.form-section:not([open]) summary::before {
+.form-section:not([open]) > summary::before {
   content: "▶";
 }
 

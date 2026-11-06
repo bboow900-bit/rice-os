@@ -5,6 +5,80 @@
   const U = RiceOS.utils;
   const S = RiceOS.schema;
   const state = RiceOS.state;
+  let purchaseMaterialId = "";
+  const purchaseDrafts = new Map(), purchaseYears = new Map(), purchaseErrors = new Map();
+  const moneyText = value => typeof value === "number" && Number.isFinite(value) ? `${value.toLocaleString("ja-JP")}円` : "価格未記録";
+
+  function renderPurchases() {
+    const host = U.$("materialPurchases"), api = RiceOS.materialPurchases;
+    if (!host || !api) return;
+    const material = state.data().materials.find(row => row.materialId === purchaseMaterialId);
+    if (!material) { host.innerHTML = '<p class="muted">購入履歴は、保存済み資材の「購入履歴」から開けます。</p>'; return; }
+    const rows = api.records(material.materialId), draft = purchaseDrafts.get(material.materialId);
+    const year = purchaseYears.get(material.materialId) || "all";
+    const years = [...new Set(rows.map(row => String(row.season || String(row.date || "").slice(0,4))).filter(value => /^\d{4}$/.test(value)))].sort().reverse();
+    if (year !== "all" && !years.includes(year)) years.unshift(year);
+    const shown = rows.filter(row => year === "all" || String(row.season || String(row.date || "").slice(0,4)) === year).sort((a,b) => String(b.date).localeCompare(String(a.date)));
+    host.innerHTML = `<section class="mp-ledger"><div class="mp-heading"><h3>${U.escapeHTML(material.name)}の購入履歴</h3><button type="button" class="secondary" data-mp-new>＋ 購入を追加</button></div><p class="muted">購入履歴は旧欄の購入数・使用数・在庫へ自動加算しません。</p><label class="mp-year">表示年度<select id="mpViewYear"><option value="all"${year === "all" ? " selected" : ""}>全年度</option>${years.map(value => `<option value="${U.attr(value)}"${value === year ? " selected" : ""}>${U.escapeHTML(value)}年度</option>`).join("")}</select></label><p class="mp-error" role="alert">${U.escapeHTML(purchaseErrors.get(material.materialId) || "")}</p>${draft ? `<form id="materialPurchaseForm" class="mp-form"><h4>${draft.purchaseId ? "購入記録を編集" : "購入記録を追加"}</h4><div class="mp-grid">${[
+      ["date","購入日","date",'required'],["season","年度","number",'min="1900" max="2200" step="1" required'],["supplier","仕入先","text",""],["quantity","数量","number",'min="0" step="any" required'],["unit","単位","text",'required'],["unitPrice","税込単価（円・任意）","number",'min="0" step="1"'],["totalAmount","税込総額（実額・任意）","number",'min="0" step="1"']
+    ].map(([name,label,type,attrs]) => `<label>${label}<input id="mp-${name}" name="${name}" type="${type}" ${attrs} value="${U.attr(draft[name] ?? "")}"></label>`).join("")}</div><label>メモ<textarea name="memo">${U.escapeHTML(draft.memo || "")}</textarea></label><p id="mpSubtotal" class="mp-subtotal">単価×数量：${moneyText(api.subtotal(draft))} ／ 記録金額：${moneyText(api.amount(draft))}</p><div class="mp-actions"><button type="button" class="secondary" data-mp-cancel>取消</button><button type="submit" class="primary">購入記録を保存</button></div></form>` : ""}<div class="mp-history">${shown.map(row => `<article class="mp-record" data-mp-record="${U.attr(row.purchaseId || "")}"><div class="mp-heading"><b>${U.escapeHTML(row.date || "購入日未記録")}</b><span>${U.escapeHTML(row.season || String(row.date || "").slice(0,4))}年度</span></div><p>${U.escapeHTML(row.supplier || "仕入先未記録")} ／ ${U.escapeHTML(row.quantity ?? "数量未記録")} ${U.escapeHTML(row.unit || "")}</p><p>税込単価 ${moneyText(typeof row.unitPrice === "number" ? row.unitPrice : null)} ／ ${row.totalAmount !== "" && row.totalAmount != null ? "税込実額" : "計算小計"} ${moneyText(api.amount(row))}</p>${row.memo ? `<p>${U.escapeHTML(row.memo)}</p>` : ""}<div class="mp-actions"><button type="button" class="secondary" data-mp-edit="${U.attr(row.purchaseId || "")}"${row.purchaseId ? "" : " disabled"}>編集</button><button type="button" class="secondary" data-mp-delete="${U.attr(row.purchaseId || "")}"${row.purchaseId ? "" : " disabled"}>削除</button></div></article>`).join("") || '<p class="empty">この年度の購入記録はありません。</p>'}</div></section>`;
+  }
+
+  function openPurchases(id) {
+    if (!state.data().materials.some(row => row.materialId === id)) return false;
+    purchaseMaterialId = id;
+    renderPurchases();
+    U.$("materialPurchases")?.scrollIntoView({behavior:"smooth",block:"start"});
+    return true;
+  }
+
+  function bindPurchases() {
+    const host = U.$("materialPurchases");
+    if (!host) return;
+    const capture = () => {
+      const form = host.querySelector("#materialPurchaseForm"), draft = purchaseDrafts.get(purchaseMaterialId);
+      if (!form || !draft) return;
+      for (const name of ["date","season","supplier","quantity","unit","unitPrice","totalAmount","memo"]) draft[name] = form.elements.namedItem(name).value;
+      const summary = host.querySelector("#mpSubtotal");
+      if (summary) summary.textContent = `単価×数量：${moneyText(RiceOS.materialPurchases.subtotal(draft))} ／ 記録金額：${moneyText(RiceOS.materialPurchases.amount(draft))}`;
+    };
+    host.addEventListener("input",capture);
+    host.addEventListener("change",event => {
+      if (event.target.id === "mpViewYear") { purchaseYears.set(purchaseMaterialId,event.target.value); renderPurchases(); }
+      else capture();
+    });
+    host.addEventListener("click",event => {
+      const api = RiceOS.materialPurchases;
+      const replaceDraft = value => {
+        if (purchaseDrafts.has(purchaseMaterialId) && !confirm("入力中の購入記録を破棄しますか？")) return;
+        purchaseDrafts.set(purchaseMaterialId,value); purchaseErrors.delete(purchaseMaterialId); renderPurchases();
+      };
+      if (event.target.closest("[data-mp-new]")) {
+        const material = state.data().materials.find(row => row.materialId === purchaseMaterialId);
+        if (!material) return;
+        replaceDraft({date:U.today(),season:new Date().getFullYear(),supplier:"",quantity:"",unit:material.unit || "",unitPrice:"",totalAmount:"",memo:""}); return;
+      }
+      if (event.target.closest("[data-mp-cancel]")) { purchaseDrafts.delete(purchaseMaterialId); purchaseErrors.delete(purchaseMaterialId); renderPurchases(); return; }
+      const edit = event.target.closest("[data-mp-edit]");
+      if (edit) { const row = api.records(purchaseMaterialId).find(item => item.purchaseId === edit.dataset.mpEdit); if (row) replaceDraft(row); return; }
+      const del = event.target.closest("[data-mp-delete]");
+      if (del && confirm("この購入記録を削除しますか？")) {
+        if (api.deletePurchase(purchaseMaterialId,del.dataset.mpDelete)) {
+          if (purchaseDrafts.get(purchaseMaterialId)?.purchaseId === del.dataset.mpDelete) purchaseDrafts.delete(purchaseMaterialId);
+          purchaseErrors.delete(purchaseMaterialId);
+        } else purchaseErrors.set(purchaseMaterialId,api.lastError);
+        renderPurchases();
+      }
+    });
+    host.addEventListener("submit",event => {
+      if (event.target.id !== "materialPurchaseForm") return;
+      event.preventDefault(); capture();
+      const api = RiceOS.materialPurchases, saved = api.savePurchase(purchaseMaterialId,purchaseDrafts.get(purchaseMaterialId));
+      if (saved) { purchaseDrafts.delete(purchaseMaterialId); purchaseErrors.delete(purchaseMaterialId); purchaseYears.set(purchaseMaterialId,String(saved.season)); }
+      else purchaseErrors.set(purchaseMaterialId,api.lastError);
+      renderPurchases(); renderList();
+    });
+  }
 
   function safeProductUrl(value) {
     if (typeof value !== "string" || !/^https?:\/\//i.test(value.trim())) return "";
@@ -94,6 +168,7 @@
               ${remaining ? `<span class="pill warn">在庫（手入力） ${U.escapeHTML(remaining)}</span>` : ""}
             </div>
             <button type="button" class="secondary" data-material-edit="${U.attr(m.materialId)}">編集</button>
+            <button type="button" class="secondary" data-material-purchases="${U.attr(m.materialId)}">購入履歴</button>
             <button type="button" class="secondary" data-material-delete="${U.attr(m.materialId)}">削除</button>
           </div>
           <div class="record-body">
@@ -117,15 +192,18 @@
   }
 
   function render() {
-    if (RiceOS.herbicideUI) RiceOS.herbicideUI.renderManagement();
     U.setOptions(U.$("mCategory"), S.MATERIAL_CATEGORIES, U.$("mCategory").value || "肥料");
     if (!U.$("mSeason").value) U.$("mSeason").value = new Date().getFullYear();
     renderList();
+    renderPurchases();
   }
 
   function bind() {
+    bindPurchases();
     U.$("cancelMaterialEdit").addEventListener("click", resetForm);
     U.$("materialList").addEventListener("click", (event) => {
+      const purchases = event.target.closest("[data-material-purchases]");
+      if (purchases) { openPurchases(purchases.dataset.materialPurchases); return; }
       const deleteButton = event.target.closest("[data-material-delete]");
       if (deleteButton) {
         const material = state.data().materials.find((item) => item.materialId === deleteButton.dataset.materialDelete);
@@ -182,5 +260,5 @@
   }
 
   RiceOS.screens = RiceOS.screens || {};
-  RiceOS.screens.materials = { render, bind, resetForm };
+  RiceOS.screens.materials = { render, bind, resetForm, openPurchases };
 })();

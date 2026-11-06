@@ -1,0 +1,64 @@
+"use strict";
+const assert = require("node:assert/strict"), fs = require("node:fs"), path = require("node:path"), vm = require("node:vm");
+const memory = new Map(), control = {fail:false};
+const context = vm.createContext({Blob,alert(){},CustomEvent:class {constructor(type,init){this.detail=init.detail;}},dispatchEvent(){},localStorage:{getItem:key => memory.get(key) ?? null,setItem(key,value){if(control.fail)throw Error("QA write failure");memory.set(key,String(value));}}});
+context.window=context;
+const load = file => vm.runInContext(fs.readFileSync(path.join(__dirname,"../assets/js/core",`${file}.js`),"utf8"),context);
+load("utils");load("schema");
+const R=context.RiceOS;
+memory.set(R.schema.STORE_KEY,JSON.stringify(R.schema.normalize({materials:[{materialId:"m",name:"QA fertilizer",season:2026,ordered:"old ordered",used:"old used",remaining:"old stock",custom:{keep:true}},{materialId:"other",name:"Other",purchases:[{purchaseId:"other-p",date:"2026-04-01",season:2026,quantity:1,unit:"袋",memo:"Keep"}]}],fieldWorks:[{workId:"existing",date:"2026-05-01",workName:"田植え",fieldIds:[]}]})));
+load("storage");load("state");load("material-purchases");
+const P=R.materialPurchases,S=R.state;
+const plain = value => JSON.parse(JSON.stringify(value));
+const material = () => S.data().materials.find(row => row.materialId === "m");
+const raw = () => memory.get(R.schema.STORE_KEY);
+const original = plain(S.data());
+const valid = extra => ({date:"2026-04-02",season:2026,supplier:"  Supplier A  ",quantity:"2.5",unit:" 袋 ",unitPrice:"400",totalAmount:"",memo:"QA purchase",...extra});
+let row=P.savePurchase("m",valid());
+assert.ok(row?.purchaseId);assert.equal(row.supplier,"Supplier A");assert.equal(row.quantity,2.5);assert.equal(row.unit,"袋");assert.equal(P.subtotal(row),1000);assert.equal(P.amount(row),1000);
+const id=row.purchaseId,created=row.createdAt;
+const free=P.savePurchase("m",valid({date:"2025-12-31",season:2025,quantity:1,unitPrice:0}));
+const unknown=P.savePurchase("m",valid({quantity:1,unitPrice:"",totalAmount:""}));
+assert.equal(P.amount(free),0);assert.equal(P.amount(unknown),null);
+assert.equal(P.records("m",{season:2025}).length,1);
+row=P.savePurchase("m",valid({...row,quantity:3,unitPrice:400,totalAmount:1100}));
+assert.equal(row.purchaseId,id);assert.equal(row.createdAt,created);assert.equal(P.subtotal(row),1200);assert.equal(P.amount(row),1100);
+const baseline=raw();
+for (const bad of [{date:"2026-02-30"},{date:"bad"},{season:""},{season:true},{season:2201},{quantity:"2袋"},{quantity:0},{quantity:-1},{quantity:Infinity},{quantity:true},{unit:" "},{unitPrice:-1},{unitPrice:"NaN"},{unitPrice:1.5},{totalAmount:-1},{totalAmount:Infinity},{totalAmount:Number.MAX_SAFE_INTEGER+1},{quantity:2,unitPrice:Number.MAX_SAFE_INTEGER},{quantity:1.5,unitPrice:101},{purchaseId:"deleted-id"}]) {
+  assert.equal(P.savePurchase("m",valid(bad)),null,JSON.stringify(bad));assert.equal(raw(),baseline);assert.ok(P.lastError);
+}
+assert.equal(P.deletePurchase("m","unknown"),false);assert.equal(raw(),baseline);
+assert.equal(P.savePurchase("deleted",valid()),null);assert.equal(raw(),baseline);
+control.fail=true;
+assert.equal(P.savePurchase("m",valid({memo:"Failure"})),null);assert.equal(P.deletePurchase("m",id),false);assert.equal(raw(),baseline);
+control.fail=false;
+assert.ok(S.saveMaterial({materialId:"m",name:"Edited material"}));
+assert.equal(P.records("m").length,3,"Normal material edit preserves purchase history");
+const d=plain(S.data());d.materials.find(row=>row.materialId==="m").purchases[0].futureField={keep:1};
+assert.ok(S.replace(d,"QA roundtrip"));
+row=P.savePurchase("m",{...P.records("m").find(item=>item.purchaseId===id),memo:"Edit after import"});
+assert.deepEqual(plain(row.futureField),{keep:1});
+const normalized=R.schema.normalize(JSON.parse(JSON.stringify(S.data())));
+assert.deepEqual(plain(normalized.materials.find(row=>row.materialId==="m").purchases),plain(material().purchases));
+const beforeDeleteGuard=raw();
+assert.equal(S.deleteMaterial("m"),null,"A material with purchase history cannot be deleted wholesale");
+assert.equal(raw(),beforeDeleteGuard);
+for(const bad of [{purchases:null},{purchases:[{purchaseId:"bad",date:"2026-02-30",season:2026,quantity:1,unit:"袋"}]}]) {
+  const candidate=plain(S.data());Object.assign(candidate.materials.find(row=>row.materialId==="m"),bad);
+  assert.throws(()=>R.schema.normalize(candidate),/購入履歴/);
+  assert.equal(raw(),beforeDeleteGuard);
+}
+for(const key of ["ordered","used","remaining","custom"])assert.deepEqual(plain(material()[key]),original.materials[0][key]);
+assert.deepEqual(plain(S.data().fieldWorks),original.fieldWorks);assert.deepEqual(plain(S.data().materials.find(row=>row.materialId==="other")),original.materials[1]);
+assert.equal(P.deletePurchase("m",id),true);assert.equal(P.records("m").length,2);
+const malformed=plain(S.data());malformed.materials.find(row=>row.materialId==="m").purchases={broken:true};
+// Bypass normalization only in this isolated fixture to audit unsafe legacy payload handling.
+const oldData=S.data;S.data=()=>malformed;
+assert.equal(P.savePurchase("m",valid()),null);assert.equal(P.deletePurchase("m",free.purchaseId),false);S.data=oldData;
+malformed.materials.find(row=>row.materialId==="m").purchases=null;S.data=()=>malformed;
+assert.equal(P.savePurchase("m",valid()),null);S.data=oldData;
+const duplicates=plain(S.data());const list=duplicates.materials.find(row=>row.materialId==="m").purchases;list.push({...list[0]});S.data=()=>duplicates;
+assert.equal(P.savePurchase("m",valid({purchaseId:free.purchaseId})),null);assert.equal(P.deletePurchase("m",free.purchaseId),false);S.data=oldData;
+assert.equal(P.amount({quantity:1,unitPrice:"",totalAmount:0}),0);
+assert.equal(P.subtotal({quantity:2,unitPrice:Number.MAX_SAFE_INTEGER}),null);
+console.log("PASS material purchases CRUD, strict validation, no-loss, prices, roundtrip, failures");

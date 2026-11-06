@@ -10,7 +10,7 @@ let year = "2025", status = "none";
 const calls = [];
 const data = { fieldId: "a", name: "A", status: "master-unchanged", areaA: 10 };
 const before = JSON.stringify(data);
-const c = vm.createContext({ U: { today: () => "2026-10-04", dateYear: d => d.slice(0,4), escapeHTML: String, attr: String, fd: String },
+const c = vm.createContext({ herbicideYear: null, RiceOS: {}, U: { today: () => "2026-10-04", dateYear: d => d.slice(0,4), escapeHTML: String, attr: String, fd: String },
   state: { variety: () => ({ name: "V" }), harvestStatusForField: (...args) => { calls.push(args); return { status, date: "2025-09-03" }; } },
   yearValue: () => year, stageAsOfDateForField: () => year === "all" ? "2026-10-04" : "2025-12-31",
   fieldStage: () => ({ number: 1, label: "stage" }), groupRiceImage: () => "image", fieldStatusText: () => "master-unchanged",

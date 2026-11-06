@@ -1,0 +1,16 @@
+#materialPurchases { min-width: 0; scroll-margin-top: 16px; }
+#materialPurchases .mp-ledger { padding-block: 16px; border-block: 1px solid #d4e3da; }
+#materialPurchases .mp-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+#materialPurchases h3, #materialPurchases h4 { margin: 8px 0; font-size: 17px; overflow-wrap: anywhere; }
+#materialPurchases .mp-year { display: block; max-width: 220px; }
+#materialPurchases .mp-form { margin-block: 16px; padding-block: 12px; border-block: 1px solid #d4e3da; }
+#materialPurchases .mp-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; }
+#materialPurchases label { display: block; min-width: 0; font-size: 13px; }
+#materialPurchases input, #materialPurchases select, #materialPurchases textarea { box-sizing: border-box; width: 100%; min-width: 0; margin-block: 4px 10px; }
+#materialPurchases .mp-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+#materialPurchases button { min-height: 44px; border-radius: 8px; }
+#materialPurchases .mp-record { padding: 14px 0; border-bottom: 1px solid #e1e9e4; }
+#materialPurchases p { overflow-wrap: anywhere; font-size: 13px; line-height: 1.6; }
+#materialPurchases .mp-error { color: #a32323; }
+#materialPurchases .mp-subtotal { background: #f0f7f3; padding: 10px; border-radius: 8px; }
+@media (min-width: 768px) { #materialPurchases .mp-grid { grid-template-columns: repeat(3,minmax(0,1fr)); } }

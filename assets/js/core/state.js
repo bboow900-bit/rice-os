@@ -2164,6 +2164,8 @@
   function deleteMaterial(materialId) {
     return mutate((d) => {
       if (!d.materials.some((m) => m.materialId === materialId)) throw new Error("資材が見つかりません。");
+      const material = d.materials.find(m => m.materialId === materialId);
+      if (material.purchases !== undefined && (!Array.isArray(material.purchases) || material.purchases.length)) throw new Error("購入履歴のある資材は削除できません。購入履歴を確認・編集してください。");
       if (Object.entries(d).some(([key, value]) => key !== "materials" && hasMasterReference(value, "materialId", materialId))) throw new Error("作業記録・予定・除草体系で参照されている資材は削除できません。履歴を保持するため、資材の編集をご利用ください。");
       d.materials = d.materials.filter((m) => m.materialId !== materialId);
     }, "資材を削除しました");

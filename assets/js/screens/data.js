@@ -41,6 +41,7 @@
       dryPeriods: (data.dryPeriods || []).length,
       irrigations: (data.irrigations || []).length,
       materials: (data.materials || []).length,
+      herbicide: RiceOS.herbicide ? RiceOS.herbicide.programs().length : 0,
       photos: (data.photos || []).length,
       results: (data.varietyResults || []).length,
       milling: (data.millingRecords || []).length,

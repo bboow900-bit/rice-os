@@ -779,7 +779,7 @@
     const harvestStatus = state.harvestStatusForField(field.fieldId, cropYear(date), date);
     const harvestLabel = harvestStatus.status === "legacy" ? "区分未確認" : harvestStatus.status === "partial" ? "一部実施" : "";
     return `
-      <article class="home-decision-card ${isExpanded ? "expanded" : ""}" data-home-stage-card="${U.attr(field.fieldId)}">
+      <article class="home-decision-card ${isExpanded ? "expanded" : ""}" data-home-stage-card="${U.attr(field.fieldId)}" data-home-pop-stage="${U.attr(fieldStage && fieldStage.key || "")}">
         <button type="button" class="home-decision-card-toggle" data-home-toggle-field="${U.attr(field.fieldId)}" aria-expanded="${isExpanded ? "true" : "false"}" aria-controls="home-management-${U.attr(field.fieldId)}">
         <div class="home-decision-card-head">
           <img class="stage" src="${U.attr(stageImage)}" alt="">
@@ -1197,14 +1197,13 @@
     const groupOptions = [`<option value="all">すべてのグループ（${state.activeFields().length}圃場）</option>`, ...homeGroups().map((group) => `<option value="${U.attr(group.fieldGroupId)}" ${group.fieldGroupId === homeGroupFilter ? "selected" : ""}>${U.escapeHTML(group.name)}（${group.count}圃場）</option>`)].join("");
     return `
       <section class="home-decision-hero">
-        <div><p>${U.escapeHTML(U.fd(U.today()))}</p><h2>おはようございます</h2><small>${U.escapeHTML(candidates.length ? `今日は${candidates.length}件の確認があります` : "今日は確認候補はありません")}</small></div>
-        <button type="button" class="primary" data-home-quick-record>記録を追加</button>
+        <button type="button" class="primary" data-home-quick-record><span class="home-pop-add-symbol" aria-hidden="true">+</span><span>記録を追加</span></button>
       </section>
       <section class="home-decision-summary" aria-label="今日の状況">
-        <button type="button" data-home-summary-action="candidate" ${candidates.length ? "" : "disabled"}><b>${U.escapeHTML(String(candidates.length))}</b><span>確認候補</span><small>${candidates.length ? "入力を選ぶ" : "候補なし"}</small></button>
-        <button type="button" data-home-summary-action="overdue" ${overdue.length ? "" : "disabled"}><b>${U.escapeHTML(String(overdue.length))}</b><span>期限超過</span><small>${overdue.length ? "予定を確認" : "遅れなし"}</small></button>
-        <button type="button" data-home-summary-action="today"><b>${U.escapeHTML(String(todayEntries.length))}</b><span>今日の記録</span><small>記録を追加</small></button>
-        <button type="button" data-home-summary-action="water" ${activeWaterCount(U.today()) ? "" : "disabled"}><b>${U.escapeHTML(String(activeWaterCount(U.today())))}</b><span>進行中の水管理</span><small>${activeWaterCount(U.today()) ? "水管理を開く" : "進行中なし"}</small></button>
+        <button type="button" data-home-summary-action="candidate" ${candidates.length ? "" : "disabled"}><img class="home-pop-stat-icon" src="assets/images/light-icons/rice-panicle.png" alt="" aria-hidden="true"><b>${U.escapeHTML(String(candidates.length))}</b><span>確認候補</span><small>${candidates.length ? "入力を選ぶ" : "候補なし"}</small></button>
+        <button type="button" data-home-summary-action="overdue" ${overdue.length ? "" : "disabled"}><img class="home-pop-stat-icon" src="assets/images/light-icons/farm-calendar.png" alt="" aria-hidden="true"><b>${U.escapeHTML(String(overdue.length))}</b><span>期限超過</span><small>${overdue.length ? "予定を確認" : "遅れなし"}</small></button>
+        <button type="button" data-home-summary-action="today"><img class="home-pop-stat-icon" src="assets/images/light-icons/karte-notebook.png" alt="" aria-hidden="true"><b>${U.escapeHTML(String(todayEntries.length))}</b><span>今日の記録</span><small>記録を追加</small></button>
+        <button type="button" data-home-summary-action="water" ${activeWaterCount(U.today()) ? "" : "disabled"}><img class="home-pop-stat-icon" src="assets/images/light-icons/water-gate.png" alt="" aria-hidden="true"><b>${U.escapeHTML(String(activeWaterCount(U.today())))}</b><span>進行中の水管理</span><small>${activeWaterCount(U.today()) ? "水管理を開く" : "進行中なし"}</small></button>
       </section>
       ${homeCandidatesExpanded ? renderCandidateCard() : ""}
       ${renderTodayPlans(U.today())}
@@ -1217,9 +1216,12 @@
 
   function renderHeader() {
     if (viewMode === "dashboard") {
+      const today = U.today();
+      const art = RiceOS.seasonArt.forDate(today);
       return `
-        <header class="farm-calendar-header home-dashboard-header">
-          <div><h1>ホーム</h1><p>今年の記録を、来年の判断につなげます</p></div>
+        <header class="farm-calendar-header home-dashboard-header home-pop-header">
+          <div><p>${U.escapeHTML(U.fd(today))}</p><h1>今日の田んぼ</h1></div>
+          <img class="home-pop-illustration" data-season-art="${U.attr(art.key)}" src="${U.attr(art.src)}" width="200" height="120" alt="" aria-hidden="true" decoding="async">
         </header>
       `;
     }

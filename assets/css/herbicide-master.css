@@ -1,0 +1,49 @@
+/* Standalone herbicide master; annual review styling remains unchanged. */
+#screen-herbicide { color: #234b36; }
+#screen-herbicide #herbicideManagementContent { width: 100%; max-width: 760px; margin: 0 auto; padding-bottom: 90px; }
+#screen-herbicide .hm-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 4px 0 18px; }
+#screen-herbicide .hm-header h1 { margin: 0; font-size: 22px; line-height: 1.4; letter-spacing: 0; }
+#screen-herbicide .hm-header p { margin: 3px 0 0; color: #627269; font-size: 12px; }
+#screen-herbicide h2 { margin: 0 0 12px; color: #264e38; font-size: 18px; line-height: 1.5; overflow-wrap: anywhere; }
+#screen-herbicide h3 { margin: 20px 0 10px; font-size: 15px; }
+#screen-herbicide .hm-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 14px; }
+#screen-herbicide .hm-actions > button { min-height: 44px; }
+#screen-herbicide .primary, #screen-herbicide .secondary { border-radius: 8px; font-size: 13px; line-height: 1.5; }
+#screen-herbicide .hm-text-button { min-height: 44px; padding: 6px 10px; border: 0; border-radius: 0; background: transparent; color: #286943; font: inherit; font-size: 13px; font-weight: 700; }
+#screen-herbicide .hm-danger { color: #a34236; }
+#screen-herbicide .herbicide-program-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0; padding: 10px 0; border: 0; border-bottom: 1px solid #dce7df; border-radius: 0; background: transparent; }
+#screen-herbicide .hm-program-open { display: block; flex: 1; min-width: 0; min-height: 60px; padding: 7px 0; border: 0; background: transparent; color: #254c36; font: inherit; text-align: left; }
+#screen-herbicide .hm-program-open b { display: block; font-size: 15px; line-height: 1.5; overflow-wrap: anywhere; }
+#screen-herbicide .hm-program-open small { display: block; margin-top: 4px; color: #627269; font-size: 11px; line-height: 1.6; }
+#screen-herbicide .hm-row-actions { display: flex; flex: 0 0 auto; flex-wrap: wrap; justify-content: end; gap: 0; }
+#screen-herbicide .hm-row-actions button { padding-inline: 7px; }
+#screen-herbicide .stack-form { display: grid; gap: 12px; margin: 0; }
+#screen-herbicide label { display: grid; min-width: 0; gap: 5px; color: #365641; font-size: 13px; font-weight: 650; }
+#screen-herbicide input, #screen-herbicide select, #screen-herbicide textarea { box-sizing: border-box; width: 100%; min-width: 0; max-width: 100%; min-height: 44px; padding: 9px 10px; border: 1px solid #cddfd1; border-radius: 6px; background: #fff; color: #243d2d; font: inherit; font-size: 16px; }
+#screen-herbicide textarea { min-height: 96px; resize: vertical; }
+#screen-herbicide input[readonly] { background: #f1f6f2; color: #516658; }
+#screen-herbicide .herbicide-step-editor { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; min-width: 0; margin: 0 0 14px; padding: 12px; border: 1px solid #d7e5db; border-radius: 8px; background: #fff; }
+#screen-herbicide .herbicide-step-editor legend { padding: 0 5px; color: #3e684a; font-size: 13px; font-weight: 700; }
+#screen-herbicide .herbicide-step-editor > button { grid-column: 1 / -1; min-height: 44px; justify-self: start; }
+#screen-herbicide .form-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+#screen-herbicide .form-actions button { min-height: 44px; }
+#screen-herbicide .hm-error { margin: 0; color: #a43d31; font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
+#screen-herbicide .hm-error:empty { display: none; }
+#screen-herbicide .hm-label-note { margin: 20px 0 0; padding-top: 12px; border-top: 1px solid #e0e9e2; color: #687369; font-size: 11px; line-height: 1.8; }
+#screen-herbicide .hm-detail-heading p { margin: 0 0 18px; color: #627269; font-size: 12px; }
+#screen-herbicide .herbicide-steps { display: grid; gap: 0; margin: 0 0 20px; padding-left: 23px; }
+#screen-herbicide .herbicide-steps > li { padding: 10px 0; border: 0; border-bottom: 1px solid #e1e9e3; border-radius: 0; background: transparent; overflow-wrap: anywhere; }
+#screen-herbicide dl { display: grid; gap: 7px; margin: 10px 0 0; }
+#screen-herbicide dl > div { display: grid; grid-template-columns: 90px minmax(0, 1fr); gap: 8px; }
+#screen-herbicide dt { color: #68776d; font-size: 12px; }
+#screen-herbicide dd { margin: 0; font-size: 13px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
+#screen-herbicide .hm-assignment-history details { margin: 0; border: 0; border-bottom: 1px solid #dce7df; border-radius: 0; background: transparent; }
+#screen-herbicide .hm-assignment-history summary { min-height: 44px; padding: 10px 0; font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; cursor: pointer; }
+#screen-herbicide .hm-assignment-history summary small { display: block; color: #66766c; font-size: 11px; }
+#screen-herbicide .hm-assignment-history ol { padding-left: 24px; font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
+#screen-herbicide .hm-assignment-history p { white-space: pre-wrap; }
+#screen-herbicide button:focus-visible, #screen-herbicide summary:focus-visible, #screen-herbicide input:focus-visible, #screen-herbicide select:focus-visible, #screen-herbicide textarea:focus-visible { outline: 3px solid #80ad8d; outline-offset: 2px; }
+@media (max-width: 520px) {
+  #screen-herbicide .herbicide-step-editor { grid-template-columns: minmax(0, 1fr); }
+  #screen-herbicide .hm-actions > button { flex: 1 1 130px; }
+}

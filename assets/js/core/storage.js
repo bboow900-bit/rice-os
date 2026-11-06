@@ -348,6 +348,21 @@
       added[key] = additions.length;
       skipped[key] = (incoming[key] || []).length - additions.length;
     });
+    // Purchase IDs merge independently; material values and existing purchases win.
+    const incomingMaterials = new Map((incoming.materials || []).map(material => [material.materialId, material]));
+    merged.materials = (merged.materials || []).map(material => {
+      const source = incomingMaterials.get(material.materialId);
+      if (!source || !Array.isArray(source.purchases)) return material;
+      const purchases = Array.isArray(material.purchases) ? material.purchases : [];
+      const ids = new Set(purchases.map(row => String(row && row.purchaseId || "")));
+      const additions = source.purchases.filter(row => {
+        const id = String(row && row.purchaseId || "");
+        if (!id || ids.has(id)) return false;
+        ids.add(id);
+        return true;
+      });
+      return additions.length ? { ...material, purchases: [...purchases, ...additions] } : material;
+    });
     // Fields are de-duplicated by ID, but their annual reflections are nested.
     // Merge notes separately so a backup cannot silently lose a year's insight.
     const incomingFields = new Map((incoming.fields || []).map((field) => [field.fieldId, field]));

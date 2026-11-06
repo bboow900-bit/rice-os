@@ -1,0 +1,63 @@
+/* Illustration-led surfaces; persistence and navigation remain unchanged. */
+body:has(#screen-herbicide.active), body:has(#screen-materials.active) { background: #f3faf6 !important; }
+body:has(#screen-herbicide.active) .app-header, body:has(#screen-materials.active) .app-header { display: flex !important; align-items: center; justify-content: space-between; position: relative; min-height: 58px; width: 100%; max-width: none; padding: 12px 18px; margin: 0; border: 0; border-radius: 0; background: #086b3d; box-shadow: none; color: #fff; }
+body:has(#screen-herbicide.active) .app-header > div:first-child, body:has(#screen-materials.active) .app-header > div:first-child { display: flex; align-items: center; gap: 9px; width: auto; min-width: 0; }
+body:has(#screen-home.active),
+body:has(#screen-annual.active),
+body:has(#screen-harvest-performance.active) {
+  background: #f3faf6 !important;
+}
+body:has(#screen-home.active) .app-header,
+body:has(#screen-annual.active) .app-header,
+body:has(#screen-harvest-performance.active) .app-header {
+  display: flex !important;
+  align-items: center;
+  justify-content: space-between;
+  position: relative;
+  width: 100%;
+  max-width: none;
+  min-height: 58px;
+  padding: 12px 18px;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  background: #086b3d;
+  box-shadow: none;
+  color: #fff;
+}
+body:has(#screen-home.active) .app-header > div:first-child,
+body:has(#screen-annual.active) .app-header > div:first-child,
+body:has(#screen-harvest-performance.active) .app-header > div:first-child {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: auto;
+  min-width: 0;
+}
+.app-header > div:first-child::before {
+  content: "";
+  display: block;
+  width: 30px;
+  height: 32px;
+  flex: 0 0 30px;
+  background: url("../images/ui-pop/harvest-rice.png") center / contain no-repeat;
+}
+.app-header .eyebrow, .app-header .header-copy { display: none; }
+.app-header h1 { color: #fff; font-size: 20px; line-height: 1.3; margin: 0; letter-spacing: 0; }
+.app-header .header-status { position: static; transform: none; display: flex; flex: 0 0 auto; margin: 0; }
+.app-header #todayLabel { display: none; }
+.app-header #saveStatus { max-width: 120px; font-size: 11px; line-height: 1.4; color: #fff; background: #075b34; border: 1px solid #4e9674; border-radius: 8px; white-space: normal; }
+.app-header #saveStatus[data-save-state="error"] { background: #fff0ee; color: #9d2b23; border-color: #ffb7ae; }
+body:has(#appBackButton:not(.hidden)) .app-header { padding-left: 66px; }
+body:has(#screen-home.active) .content,
+body:has(#screen-annual.active) .content,
+body:has(#screen-harvest-performance.active) .content { min-width: 0; }
+.side-nav .nav-item { transition: background-color .15s ease-out, color .15s ease-out; }
+.side-nav .nav-item:active .nav-icon { transform: scale(.94); }
+.side-nav .nav-icon { transition: transform .12s ease-out; }
+body .app-shell .side-nav .nav-item { border-radius: 8px !important; }
+body .app-shell .side-nav .nav-icon { border-radius: 8px !important; }
+@media (prefers-reduced-motion: reduce) {
+  .side-nav .nav-item, .side-nav .nav-icon { transition: none; }
+  .side-nav .nav-item:active .nav-icon { transform: none; }
+}

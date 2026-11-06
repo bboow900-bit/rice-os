@@ -9,6 +9,7 @@
   let fieldView = "list";
   let fieldSearch = "";
   let fieldGroupFilter = "all";
+  let herbicideYear = null;
 
   const SOIL_TYPES = ["", "砂質", "粘土質", "中間", "その他"];
   const WATER_LEVELS = ["", "良い", "普通", "悪い"];
@@ -896,10 +897,13 @@
     const harvestLabel = harvest.status === "complete" ? `収穫済み・${Number(harvest.date.slice(5, 7))}/${Number(harvest.date.slice(8, 10))}`
       : harvest.status === "partial" ? "稲刈り一部実施" : harvest.status === "legacy" ? "完了区分未確認" : "";
     const harvestBadge = harvestLabel ? `<span class="harvest-list-badge ${U.attr(harvest.status)}" data-harvest-status="${U.attr(harvest.status)}">${U.escapeHTML(harvestLabel)}</span>` : "";
+    const year = herbicideYear || currentSeasonYear();
+    const assignment = RiceOS.herbicide && RiceOS.herbicide.assignmentFor(field.fieldId, year);
+    const herbicideLabel = assignment ? assignment.name : "未設定";
     return `
       <button type="button" class="field-hub-card stage-${U.attr(String(stage.number).padStart(2, "0"))}" data-field-open="${U.attr(field.fieldId)}" data-field-search-text="${U.attr(`${field.name} ${variety && variety.name || ""} ${field.district || ""}`.toLowerCase())}">
         <span class="field-hub-card-rice">${groupRiceImage(stage.number)}</span>
-        <span class="field-hub-card-main"><b>${U.escapeHTML(field.name)}</b><small>${U.escapeHTML(variety && variety.name || "品種未設定")} / ${U.escapeHTML(String(field.areaA || 0))}a</small><em>${U.escapeHTML(fieldStatusText(field))}</em>${harvestBadge}</span>
+        <span class="field-hub-card-main"><b>${U.escapeHTML(field.name)}</b><small>${U.escapeHTML(variety && variety.name || "品種未設定")} / ${U.escapeHTML(String(field.areaA || 0))}a</small><em>${U.escapeHTML(fieldStatusText(field))}</em>${harvestBadge}<span class="field-herbicide-summary" data-field-herbicide="${U.attr(field.fieldId)}"><small>${U.escapeHTML(String(year))}年度の除草体系（計画）</small><strong>${U.escapeHTML(herbicideLabel)}</strong>${assignment ? `<small>${U.escapeHTML(assignment.steps.map(step => step.category).filter(Boolean).join(" → "))}</small>` : ""}</span></span>
         <span class="field-hub-stage"><small>現在 / ${U.escapeHTML(stage.certainty || "記録待ち")}</small><b>${U.escapeHTML(stage.label)}</b></span>
       </button>
     `;
@@ -940,6 +944,7 @@
         <section class="field-hub-list">
         <div class="field-hub-intro"><div><span>圃場一覧</span><h3>田んぼを管理する</h3><small>圃場名・品種・面積・グループなど固定情報を整えます。</small></div><button class="primary" type="button" data-action="add-field">＋ 圃場追加</button></div>
         ${renderActiveAreaSummary()}
+        <label class="field-herbicide-year">除草体系の表示年度<select data-field-herbicide-year>${[...new Set([currentSeasonYear(), herbicideYear || currentSeasonYear(), ...(RiceOS.herbicide ? RiceOS.herbicide.assignments().map(row => Number(row.year)) : [])])].sort((a,b) => b-a).map(year => `<option value="${U.attr(String(year))}" ${year === (herbicideYear || currentSeasonYear()) ? "selected" : ""}>${U.escapeHTML(String(year))}年度</option>`).join("")}</select></label>
         <div class="field-hub-filters"><input type="search" data-field-search placeholder="圃場名・品種・地区で検索" value="${U.attr(fieldSearch)}"><select data-field-group-filter>${groupOptions}</select></div>
         <div class="field-hub-groups">${groups.map((group) => `<div><button type="button" data-field-group-open="${U.attr(group.fieldGroupId)}"><span>${U.escapeHTML(group.unassigned ? "グループ未設定" : group.name)}</span><small>${group.fields.length}圃場 / ${Math.round(group.area * 10) / 10}a</small></button>${group.unassigned ? "" : `<button type="button" data-field-group-bulk="${U.attr(group.fieldGroupId)}">一括作業入力</button>`}</div>`).join("")}</div>
         <div class="field-hub-cards">${visible.length ? visible.map(renderFieldListCard).join("") : '<div class="empty">条件に合う圃場はありません。</div>'}</div>
@@ -961,6 +966,7 @@
           <div><small>現在の生育ステージ / ${U.escapeHTML(stage.certainty)}</small><b>${U.escapeHTML(stage.label)}</b><p>${U.escapeHTML(stageDetail)}</p></div>
         </section>
         ${renderCriticalWaterWindow(field)}
+        <section class="field-herbicide-detail"><h4>${U.escapeHTML(String(herbicideYear || currentSeasonYear()))}年度の除草体系</h4><p>${U.escapeHTML((RiceOS.herbicide && RiceOS.herbicide.assignmentFor(field.fieldId, herbicideYear || currentSeasonYear()) || {}).name || "未設定")}</p><button type="button" class="secondary" data-field-herbicide-open>除草剤体系を確認・設定</button></section>
         <section class="field-hub-master-card">
           <div class="field-hub-master-card-head"><b>固定情報</b><span>圃場設定で編集</span></div>
           <div class="field-hub-master-grid">
@@ -1073,6 +1079,10 @@
     });
 
     U.$("fieldList").addEventListener("click", (event) => {
+      if (event.target.closest("[data-field-herbicide-open]")) {
+        RiceOS.app.openInput("herbicide", "fields");
+        return;
+      }
       const viewButton = event.target.closest("[data-field-view]");
       if (viewButton) {
         if (viewButton.dataset.fieldView === "list" && RiceOS.navigation && RiceOS.navigation.current && RiceOS.navigation.current()) {
@@ -1221,6 +1231,11 @@
 
     U.$("fieldList").addEventListener("change", (event) => {
       const group = event.target.closest("[data-field-group-filter]");
+      if (event.target.closest("[data-field-herbicide-year]")) {
+        herbicideYear = Number(event.target.value);
+        render();
+        return;
+      }
       if (group) {
         fieldGroupFilter = group.value;
         render();

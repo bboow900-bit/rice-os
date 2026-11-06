@@ -1,0 +1,51 @@
+/* Annual decoration is isolated from timeline positioning and shared forms. */
+#screen-annual .annual-pop-heading,
+#screen-harvest-performance .annual-pop-heading {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 140px;
+  padding: 12px 0 18px;
+  margin: 0;
+  border: 0;
+  text-align: left;
+}
+.annual-pop-heading > div { min-width: 0; }
+#screen-harvest-performance .annual-pop-heading > div { flex: 1 1 0; width: auto; max-width: none; padding: 0; text-align: left; }
+#screen-harvest-performance .annual-pop-heading h2 { width: auto; max-width: none; }
+.annual-pop-machine { object-fit: contain; }
+.annual-pop-heading h2 { color: #246345; font-size: 26px; line-height: 1.35; margin: 6px 0; letter-spacing: 0; overflow-wrap: anywhere; }
+.annual-pop-kicker { color: #52796b; font-size: 13px; margin: 0; }
+.annual-pop-rice { display: block; width: 120px; height: 120px; flex: 0 0 120px; object-fit: contain; }
+#screen-annual .annual-v2-top { background: #f7fcfa; }
+#screen-annual .annual-v2-top { gap: 10px; }
+#screen-annual .annual-v2-top > .annual-hub-tools { margin: 0; }
+#screen-annual .annual-v2-top > .annual-year-review,
+#screen-annual .annual-v2-top > .annual-year-backups,
+#screen-annual .annual-v2-top > section { margin-block: 0; }
+#screen-annual .annual-v2-top > .annual-year-review,
+#screen-annual .annual-v2-top > .annual-year-backups { padding-block: 0; }
+#screen-annual .annual-shipment-entry { border-color: #c7dfd2; background: #fff; border-radius: 8px; }
+#screen-annual .annual-hub-nav button.active { background: #277551; color: #fff; }
+#screen-annual .annual-field-pick-open { border-color: #d2e6df; }
+#screen-harvest-performance { background: #f7fcfa; }
+#screen-harvest-performance .hp-card { border-radius: 8px; border-color: #cfdfd5; background: #fff; box-shadow: none; }
+#screen-harvest-performance .hp-primary { color: #286c4d; }
+#screen-harvest-performance .hp-goal { background: #f1f8ed; border-radius: 8px; border-color: #d9e7c9; }
+#screen-harvest-performance .hp-goal-track { background: #dfebdf; height: 16px; border-radius: 4px; overflow: hidden; }
+#screen-harvest-performance .hp-goal-fill { background: #69a778; height: 100%; border-radius: 4px; }
+#screen-harvest-performance .hp-goal[data-tier="near"] .hp-goal-fill { background: #b99c34; }
+#screen-harvest-performance .hp-goal[data-tier="achieved"] .hp-goal-fill,
+#screen-harvest-performance .hp-goal[data-tier="exceeded"] .hp-goal-fill { background: #d1ac35; }
+#screen-harvest-performance .hp-trend-bar { background: #54986d; border-radius: 3px; }
+#screen-harvest-performance .hp-trend-partial { background: #93b8af; }
+#screen-harvest-performance .hp-journey > summary { color: #28634d; }
+#screen-harvest-performance .hp-status { background: #edf6f7; color: #326a7c; }
+@media (min-width: 768px) {
+  #screen-harvest-performance .annual-pop-heading > div { flex: 0 1 auto; }
+  .annual-pop-rice { width: 144px; height: 144px; flex-basis: 144px; }
+  #screen-annual .annual-pop-heading,
+  #screen-harvest-performance .annual-pop-heading { justify-content: flex-start; gap: 32px; }
+}

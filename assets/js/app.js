@@ -21,6 +21,7 @@
     "calendar",
     "field-work",
     "materials",
+    "herbicide",
     "growth",
     "dry-period",
     "irrigation",
@@ -71,7 +72,7 @@
     U.$$(".screen").forEach((section) => {
       section.classList.toggle("active", section.id === `screen-${screenId}`);
     });
-    const navScreen = ["machines", "tractor-settings", "transplanter-settings"].includes(screenId) ? "data" : ["shipments", "harvest-performance"].includes(screenId) ? "annual" : screenId;
+    const navScreen = ["machines", "tractor-settings", "transplanter-settings", "herbicide"].includes(screenId) ? "data" : ["shipments", "harvest-performance"].includes(screenId) ? "annual" : screenId;
     U.$$(".nav-item").forEach((button) => {
       button.classList.toggle("active", button.dataset.screen === navScreen);
     });
@@ -93,6 +94,16 @@
     }
     if (activeScreen === "shipments" && RiceOS.screens.shipments && RiceOS.screens.shipments.canHandleBack() && RiceOS.screens.shipments.handleBack()) {
       updateBackButton();
+      return;
+    }
+    if (activeScreen === "herbicide" && RiceOS.screens.herbicide && RiceOS.screens.herbicide.canHandleBack() && RiceOS.screens.herbicide.handleBack()) {
+      updateBackButton();
+      return;
+    }
+    if (activeScreen === "herbicide" && inputOriginScreen) {
+      const origin = inputOriginScreen;
+      inputOriginScreen = inputOriginParents.pop() || "";
+      show(origin, { skipHistory: true });
       return;
     }
     // Close temporary review layers before walking back through selected fields.

@@ -1,0 +1,9 @@
+#screen-fields .field-herbicide-summary { display: grid; gap: 3px; margin-top: 8px; padding-top: 8px; border-top: 1px solid #d9e5d9; min-width: 0; }
+#screen-fields .field-herbicide-summary strong { font-size: 14px; line-height: 1.4; color: #28633f; overflow-wrap: anywhere; }
+#screen-fields .field-herbicide-summary small { white-space: normal; overflow-wrap: anywhere; }
+#screen-fields .field-herbicide-year { display: flex; align-items: center; gap: 12px; margin: 12px 0; font-size: 13px; }
+#screen-fields .field-herbicide-year select { width: auto; min-width: 120px; }
+#screen-fields .field-herbicide-detail { border-block: 1px solid #d9e5d9; padding: 12px 0; }
+#screen-fields .field-hub-detail-head { min-width: 0; }
+#screen-fields .field-hub-detail-head > div { min-width: 0; }
+#screen-fields .field-hub-detail-head h3 { white-space: normal; overflow-wrap: anywhere; }

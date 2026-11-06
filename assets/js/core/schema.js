@@ -5,7 +5,7 @@
   const U = RiceOS.utils;
 
   const SCHEMA_VERSION = 17;
-  const APP_VERSION = "20261103_ver298";
+  const APP_VERSION = "20261105_ver299";
   const STORE_KEY = "rice_os_v8_stable";
   const BACKUP_KEY = "rice_os_v8_stable_backup";
   const RELEASE_BACKUPS_KEY = "rice_os_v8_stable_release_backups";
@@ -772,6 +772,23 @@
 
   function normalizeMaterial(input) {
     const m = input || {};
+    if (m.purchases !== undefined) {
+      const ids = new Set();
+      if (!Array.isArray(m.purchases)) throw new Error("資材の購入履歴の形式を確認してください。元のデータは変更していません。");
+      m.purchases.forEach(row => {
+        const date = row && row.date;
+        const time = typeof date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(date) ? Date.parse(`${date}T00:00:00Z`) : NaN;
+        const validMoney = value => value === "" || value === undefined || value === null || typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
+        if (!row || typeof row !== "object" || typeof row.purchaseId !== "string" || !row.purchaseId || ids.has(row.purchaseId)
+          || !Number.isFinite(time) || new Date(time).toISOString().slice(0, 10) !== date
+          || !Number.isInteger(row.season) || row.season < 1900 || row.season > 2200
+          || typeof row.quantity !== "number" || !Number.isFinite(row.quantity) || row.quantity <= 0 || row.quantity > Number.MAX_SAFE_INTEGER
+          || typeof row.unit !== "string" || !row.unit.trim() || !validMoney(row.unitPrice) || !validMoney(row.totalAmount)) {
+          throw new Error("資材の購入履歴に不正な日付・数量・金額または重複IDがあります。元のデータは変更していません。");
+        }
+        ids.add(row.purchaseId);
+      });
+    }
     return {
       ...m,
       materialId: String(m.materialId || m.id || U.id("material", U.today())),
