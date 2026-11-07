@@ -5,6 +5,7 @@
   let cropYear = Number(state.defaultCropYear(U.today()));
   let machineId = "", varietyId = "", draft = null, error = "", bound = false;
   let machineDraft = {name:"",maker:"",model:""}, machineOpen = false;
+  let detailId = "";
   const commonKeys = new Set(["rowSpacing","plantSpacing","plantsPerHill","plantsPerTsubo","seedlingBoxesPer10a","seedlingScrapeAmount","transplanterSetting"]);
   const esc = value => U.escapeHTML(String(value ?? ""));
   function definitions() { return S.TRANSPLANTER_SETTING_FIELDS || []; }
@@ -26,7 +27,7 @@
     draft = row; error = ""; render(); return true;
   }
   function fresh(row,year) { const value = U.clone(row); delete value.profileId; delete value.createdAt; delete value.updatedAt; value.cropYear = year; return value; }
-  function render() {
+  function renderContent() {
     const root = U.$("transplanterSettingsContent"); if (!root) return;
     const all = profiles(), varieties = state.varieties(), currentYear = Number(U.today().slice(0,4));
     if (!varietyId && varieties.length) varietyId = varieties[0].varietyId;
@@ -45,6 +46,28 @@
       ${draft ? `<form id="transplanterProfileForm" class="ts-form" data-profile-id="${U.attr(draft.profileId || "")}"><h3>${draft.profileId ? "設定を編集" : "設定を登録"}</h3><p>${esc(draft.cropYear)}年産 / ${esc(varietyName(draft.varietyId))} / ${esc(machineName(draft.machineId))}</p><label>設定名<input name="name" required value="${U.attr(draft.name)}"></label>${settingsFields(draft.settings,"tps")}<label>設定の意図・条件<textarea name="intent">${esc(draft.intent)}</textarea></label><label>メモ<textarea name="memo">${esc(draft.memo)}</textarea></label><div class="ts-actions"><button type="button" class="secondary" data-tps-cancel>編集を取消</button><button type="submit" class="primary">設定を保存</button></div></form>` : ""}
       <section id="tpsProfiles" aria-label="保存した年度別設定">${rows.map(row => `<article class="ts-profile" data-tps-profile="${U.attr(row.profileId)}"><h3>${esc(row.name)}</h3><p>${esc(row.cropYear)}年産 / ${esc(varietyName(row.varietyId))}</p>${row.intent ? `<p>${esc(row.intent)}</p>` : ""}<details><summary>設定を確認</summary><dl>${definitions().filter(field => row.settings[field.key] !== "" && row.settings[field.key] != null).map(field => `<div><dt>${esc(field.label)}</dt><dd>${esc(row.settings[field.key])}${esc(field.unit)}</dd></div>`).join("")}</dl>${row.memo ? `<p>${esc(row.memo)}</p>` : ""}</details><div class="ts-actions"><button type="button" class="secondary" data-tps-edit="${U.attr(row.profileId)}">編集</button><button type="button" class="secondary" data-tps-copy="${U.attr(row.profileId)}">複製</button><button type="button" class="danger" data-tps-delete="${U.attr(row.profileId)}">削除</button></div></article>`).join("") || '<p class="empty">この年産・田植機・品種の設定はまだありません。</p>'}</section>`;
   }
+  function render() {
+    renderContent();
+    const root=U.$("transplanterSettingsContent");
+    if (!root || !root.querySelector) return;
+    const list=root.querySelector("#tpsProfiles"),toolbar=root.querySelector(".ts-toolbar"),row=profiles().find(item=>item.profileId===detailId);
+    if (detailId && !row) detailId="";
+    if (list) list.hidden=Boolean(draft || machineOpen || row);
+    if (toolbar) toolbar.hidden=Boolean(draft || machineOpen || row);
+    root.querySelectorAll(":scope > details.ts-details").forEach(el=>{el.hidden=Boolean(draft || machineOpen || row);});
+    if (!draft && !machineOpen && row) {
+      root.insertAdjacentHTML("beforeend",`<section class="profile-ledger-detail"><div class="ts-actions"><button type="button" class="secondary" data-tps-list>一覧へ</button><button type="button" class="primary" data-tps-edit="${U.attr(row.profileId)}">編集</button><button type="button" class="secondary" data-tps-copy="${U.attr(row.profileId)}">複製</button><button type="button" class="danger" data-tps-delete="${U.attr(row.profileId)}">削除</button></div><h3>${esc(row.name)}</h3><p>${esc(row.cropYear)}年産 / ${esc(varietyName(row.varietyId))} / ${esc(machineName(row.machineId))}</p><dl>${definitions().filter(field=>row.settings[field.key]!=="" && row.settings[field.key]!=null).map(field=>`<div><dt>${esc(field.label)}</dt><dd>${esc(row.settings[field.key])}${esc(field.unit)}</dd></div>`).join("")}</dl><p>${esc(row.intent || "")}</p><p>${esc(row.memo || "")}</p></section>`);
+    } else if (!draft && !machineOpen && list) {
+      list.querySelectorAll("[data-tps-profile]").forEach(article=>{article.querySelector("details")?.remove();article.insertAdjacentHTML("beforeend",`<button type="button" class="secondary" data-tps-open="${U.attr(article.dataset.tpsProfile)}">詳細を見る ›</button>`);});
+    }
+    if (R.app && R.app.syncBackButton) R.app.syncBackButton();
+  }
+  function handleBack() {
+    if (draft) {readDraft();if (!confirm("入力中の設定を取り消して戻りますか？")) return true;draft=null;error="";render();return true;}
+    if (machineOpen) {if (Object.values(machineDraft).some(Boolean) && !confirm("機械登録の入力を取り消しますか？")) return true;machineOpen=false;render();return true;}
+    if (detailId) {detailId="";render();return true;}
+    return false;
+  }
   function enter(year) { if (Number.isInteger(Number(year)) && Number(year) >= 1900 && Number(year) <= 2200) cropYear = Number(year); render(); }
   function bind() {
     const root = U.$("transplanterSettingsContent"); if (!root || bound) return; bound = true;
@@ -52,6 +75,10 @@
     root.addEventListener("change",event => { if (["tpsYear","tpsMachine","tpsVariety"].includes(event.target.id)) { readDraft(); cropYear = Number(U.$("tpsYear").value); machineId = U.$("tpsMachine").value; varietyId = U.$("tpsVariety").value; render(); } });
     root.addEventListener("click",event => {
       const button = event.target.closest("button"); if (!button) return;
+      if (button.hasAttribute("data-tps-open")) {detailId=button.dataset.tpsOpen;render();return;}
+      if (button.hasAttribute("data-tps-list")) {detailId="";render();return;}
+      if (["data-tps-new","data-tps-copy","data-tps-copy-previous","data-tps-import"].some(attr=>button.hasAttribute(attr))) detailId="";
+      if (button.hasAttribute("data-tps-edit")) detailId=button.dataset.tpsEdit;
       if (button.hasAttribute("data-tps-new")) replaceDraft({cropYear,machineId,varietyId,name:"",settings:{},intent:"",memo:""});
       if (button.hasAttribute("data-tps-cancel")) { draft = null; error = ""; render(); }
       if (button.hasAttribute("data-tps-add-machine")) { readDraft(); machineOpen = true; render(); }
@@ -89,5 +116,5 @@
     });
   }
   R.screens = R.screens || {};
-  R.screens.transplanterSettings = {render,bind,enter,settingsFields,readSettings,preserveOnDataChange:true};
+  R.screens.transplanterSettings = {render,bind,enter,settingsFields,readSettings,canHandleBack:()=>Boolean(draft || machineOpen || detailId),handleBack,preserveOnDataChange:true};
 })();

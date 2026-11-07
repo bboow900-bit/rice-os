@@ -39,8 +39,8 @@ assert.equal(rows.filter(r => r.id === "missing").length, 0, "Missing field is n
 assert.equal(app.annualTest.rowsForField(rows, "a").length, 1);
 const html = app.annualTest.renderWorkArchive(rows);
 assert.match(html, /data-annual-work-scope="offField"/);
-assert.match(html, /data-kind="fieldWork" data-id="off"/);
-assert.match(html, /data-kind="other" data-id="old"/);
+assert.match(html, /data-annual-record-open-kind="fieldWork" data-annual-record-open-id="off"/);
+assert.match(html, /data-annual-record-open-kind="other" data-annual-record-open-id="old"/);
 let edited = "";
 app.app = { show: screen => { edited = screen; } };
 app.screens.otherWork = { editWork: id => { edited += ":" + id; } };

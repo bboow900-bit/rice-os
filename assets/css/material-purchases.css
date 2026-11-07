@@ -1,4 +1,6 @@
 #materialPurchases { min-width: 0; scroll-margin-top: 16px; }
+#materialPurchases[hidden] { display: none !important; }
+#materialPurchases .mp-detail h3 { font-size: 19px; overflow-wrap: anywhere; }
 #materialPurchases .mp-ledger { padding-block: 16px; border-block: 1px solid #d4e3da; }
 #materialPurchases .mp-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
 #materialPurchases h3, #materialPurchases h4 { margin: 8px 0; font-size: 17px; overflow-wrap: anywhere; }

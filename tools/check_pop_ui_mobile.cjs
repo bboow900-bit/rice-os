@@ -81,16 +81,8 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || "C:/Users/Keisuke/
       await page.locator(`[data-annual-hub-open-field="${f.field}"]`).click();
       await page.locator(".annual-detail-head").waitFor();
       await page.locator('[data-annual-tab="work"]').click();
-      for (const [label,file] of [["田植え","rice-transplanter"],["稲刈り","rice-combine"]]) {
-        const img = page.locator(`.annual-work-icon img[src="assets/images/ui-pop/${file}.png"]`).first();
-        await img.evaluate(el => el.decode());
-        assert.equal(await img.evaluate(el => el.complete && el.naturalWidth > 0),true);
-        assert.equal(await img.getAttribute("src"),`assets/images/ui-pop/${file}.png`);
-        assert.equal(await img.evaluate(el => {
-          const a=el.getBoundingClientRect(),b=el.parentElement.getBoundingClientRect();
-          return a.width>0 && a.height>0 && a.left>=b.left-1 && a.right<=b.right+1 && a.top>=b.top-1 && a.bottom<=b.bottom+1;
-        }),true,"Machine art stays in its existing icon frame");
-      }
+      for (const label of ["田植え","稲刈り"]) assert.ok(await page.locator(".annual-archive-preview").filter({hasText:label}).count(),"Important work remains available in compact read-only previews");
+      assert.equal(await page.locator(".annual-work-icon").count(),0,"Archive previews avoid repeated decorative icons");
       await shot("machines");
       await page.locator("#appBackButton").click(); await page.locator("[data-annual-harvest-performance]").click();
       await page.locator("#screen-harvest-performance.active").waitFor(); await art();

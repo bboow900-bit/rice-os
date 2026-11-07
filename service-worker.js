@@ -1,5 +1,5 @@
-const CACHE_NAME = "rice-karte-20261106-300";
-const APP_VERSION = "20261106_ver300";
+const CACHE_NAME = "rice-karte-20261106-302";
+const APP_VERSION = "20261106_ver302";
 const CACHE_PREFIX = "rice-karte-";
 const RETAINED_APP_CACHES = 2;
 
@@ -18,6 +18,11 @@ const APP_SHELL = [
   `./assets/css/field-herbicide.css?v=${APP_VERSION}`,
   `./assets/css/backup-center.css?v=${APP_VERSION}`,
   `./assets/js/core/backup-export.js?v=${APP_VERSION}`,
+  `./assets/css/materials-ledger.css?v=${APP_VERSION}`,
+  `./assets/css/seeder-settings.css?v=${APP_VERSION}`,
+  `./assets/css/review-ledger.css?v=${APP_VERSION}`,
+  `./assets/js/core/seeder-settings.js?v=${APP_VERSION}`,
+  `./assets/js/screens/seeder-settings.js?v=${APP_VERSION}`,
   `./assets/js/core/material-purchases.js?v=${APP_VERSION}`,
   `./assets/js/ui/season-art.js?v=${APP_VERSION}`,
   "./assets/images/ui-pop/rice-sowing.png",
@@ -35,6 +40,8 @@ const APP_SHELL = [
   "./assets/images/menu-icons/photos.png",
   "./assets/images/menu-icons/irrigation.png",
   "./assets/images/menu-icons/materials.png",
+  "./assets/images/menu-icons/maintenance.png",
+  "./assets/images/menu-icons/herbicide-program.png",
   "./assets/images/menu-icons/harvest.png",
   "./assets/images/rice-stages/rice-stage-01.png",
   "./assets/images/rice-stages/rice-stage-02.png",

@@ -31,7 +31,7 @@
     const date = info.lastJsonExportAt ? String(info.lastJsonExportAt).slice(0, 10) : "";
     const age = date ? U.daysBetween(date, U.today()) : null;
     const reminder = age === null ? "端末外へのバックアップを残しましょう" : Number.isFinite(age) && age >= 7 ? "前回のJSON出力から7日以上経過" : "JSONの保存先も確認しましょう";
-    host.innerHTML = `<div class="backup-center-heading"><div><small>データの保護</small><h3>田んぼの記録を、端末の外にも</h3></div><span>クラウド自動保存：未接続</span></div><p>${U.escapeHTML(reminder)}</p><div class="backup-center-actions"><button type="button" class="primary" id="dataBackupShare" ${sharingBackup ? "disabled" : ""}>${sharingBackup ? "共有先を選択中…" : "端末外へ保存・共有"}</button><button type="button" class="secondary" id="dataBackupDownload">JSONダウンロード</button></div><p id="dataBackupMessage" class="backup-center-message" role="status">${U.escapeHTML(backupMessage)}</p><small>自動退避は同じブラウザ内です。端末故障・サイトデータ削除には、別端末やクラウドに保存したJSONが必要です。JSONには写真・メモも含まれます。</small>`;
+    host.innerHTML = `<div class="backup-center-heading"><div><small>データの保護</small><h3>田んぼの記録を、端末の外にも</h3></div><span>JSONの手動バックアップ</span></div><p>${U.escapeHTML(reminder)}</p><div class="backup-center-actions"><button type="button" class="primary" id="dataBackupShare" ${sharingBackup ? "disabled" : ""}>${sharingBackup ? "共有先を選択中…" : "端末外へ保存・共有"}</button><button type="button" class="secondary" id="dataBackupDownload">JSONダウンロード</button></div><p id="dataBackupMessage" class="backup-center-message" role="status">${U.escapeHTML(backupMessage)}</p><small>自動退避は同じブラウザ内です。端末故障・サイトデータ削除には、別端末やクラウドに保存したJSONが必要です。JSONには写真・メモも含まれます。</small>`;
     U.$("dataBackupDownload").onclick = downloadBackup;
     U.$("dataBackupShare").onclick = async () => {
       if (sharingBackup) return;
@@ -86,7 +86,8 @@
       milling: (data.millingRecords || []).length,
       shipments: (data.shipments || []).length,
       machines: (data.machines || []).filter((item) => item.status !== "使用停止").length,
-      tractorProfiles: (data.tractorProfiles || []).length
+      tractorProfiles: (data.tractorProfiles || []).length,
+      seeder: RiceOS.seederSettings ? RiceOS.seederSettings.profilesFor().length : 0
     };
     Object.entries(values).forEach(([key, value]) => {
       U.$$(`[data-master-count="${key}"]`).forEach((el) => {

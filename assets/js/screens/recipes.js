@@ -4,6 +4,8 @@
   const RiceOS = window.RiceOS = window.RiceOS || {};
   const U = RiceOS.utils;
   const state = RiceOS.state;
+  let selectedId = "", editing = false, draft = null;
+  const syncBack = () => RiceOS.app && RiceOS.app.syncBackButton();
 
   const GROUPS = [
     {
@@ -71,7 +73,7 @@
   function input(variety, key, label) {
     return `
       <label>${U.escapeHTML(label)}
-        <input data-variety-id="${U.attr(variety.varietyId)}" data-recipe-field="${U.attr(key)}" value="${U.attr(variety[key] || "")}">
+        <input data-variety-id="${U.attr(variety.varietyId)}" data-recipe-field="${U.attr(key)}" value="${U.attr(variety[key] ?? "")}">
       </label>
     `;
   }
@@ -121,24 +123,54 @@
   }
 
   function render() {
-    U.$("recipeList").innerHTML = `<div class="record-grid">${state.varieties().map(renderRecipe).join("")}</div>`;
+    const root = U.$("recipeList"), row = selectedId && state.variety(selectedId);
+    if (selectedId && !row) {selectedId="";editing=false;draft=null;}
+    if (!row) {
+      root.innerHTML = `<div class="recipe-ledger-list">${state.varieties().map(v => `<button type="button" class="recipe-open" data-recipe-open="${U.attr(v.varietyId)}"><b>${U.escapeHTML(v.name)}</b><small>${state.fields().filter(f=>f.varietyId===v.varietyId).length}圃場 / 詳細を見る ›</small></button>`).join("") || '<p class="empty">レシピはまだありません。</p>'}</div>`;
+    } else if (editing) {
+      root.innerHTML = `<div class="recipe-ledger-actions"><button type="button" data-recipe-cancel class="secondary">取消</button><button type="button" data-recipe-save class="primary">変更を保存</button></div>${renderRecipe(draft)}`;
+    } else {
+      root.innerHTML = `<div class="recipe-ledger-actions"><button type="button" data-recipe-back class="secondary">一覧へ</button><button type="button" data-recipe-edit class="primary">編集</button><button type="button" class="secondary" data-variety-delete="${U.attr(row.varietyId)}">削除</button></div><h3>${U.escapeHTML(row.name)}</h3>${GROUPS.map(group => `<section class="recipe-readonly"><h4>${U.escapeHTML(group.title)}</h4><dl>${group.fields.map(([key,label]) => `<div><dt>${U.escapeHTML(label)}</dt><dd>${U.escapeHTML(row[key] === "" || row[key] == null ? "未登録" : String(row[key]))}</dd></div>`).join("")}</dl></section>`).join("")}<p>${U.escapeHTML(row.memo || "")}</p>`;
+    }
+    syncBack();
+  }
+
+  function handleBack() {
+    if (editing) {
+      const row = state.variety(selectedId);
+      if (JSON.stringify(draft) !== JSON.stringify(row) && !confirm("編集内容を取り消して戻りますか？")) return true;
+      editing=false;draft=null;render();return true;
+    }
+    if (selectedId) {selectedId="";render();return true;}
+    return false;
   }
 
   function bind() {
     U.$("recipeList").addEventListener("click", (event) => {
+      const open = event.target.closest("[data-recipe-open]");
+      if (open) {selectedId=open.dataset.recipeOpen;editing=false;draft=null;render();return;}
+      if (event.target.closest("[data-recipe-edit]")) {draft=U.clone(state.variety(selectedId));editing=true;render();return;}
+      if (event.target.closest("[data-recipe-back],[data-recipe-cancel]")) {handleBack();return;}
+      if (event.target.closest("[data-recipe-save]")) {
+        const patch = {...draft};delete patch.varietyId;
+        if (state.updateVariety(selectedId,patch)) {editing=false;draft=null;render();}
+        return;
+      }
       const button = event.target.closest("[data-variety-delete]");
       if (!button) return;
       const variety = state.variety(button.dataset.varietyDelete);
       if (!variety || !confirm(`品種「${variety.name}」の栽培レシピを削除しますか？この操作は取り消せません。`)) return;
       state.deleteVariety(variety.varietyId);
     });
-    U.$("recipeList").addEventListener("change", (event) => {
+    const capture = (event) => {
       const el = event.target.closest("[data-recipe-field]");
       if (!el) return;
-      state.updateVariety(el.dataset.varietyId, { [el.dataset.recipeField]: el.value });
-    });
+      if (editing && draft && draft.varietyId === el.dataset.varietyId) draft[el.dataset.recipeField] = el.value;
+    };
+    U.$("recipeList").addEventListener("input", capture);
+    U.$("recipeList").addEventListener("change", capture);
   }
 
   RiceOS.screens = RiceOS.screens || {};
-  RiceOS.screens.recipes = { render, bind };
+  RiceOS.screens.recipes = { render, bind, canHandleBack:()=>Boolean(selectedId), handleBack };
 })();

@@ -18,6 +18,7 @@
     "machines",
     "tractor-settings",
     "transplanter-settings",
+    "seeder-settings",
     "calendar",
     "field-work",
     "materials",
@@ -72,7 +73,7 @@
     U.$$(".screen").forEach((section) => {
       section.classList.toggle("active", section.id === `screen-${screenId}`);
     });
-    const navScreen = ["machines", "tractor-settings", "transplanter-settings", "herbicide"].includes(screenId) ? "data" : ["shipments", "harvest-performance"].includes(screenId) ? "annual" : screenId;
+    const navScreen = ["machines", "tractor-settings", "transplanter-settings", "seeder-settings", "herbicide"].includes(screenId) ? "data" : ["shipments", "harvest-performance"].includes(screenId) ? "annual" : screenId;
     U.$$(".nav-item").forEach((button) => {
       button.classList.toggle("active", button.dataset.screen === navScreen);
     });
@@ -92,6 +93,9 @@
       updateBackButton();
       return;
     }
+    const ledger = ["materials", "seeder-settings", "recipes", "tractor-settings", "transplanter-settings", "results", "irrigation"].includes(activeScreen) ? screenModule(activeScreen) : null;
+    if (ledger && ledger.canHandleBack && ledger.canHandleBack() && ledger.handleBack()) { updateBackButton(); return; }
+    if (ledger && inputOriginScreen) {const origin = inputOriginScreen; inputOriginScreen = inputOriginParents.pop() || "";show(origin,{skipHistory:true});return;}
     if (activeScreen === "shipments" && RiceOS.screens.shipments && RiceOS.screens.shipments.canHandleBack() && RiceOS.screens.shipments.handleBack()) {
       updateBackButton();
       return;
@@ -290,10 +294,12 @@
       }
       event.preventDefault();
       const primaryScreens = new Set(["home", "fields", "calendar", "annual", "outlook", "data"]);
+      const fromManagement = activeScreen === "data";
       if (activeScreen === "data" && !primaryScreens.has(target)) openInput(target, "data");
       else show(target);
       if (target === "machines" && RiceOS.screens.machines && RiceOS.screens.machines.enter) RiceOS.screens.machines.enter("data");
-      if (target === "irrigation" && jump.dataset.waterType && RiceOS.screens.irrigation) {
+      if (target === "irrigation" && fromManagement && RiceOS.screens.irrigation && RiceOS.screens.irrigation.enterLedger) RiceOS.screens.irrigation.enterLedger(jump.dataset.waterType || "");
+      else if (target === "irrigation" && jump.dataset.waterType && RiceOS.screens.irrigation) {
         const firstField = RiceOS.state.activeFields()[0];
         RiceOS.screens.irrigation.prefillDate(U.today(), firstField && firstField.fieldId, jump.dataset.waterType);
       }

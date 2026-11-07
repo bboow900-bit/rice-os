@@ -16,7 +16,7 @@ let saved;
 function save(record) { saved = record; return data; }
 const RiceOS = { utils: { today: () => "2026-10-04", $: id => id === "waterManualEndConfirm" ? nodes.get(id) : node(id) },
   state: { data: () => data, saveIrrigation: save, saveDryPeriod: save } };
-const context = vm.createContext({ window: { RiceOS }, document: { querySelector: () => node("reset") }, alert() {}, console });
+const context = vm.createContext({ window: { RiceOS, dispatchEvent() {} }, CustomEvent: class {}, document: { querySelector: () => node("reset") }, alert() {}, console });
 let source = fs.readFileSync(path.resolve(__dirname, "../assets/js/screens/irrigation.js"), "utf8");
 // Run the real editor/event handlers; unrelated dashboard rendering is isolated.
 source = source.replace("RiceOS.screens.irrigation = {", "render = () => {}; RiceOS.screens.irrigation = { resetEdit, fillEdit,");

@@ -8,6 +8,104 @@
   let focusedTypeKey = "";
   let pendingWaterSchedule = null;
   let manualWaterEndEdited = false;
+  let view = "input";
+  let ledgerTypeKey = "";
+  let ledgerYear = U.today().slice(0, 4);
+  let ledgerTarget = "all";
+  let inputFromLedger = false;
+  let editFromLedger = false;
+  let selectedHistory = null;
+  let editBaseline = "";
+  let bound = false;
+
+  function notifyView() { window.dispatchEvent(new CustomEvent("riceos:navigationchange")); }
+  function showNode(node, show) {
+    if (!node) return;
+    node.hidden = !show;
+    node.classList.toggle("hidden", !show);
+  }
+  function ensureLedger() {
+    const root = U.$("screen-irrigation");
+    if (!root || U.$("waterLedgerToolbar")) return;
+    root.querySelector(".screen-head").insertAdjacentHTML("afterend", '<div id="waterLedgerToolbar"></div><div id="waterLedgerDetail" class="water-history hidden" hidden></div>');
+    U.$("waterEditForm").insertAdjacentHTML("beforeend", '<button type="button" class="secondary" data-water-cancel-edit>取り消す</button>');
+  }
+  function applyView() {
+    const root = U.$("screen-irrigation");
+    if (!root || !root.dataset || typeof root.querySelector !== "function") return;
+    root.dataset.waterView = view;
+    showNode(root.querySelector(".water-management-target"), view === "input");
+    showNode(U.$("waterFlowChart"), view === "input");
+    showNode(U.$("waterCurrentStatus"), view === "input");
+    showNode(root.querySelector(".water-action-section"), view === "input");
+    showNode(document.querySelector('[data-action="reset-irrigation"]'), view === "input");
+    showNode(U.$("waterEditSection"), view === "edit");
+    showNode(U.$("waterHistory"), view === "list");
+    showNode(U.$("waterLedgerDetail"), view === "detail");
+    showNode(U.$("waterLedgerToolbar"), view !== "input" || inputFromLedger);
+  }
+  function ledgerFields() {
+    if (ledgerTarget.startsWith("field:")) return state.fields().filter(f => f.fieldId === ledgerTarget.slice(6));
+    if (ledgerTarget.startsWith("group:")) return state.fields().filter(f => f.fieldGroupId === ledgerTarget.slice(6));
+    return state.fields();
+  }
+  function renderLedgerToolbar() {
+    const host = U.$("waterLedgerToolbar"); if (!host) return;
+    if (view !== "list") {
+      host.innerHTML = `<div class="form-actions"><button type="button" class="secondary" data-water-ledger-back>${view === "detail" ? "一覧に戻る" : "取り消す"}</button></div>`;
+      return;
+    }
+    const years = [...new Set([U.today().slice(0, 4), ledgerYear, ...[...(state.data().dryPeriods || []), ...(state.data().irrigations || []), ...(state.data().fieldWorks || [])].map(r => String(r.season || r.startDate || r.date || "").slice(0, 4)).filter(y => /^\d{4}$/.test(y))])].sort((a, b) => Number(b) - Number(a));
+    const option = (value, text, selected) => `<option value="${U.attr(value)}"${value === selected ? " selected" : ""}>${U.escapeHTML(text)}</option>`;
+    host.innerHTML = `<div class="form-actions"><button type="button" class="primary" data-water-ledger-new>水管理を記録</button></div><div class="form-grid dense"><label>実施年度<select data-water-ledger-year>${years.map(y => option(y, `${y}年`, ledgerYear)).join("")}</select></label><label>対象<select data-water-ledger-target>${option("all", "すべての圃場", ledgerTarget)}${state.fieldGroups().map(g => option(`group:${g.fieldGroupId}`, `${g.name}グループ`, ledgerTarget)).join("")}${state.fields().map(f => option(`field:${f.fieldId}`, f.name, ledgerTarget)).join("")}</select></label><label>水管理の種類<select data-water-ledger-type>${option("", "すべて", ledgerTypeKey)}${WATER_TYPES.map(t => option(t.key, t.label, ledgerTypeKey)).join("")}</select></label></div>`;
+  }
+  function historySelection(type, id, fieldId, legacyKey) { return { type, id, fieldId, legacyKey }; }
+  function selectedPeriod() {
+    if (!selectedHistory) return null;
+    const rows = selectedHistory.type === "legacy" ? legacyHistory(ledgerFields(), ledgerYear) : allHistory(ledgerFields(), ledgerYear);
+    return rows.find(r => selectedHistory.type === "legacy" ? r.fieldId === selectedHistory.fieldId && r.legacyKey === selectedHistory.legacyKey : r.editType === selectedHistory.type && r.editId === selectedHistory.id) || null;
+  }
+  function renderLedgerDetail() {
+    const host = U.$("waterLedgerDetail"), item = selectedPeriod();
+    if (!host) return;
+    if (!item) { host.innerHTML = '<p class="empty">この履歴は見つかりません。一覧から確認してください。</p>'; return; }
+    const legacy = selectedHistory.type === "legacy", type = typeForKey(item.kind);
+    const start = item.startDate || item.date || "", end = item.actualEndDate || "";
+    const duration = start && end ? U.daysBetween(start, end) : "";
+    host.innerHTML = `<section class="water-history-head"><div><h3>${U.escapeHTML(item.label || "水管理")}</h3><small>${U.escapeHTML(state.field(item.fieldId)?.name || "圃場未登録")}</small></div></section><article class="water-history-card ${U.attr(item.tone)}"><div><span>${legacy ? "旧作業記録の照合候補" : item.planned ? "予定" : "実績"}</span><b>${U.escapeHTML(start ? U.fd(start) : "開始日未確認")} - ${U.escapeHTML(end ? U.fd(end) : "終了日未記録")}</b>${Number.isFinite(duration) && duration >= 0 ? `<small>${U.escapeHTML(String(duration))}日間</small>` : ""}<p>${U.escapeHTML(item.raw && item.raw.memo || "")}</p></div></article>${supportsMovement(type) && item.raw ? renderMovementTimeline(type, item.raw, ledgerYear === U.today().slice(0, 4) ? U.today() : `${ledgerYear}-12-31`) : ""}${legacy ? '<p class="muted">元の作業記録は変更しません。日付を確認したものだけ専用履歴へ引き継ぎます。</p>' : ""}${item.raw && item.raw.harvestAutoEnd && item.raw.harvestAutoEnd.blocked ? '<p class="water-edit-guide">収穫後の水の動きがあります。期間と日付を確認してください。</p>' : ""}<button type="button" class="primary" data-water-edit="${legacy ? "legacy" : U.attr(item.editType)}" data-id="${U.attr(item.editId || "")}" data-water-field="${U.attr(item.fieldId)}" data-water-legacy-key="${U.attr(item.legacyKey || "")}">${legacy ? "日付を確認して引き継ぐ" : "編集"}</button>`;
+  }
+  function editValues() { return JSON.stringify(["waterEditType", "waterEditId", "waterEditField", "waterEditStart", "waterEditEnd", "waterEditMemo"].map(id => U.$(id).value)); }
+  function enterLedger(typeKey = "") {
+    ensureLedger(); resetEdit(); bulkFieldIds = []; pendingWaterSchedule = null;
+    ledgerTypeKey = typeForKey(typeKey) ? typeKey : "";
+    ledgerYear = U.today().slice(0, 4); ledgerTarget = "all"; selectedHistory = null; inputFromLedger = false; view = "list";
+    render(); notifyView();
+  }
+  function finishEdit(type, id, record) {
+    const returnToLedger = editFromLedger;
+    resetEdit();
+    if (returnToLedger) {
+      ledgerYear = cropYear(record.startDate || record.date);
+      selectedHistory = historySelection(type, id, record.fieldId, "");
+      view = "detail";
+    } else view = "input";
+    render(); notifyView();
+  }
+  function cancelEdit() {
+    const returnToLedger = editFromLedger;
+    resetEdit(); view = returnToLedger ? "detail" : "input";
+    render(); notifyView();
+    return returnToLedger;
+  }
+  function canHandleBack() { return view === "detail" || view === "edit" || view === "input" && inputFromLedger; }
+  function handleBack() {
+    if (view === "edit") {
+      if (editValues() !== editBaseline && !confirm("入力中の変更を取り消して戻りますか？")) return true;
+      return cancelEdit();
+    }
+    if (view === "detail" || view === "input" && inputFromLedger) { resetEdit(); view = "list"; render(); notifyView(); return true; }
+    return false;
+  }
 
   const ROAD = [
     { key: "establishment", label: "移植・活着", water: "deep", waterLabel: "深水" },
@@ -608,11 +706,10 @@
     render();
   }
 
-  function allHistory() {
-    const year = cropYear(U.$("waterDate").value || U.today());
+  function allHistory(fields = targetFields(), year = cropYear(U.$("waterDate").value || U.today())) {
     // Dedicated records are the authoritative, editable history. Older work
     // records are shown below in their own read-only section until adopted.
-    return targetFields().flatMap((field) => resolvedRows(field.fieldId, `${year}-12-31`)
+    return fields.flatMap((field) => resolvedRows(field.fieldId, `${year}-12-31`)
       .filter((period) => period.source === "direct")
       .map((period) => ({
       ...period,
@@ -624,10 +721,9 @@
     }))).sort((a, b) => String(b.startDate || b.actualEndDate || "").localeCompare(String(a.startDate || a.actualEndDate || "")));
   }
 
-  function legacyHistory() {
-    const year = cropYear(U.$("waterDate").value || U.today());
+  function legacyHistory(fields = targetFields(), year = cropYear(U.$("waterDate").value || U.today())) {
     if (!state.legacyWaterReviewFor) return [];
-    return targetFields().flatMap((field) => state.legacyWaterReviewFor(field.fieldId, { year })
+    return fields.flatMap((field) => state.legacyWaterReviewFor(field.fieldId, { year })
       .filter((period) => !period.migrated)
       .map((period) => ({
         ...period,
@@ -640,8 +736,8 @@
   }
 
   function renderHistory() {
-    const rows = allHistory();
-    const legacyRows = legacyHistory();
+    const rows = allHistory(ledgerFields(), ledgerYear).filter(r => !ledgerTypeKey || r.kind === ledgerTypeKey);
+    const legacyRows = legacyHistory(ledgerFields(), ledgerYear).filter(r => !ledgerTypeKey || r.kind === ledgerTypeKey);
     const renderPeriod = (item, legacy) => {
       const field = state.field(item.fieldId);
       const end = item.actualEndDate || "";
@@ -653,7 +749,7 @@
         ? item.requiresDateReview ? "開始・終了日を確認してから引き継げます" : "旧作業記録。内容を確認してから引き継げます"
         : `開始時: ${startStage}${endStage ? ` → 完了時: ${endStage}` : ""}`)
         + (item.raw && item.raw.harvestAutoEnd && item.raw.harvestAutoEnd.blocked ? " / 収穫後の入落水記録があります。日付を要確認" : "");
-      return `<article class="water-history-card ${U.attr(item.tone)}${legacy ? " legacy" : ""}"><div><span>${U.escapeHTML(item.label)}</span><b>${U.escapeHTML(field?.name || "圃場")}</b><small>${U.escapeHTML(U.fd(start))} - ${U.escapeHTML(end ? U.fd(end) : "終了日未記録")}${days !== "" ? ` / ${days}日` : ""}</small><em>${U.escapeHTML(note)}</em></div><button type="button" data-water-edit="${legacy ? "legacy" : U.attr(item.editType)}" data-id="${legacy ? "" : U.attr(item.editId)}" data-water-field="${U.attr(item.fieldId)}" data-water-legacy-key="${U.attr(item.legacyKey || "")}">${legacy ? "日付を確認" : "編集"}</button></article>`;
+      return `<article class="water-history-card ${U.attr(item.tone)}${legacy ? " legacy" : ""}"><div><span>${U.escapeHTML(item.label)}</span><b>${U.escapeHTML(field?.name || "圃場")}</b><small>${U.escapeHTML(U.fd(start))} - ${U.escapeHTML(end ? U.fd(end) : "終了日未記録")}${days !== "" ? ` / ${days}日` : ""}</small><em>${U.escapeHTML(note)}</em></div><button type="button" data-water-open="${legacy ? "legacy" : U.attr(item.editType)}" data-id="${legacy ? "" : U.attr(item.editId)}" data-water-field="${U.attr(item.fieldId)}" data-water-legacy-key="${U.attr(item.legacyKey || "")}">詳細</button></article>`;
     };
     U.$("waterHistory").innerHTML = `
       <section class="water-history-head"><div><h3>水管理の履歴</h3><small>この画面で入力した専用履歴です</small></div><span>${rows.length}件</span></section>
@@ -678,7 +774,7 @@
     U.$("waterEditSection").open = false;
   }
 
-  function fillEdit(type, id, fieldId, legacyKey) {
+  function fillEdit(type, id, fieldId, legacyKey, fromLedger = false) {
     if (type === "legacy") {
       const legacy = fieldId && legacyKey && state.legacyWaterReviewFor
         ? state.legacyWaterReviewFor(fieldId, { year: "" }).find((item) => item.legacyKey === legacyKey)
@@ -696,6 +792,8 @@
       U.$("waterEditGuide").classList.remove("hidden");
       U.$("waterEditSubmit").textContent = "確認して専用履歴へ引き継ぐ";
       U.$("waterEditSection").open = true;
+      editFromLedger = fromLedger; if (!fromLedger) inputFromLedger = false; view = "edit"; editBaseline = editValues();
+      ensureLedger(); renderLedgerToolbar(); applyView(); notifyView();
       U.$("waterEditSection").scrollIntoView({ behavior: "smooth", block: "center" });
       return;
     }
@@ -713,10 +811,13 @@
     U.$("waterEditGuide").classList.add("hidden");
     U.$("waterEditSubmit").textContent = "変更を保存";
     U.$("waterEditSection").open = true;
+    editFromLedger = fromLedger; if (!fromLedger) inputFromLedger = false; view = "edit"; editBaseline = editValues();
+    ensureLedger(); renderLedgerToolbar(); applyView(); notifyView();
     U.$("waterEditSection").scrollIntoView({ behavior: "smooth", block: "center" });
   }
 
   function resetForm() {
+    view = "input"; inputFromLedger = false;
     const field = state.field(firstFieldId());
     U.$("waterDate").value = U.today();
     U.$("waterTargetMode").value = "field";
@@ -729,6 +830,21 @@
   }
 
   function render() {
+    ensureLedger();
+    renderLedgerToolbar();
+    if (view === "list") { renderHistory(); applyView(); return; }
+    if (view === "detail") {
+      renderLedgerDetail();
+      const period = selectedPeriod();
+      if (period && period.planned && selectedHistory.type !== "legacy") {
+        const host = U.$("waterLedgerDetail");
+        const edit = host.querySelector("[data-water-edit]");
+        if (edit) edit.remove();
+        host.insertAdjacentHTML("beforeend", `<p class="muted">開始実績がない予定期間です。${period.plannedStartDate ? `開始予定 ${U.escapeHTML(U.fd(period.plannedStartDate))}` : ""}${period.plannedEndDate ? ` / 終了予定 ${U.escapeHTML(U.fd(period.plannedEndDate))}` : ""}</p>`);
+      }
+      applyView(); return;
+    }
+    if (view === "edit") { applyView(); return; }
     renderOptions();
     renderFlowChart();
     const fields = targetFields();
@@ -736,10 +852,11 @@
     const stateLabel = states.length && states.every((item) => item.key === states[0].key) ? states[0].label : "圃場ごとに状態が異なります";
     U.$("waterCurrentStatus").innerHTML = "";
     renderActions();
-    renderHistory();
+    applyView();
   }
 
   function prefillDate(date, fieldId, typeKey) {
+    view = "input"; inputFromLedger = false; resetEdit();
     bulkFieldIds = [];
     U.$("waterDate").value = date || U.today();
     U.$("waterTargetMode").value = "field";
@@ -753,6 +870,7 @@
   }
 
   function prefillFields(date, fieldIds, typeKey) {
+    view = "input"; inputFromLedger = false; resetEdit();
     bulkFieldIds = (fieldIds || []).filter(Boolean);
     U.$("waterDate").value = date || U.today();
     const matchingGroup = groups().find((group) => group.fields.length === bulkFieldIds.length && group.fields.every((field) => bulkFieldIds.includes(field.fieldId)));
@@ -781,6 +899,25 @@
   }
 
   function bind() {
+    if (bound) return;
+    bound = true;
+    ensureLedger();
+    const root = U.$("screen-irrigation");
+    root.addEventListener("change", event => {
+      if (event.target.hasAttribute("data-water-ledger-year")) ledgerYear = event.target.value;
+      else if (event.target.hasAttribute("data-water-ledger-target")) ledgerTarget = event.target.value;
+      else if (event.target.hasAttribute("data-water-ledger-type")) ledgerTypeKey = event.target.value;
+      else return;
+      render();
+    });
+    root.addEventListener("click", event => {
+      const button = event.target.closest("button"); if (!button) return;
+      if (button.hasAttribute("data-water-ledger-new")) { const type = ledgerTypeKey; resetForm(); inputFromLedger = true; focusedTypeKey = type; render(); notifyView(); }
+      if (button.hasAttribute("data-water-ledger-back")) handleBack();
+      if (button.hasAttribute("data-water-cancel-edit")) { if (!cancelEdit() && RiceOS.app && RiceOS.app.back) RiceOS.app.back(); }
+      if (button.hasAttribute("data-water-open")) { selectedHistory = historySelection(button.dataset.waterOpen, button.dataset.id, button.dataset.waterField, button.dataset.waterLegacyKey); view = "detail"; render(); notifyView(); }
+      if (button.hasAttribute("data-water-edit")) fillEdit(button.dataset.waterEdit, button.dataset.id, button.dataset.waterField, button.dataset.waterLegacyKey, true);
+    });
     if (!U.$("waterManualEndConfirm")) U.$("waterEditForm").insertAdjacentHTML("beforeend", '<button type="submit" class="secondary" id="waterManualEndConfirm" hidden>終了日を手動確定して保存</button>');
     U.$("waterEditEnd").addEventListener("input", () => { manualWaterEndEdited = true; });
     U.$("waterEditEnd").addEventListener("change", () => { manualWaterEndEdited = true; });
@@ -793,10 +930,6 @@
       if (planButton) saveWaterSchedule(planButton.dataset.waterPlan);
       const movementButton = event.target.closest("[data-water-movement]");
       if (movementButton && !movementButton.disabled) recordMovement(movementButton.dataset.waterMovement);
-    });
-    U.$("waterHistory").addEventListener("click", (event) => {
-      const button = event.target.closest("[data-water-edit]");
-      if (button) fillEdit(button.dataset.waterEdit, button.dataset.id, button.dataset.waterField, button.dataset.waterLegacyKey);
     });
     U.$("waterEditForm").addEventListener("submit", (event) => {
       event.preventDefault();
@@ -821,7 +954,7 @@
           : [inheritedMemo, enteredMemo].filter(Boolean).join("\n");
         const record = { ...item, ...(manualEnd ? { harvestEndOverride: true } : {}), date: item.date || U.$("waterEditStart").value, startDate: U.$("waterEditStart").value, actualEndDate: U.$("waterEditEnd").value, status: U.$("waterEditEnd").value ? "完了" : "実施中", periodStatus: U.$("waterEditEnd").value ? "完了" : "実施中", memo };
         const saved = adopted.kind === "dry" ? state.saveDryPeriod(record) : state.saveIrrigation(record);
-        if (saved !== null) { resetEdit(); render(); }
+        if (saved !== null) finishEdit(adopted.kind === "dry" ? "dry" : "irrigation", adopted.id, record);
         return;
       }
       const item = type === "dry" ? state.data().dryPeriods.find((row) => row.dryPeriodId === id) : state.data().irrigations.find((row) => row.irrigationId === id);
@@ -834,11 +967,11 @@
       }
       const record = { ...item, ...(manualEnd ? { harvestEndOverride: true } : {}), date: item.date || startDate, startDate, actualEndDate: endDate, status: endDate ? "完了" : "実施中", periodStatus: endDate ? "完了" : "実施中", memo: U.$("waterEditMemo").value };
       const saved = type === "dry" ? state.saveDryPeriod(record) : state.saveIrrigation(record);
-      if (saved !== null) { resetEdit(); render(); }
+      if (saved !== null) finishEdit(type, id, record);
     });
     document.querySelector('[data-action="reset-irrigation"]').addEventListener("click", resetForm);
   }
 
   RiceOS.screens = RiceOS.screens || {};
-  RiceOS.screens.irrigation = { render, bind, resetForm, prefillDate, prefillFields, prefillSchedule, editIrrigation: (id) => fillEdit("irrigation", id) };
+  RiceOS.screens.irrigation = { render, bind, resetForm, prefillDate, prefillFields, prefillSchedule, editIrrigation: (id) => fillEdit("irrigation", id), enterLedger, canHandleBack, handleBack, preserveOnDataChange: true };
 })();

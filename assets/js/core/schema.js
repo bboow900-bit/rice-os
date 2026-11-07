@@ -5,7 +5,7 @@
   const U = RiceOS.utils;
 
   const SCHEMA_VERSION = 17;
-  const APP_VERSION = "20261106_ver300";
+  const APP_VERSION = "20261106_ver302";
   const STORE_KEY = "rice_os_v8_stable";
   const BACKUP_KEY = "rice_os_v8_stable_backup";
   const RELEASE_BACKUPS_KEY = "rice_os_v8_stable_release_backups";
@@ -222,7 +222,7 @@
     "その他"
   ];
 
-  const MATERIAL_CATEGORIES = ["種籾", "肥料", "除草剤", "防除剤", "燃料", "米袋", "部品", "その他"];
+  const MATERIAL_CATEGORIES = ["種籾", "肥料", "除草剤", "防除剤", "殺虫殺菌剤", "培土", "マット", "燃料", "米袋", "部品", "その他"];
   const GROWTH_LEVELS = ["-", "少ない", "普通", "多い", "注意"];
   const LEAF_COLOR_LEVELS = [
     { value: "1", label: "1 薄い", text: "薄い", tone: "bad" },

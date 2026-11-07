@@ -338,6 +338,17 @@
   function mergeData(currentData, incomingData) {
     const current = S.normalize(currentData || {});
     const incoming = S.normalize(incomingData || {});
+    for (const data of [current, incoming]) {
+      const profiles = data.meta && data.meta.seederProfiles;
+      if (profiles === undefined) continue;
+      const ids = new Set();
+      if (!Array.isArray(profiles) || profiles.some(row => {
+        if (!row || typeof row !== "object" || Array.isArray(row)
+          || typeof row.profileId !== "string" || !row.profileId || ids.has(row.profileId)) return true;
+        ids.add(row.profileId);
+        return false;
+      })) throw new Error("播種機設定の保存形式を確認してください。元のデータは変更していません。");
+    }
     const merged = U.clone(current);
     const added = {};
     const skipped = {};
@@ -430,7 +441,7 @@
     if (!S.validCropYear(current.meta && current.meta.activeCropYear) && S.validCropYear(incoming.meta && incoming.meta.activeCropYear)) {
       merged.meta.activeCropYear = Number(incoming.meta.activeCropYear);
     }
-    Object.entries({ nextSeasonIdeas: "ideaId", herbicidePrograms: "programId", herbicideAssignments: "assignmentId", herbicideObservations: "observationId" }).forEach(([key, idKey]) => {
+    Object.entries({ nextSeasonIdeas: "ideaId", herbicidePrograms: "programId", herbicideAssignments: "assignmentId", herbicideObservations: "observationId", seederProfiles: "profileId" }).forEach(([key, idKey]) => {
       const existing = Array.isArray(current.meta && current.meta[key]) ? current.meta[key] : [];
       const source = Array.isArray(incoming.meta && incoming.meta[key]) ? incoming.meta[key] : [];
       const ids = new Set(existing.map((row) => row[idKey]));

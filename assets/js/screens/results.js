@@ -16,6 +16,116 @@
   let millingFormVisible = true;
   let issueViewYear = "all";
   let savedMillingId = "";
+  let ledgerView = "milling-list", detailId = "", editorReturn = null, editorBaseline = "";
+  let resultError = "";
+  const ledgerHistory = [];
+
+  const viewState = () => ({view:ledgerView,id:detailId});
+  function syncNavigation() { if (RiceOS.app?.syncBackButton) RiceOS.app.syncBackButton(); }
+  function goView(view,id = "") {
+    ledgerHistory.push(viewState()); ledgerView = view; detailId = id; render(); syncNavigation();
+  }
+  function startEditor(kind) {
+    if (ledgerView !== `${kind}-edit`) editorReturn = ledgerView.startsWith(`${kind}-`) ? viewState() : {view:`${kind}-list`,id:""};
+    ledgerView = `${kind}-edit`; detailId = ""; syncNavigation();
+  }
+  function finishEditor(kind,id) {
+    const target = editorReturn || {view:`${kind}-list`,id:""};
+    if (target.view === `${kind}-detail` && target.id === id) {
+      ledgerView = target.view; detailId = id;
+    } else {
+      ledgerView = target.view.endsWith("-edit") ? `${kind}-list` : target.view; detailId = target.id;
+      ledgerHistory.push(viewState()); ledgerView = `${kind}-detail`; detailId = id;
+    }
+    editorReturn = null; render(); syncNavigation();
+  }
+  function cancelEditor() {
+    const kind = ledgerView.split("-")[0], target = editorReturn || {view:`${kind}-list`,id:""};
+    if (kind === "milling") resetMilling();
+    if (kind === "issue") resetIssue();
+    if (kind === "result") { resetForm(); resultError = ""; }
+    ledgerView = target.view; detailId = target.id; editorReturn = null; render(); syncNavigation();
+  }
+  function editorValue() {
+    if (ledgerView === "milling-edit") return JSON.stringify(millingDraft);
+    if (ledgerView === "issue-edit") return JSON.stringify(issueDraft);
+    return JSON.stringify(["rSeason","rVariety","rAreaA","rYield","rYieldPer10a","rFirstGradeRate","rShipped","rSales","rSalesPer10a","rQuality","rReflection"].map(id => U.$(id).value));
+  }
+  function canHandleBack() { return ledgerView.endsWith("-edit") || ledgerHistory.length > 0; }
+  function handleBack() {
+    if (!canHandleBack()) return false;
+    if (ledgerView.endsWith("-edit")) {
+      if (editorValue() !== editorBaseline && !confirm("入力中の変更を取り消して戻りますか？")) return true;
+      cancelEditor();
+    } else {
+      const previous = ledgerHistory.pop(); ledgerView = previous.view; detailId = previous.id; render(); syncNavigation();
+    }
+    return true;
+  }
+  function visible(node,show) {
+    if (!node) return;
+    node.hidden = !show;
+    if (node.style) { if (show) node.style.removeProperty("display"); else node.style.setProperty("display","none","important"); }
+  }
+  function recordDetail(kind,id) {
+    const record = kind === "milling" ? millingRows().find(r => r.millingId === id) : kind === "issue" ? issueRows().find(r => r.issueId === id) : state.data().varietyResults.find(r => r.resultId === id);
+    if (!record) return '<p role="alert">この記録は見つかりません。一覧へ戻って確認してください。</p>';
+    const variety = state.variety(record.varietyId)?.name || record.varietyId || "品種未設定";
+    const kg = kind === "milling" ? quantityKg(record) : null;
+    const facts = kind === "milling" ? [["実施日",record.date],["収量",kg === null || kg <= 0 ? "数量未確認" : `${numberText(kg)}kg / ${numberText(kg / 60)}俵（60kg）`],["対象",(record.fieldIds || []).length ? `${record.fieldIds.length > 1 ? "選択圃場合算" : "圃場指定"}：${record.fieldIds.map(id => state.field(id)?.name || id).join("・")}` : "品種集計"],...(record.packages || []).map(p => ["袋",`${p.kg}kg × ${p.bags}袋`]),["端数",record.looseKg === "" || record.looseKg == null ? "未登録" : `${record.looseKg}kg`],["メモ",record.memo]] : kind === "issue" ? [["日付",record.date],["理由",record.reason],["対応",record.action],["対応費用",record.costYen === "" || record.costYen == null ? "未登録" : `${numberText(Number(record.costYen))}円`],["メモ",record.memo]] : [["対象",record.fieldId ? `圃場指定：${state.field(record.fieldId)?.name || record.fieldId}` : "品種集計"],["作付面積",record.areaA],["収量",record.yield],["10aあたり収量",record.yieldPer10a],["1等米率",record.firstGradeRate],["売渡数量",record.shippedQuantity],["販売額",record.salesAmount],["10aあたり販売額",record.salesPer10a],["品質",record.quality],["反省点",record.reflection]];
+    const attrs = kind === "milling" ? "data-milling-action" : kind === "issue" ? "data-shipment-issue-action" : "data-result-action";
+    const failure = kind === "milling" ? millingError : kind === "issue" ? issueError : resultError;
+    return `<article data-${kind === "issue" ? "shipment-issue" : kind}-detail="${U.attr(id)}"><h3>${U.escapeHTML(record.season)}年産 / ${U.escapeHTML(variety)}</h3>${kind === "result" ? '<p class="muted">従来の品種別集計・品質記録。在庫には加算しません。</p>' : ""}<dl>${facts.map(([label,value]) => `<div><dt>${U.escapeHTML(label)}</dt><dd>${U.escapeHTML(value === "" || value == null ? "未登録" : value)}</dd></div>`).join("")}</dl>${kind === "issue" ? '<p class="muted">対応費用は利益ではありません。在庫から差し引きません。</p>' : ""}<p role="alert" class="milling-warning">${U.escapeHTML(failure)}</p><div class="form-actions"><button type="button" class="primary" ${attrs}="edit" data-id="${U.attr(id)}">編集</button><button type="button" class="danger" ${attrs}="delete" data-id="${U.attr(id)}">削除</button></div></article>`;
+  }
+  function applyView() {
+    const screen = U.$("screen-results");
+    if (!screen || !document.createElement || !screen.querySelector) return;
+    let nav = U.$("resultsLedgerNav");
+    if (!nav) { nav = document.createElement("div"); nav.id = "resultsLedgerNav"; U.$("millingContent").before(nav); }
+    const family = ledgerView.split("-")[0], list = ledgerView.endsWith("-list"), edit = ledgerView.endsWith("-edit");
+    nav.innerHTML = `<div class="form-actions" role="group" aria-label="収穫台帳の表示">${[["milling","収量・在庫"],["result","従来の品種結果"],["issue","出荷対応記録"]].map(([kind,label]) => `<button type="button" class="${family === kind ? "primary" : "secondary"}" data-results-ledger="${kind}" aria-pressed="${family === kind}">${label}</button>`).join("")}</div><div class="section-title"><h3>${list ? "一覧" : edit ? "入力・編集" : "記録の詳細"}</h3>${list ? `<button type="button" class="secondary" data-results-new="${family}">＋ 新規入力</button>` : '<button type="button" class="secondary" data-results-back>戻る</button>'}</div>`;
+    visible(U.$("millingContent"),family === "milling"); visible(U.$("shipmentIssuesSection"),family === "issue"); visible(U.$("legacyHarvestResults"),family === "result");
+    for (const id of ["shipmentIssuesSection","legacyHarvestResults"]) { const el = U.$(id); if (el) { el.open = true; visible(el.querySelector(":scope > summary"),false); } }
+    const milling = U.$("millingContent"), issues = U.$("shipmentIssuesContent");
+    visible(milling.querySelector(".section-title"),false);
+    visible(U.$("millingForm"),ledgerView === "milling-edit"); visible(U.$("millingStock"),false); visible(U.$("millingLedger"),ledgerView === "milling-list");
+    if (U.$("millingLedgerError")) U.$("millingLedgerError").textContent = ledgerView === "milling-list" ? millingError : "";
+    const listError = family === "milling" ? millingError : family === "issue" ? issueError : resultError;
+    if (list && listError) nav.insertAdjacentHTML("beforeend",`<p role="alert" class="milling-warning">${U.escapeHTML(listError)}</p>`);
+    const tabs = nav.querySelector('[role="group"]');
+    tabs.style.setProperty("display","grid"); tabs.style.setProperty("grid-template-columns","repeat(3,minmax(0,1fr))"); tabs.style.gap = "6px";
+    tabs.querySelectorAll("button").forEach(button => { button.style.minWidth = "0"; button.style.whiteSpace = "normal"; button.style.padding = "10px 6px"; button.style.fontSize = "13px"; });
+    visible(U.$("resultForm"),ledgerView === "result-edit"); visible(U.$("resultList"),ledgerView !== "result-edit");
+    let resultAlert = U.$("resultEditorError");
+    if (!resultAlert) { resultAlert = document.createElement("p"); resultAlert.id = "resultEditorError"; resultAlert.className = "milling-warning"; resultAlert.setAttribute("role","alert"); U.$("resultForm").append(resultAlert); }
+    resultAlert.textContent = resultError;
+    [...issues.children].forEach(el => visible(el,ledgerView === "issue-edit" ? el.id === "shipmentIssueForm" : ledgerView === "issue-list" && el.id !== "shipmentIssueForm"));
+    if (ledgerView === "issue-list") {
+      const rows = issueRows().filter(row => issueViewYear === "all" || String(row.season) === issueViewYear);
+      const groups = new Map();
+      rows.forEach(row => { const key = `${row.season}|${row.varietyId}`; if (!groups.has(key)) groups.set(key,[]); groups.get(key).push(row); });
+      U.$("shipmentIssueCosts").innerHTML = [...groups.values()].map(group => {
+        const known = group.filter(row => row.costYen !== "" && row.costYen != null && Number.isSafeInteger(Number(row.costYen)) && Number(row.costYen) >= 0);
+        const sum = known.reduce((total,row) => total + Number(row.costYen),0), row = group[0];
+        return `${U.escapeHTML(row.season)}年産 / ${U.escapeHTML(state.variety(row.varietyId)?.name || row.varietyId)}：参考対応費用 ${Number.isSafeInteger(sum) ? numberText(sum) : "集計範囲外"}円 / 費用未登録 ${group.length - known.length}件`;
+      }).join("<br>") || "この年度の対応費用は未登録です。";
+    }
+    for (const [kind,host] of [["milling",milling],["issue",issues],["result",U.$("resultList")]]) {
+      let detail = host.querySelector(`[data-results-detail-host="${kind}"]`);
+      if (!detail) { detail = document.createElement("div"); detail.dataset.resultsDetailHost = kind; host.append(detail); }
+      const show = ledgerView === `${kind}-detail`; visible(detail,show); if (show) detail.innerHTML = recordDetail(kind,detailId);
+      if (kind === "result") [...host.children].forEach(el => { if (el !== detail) visible(el,ledgerView === "result-list"); });
+    }
+    for (const [selector,key] of [["[data-milling-id]","millingOpen"],["[data-shipment-issue-id]","shipmentIssueOpen"],["[data-result-id]","resultOpen"]]) {
+      screen.querySelectorAll(selector).forEach(row => {
+        if (row.querySelector(`[data-${key.replace(/[A-Z]/g,c => `-${c.toLowerCase()}`)}]`)) return;
+        const button = document.createElement("button"); button.type = "button"; button.className = "secondary"; button.textContent = "詳細を見る ›";
+        button.dataset[key] = row.dataset.millingId || row.dataset.shipmentIssueId || row.dataset.resultId;
+        row.querySelector(".record-head")?.append(button);
+      });
+    }
+    syncNavigation();
+  }
 
   function newLedgerDraft() {
     const date = U.today();
@@ -110,6 +220,7 @@
     host.querySelectorAll("[data-milling-id]").forEach(row => {
       if (row.dataset.millingId === savedMillingId) row.insertAdjacentHTML("afterbegin", '<p role="status">保存しました</p>');
     });
+    applyView();
   }
 
   function renderLedgerStock() {
@@ -146,16 +257,18 @@
   function editMillingRecord(id) {
     const record = millingRows().find(r => r.millingId === id);
     if (!record) { alert("この籾摺り記録は見つかりません。"); return false; }
+    startEditor("milling");
     millingFormVisible = true;
     millingOriginal = U.clone(record); millingDraft = U.clone(record); millingDraft.fieldIds = (record.fieldIds || []).slice(); millingDraft.packages = U.clone(record.packages || []); millingError = "";
-    renderMilling(); U.$("millingForm").scrollIntoView({ block: "start",behavior: "smooth" }); return true;
+    renderMilling(); readMilling(); editorBaseline = editorValue(); U.$("millingForm").scrollIntoView({ block: "start",behavior: "smooth" }); return true;
   }
 
-  function openMilling() { millingLedgerMode = false; millingFormVisible = true; resetMilling(); U.$("millingForm").scrollIntoView({ block: "start",behavior: "smooth" }); }
+  function openMilling() { startEditor("milling"); millingLedgerMode = false; millingFormVisible = true; resetMilling(); readMilling(); editorBaseline = editorValue(); U.$("millingForm").scrollIntoView({ block: "start",behavior: "smooth" }); }
   function openMillingForYear(season, varietyId) {
     if (!RiceOS.schema.validCropYear(season) || varietyId && !state.variety(varietyId)) return false;
     const hasDraft = millingDraft && (millingOriginal || millingDraft.varietyId || millingDraft.packages.length || Number(millingDraft.looseKg) > 0 || String(millingDraft.memo || "").trim());
     if (hasDraft && !confirm("入力中の籾摺り記録があります。新しい収量入力へ切り替えますか？")) return false;
+    startEditor("milling");
     millingLedgerMode = false;
     millingFormVisible = true;
     resetMilling();
@@ -163,18 +276,24 @@
     millingDraft.varietyId = varietyId || "";
     millingViewYear = String(season);
     renderMilling();
+    readMilling(); editorBaseline = editorValue();
     return true;
   }
   function openMillingLedger() {
+    ledgerView = "milling-list"; detailId = ""; ledgerHistory.length = 0; editorReturn = null;
     if (U.$("legacyHarvestResults")) U.$("legacyHarvestResults").open = false;
     millingLedgerMode = true; millingFormVisible = false; renderMilling();
     U.$("millingContent").scrollIntoView({ block: "start",behavior: "smooth" });
   }
   function showMillingForm() {
+    startEditor("milling");
     if (U.$("legacyHarvestResults")) U.$("legacyHarvestResults").open = true;
     millingLedgerMode = false; millingFormVisible = true; renderMilling();
+    readMilling(); editorBaseline = editorValue();
   }
   function openShipmentIssues() {
+    ledgerView = "issue-list"; detailId = ""; ledgerHistory.length = 0; editorReturn = null;
+    renderIssues();
     const section = U.$("shipmentIssuesSection");
     if (!section) return;
     section.open = true;
@@ -189,13 +308,14 @@
     const known = costs.filter(r => r.costYen !== "" && r.costYen != null && Number.isSafeInteger(Number(r.costYen)) && Number(r.costYen) >= 0);
     const sum = known.reduce((n,r) => n + Number(r.costYen),0);
     host.innerHTML = `${renderIssueFilter()}<form id="shipmentIssueForm" class="stack-form"><input id="editShipmentIssueId" type="hidden" value="${U.attr(issueOriginal && issueOriginal.issueId || "")}"><h4>${issueOriginal ? "出荷できなかった記録を編集" : "出荷できなかった記録を登録"}</h4><div class="form-grid dense"><label>日付<input id="shipmentIssueDate" type="date" value="${U.attr(d.date)}" required></label><label>年産<input id="shipmentIssueSeason" type="number" min="1900" max="2200" step="1" value="${U.attr(d.season)}" required></label><label class="wide">品種<select id="shipmentIssueVariety" required>${ledgerVarieties(d.varietyId)}</select></label></div><label>理由<input id="shipmentIssueReason" value="${U.attr(d.reason || "")}" required></label><label>対応<input id="shipmentIssueAction" value="${U.attr(d.action || "")}"></label><label>対応費用（円・任意）<input id="shipmentIssueCost" type="number" min="0" step="1" value="${U.attr(d.costYen ?? "")}"></label><label>メモ<textarea id="shipmentIssueMemo">${U.escapeHTML(d.memo || "")}</textarea></label><p id="shipmentIssueError" class="milling-warning" role="alert">${U.escapeHTML(issueError)}</p><div class="form-actions"><button type="button" class="secondary" data-shipment-issue-cancel>${issueOriginal ? "編集を取消" : "入力をクリア"}</button><button type="submit" class="primary">保存</button></div></form><p id="shipmentIssueCosts">${d.varietyId ? `${U.escapeHTML(d.season)}年産・選択品種の参考対応費用：${Number.isSafeInteger(sum) ? numberText(sum) : "集計範囲外"}円 / 費用未登録 ${costs.length - known.length}件` : "年度と品種を選択してください。"}</p><p class="muted">対応費用は利益ではありません。出荷数量・在庫からは差し引きません。</p><div id="shipmentIssueList">${rows.filter(row => issueViewYear === "all" || String(row.season) === issueViewYear).slice().sort((a,b) => String(b.date).localeCompare(String(a.date))).map(r => `<article class="record" data-shipment-issue-id="${U.attr(r.issueId)}"><div class="record-head"><b>${U.escapeHTML(r.date)} / ${U.escapeHTML(r.season)}年産 ${U.escapeHTML(state.variety(r.varietyId)?.name || r.varietyId)}</b></div><div class="record-body"><p>${U.escapeHTML(r.reason)}</p>${r.action ? `<p>対応：${U.escapeHTML(r.action)}</p>` : ""}<p>対応費用：${r.costYen === "" || r.costYen == null ? "未登録" : `${numberText(Number(r.costYen))}円`}</p>${r.memo ? `<p>${U.escapeHTML(r.memo)}</p>` : ""}</div><div class="record-actions"><button type="button" class="secondary" data-shipment-issue-action="edit" data-id="${U.attr(r.issueId)}">編集</button><button type="button" class="danger" data-shipment-issue-action="delete" data-id="${U.attr(r.issueId)}">削除</button></div></article>`).join("") || '<p class="empty">記録はありません。</p>'}</div>`;
+    applyView();
   }
 
   function renderIssueFilter() {
     const years = [...new Set(issueRows().map(row => String(row.season)))];
     if (issueViewYear !== "all" && !years.includes(issueViewYear)) years.push(issueViewYear);
     years.sort((a,b) => Number(b) - Number(a));
-    return `<label>対応履歴の表示年度<select id="shipmentIssueViewYear"><option value="all"${issueViewYear === "all" ? " selected" : ""}>全年度</option>${years.map(year => `<option value="${U.attr(year)}"${issueViewYear === year ? " selected" : ""}>${U.escapeHTML(year)}年産</option>`).join("")}</select></label><p class="muted">対応費用の集計は入力欄の年度・品種が対象です。履歴フィルターとは別です。</p>`;
+    return `<label>対応履歴の表示年度<select id="shipmentIssueViewYear"><option value="all"${issueViewYear === "all" ? " selected" : ""}>全年度</option>${years.map(year => `<option value="${U.attr(year)}"${issueViewYear === year ? " selected" : ""}>${U.escapeHTML(year)}年産</option>`).join("")}</select></label><p class="muted">表示年度の品種別参考対応費用です。在庫から差し引きません。</p>`;
   }
 
   function readIssue() {
@@ -221,14 +341,17 @@
       renderMillingSummary();
     });
     milling.addEventListener("click",event => {
-      const button = event.target.closest("button"); if (!button) return;
-      if (button.hasAttribute("data-milling-new")) { millingFormVisible = true; savedMillingId = ""; resetMilling(); if (millingLedgerMode && /^\d{4}$/.test(millingViewYear)) { millingDraft.season = millingViewYear; renderMilling(); } return; }
-      if (button.hasAttribute("data-milling-cancel")) { if (millingLedgerMode) millingFormVisible = false; resetMilling(); return; }
+      const button = event.target.closest("button");
+      if (!button) { const row = event.target.closest("[data-milling-id]"); if (row) goView("milling-detail",row.dataset.millingId); return; }
+      if (button.hasAttribute("data-milling-open")) { goView("milling-detail",button.dataset.millingOpen); return; }
+      if (button.hasAttribute("data-milling-new")) { startEditor("milling"); millingFormVisible = true; savedMillingId = ""; resetMilling(); if (millingLedgerMode && /^\d{4}$/.test(millingViewYear)) { millingDraft.season = millingViewYear; renderMilling(); } readMilling(); editorBaseline = editorValue(); return; }
+      if (button.hasAttribute("data-milling-cancel")) { cancelEditor(); return; }
       if (button.hasAttribute("data-milling-add-package")) { readMilling(); millingDraft.packages.push({ kg: button.dataset.millingAddPackage,bags: "1" }); renderMilling(); return; }
       if (button.hasAttribute("data-milling-remove-package")) { readMilling(); millingDraft.packages.splice(Number(button.dataset.millingRemovePackage),1); renderMilling(); return; }
       if (button.dataset.millingAction === "edit") { editMillingRecord(button.dataset.id); return; }
       if (button.dataset.millingAction === "delete" && confirm("この籾摺り記録を削除しますか？")) {
         if (typeof state.deleteMillingRecord !== "function" || !state.deleteMillingRecord(button.dataset.id)) { millingError = "削除できませんでした。記録は変更していません。"; renderMilling(); return; }
+        if (ledgerView === "milling-detail" && detailId === button.dataset.id) { const previous = ledgerHistory.pop() || {view:"milling-list",id:""}; ledgerView = previous.view; detailId = previous.id; }
         if (millingOriginal && millingOriginal.millingId === button.dataset.id) { if (millingLedgerMode) millingFormVisible = false; resetMilling(); } else renderMilling();
       }
     });
@@ -242,20 +365,22 @@
       const scope = { season: millingDraft.season,varietyId: millingDraft.varietyId };
       if (millingLedgerMode) millingFormVisible = false;
       resetMilling(); Object.assign(millingDraft,scope); renderMilling();
-      const savedRow = [...U.$("millingList").querySelectorAll("[data-milling-id]")].find(row => row.dataset.millingId === savedMillingId);
-      if (savedRow) savedRow.scrollIntoView({ block: "center",behavior: "smooth" });
+      finishEditor("milling",saved.millingId);
     });
     issues.addEventListener("input",event => { if (event.target.id !== "shipmentIssueViewYear") { readIssue(); refreshIssueCosts(); } });
     issues.addEventListener("change",event => { if (event.target.id === "shipmentIssueViewYear") { issueViewYear = event.target.value; renderIssues(); return; } readIssue(); refreshIssueCosts(); });
     issues.addEventListener("click",event => {
-      const button = event.target.closest("button"); if (!button) return;
-      if (button.hasAttribute("data-shipment-issue-cancel")) { resetIssue(); return; }
+      const button = event.target.closest("button");
+      if (!button) { const row = event.target.closest("[data-shipment-issue-id]"); if (row) goView("issue-detail",row.dataset.shipmentIssueId); return; }
+      if (button.hasAttribute("data-shipment-issue-open")) { goView("issue-detail",button.dataset.shipmentIssueOpen); return; }
+      if (button.hasAttribute("data-shipment-issue-cancel")) { cancelEditor(); return; }
       if (button.dataset.shipmentIssueAction === "edit") {
         const r = issueRows().find(r => r.issueId === button.dataset.id); if (!r) return;
-        issueOriginal = U.clone(r); issueDraft = U.clone(r); issueError = ""; renderIssues(); U.$("shipmentIssueForm").scrollIntoView({ block: "start" });
+        startEditor("issue"); issueOriginal = U.clone(r); issueDraft = U.clone(r); issueError = ""; renderIssues(); readIssue(); editorBaseline = editorValue(); U.$("shipmentIssueForm").scrollIntoView({ block: "start" });
       }
       if (button.dataset.shipmentIssueAction === "delete" && confirm("この出荷できなかった記録を削除しますか？")) {
         if (typeof state.deleteShipmentIssue !== "function" || !state.deleteShipmentIssue(button.dataset.id)) { issueError = "削除できませんでした。記録は変更していません。"; renderIssues(); return; }
+        if (ledgerView === "issue-detail" && detailId === button.dataset.id) { const previous = ledgerHistory.pop() || {view:"issue-list",id:""}; ledgerView = previous.view; detailId = previous.id; }
         if (issueOriginal && issueOriginal.issueId === button.dataset.id) resetIssue(); else renderIssues();
       }
     });
@@ -267,6 +392,7 @@
       if (!saved) { issueError = "保存できませんでした。入力内容を確認してください。"; renderIssues(); return; }
       issueViewYear = String(saved.season);
       const scope = { season: issueDraft.season,varietyId: issueDraft.varietyId }; resetIssue(); Object.assign(issueDraft,scope); renderIssues();
+      finishEditor("issue",saved.issueId);
     });
   }
 
@@ -293,7 +419,7 @@
   }
 
   function resetForm() {
-    showMillingForm();
+    startEditor("result");
     editingResult = null;
     U.$("rSeason").value = new Date().getFullYear();
     if (state.varieties()[0]) U.$("rVariety").value = state.varieties()[0].varietyId;
@@ -308,11 +434,13 @@
     U.$("rReflection").value = "";
     renderVarietyOptions(state.varieties()[0]?.varietyId || "");
     renderFormState();
+    editorBaseline = editorValue(); applyView();
   }
 
   function editResult(resultId) {
     const record = state.data().varietyResults.find((row) => row.resultId === resultId);
     if (!record) { alert("この結果は見つかりません。一覧を確認してください。"); return false; }
+    startEditor("result");
     if (U.$("legacyHarvestResults")) U.$("legacyHarvestResults").open = true;
     editingResult = U.clone(record);
     const inputs = { rSeason: "season", rVariety: "varietyId", rAreaA: "areaA", rYield: "yield", rYieldPer10a: "yieldPer10a",
@@ -323,6 +451,7 @@
     const form = U.$("resultForm");
     form.querySelector("details").open = true;
     form.scrollIntoView({ behavior: "smooth", block: "start" });
+    editorBaseline = editorValue(); applyView();
     return true;
   }
 
@@ -365,6 +494,7 @@
     renderFormState();
     renderMilling();
     renderIssues();
+    applyView();
   }
 
   function bind() {
@@ -372,6 +502,22 @@
       if (event.target.closest('[data-sheet-add="result"], [data-jump-screen="results"], .nav-item[data-screen="results"]')) showMillingForm();
     },true);
     bindLedgers();
+    applyView();
+    U.$("resultsLedgerNav")?.addEventListener("click",event => {
+      const tab = event.target.closest("[data-results-ledger]");
+      if (tab) {
+        if (ledgerView === "milling-edit") readMilling();
+        if (ledgerView === "issue-edit") readIssue();
+        if (ledgerView.endsWith("-edit") && editorValue() !== editorBaseline && !confirm("入力中の変更を取り消して台帳を切り替えますか？")) return;
+        ledgerView = `${tab.dataset.resultsLedger}-list`; detailId = ""; ledgerHistory.length = 0; editorReturn = null; render(); return;
+      }
+      if (event.target.closest("[data-results-back]")) { handleBack(); return; }
+      const add = event.target.closest("[data-results-new]");
+      if (!add) return;
+      if (add.dataset.resultsNew === "milling") { openMilling(); if (/^\d{4}$/.test(millingViewYear)) { millingDraft.season = millingViewYear; renderMilling(); readMilling(); editorBaseline = editorValue(); } }
+      if (add.dataset.resultsNew === "result") resetForm();
+      if (add.dataset.resultsNew === "issue") { startEditor("issue"); resetIssue(); if (/^\d{4}$/.test(issueViewYear)) { issueDraft.season = issueViewYear; renderIssues(); } readIssue(); editorBaseline = editorValue(); }
+    });
     U.$("resultForm").addEventListener("submit", (event) => {
       event.preventDefault();
       const current = editingResult && state.data().varietyResults.find((row) => row.resultId === editingResult.resultId);
@@ -391,26 +537,31 @@
         quality: U.$("rQuality").value,
         reflection: U.$("rReflection").value
       });
-      if (!saved) return;
-      resetForm();
+      if (!saved) { resultError = "保存できませんでした。入力は保持しています。"; applyView(); return; }
+      const id = editingResult?.resultId || state.data().varietyResults.at(-1)?.resultId;
+      resetForm(); resultError = ""; finishEditor("result",id);
     });
     U.$("resultForm").addEventListener("click", (event) => {
-      if (event.target.closest("[data-result-reset], [data-result-new]")) resetForm();
+      if (event.target.closest("[data-result-reset]")) cancelEditor();
+      if (event.target.closest("[data-result-new]")) resetForm();
     });
     U.$("resultList").addEventListener("click", (event) => {
       const button = event.target.closest("[data-result-action]");
-      if (!button) return;
+      if (!button) { const row = event.target.closest("[data-result-id]"); if (row) goView("result-detail",row.dataset.resultId); return; }
       const id = button.dataset.id;
       const record = state.data().varietyResults.find((row) => row.resultId === id);
       if (!record) { alert("この結果は見つかりません。一覧を確認してください。"); return; }
       if (button.dataset.resultAction === "edit") { editResult(id); return; }
       if (button.dataset.resultAction !== "delete" || !confirm(`${record.season}年のこの品種結果を削除しますか？`)) return;
       if (typeof state.deleteResult !== "function") { alert("削除処理を利用できません。再読み込みしてください。"); return; }
-      if (!state.deleteResult(id)) return;
-      if (editingResult && editingResult.resultId === id) resetForm();
+      if (!state.deleteResult(id)) { resultError = "削除できませんでした。記録は変更していません。"; applyView(); return; }
+      if (ledgerView === "result-detail" && detailId === id) { const previous = ledgerHistory.pop() || {view:"result-list",id:""}; ledgerView = previous.view; detailId = previous.id; resultError = ""; render(); }
+      if (editingResult && editingResult.resultId === id) {
+        const target = viewState(); resetForm(); ledgerView = target.view; detailId = target.id; editorReturn = null; render();
+      }
     });
   }
 
   RiceOS.screens = RiceOS.screens || {};
-  RiceOS.screens.results = { render, bind, resetForm, editResult, editMillingRecord, openMilling, openMillingForYear, openMillingLedger, showMillingForm, openShipmentIssues };
+  RiceOS.screens.results = { render, bind, resetForm, editResult, editMillingRecord, openMilling, openMillingForYear, openMillingLedger, showMillingForm, openShipmentIssues, canHandleBack, handleBack };
 })();

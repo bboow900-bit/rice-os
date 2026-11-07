@@ -1,0 +1,51 @@
+#screen-seeder-settings { color: #214a35; background: #f3faf6; }
+#screen-seeder-settings #seederSettingsRoot { max-width: 760px; margin: 0 auto; padding-bottom: 90px; }
+#screen-seeder-settings .ss-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 4px 0 20px; }
+#screen-seeder-settings .ss-header > div { display: flex; align-items: center; gap: 10px; min-width: 0; }
+#screen-seeder-settings .ss-header img { width: 40px; height: 40px; object-fit: contain; }
+#screen-seeder-settings h1 { margin: 0; color: #214a35; font-size: 22px; line-height: 1.4; letter-spacing: 0; }
+#screen-seeder-settings h2 { margin: 0 0 14px; font-size: 18px; line-height: 1.5; overflow-wrap: anywhere; }
+#screen-seeder-settings h3 { margin: 0 0 12px; font-size: 14px; }
+#screen-seeder-settings .ss-presets { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; margin-bottom: 18px; }
+#screen-seeder-settings .primary, #screen-seeder-settings .secondary { min-height: 44px; border-radius: 8px; font-size: 13px; line-height: 1.5; padding: 8px 10px; }
+#screen-seeder-settings .ss-text-button { min-height: 44px; padding: 8px 10px; border: 0; background: transparent; color: #286a44; font: inherit; font-size: 13px; font-weight: 700; }
+#screen-seeder-settings .ss-danger { color: #9e4037; }
+#screen-seeder-settings label { display: grid; min-width: 0; gap: 5px; color: #355842; font-size: 13px; font-weight: 650; }
+#screen-seeder-settings input, #screen-seeder-settings select, #screen-seeder-settings textarea { box-sizing: border-box; min-width: 0; max-width: 100%; width: 100%; min-height: 44px; padding: 9px 10px; border: 1px solid #cddfd3; border-radius: 6px; background: #fff; color: #233e2e; font: inherit; font-size: 16px; }
+#screen-seeder-settings textarea { min-height: 90px; resize: vertical; }
+#screen-seeder-settings .ss-year-filter { display: grid; grid-template-columns: auto minmax(0, 190px); align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+#screen-seeder-settings .ss-list-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; min-height: 90px; padding: 14px 0; border: 0; border-bottom: 1px solid #dce8df; border-radius: 0; background: transparent; color: inherit; font: inherit; text-align: left; }
+#screen-seeder-settings .ss-list-row > span:first-child { min-width: 0; }
+#screen-seeder-settings .ss-list-row b { display: block; font-size: 15px; line-height: 1.5; overflow-wrap: anywhere; }
+#screen-seeder-settings .ss-list-row small { color: #627469; font-size: 11px; line-height: 1.6; overflow-wrap: anywhere; }
+#screen-seeder-settings .ss-tags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; }
+#screen-seeder-settings .ss-tags > span { padding: 3px 6px; border-radius: 4px; background: #e8f4eb; color: #306a43; font-size: 11px; }
+#screen-seeder-settings .ss-tags > span + span { background: #edf5fa; color: #376b83; }
+#screen-seeder-settings .ss-row-quantity { display: flex; align-items: center; gap: 8px; flex: 0 1 120px; color: #365f43; font-size: 13px; line-height: 1.5; text-align: right; overflow-wrap: anywhere; }
+#screen-seeder-settings .ss-row-quantity i { font-size: 25px; font-style: normal; }
+#screen-seeder-settings .stack-form { display: grid; gap: 18px; }
+#screen-seeder-settings .ss-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+#screen-seeder-settings .ss-input-section { margin: 0; padding: 14px 0 0; border: 0; border-top: 1px solid #dce8df; border-radius: 0; background: transparent; }
+#screen-seeder-settings .ss-mode { margin: 0; padding: 0; border: 0; min-width: 0; }
+#screen-seeder-settings .ss-mode legend { margin-bottom: 7px; color: #355842; font-size: 13px; font-weight: 650; }
+#screen-seeder-settings .ss-mode > div { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+#screen-seeder-settings .ss-mode label { display: flex; flex-direction: row; align-items: center; gap: 8px; min-height: 44px; padding: 8px 12px; border: 1px solid #cddfd3; border-radius: 6px; background: #fff; }
+#screen-seeder-settings .ss-mode label:has(input:checked) { border-color: #4b9567; background: #eaf5ed; color: #25643a; }
+#screen-seeder-settings input[type="radio"] { width: 17px; height: 17px; min-height: 17px; margin: 0; accent-color: #2d7a4b; flex: 0 0 17px; }
+#screen-seeder-settings .ss-extra { border: 0; border-top: 1px solid #dce8df; border-radius: 0; background: transparent; }
+#screen-seeder-settings .ss-extra summary { min-height: 44px; padding: 12px 0; color: #355842; font-size: 13px; cursor: pointer; }
+#screen-seeder-settings .ss-actions, #screen-seeder-settings .form-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+#screen-seeder-settings .ss-error { color: #a03c33; font-size: 13px; line-height: 1.7; overflow-wrap: anywhere; }
+#screen-seeder-settings .ss-error:empty { display: none; }
+#screen-seeder-settings .ss-detail-title p { margin: 0 0 8px; color: #627469; font-size: 12px; }
+#screen-seeder-settings .ss-detail dl { display: grid; gap: 0; margin: 20px 0; }
+#screen-seeder-settings .ss-detail dl > div { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; padding: 10px 0; border-bottom: 1px solid #e0e9e3; }
+#screen-seeder-settings dt { color: #63766a; font-size: 12px; line-height: 1.6; }
+#screen-seeder-settings dd { margin: 0; font-size: 14px; line-height: 1.6; text-align: right; white-space: pre-wrap; overflow-wrap: anywhere; }
+#screen-seeder-settings .ss-note { margin-bottom: 20px; }
+#screen-seeder-settings .ss-note p { margin: 0 0 16px; white-space: pre-wrap; font-size: 13px; line-height: 1.7; overflow-wrap: anywhere; }
+#screen-seeder-settings button:focus-visible, #screen-seeder-settings input:focus-visible, #screen-seeder-settings select:focus-visible, #screen-seeder-settings textarea:focus-visible, #screen-seeder-settings summary:focus-visible { outline: 3px solid #8bb899; outline-offset: 2px; }
+@media (max-width: 520px) {
+  #screen-seeder-settings .ss-form-grid { grid-template-columns: minmax(0, 1fr); }
+  #screen-seeder-settings .ss-presets .secondary { padding-inline: 5px; font-size: 12px; }
+}

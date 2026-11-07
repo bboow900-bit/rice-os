@@ -1,0 +1,38 @@
+#screen-annual .annual-record-focus { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0; }
+#screen-data .settings-menu { display: block; }
+#screen-annual .annual-record-focus button { flex: 1 1 90px; min-height: 44px; padding: 8px 10px; border-radius: 8px; border: 1px solid #c8ddd1; color: #346548; background: #fff; font-size: 13px; }
+#screen-annual .annual-record-focus button.active { background: #277551; color: #fff; border-color: #277551; }
+#screen-annual .annual-archive-preview { display: grid; grid-template-columns: 76px minmax(0,1fr) 16px; gap: 10px; align-items: center; width: 100%; min-height: 68px; padding: 12px 6px; margin: 0; border: 0; border-bottom: 1px solid #d9e7dc; border-radius: 0; background: #fff; color: #28523b; text-align: left; }
+#screen-annual .annual-archive-preview > span { min-width: 0; }
+#screen-annual .annual-archive-preview b { display: block; font-size: 15px; line-height: 1.5; overflow-wrap: anywhere; }
+#screen-annual .annual-archive-preview small { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-size: 12px; color: #62746a; line-height: 1.5; }
+#screen-annual .annual-archive-preview time { font-size: 12px; line-height: 1.5; }
+#screen-annual .annual-summary-essential { grid-template-columns: repeat(3,minmax(0,1fr)); }
+#screen-annual .annual-summary-milestones { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; margin:12px 0; }
+#screen-annual .annual-summary-milestones > div { border-left:3px solid #6eab80;padding:6px 10px;min-width:0; }
+#screen-annual .annual-summary-milestones small, #screen-annual .annual-summary-milestones b { display:block;line-height:1.5;overflow-wrap:anywhere; }
+#screen-annual .annual-summary-milestones small { font-size:12px;color:#62746a; }
+#screen-annual .annual-summary-milestones b { font-size:15px;color:#28523b; }
+#screen-annual .annual-summary-board > details { margin-top: 10px; }
+#screen-annual .annual-summary-board > details > summary { min-height: 44px; padding: 10px 0; font-size: 13px; cursor: pointer; }
+#screen-annual .annual-material-group > details > summary { cursor: pointer; padding: 12px 0; font-size: 13px; }
+#screen-annual .annual-material-group > .annual-material-brief { font-size: 13px; line-height: 1.6; color: #52715e; }
+#screen-recipes .recipe-ledger-list { display: grid; gap: 8px; }
+#screen-recipes .recipe-open { text-align: left; width: 100%; padding: 14px; border-radius: 8px; border: 1px solid #d2e4d6; background: #fff; color: #2c6543; }
+#screen-recipes .recipe-open b { display:block; overflow-wrap:anywhere; }
+#screen-recipes .recipe-open small { display:block; margin-top:5px; }
+#screen-recipes .recipe-readonly { padding: 12px 0; border-block: 1px solid #dae7dc; }
+#screen-recipes .recipe-readonly dl { display:grid; gap:8px; }
+#screen-recipes .recipe-readonly dl > div { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:12px; font-size:13px; }
+#screen-recipes .recipe-readonly dd { margin:0; overflow-wrap:anywhere; }
+#screen-recipes .recipe-ledger-actions { display:flex; flex-wrap:wrap; gap:8px; margin:12px 0; }
+.profile-ledger-detail { padding: 16px 0; border-block: 1px solid #d4e4d9; color: #28523b; }
+.profile-ledger-detail h3, .profile-ledger-detail p { overflow-wrap: anywhere; white-space: pre-wrap; }
+.profile-ledger-detail dl { display: grid; gap: 8px; }
+.profile-ledger-detail dl > div { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:12px; font-size:13px; }
+.profile-ledger-detail dd { margin:0; overflow-wrap:anywhere; }
+#screen-tractor-settings .ts-toolbar[hidden], #screen-transplanter-settings .ts-toolbar[hidden], #tsProfiles[hidden], #tpsProfiles[hidden], #transplanterSettingsContent > details[hidden] { display: none !important; }
+body:has(:is(#screen-recipes.active,#screen-tractor-settings.active,#screen-transplanter-settings.active,#screen-seeder-settings.active,#screen-results.active,#screen-irrigation.active)) { background: #f3faf6 !important; }
+body:has(:is(#screen-recipes.active,#screen-tractor-settings.active,#screen-transplanter-settings.active,#screen-seeder-settings.active,#screen-results.active,#screen-irrigation.active)) .app-header { display:flex !important; align-items:center; justify-content:space-between; position:relative; min-height:58px; width:100%; max-width:none; padding:12px 18px; margin:0; border:0; border-radius:0; background:#086b3d; box-shadow:none; color:#fff; }
+body:has(:is(#screen-recipes.active,#screen-tractor-settings.active,#screen-transplanter-settings.active,#screen-seeder-settings.active,#screen-results.active,#screen-irrigation.active)) .app-header > div:first-child { display:flex;align-items:center;gap:9px;width:auto;min-width:0; }
+body:has(#appBackButton:not(.hidden)) .app-header { padding-left:66px; }

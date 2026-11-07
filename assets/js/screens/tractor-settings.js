@@ -7,6 +7,7 @@
   let draft = null, error = "", bound = false;
   let machineDraft = {name:"",maker:"",model:""};
   let addMachineOpen = false;
+  let detailId = "";
   const esc = value => U.escapeHTML(String(value ?? ""));
   function fields(type) { return S.TRACTOR_SETTING_FIELDS.filter(field => !field.workTypes || field.workTypes.includes(type)); }
   function settingsFields(type, values, prefix) {
@@ -23,7 +24,7 @@
     const form = U.$("tractorProfileForm"); if (!form || !draft) return;
     Object.assign(draft,{name:form.elements.namedItem("name").value,conditions:form.elements.namedItem("conditions").value,memo:form.elements.namedItem("memo").value,settings:readSettings(form)});
   }
-  function render() {
+  function renderContent() {
     const root = U.$("tractorSettingsContent"); if (!root) return;
     const machines = tractors();
     if (!machineId && machines.length) machineId = machines.find(row => row.status !== "使用停止")?.machineId || machines[0].machineId;
@@ -35,6 +36,28 @@
       <p id="tsError" class="ts-error" role="alert">${esc(error)}</p>
       ${draft ? `<form id="tractorProfileForm" class="ts-form" data-profile-id="${U.attr(draft.profileId || "")}"><h3>${draft.profileId ? "設定を編集" : "設定を登録"}</h3><p>${esc(title(state.machine(draft.machineId)))} / ${esc(S.TRACTOR_WORK_TYPES.find(row => row.value === draft.workType)?.label || draft.workType)}</p><label>設定名<input name="name" value="${U.attr(draft.name)}" required></label>${settingsFields(draft.workType,draft.settings,"ts")}<label>条件・使い分け<input name="conditions" value="${U.attr(draft.conditions || "")}"></label><label>メモ<textarea name="memo">${esc(draft.memo)}</textarea></label><div class="ts-actions"><button type="button" class="secondary" data-ts-cancel>編集を取消</button><button type="submit" class="primary">設定を保存</button></div></form>` : ""}
       <section id="tsProfiles" aria-label="保存した設定">${rows.map(row => `<article class="ts-profile" data-ts-profile="${U.attr(row.profileId)}"><h3>${esc(row.name)}</h3>${row.conditions ? `<p>${esc(row.conditions)}</p>` : ""}<details><summary>設定を確認</summary><p>${esc(summary(row))}</p>${row.memo ? `<p>${esc(row.memo)}</p>` : ""}</details><div class="ts-actions"><button type="button" class="secondary" data-ts-edit="${U.attr(row.profileId)}">編集</button><button type="button" class="secondary" data-ts-copy="${U.attr(row.profileId)}">複製</button><button type="button" class="danger" data-ts-delete="${U.attr(row.profileId)}">削除</button></div></article>`).join("") || '<p class="empty">このトラクター・作業種別の設定はまだありません。</p>'}</section>`;
+  }
+  function render() {
+    renderContent();
+    const root = U.$("tractorSettingsContent");
+    if (!root || !root.querySelector) return;
+    const list = root.querySelector("#tsProfiles"), toolbar = root.querySelector(".ts-toolbar");
+    const row = profiles().find(item=>item.profileId===detailId);
+    if (detailId && !row) detailId="";
+    if (list) list.hidden=Boolean(draft || addMachineOpen || row);
+    if (toolbar) toolbar.hidden=Boolean(draft || addMachineOpen || row);
+    if (!draft && !addMachineOpen && row) {
+      root.insertAdjacentHTML("beforeend",`<section class="profile-ledger-detail"><div class="ts-actions"><button type="button" class="secondary" data-ts-list>一覧へ</button><button type="button" class="primary" data-ts-edit="${U.attr(row.profileId)}">編集</button><button type="button" class="secondary" data-ts-copy="${U.attr(row.profileId)}">複製</button><button type="button" class="danger" data-ts-delete="${U.attr(row.profileId)}">削除</button></div><h3>${esc(row.name)}</h3><p>${esc(title(state.machine(row.machineId)))}</p><p>${esc(summary(row))}</p><p>${esc(row.conditions || "")}</p><p>${esc(row.memo || "")}</p></section>`);
+    } else if (!draft && !addMachineOpen && list) {
+      list.querySelectorAll("[data-ts-profile]").forEach(article=>{article.querySelector("details")?.remove();article.insertAdjacentHTML("beforeend",`<button type="button" class="secondary" data-ts-open="${U.attr(article.dataset.tsProfile)}">詳細を見る ›</button>`);});
+    }
+    if (R.app && R.app.syncBackButton) R.app.syncBackButton();
+  }
+  function handleBack() {
+    if (draft) {readDraft();if (!confirm("入力中の設定を取り消して戻りますか？")) return true;draft=null;error="";render();return true;}
+    if (addMachineOpen) {if (Object.values(machineDraft).some(Boolean) && !confirm("機械登録の入力を取り消しますか？")) return true;addMachineOpen=false;render();return true;}
+    if (detailId) {detailId="";render();return true;}
+    return false;
   }
   function enter() { render(); }
   function bind() {
@@ -48,6 +71,10 @@
     });
     root.addEventListener("click",event => {
       const button = event.target.closest("button"); if (!button) return;
+      if (button.hasAttribute("data-ts-open")) {detailId=button.dataset.tsOpen;render();return;}
+      if (button.hasAttribute("data-ts-list")) {detailId="";render();return;}
+      if (button.hasAttribute("data-ts-new") || button.hasAttribute("data-ts-copy")) detailId="";
+      if (button.hasAttribute("data-ts-edit")) detailId=button.dataset.tsEdit;
       if (button.hasAttribute("data-ts-add-machine")) { readDraft(); addMachineOpen = true; render(); }
       if (button.hasAttribute("data-ts-machine-cancel")) { addMachineOpen = false; machineDraft = {name:"",maker:"",model:""}; error = ""; render(); }
       if (button.hasAttribute("data-ts-cancel")) { draft = null; error = ""; render(); }
@@ -84,5 +111,5 @@
     });
   }
   R.screens = R.screens || {};
-  R.screens.tractorSettings = {render,bind,enter,settingsFields,readSettings,preserveOnDataChange:true};
+  R.screens.tractorSettings = {render,bind,enter,settingsFields,readSettings,canHandleBack:()=>Boolean(draft || addMachineOpen || detailId),handleBack,preserveOnDataChange:true};
 })();
