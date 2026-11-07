@@ -944,12 +944,24 @@
     return found && found.name || "圃場";
   }
 
+  function saveTargetsFeedback(message, records, collection, idKey) {
+    const effective = records.map(record => {
+      const previous = record[idKey] && data()[collection].find(row => row[idKey] === record[idKey]);
+      return { ...previous, ...Object.fromEntries(Object.entries(record).filter(([, value]) => value !== undefined)) };
+    });
+    const ids = [...new Set(effective.map(row => row.fieldId).filter(Boolean))];
+    const place = ids.length > 1 ? `${fieldNameForFeedback(ids[0])}ほか・計${ids.length}圃場`
+      : ids.length ? fieldNameForFeedback(ids[0]) : "対象圃場未確認";
+    return `${message}（対象：${place}）`;
+  }
+
   function workSaveFeedback(record) {
     const previous = record.workId && data().fieldWorks.find((work) => work.workId === record.workId);
     if ((record.targetScope === undefined ? targetScope(previous) : targetScope(record)) === "offField") return "作業を保存しました。";
-    const ids = record.fieldIds || [];
-    const place = ids.length > 1 ? `${fieldNameForFeedback(ids[0])}ほか${ids.length - 1}圃場` : fieldNameForFeedback(ids[0]);
-    const workName = record.workName || "作業";
+    const suppliedIds = record.fieldIds === undefined ? previous && previous.fieldIds : record.fieldIds;
+    const ids = [...new Set(Array.isArray(suppliedIds) ? suppliedIds : [])];
+    const place = ids.length > 1 ? `${fieldNameForFeedback(ids[0])}ほか・計${ids.length}圃場` : fieldNameForFeedback(ids[0]);
+    const workName = record.workName || previous && previous.workName || "作業";
     if (isPlantingWorkName(workName)) return `${place}に田植えを残しました。次は活着・分げつの様子を見てみましょう。`;
     if (isDryEndWorkName(workName)) return `${place}の中干し完了を残しました。次は水管理の様子を見てみましょう。`;
     if (/収穫|稲刈り/.test(workName)) return `${place}に収穫を残しました。今年のひとことも振り返りに残せます。`;
@@ -1904,7 +1916,7 @@
     }
     return mutate((d) => {
       rows.forEach((record) => saveGrowthLogToDraft(d, record));
-    }, message || `生育ログを${rows.length}件保存しました`);
+    }, saveTargetsFeedback(message || `生育ログを${rows.length}件保存しました`, rows, "growthLogs", "logId"));
   }
 
   function saveGrowthLog(record) {
@@ -2558,7 +2570,7 @@
         const saved = saveDryPeriodToDraft(d, record);
         completeLinkedWaterSchedule(d, saved, "dry", saved.dryPeriodId);
       });
-    }, message || `中干し記録を${rows.length}件保存しました`);
+    }, saveTargetsFeedback(message || `中干し記録を${rows.length}件保存しました`, rows, "dryPeriods", "dryPeriodId"));
   }
 
   function saveDryPeriod(record) {
@@ -2663,7 +2675,7 @@
         const saved = saveIrrigationToDraft(d, record);
         completeLinkedWaterSchedule(d, saved, "irrigation", saved.irrigationId);
       });
-    }, message || `水管理を${rows.length}件保存しました`);
+    }, saveTargetsFeedback(message || `水管理を${rows.length}件保存しました`, rows, "irrigations", "irrigationId"));
   }
 
   function saveIrrigation(record) {

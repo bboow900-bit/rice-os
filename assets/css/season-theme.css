@@ -1,0 +1,29 @@
+/* Seasonal decoration is separate from water, warning and destructive-action colors. */
+body[data-season-theme] {
+  --season-accent: #38665d;
+  --season-soft: #edf5f2;
+  --season-page: #f4f8f7;
+  --season-line: #d1e2dc;
+}
+body[data-season-theme="growing"] { --season-accent: #286848; --season-soft: #eaf5ec; --season-page: #f3f9f5; --season-line: #cfe3d4; }
+body[data-season-theme="heading"] { --season-accent: #176a72; --season-soft: #e5f3f3; --season-page: #f1f8f9; --season-line: #c6e0e2; }
+body[data-season-theme="ripening"] { --season-accent: #816016; --season-soft: #faf3d7; --season-page: #fbfaf5; --season-line: #e5d9aa; }
+body[data-season-theme="harvested"] { --season-accent: #884256; --season-soft: #f8edf1; --season-page: #fbf7f9; --season-line: #e8ced8; }
+html:has(#appBackButton) body[data-season-theme],
+html:has(#appBackButton) body[data-season-theme] .app-shell,
+html:has(#appBackButton) body[data-season-theme] .main-area,
+html:has(#appBackButton) body[data-season-theme] .screen.active { background: var(--season-page) !important; }
+html:has(#appBackButton) body[data-season-theme] .app-header { background: var(--season-accent) !important; }
+body[data-season-theme] .app-header #saveStatus:not([data-save-state="error"]) { background: transparent; border-color: #ffffff80; }
+body[data-season-theme] .app-shell .side-nav .nav-item.active { background: var(--season-soft) !important; border-color: var(--season-line) !important; }
+body[data-season-theme] .app-shell .side-nav .nav-item.active .nav-icon { background: var(--season-soft) !important; color: var(--season-accent) !important; box-shadow: inset 0 0 0 1px var(--season-line) !important; }
+body[data-season-theme] .app-shell .side-nav .nav-item.active .nav-label { color: var(--season-accent) !important; }
+body[data-season-theme] #screen-home {
+  --home-pop-green: var(--season-accent);
+  --home-pop-ink: #293d35;
+  --home-pop-line: var(--season-line);
+}
+body[data-season-theme] #screen-home [data-home-quick-record],
+body[data-season-theme] .fab { background: var(--season-accent) !important; border-color: var(--season-accent) !important; color: #fff; }
+body[data-season-theme] #screen-home .home-stage-observed em { background: var(--season-soft); color: var(--season-accent); }
+#screen-home [data-home-pop-stage="maturity"] .home-stage-observed b { color: var(--home-pop-gold); }

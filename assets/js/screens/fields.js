@@ -694,6 +694,10 @@
   }
 
   function fieldStage(field) {
+    const harvest = state.harvestStatusForField(field.fieldId, currentSeasonYear(), U.today());
+    if (harvest.status === "complete" && harvest.date && harvest.date <= U.today()) {
+      return { number: 8, label: "収穫済み", certainty: "作業記録", harvestDate: harvest.date };
+    }
     if (RiceOS.agro && RiceOS.agro.seasonStageForField) {
       const shared = RiceOS.agro.seasonStageForField(field);
       return {
@@ -903,8 +907,9 @@
     return `
       <button type="button" class="field-hub-card stage-${U.attr(String(stage.number).padStart(2, "0"))}" data-field-open="${U.attr(field.fieldId)}" data-field-search-text="${U.attr(`${field.name} ${variety && variety.name || ""} ${field.district || ""}`.toLowerCase())}">
         <span class="field-hub-card-rice">${groupRiceImage(stage.number)}</span>
-        <span class="field-hub-card-main"><b>${U.escapeHTML(field.name)}</b><small>${U.escapeHTML(variety && variety.name || "品種未設定")} / ${U.escapeHTML(String(field.areaA || 0))}a</small><em>${U.escapeHTML(fieldStatusText(field))}</em>${harvestBadge}<span class="field-herbicide-summary" data-field-herbicide="${U.attr(field.fieldId)}"><small>${U.escapeHTML(String(year))}年度の除草体系（計画）</small><strong>${U.escapeHTML(herbicideLabel)}</strong>${assignment ? `<small>${U.escapeHTML(assignment.steps.map(step => step.category).filter(Boolean).join(" → "))}</small>` : ""}</span></span>
-        <span class="field-hub-stage"><small>現在 / ${U.escapeHTML(stage.certainty || "記録待ち")}</small><b>${U.escapeHTML(stage.label)}</b></span>
+        <span class="field-hub-card-main"><b class="field-hub-card-name">${U.escapeHTML(field.name)}</b><small class="field-hub-card-meta">${U.escapeHTML(variety && variety.name || "品種未設定")} / ${U.escapeHTML(String(field.areaA || 0))}a</small><em class="field-hub-card-use-status">${U.escapeHTML(fieldStatusText(field))}</em>${harvestBadge}</span>
+        <span class="field-hub-stage field-hub-card-current"><small>現在 / ${U.escapeHTML(stage.certainty || "記録待ち")}</small><b>${U.escapeHTML(stage.label)}</b></span>
+        <span class="field-herbicide-summary field-hub-card-secondary" data-field-herbicide="${U.attr(field.fieldId)}"><small class="field-herbicide-caption">${U.escapeHTML(String(year))}年度の除草体系（計画）</small><strong class="field-herbicide-name">${U.escapeHTML(herbicideLabel)}</strong>${assignment ? `<small class="field-herbicide-steps">${U.escapeHTML(assignment.steps.map(step => step.category).filter(Boolean).join(" → "))}</small>` : ""}</span>
       </button>
     `;
   }
@@ -957,13 +962,13 @@
     const stage = fieldStage(field);
     const photo = latestPhotoForField(field);
     const planting = state.plantingDateForField ? state.plantingDateForField(field.fieldId, currentSeasonYear()) : "";
-    const stageDetail = planting ? `田植後 ${Math.max(0, U.daysBetween(planting, U.today()))}日` : "田植え実績を登録すると表示されます";
+    const stageDetail = stage.harvestDate ? `稲刈り完了 ${U.fd(stage.harvestDate)}` : planting ? `田植後 ${Math.max(0, U.daysBetween(planting, U.today()))}日` : "田植え実績を登録すると表示されます";
     return `
       <section class="field-hub-detail">
         <div class="field-hub-detail-head"><button type="button" class="field-hub-back" data-field-view="list" aria-label="圃場一覧へ戻る">‹</button><div><span>圃場情報</span><h3>${U.escapeHTML(field.name)}</h3><small>${U.escapeHTML(variety && variety.name || "品種未設定")} / ${U.escapeHTML(String(field.areaA || 0))}a</small></div><button type="button" class="secondary" data-field-view="settings">編集</button></div>
         <section class="field-hub-now stage-${U.attr(String(stage.number).padStart(2, "0"))}">
           ${photo && photo.photoData ? `<img src="${U.attr(photo.photoData)}" alt="">` : `<span>${groupRiceImage(stage.number)}</span>`}
-          <div><small>現在の生育ステージ / ${U.escapeHTML(stage.certainty)}</small><b>${U.escapeHTML(stage.label)}</b><p>${U.escapeHTML(stageDetail)}</p></div>
+          <div><small>${stage.harvestDate ? "現在の状態" : "現在の生育ステージ"} / ${U.escapeHTML(stage.certainty)}</small><b>${U.escapeHTML(stage.label)}</b><p>${U.escapeHTML(stageDetail)}</p></div>
         </section>
         ${renderCriticalWaterWindow(field)}
         <section class="field-herbicide-detail"><h4>${U.escapeHTML(String(herbicideYear || currentSeasonYear()))}年度の除草体系</h4><p>${U.escapeHTML((RiceOS.herbicide && RiceOS.herbicide.assignmentFor(field.fieldId, herbicideYear || currentSeasonYear()) || {}).name || "未設定")}</p><button type="button" class="secondary" data-field-herbicide-open>除草剤体系を確認・設定</button></section>

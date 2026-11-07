@@ -944,9 +944,6 @@
         <button type="button" class="annual-shipment-entry" data-annual-harvest-performance><b>年産別の収穫成績</b><span>品種ごとの収量・面積を振り返る ›</span></button>
         <div class="annual-hub-tools"><button type="button" data-annual-hub-notes aria-expanded="${hubNotesOpen}" aria-controls="annualHubNotes">来年メモ</button></div>
         ${renderCropYearClosure()}
-        ${!closureDraft ? renderAnnualReadiness(Number(yearValue() === "all" ? new Date().getFullYear() : yearValue())) : ""}
-        ${renderWorkTimingReviews(null, Number(yearValue() === "all" ? new Date().getFullYear() : yearValue()))}
-        ${renderSettingExperiments(null, Number(yearValue() === "all" ? new Date().getFullYear() : yearValue()))}
         <div class="annual-hub-nav" role="group" aria-label="振り返りの表示">
           ${[["fields", "圃場の一年"], ["work", "作業・資材"], ["compare", "年の比較"]].map(([value, label]) => `<button type="button" data-annual-hub-view="${value}" class="${topView === value ? "active" : ""}" aria-pressed="${topView === value}">${label}</button>`).join("")}
         </div>
@@ -982,6 +979,9 @@
         ` : ""}
         ${topView === "compare" ? renderHubCompare() : ""}
         </div>
+        ${!closureDraft ? renderAnnualReadiness(Number(yearValue() === "all" ? new Date().getFullYear() : yearValue())) : ""}
+        ${renderWorkTimingReviews(null, Number(yearValue() === "all" ? new Date().getFullYear() : yearValue()))}
+        ${renderSettingExperiments(null, Number(yearValue() === "all" ? new Date().getFullYear() : yearValue()))}
         <div id="annualHubNotes"${hubNotesOpen ? "" : " hidden"}>${hubNotesOpen ? renderNextSeasonIdeas() : ""}</div>
         ${renderAnnualFab()}
       </div>
@@ -2314,7 +2314,8 @@
       .sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""), "ja"))
       .map((item) => `<option value="${U.attr(item.fieldId)}" ${item.fieldId === field.fieldId ? "selected" : ""}>${U.escapeHTML(item.name)}${item.areaA ? ` / ${U.escapeHTML(String(item.areaA))}a` : ""}</option>`)
       .join("");
-    return `<label class="annual-field-switcher"><span>圃場を切替</span><select data-annual-field-switch aria-label="振り返る圃場を選択">${fieldOptions}</select></label>`;
+    const viewYear = yearValue() === "all" ? "全年度" : `${yearValue()}年産`;
+    return `<label class="annual-field-switcher"><span><b data-annual-view-year>閲覧：${U.escapeHTML(viewYear)}</b><small>圃場を切替</small></span><select data-annual-field-switch aria-label="振り返る圃場を選択">${fieldOptions}</select></label>`;
   }
 
   function renderFieldDetail(field) {
@@ -2328,7 +2329,7 @@
       <div class="annual-field-detail">
         <div class="annual-detail-head">
           <div>
-            <span>圃場履歴</span>
+            <span>${U.escapeHTML(yearValue() === "all" ? `全年度 / 比較基準：${detailYear}年産` : `${detailYear}年産`)}の圃場履歴</span>
             <h2>${U.escapeHTML(field.name)}</h2>
             <p>${U.escapeHTML(varietyName(field))} / ${U.escapeHTML(field.areaA ? `${field.areaA}a` : "面積未設定")}${planting ? ` / 田植後${U.escapeHTML(String(dap))}日` : ""}</p>
           </div>
@@ -2631,12 +2632,15 @@
       info.push(annualRecordInfoRow("使用量", row.amount || row.quantity));
     }
     const memo = String(row.memo || row.note || "").trim();
+    const matchedRecord = allRows().find(item => item.kind === kind && item.id === detail.id);
+    const recordYear = matchedRecord && matchedRecord.season || row.season || row.cropYear;
+    const recordYearLabel = recordYear ? `${recordYear}年産の記録` : "年度未設定";
     const photos = annualRecordPhotos(row);
     const harvestSnapshot = category === "収穫" && field ? renderHarvestTiming(row, field.fieldId) + renderHarvestReview(row) + renderHarvestSnapshot(row, field.fieldId) : "";
     return `
       <section class="annual-record-detail" aria-label="${U.attr(title)}の実績詳細">
         <button type="button" class="annual-record-detail-back" data-annual-record-detail-back aria-label="一年の流れへ戻る">‹</button>
-        <header class="annual-record-detail-head"><span>${U.escapeHTML(category)}</span><h2>${U.escapeHTML(title)}</h2><p>${U.escapeHTML(fieldNames || field?.name || "品種集計")} / ${U.escapeHTML(annualRecordDate(date))}</p></header>
+        <header class="annual-record-detail-head"><span>${U.escapeHTML(category)}</span><h2>${U.escapeHTML(title)}</h2><small data-annual-record-year>${U.escapeHTML(recordYearLabel)}</small><p>${U.escapeHTML(fieldNames || field?.name || "品種集計")} / ${U.escapeHTML(annualRecordDate(date))}</p></header>
         <section class="annual-record-detail-summary ${U.attr(isWater ? "water" : kind === "growth" ? "growth" : category === "収穫" ? "harvest" : "work")}" ><b>${U.escapeHTML(title)}</b><span>${U.escapeHTML(isLegacyWater ? "旧作業記録からの照合候補。水管理としては未確定です" : `${category}として登録された実績です`)}</span></section>
         <section class="annual-record-detail-section"><h3>記録内容</h3><div class="annual-record-detail-rows">${info.filter(Boolean).join("") || '<p class="annual-record-detail-empty">記録内容はありません。</p>'}</div></section>
         ${harvestSnapshot}

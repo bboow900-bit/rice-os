@@ -800,25 +800,28 @@
   // A home card is read-only: four short facts from existing records, not a new data source.
   function renderDecisionProgressGrid(field, stage, management, focus, dateText) {
     const fieldStage = stage.fieldStage || { current: stage.current, evidence: homeStageEvidenceLabel(stage), evidenceDate: "" };
-    const observed = fieldStage.current ? fieldStage.current.label : "現場記録なし";
-    const badge = fieldStage.current ? fieldStage.evidence : "記録待ち";
-    const outlook = homeStageOutlook(field, stage, focus, dateText);
+    const harvest = harvestHeatContext(field, dateText);
+    const observed = harvest.completed ? "収穫済み" : fieldStage.current ? fieldStage.current.label : "現場記録なし";
+    const badge = harvest.completed ? "作業記録" : fieldStage.current ? fieldStage.evidence : "記録待ち";
+    const outlook = harvest.completed ? { title: "今年の稲刈り完了", detail: `稲刈り ${U.fd(harvest.endDate)}` } : homeStageOutlook(field, stage, focus, dateText);
     const heat = homeStageHeat(field, dateText);
     const waterText = homeWaterCompactText(field, management, dateText);
     const waterDay = homeWaterDayText(field, dateText);
+    const notes = harvest.completed && state.seasonNotesForField ? state.seasonNotesForField(field.fieldId, cropYear(dateText), { includeCarryover: true }) : [];
+    const reviewStatus = notes.some(note => String(note.text || "").trim()) ? "振り返りメモあり" : "振り返りメモ未記録";
     return `
       <div class="home-stage-summary">
         <div class="home-stage-observed">
-          <span class="home-stage-observed-label">現場ステージ</span>
+          <span class="home-stage-observed-label">${harvest.completed ? "現在の状態" : "現場ステージ"}</span>
           <b>${U.escapeHTML(observed)}</b>
-          <em>${U.escapeHTML(badge)}</em>
+          <em>${U.escapeHTML(badge === "記録待ち" ? "今年の生育記録なし" : badge)}</em>
         </div>
-        <p class="home-stage-outlook"><span>見通し</span><b>${U.escapeHTML(outlook.title)}</b><small>${U.escapeHTML(outlook.detail)}</small></p>
+        <p class="home-stage-outlook"><span>${harvest.completed ? "実績" : "見通し"}</span><b>${U.escapeHTML(outlook.title)}</b><small>${U.escapeHTML(outlook.detail)}</small></p>
         <div class="home-stage-heat">
-          <div><span>積算気温</span><b>${U.escapeHTML(heat.title)}</b><small>${U.escapeHTML(heat.note)}</small></div>
+          <div><span>${harvest.completed ? "収穫時積算" : "積算気温"}</span><b>${U.escapeHTML(heat.title)}</b><small>${U.escapeHTML(heat.note)}</small></div>
           <i aria-hidden="true"><em style="width:${U.attr(String(heat.percent))}%"></em></i>
         </div>
-        <div class="home-stage-water"><span aria-hidden="true">💧</span><b>${U.escapeHTML(waterText)}</b><small>${U.escapeHTML(waterDay)}</small></div>
+        ${harvest.completed ? `<p class="home-harvest-review-state">${U.escapeHTML(reviewStatus)}</p>` : `<div class="home-stage-water"><span aria-hidden="true">💧</span><b>${U.escapeHTML(waterText)}</b><small>${U.escapeHTML(waterDay)}</small></div>`}
       </div>
     `;
   }
@@ -920,21 +923,25 @@
   }
 
   function homeStageHeat(field, dateText) {
+    const context = harvestHeatContext(field, dateText);
     const planting = plantingDateForYear(field.fieldId, cropYear(dateText));
-    if (!planting) return { title: "田植日待ち", note: "田植えを記録すると計算", percent: 0 };
     const key = heatCacheKey(field, planting, dateText);
     const cached = heatCache.get(key);
-    const heading = actualHeadingDate(field, dateText);
+    const heading = actualHeadingDate(field, context.endDate);
     const reference = harvestReferenceFor(field);
     const target = heading ? reference.target : accumulatedTempTarget(field);
-    const rows = validTempRows(cached && cached.rows);
+    const saved = harvestHeatSnapshot(field, context, heading);
+    if (saved) return { title: `${Math.round(saved.total)}℃`, note: `収穫時積算 / 出穂翌日〜${U.fd(context.endDate)} / 保存済み ${saved.count}日分`, percent: progressPercent(saved.total, target) };
+    if (context.completed && !heading) return { title: "出穂日未登録", note: "出穂後の収穫時積算は計算できません", percent: 0 };
+    if (!planting) return { title: "田植日未登録", note: "田植えの実績日が必要です", percent: 0 };
     const start = heading ? postHeadingThermalStart(heading) : planting;
-    const accumulated = cached && !cached.error ? accumulatedFromRows(rows, start, dateText) : { total: "", count: 0 };
+    const accumulated = cached && !cached.error ? accumulatedFromRows(cached.rows, start, context.endDate) : { total: "", count: 0 };
     if (!cached) return { title: "取得中", note: heading ? "出穂後の登熟を計算中" : "田植えからの生育を計算中", percent: 0 };
-    if (cached.error || accumulated.total === "") return { title: "記録待ち", note: "気温データを取得できません", percent: 0 };
+    if (cached.error) return { title: "気温取得失敗", note: "通信・地点設定をご確認ください。記録は残っています", percent: 0 };
+    if (accumulated.total === "") return { title: "気温データなし", note: "対象期間の確定した日平均気温がありません", percent: 0 };
     return {
       title: `${Math.round(accumulated.total)}℃`,
-      note: heading ? `出穂翌日から ${accumulated.count}日分 / 目安 ${reference.label}` : `田植後 ${U.daysBetween(planting, dateText)}日 / 出穂目安 ${target}℃`,
+      note: context.completed ? `収穫時積算 / ${U.fd(context.endDate)}まで ${heatCoverageLabel(accumulated)}` : heading ? `出穂翌日から ${heatCoverageLabel(accumulated)} / 目安 ${reference.label}` : `田植後 ${U.daysBetween(planting, dateText)}日 / ${heatCoverageLabel(accumulated)} / 出穂目安 ${target}℃`,
       percent: progressPercent(accumulated.total, target)
     };
   }
@@ -1427,7 +1434,8 @@
 
   function heatCacheKey(field, planting, date) {
     const location = state.data().meta && state.data().meta.weatherLocation || {};
-    return [field && field.fieldId, planting, date, location.latitude, location.longitude, location.updatedAt].join(":");
+    const end = field ? harvestHeatContext(field, date).endDate : date;
+    return [field && field.fieldId, planting, date, end, location.latitude, location.longitude, location.updatedAt].join(":");
   }
 
   function heatPace(cached) {
@@ -1479,16 +1487,51 @@
 
   function validTempRows(rows) {
     return (rows || [])
-      .filter((row) => row && row.date && row.tempMean !== "" && Number.isFinite(Number(row.tempMean)))
+      .filter((row) => row && validHeatDate(row.date)
+        && ["number", "string"].includes(typeof row.tempMean) && String(row.tempMean).trim() !== "" && Number.isFinite(Number(row.tempMean)))
       .sort((a, b) => String(a.date).localeCompare(String(b.date)));
   }
 
+  function validHeatDate(date) {
+    return typeof date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(date)
+      && Number.isFinite(Date.parse(`${date}T00:00:00Z`)) && new Date(`${date}T00:00:00Z`).toISOString().slice(0, 10) === date;
+  }
+
+  function harvestHeatContext(field, date) {
+    const status = state.harvestStatusForField(field.fieldId, cropYear(date), date);
+    const completed = status.status === "complete" && validHeatDate(status.date) && status.date <= date && cropYear(status.date) === cropYear(date);
+    return { status, completed, endDate: completed ? status.date : date };
+  }
+
+  function harvestHeatSnapshot(field, context, heading) {
+    if (!context.completed || !heading || !state.isHarvestThermalComplete) return null;
+    // Reuse only a snapshot whose coverage, heading and location still validate.
+    for (const id of context.status.workIds || []) {
+      const work = (state.data().fieldWorks || []).find(row => row.workId === id && row.date === context.endDate);
+      const snapshot = work && (work.harvestSnapshots || []).find(row => row.fieldId === field.fieldId && row.harvestDate === context.endDate);
+      const thermal = snapshot && snapshot.thermal;
+      if (thermal && thermal.headingDate === heading && thermal.startDate === postHeadingThermalStart(heading)
+        && thermal.endDate === context.endDate && typeof thermal.total === "number" && Number.isFinite(thermal.total)
+        && state.isHarvestThermalComplete(id, field.fieldId)) return thermal;
+    }
+    return null;
+  }
+
+  function heatCoverageLabel(value) {
+    return `${value.count}日分${value.count < value.expectedDays ? ` / 一部欠測（必要 ${value.expectedDays}日）` : ""}`;
+  }
+
   function accumulatedFromRows(rows, startDate, endDate) {
-    const validRows = validTempRows(rows).filter((row) => row.date >= startDate && row.date <= endDate);
+    const candidates = (rows || []).filter(row => row && row.date >= startDate && row.date <= endDate && row.date < U.today());
+    const counts = new Map();
+    candidates.forEach(row => counts.set(row.date, (counts.get(row.date) || 0) + 1));
+    const validRows = validTempRows(candidates).filter(row => counts.get(row.date) === 1
+      && !/forecast|seasonal|lastYear/i.test(`${row.source || ""} ${row.basis || ""} ${row.dataset || ""} ${row.model || ""}`));
     const total = validRows.reduce((sum, row) => sum + Number(row.tempMean), 0);
     return {
       count: validRows.length,
-      total: Math.round(total * 10) / 10
+      expectedDays: validHeatDate(startDate) && validHeatDate(endDate) && startDate <= endDate ? U.daysBetween(startDate, endDate) + 1 : 0,
+      total: validRows.length ? Math.round(total * 10) / 10 : ""
     };
   }
 
@@ -1551,21 +1594,24 @@
 
   function renderRipeningHeatMeter(field, cached, planting, headingTarget) {
     const date = U.today();
+    const context = harvestHeatContext(field, date);
     const reference = harvestReferenceFor(field);
     const target = reference.target;
-    const heading = headingDateInfo(field, cached, planting, headingTarget, date);
+    const headingCache = context.completed && cached ? { ...cached, rows: (cached.rows || []).filter(row => row.date <= context.endDate), projectionRows: [] } : cached;
+    const heading = headingDateInfo(field, headingCache, planting, headingTarget, context.endDate);
     const thermalStart = heading.date ? postHeadingThermalStart(heading.date) : "";
     const availableRows = validTempRows(cached && cached.rows);
     const projectionRows = validTempRows(cached && cached.projectionRows);
     const canUseRows = heading.date && cached && !cached.error;
     const today = date;
-    const actual = canUseRows && thermalStart <= today ? accumulatedFromRows(availableRows, thermalStart, today) : { count: 0, total: "" };
-    const futureRows = canUseRows && Number(actual.total || 0) < target
+    const saved = harvestHeatSnapshot(field, context, heading.date);
+    const actual = saved || (canUseRows && thermalStart <= context.endDate ? accumulatedFromRows(cached.rows, thermalStart, context.endDate) : { count: 0, total: "" });
+    const futureRows = !context.completed && canUseRows && Number(actual.total || 0) < target
       ? projectionRows.filter((row) => row.date >= today && row.date >= thermalStart)
       : [];
     const percent = actual.total === "" ? 0 : progressPercent(actual.total, target);
-    const harvestStatus = state.harvestStatusForField(field.fieldId, cropYear(date), date);
-    const completed = harvestStatus.status === "complete";
+    const harvestStatus = context.status;
+    const completed = context.completed;
     const status = completed ? { label: "収穫済み", tone: "ready", note: `稲刈り完了 ${U.fd(harvestStatus.date)}` }
       : ripeningStatus(actual.total, target, heading);
     const projectedEta = completed ? "" : futureRows.length
@@ -1578,17 +1624,18 @@
         : actual.count
           ? `${Math.round(actual.total)}℃`
           : "取得中";
-    const note = !planting
+    const note = saved ? `出穂翌日〜${U.fd(context.endDate)} / 保存済み ${saved.count}日分`
+      : !planting
       ? "田植え作業を登録すると計算します"
       : !heading.date
         ? "出穂確認か出穂目安が必要です"
-        : `${U.fd(thermalStart)}からの確定 ${actual.count}日分 / ${heading.source}`;
+        : `${U.fd(thermalStart)}〜${U.fd(context.endDate)} / ${heatCoverageLabel(actual)} / ${saved ? "保存済み" : heading.source}`;
     return `
       <section class="farm-heat-meter farm-heat-meter-ripening">
         <div class="farm-heat-meter-head">
           <span>🌾</span>
           <div>
-            <b>出穂後積算</b>
+            <b>${completed ? "収穫時の出穂後積算" : "出穂後積算"}</b>
             <small>${U.escapeHTML(note)}</small>
           </div>
           <strong>${U.escapeHTML(title)}</strong>
@@ -1611,14 +1658,16 @@
   }
 
   function renderHeatMeter(field) {
+    const context = harvestHeatContext(field, U.today());
     const planting = plantingDateForYear(field.fieldId, cropYear(U.today()));
     const panicleLog = panicleLogForYear(field.fieldId, cropYear(U.today()), U.today());
     const target = accumulatedTempTarget(field);
     const panicleTarget = panicleTempTarget(field);
     const key = heatCacheKey(field, planting, U.today());
     const cached = heatCache.get(key);
-    const total = cached && cached.total !== undefined ? cached.total : "";
-    const count = cached && cached.count || 0;
+    const actual = cached && !cached.error ? accumulatedFromRows(cached.rows, planting, context.endDate) : { total: "", count: 0 };
+    const total = actual.total;
+    const count = actual.count;
     const percent = total === "" ? 0 : progressPercent(total, target);
     const paniclePercent = progressPercent(panicleTarget, target);
     const title = total === "" ? "積算気温を取得中" : `${Math.round(total)}℃`;
@@ -1627,7 +1676,7 @@
       : cached && cached.error
         ? cached.error
         : count
-          ? `${U.fd(planting)}から確定 ${count}日分 / 出穂目安 ${target}℃`
+          ? `${U.fd(planting)}〜${U.fd(context.endDate)} / ${heatCoverageLabel(actual)}${context.completed ? " / 収穫時" : ` / 出穂目安 ${target}℃`}`
           : "圃場付近の天気データを確認中";
     return `
       <div class="farm-heat-stack" data-heat-field="${U.attr(field.fieldId)}">
@@ -1635,7 +1684,7 @@
           <div class="farm-heat-meter-head">
             <span>🔥</span>
             <div>
-              <b>積算気温</b>
+              <b>${context.completed ? "収穫時の積算気温" : "積算気温"}</b>
               <small>${U.escapeHTML(note)}</small>
             </div>
             <strong>${U.escapeHTML(title)}</strong>
@@ -1644,7 +1693,7 @@
             ${panicleLog ? "" : `<i style="left:${U.attr(String(paniclePercent))}%"></i>`}
             <em style="width:${U.attr(String(percent))}%"></em>
           </div>
-          ${renderHeatForecast(cached, total, panicleTarget, target, Boolean(panicleLog))}
+          ${context.completed ? "" : renderHeatForecast(cached, total, panicleTarget, target, Boolean(panicleLog))}
           <div class="farm-heat-scale">
             <span>田植え</span>
             <span>${panicleLog ? `幼穂確認済み ${U.escapeHTML(U.fd(panicleLog.date))}` : `幼穂 ${U.escapeHTML(String(panicleTarget))}℃`}</span>
@@ -2071,16 +2120,21 @@
           location = location || await RiceOS.weather.ensureLocation();
           // Keep the confirmed accumulation separate from the current day's
           // forecast. Today and later remain in projectionRows only.
-          const result = await RiceOS.weather.fetchDailyRange(planting, addDays(U.today(), -1), location);
-          projectionRows = projectionRows.length ? projectionRows : await fetchHeatProjection(location);
-          result.projectionRows = projectionRows;
+          const context = harvestHeatContext(field, U.today());
+          const end = context.endDate < U.today() ? context.endDate : addDays(U.today(), -1);
+          if (planting > end) continue;
+          const result = context.completed
+            ? await RiceOS.weather.fetchDailyRange(planting, end, location)
+            : await RiceOS.weather.fetchDailyRange(planting, addDays(U.today(), -1), location);
+          if (!context.completed) projectionRows = projectionRows.length ? projectionRows : await fetchHeatProjection(location);
+          result.projectionRows = context.completed ? [] : projectionRows;
           heatCache.set(key, result);
         } catch (error) {
           heatCache.set(key, { error: error.message || "積算気温を取得できませんでした" });
         }
       } else {
         const cached = heatCache.get(key);
-        if (cached && !cached.error && !cached.projectionRows) {
+        if (cached && !cached.error && !cached.projectionRows && !harvestHeatContext(field, U.today()).completed) {
           try {
             location = location || await RiceOS.weather.ensureLocation();
             projectionRows = projectionRows.length ? projectionRows : await fetchHeatProjection(location);

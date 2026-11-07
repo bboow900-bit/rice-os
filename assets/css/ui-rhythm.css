@@ -1,0 +1,155 @@
+/* Shared presentation rhythm. Record models, route targets and timelines stay intact. */
+body {
+  --ui-ink: #263c35;
+  --ui-muted: #596d66;
+  --ui-rule: #dce5e0;
+  --ui-accent: var(--season-accent, #286848);
+  --ui-soft: var(--season-soft, #eaf5ec);
+}
+.screen { min-width: 0; }
+.screen :is(button, input, select, textarea) { letter-spacing: 0; }
+.screen :is(button, input, select, textarea):focus-visible {
+  outline: 3px solid var(--ui-accent);
+  outline-offset: 3px;
+}
+.screen :is(.screen-head, .section-title) { gap: 12px; }
+.screen .screen-head > div { min-width: 0; }
+.screen .screen-head h2 { font-size: 22px; line-height: 1.4; overflow-wrap: anywhere; }
+.screen .section-title h3 { font-size: 18px; line-height: 1.45; color: var(--ui-ink); }
+.screen .eyebrow { font-size: 12px; line-height: 1.5; color: var(--ui-muted); }
+.screen :is(.muted, .section-title > span) { line-height: 1.6; }
+.screen :is(.form-actions, .ts-actions, .recipe-ledger-actions) { gap: 10px; }
+.screen .form-actions > button { min-height: 48px; border-radius: 8px; padding: 11px 18px; font-size: 15px; }
+.screen :is(.stack-form, .profile-ledger-detail, .recipe-readonly, .annual-record-detail) {
+  font-size: 14px;
+  line-height: 1.65;
+  color: var(--ui-ink);
+}
+.screen .stack-form { gap: 16px; }
+.screen .stack-form label { font-size: 13px; line-height: 1.55; }
+.screen .stack-form :is(input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]):not([type="range"]), select, textarea) {
+  min-width: 0;
+  max-width: 100%;
+  min-height: 44px;
+  border: 1px solid #cbd9d1;
+  border-radius: 8px;
+  background: #fff;
+  color: var(--ui-ink);
+  padding: 10px 12px;
+  font-size: 16px;
+  line-height: 1.45;
+}
+.screen .stack-form textarea { min-height: 100px; resize: vertical; }
+.screen :is(.worker-preset, .work-time-tools) button { min-height: 44px; border-radius: 8px; font-size: 12px; line-height: 1.4; white-space: normal; }
+#screen-field-work .work-template-panel { border: 0; border-radius: 0; box-shadow: none; background: transparent; padding: 0 12px 12px; }
+#screen-field-work #fwTemplatePicks button { border-radius: 8px; box-shadow: none; min-height: 64px; height: auto; }
+#screen-field-work #fwTemplatePicks button small,
+#screen-field-work .work-input-mode button small { font-size: 11px; line-height: 1.5; white-space: normal; overflow: visible; text-overflow: clip; -webkit-line-clamp: unset; }
+.screen .form-section { border-radius: 8px; box-shadow: none; border: 1px solid var(--ui-rule); }
+.screen .form-section > summary { min-height: 48px; font-size: 15px; line-height: 1.5; font-weight: 750; }
+.screen .form-section[open] > summary { margin-bottom: 8px; border-bottom: 1px solid var(--ui-rule); }
+.screen :is(.profile-ledger-detail, .recipe-readonly) dl > div { padding: 8px 0; border-bottom: 1px solid var(--ui-rule); }
+.screen :is(.profile-ledger-detail, .recipe-readonly) dt { color: var(--ui-muted); }
+.screen :is(.profile-ledger-detail, .recipe-readonly) dd { color: var(--ui-ink); font-weight: 650; }
+
+/* Home: stable identity, a clear current state, then quieter evidence. */
+#screen-home .home-decision-list { display: grid; gap: 12px; }
+#screen-home .home-decision-card { border: 1px solid var(--home-pop-line); border-radius: 8px; overflow: hidden; }
+#screen-home .home-decision-card-toggle { padding: 16px 14px 12px; }
+#screen-home .home-decision-card-head b { font-size: 18px; line-height: 1.4; }
+#screen-home .home-decision-card-head small { font-size: 12px; line-height: 1.5; font-weight: 500; }
+#screen-home .home-stage-summary { margin-top: 12px; gap: 9px; }
+#screen-home .home-stage-observed { gap: 6px; align-items: center; }
+#screen-home .home-stage-observed b { font-size: 17px; line-height: 1.4; }
+#screen-home .home-stage-observed-label { font-size: 11px; }
+#screen-home .home-stage-observed em { font-size: 11px; line-height: 1.5; white-space: normal; }
+#screen-home .home-stage-outlook { margin: 0; line-height: 1.55; }
+#screen-home .home-stage-outlook > b { font-size: 13px; }
+#screen-home .home-stage-outlook small { font-size: 12px; line-height: 1.55; font-weight: 500; }
+#screen-home .home-stage-heat small { font-size: 11px; line-height: 1.55; font-weight: 500; }
+#screen-home .home-stage-water { padding: 8px; gap: 6px; line-height: 1.5; }
+#screen-home .home-stage-water small { font-size: 11px; }
+#screen-home .home-harvest-review-state { margin: 0; padding-top: 8px; border-top: 1px solid var(--ui-rule); color: var(--ui-muted); font-size: 12px; line-height: 1.6; }
+#screen-home .home-water-quick { margin: 0 14px 14px; }
+#screen-home .home-decision-section-head { margin-top: 20px; align-items: center; }
+#screen-home .home-decision-section-head small { font-size: 11px; }
+#screen-home .home-decision-summary > button { border-radius: 8px; box-shadow: none; }
+
+/* Field settings keep their own status colors; the total and filters are quiet bands. */
+#screen-fields > .screen-head { display: none !important; }
+#screen-fields .field-hub-intro { align-items: center; gap: 14px; margin-bottom: 0; }
+#screen-fields .field-hub-intro h3 { font-size: 22px; line-height: 1.4; margin: 4px 0; }
+#screen-fields .field-hub-intro small { font-size: 12px; line-height: 1.6; font-weight: 500; }
+#screen-fields .field-hub-intro .primary { min-width: 76px; min-height: 44px; border-radius: 8px; font-size: 12px; padding: 10px; }
+#screen-fields [data-field-active-area] { margin: 0; padding: 12px 0; border-block: 1px solid var(--ui-rule); font-size: 12px; line-height: 1.7; }
+#screen-fields [data-field-active-area] b { color: var(--ui-ink); font-size: 14px; }
+#screen-fields .field-herbicide-year { flex-wrap: wrap; gap: 8px; margin: 0; padding: 0; font-size: 12px; color: var(--ui-muted); }
+#screen-fields .field-herbicide-year select { min-height: 44px; font-size: 14px; border-radius: 8px; }
+#screen-fields .field-hub-filters :is(input, select) { min-height: 44px; border-radius: 8px; font-size: 14px; }
+#screen-fields .field-hub-groups { gap: 8px; margin-block: 0; }
+#screen-fields .field-hub-groups > div { border-radius: 8px; }
+#screen-fields .field-hub-cards { gap: 12px; }
+#screen-fields .field-hub-settings :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea) { border-radius: 8px; font-size: 16px; line-height: 1.5; min-height: 44px; }
+
+/* Review: preserve all factual content and the single-column yearly flow. */
+#screen-annual .annual-v2-top { background: transparent; }
+#screen-annual .annual-pop-heading { min-height: 116px; padding-block: 12px; }
+#screen-annual .annual-pop-heading h2 { font-size: 24px; color: var(--ui-ink); }
+#screen-annual .annual-pop-rice { width: 104px; height: 104px; flex-basis: 104px; }
+#screen-annual .annual-shipment-entry { padding: 14px; gap: 8px; min-height: 56px; text-align: left; }
+#screen-annual .annual-shipment-entry b { font-size: 15px; line-height: 1.5; }
+#screen-annual .annual-shipment-entry span { font-size: 12px; line-height: 1.5; }
+#screen-annual .annual-hub-nav { gap: 4px; padding: 4px; border: 1px solid var(--ui-rule); border-radius: 8px; background: #fff; }
+#screen-annual .annual-hub-nav button { min-width: 0; min-height: 44px; padding: 9px 5px; font-size: 13px; line-height: 1.5; border-radius: 6px; }
+#screen-annual .annual-hub-nav button.active { background: var(--ui-accent); color: #fff; }
+#screen-annual .annual-field-picker .section-title { text-align: left; justify-items: start; }
+#screen-annual .annual-field-pick-grid { gap: 12px; }
+#screen-annual .annual-field-pick-card { border-radius: 8px; box-shadow: none; }
+#screen-annual .annual-field-pick-head { flex-wrap: wrap; }
+#screen-annual .annual-field-pick-head > div { flex-wrap: wrap; gap: 2px 8px; }
+#screen-annual .annual-field-pick-head b { font-size: 18px; line-height: 1.4; overflow-wrap: anywhere; }
+#screen-annual .annual-field-pick-head em { font-size: 12px; font-weight: 500; white-space: normal; }
+#screen-annual .annual-field-pick-main small { font-size: 12px; line-height: 1.55; font-weight: 500; }
+#screen-annual .annual-field-pick-metrics span { padding: 3px 5px; font-size: 11px; font-weight: 500; border-radius: 4px; }
+#screen-annual .annual-year-review > summary { min-height: 44px; padding-block: 12px; line-height: 1.5; font-size: 13px; }
+#screen-annual .annual-record-detail-head h2 { font-size: 22px; line-height: 1.45; }
+#screen-annual .annual-field-switcher > span { display: grid; gap: 3px; max-width: 110px; }
+#screen-annual.annual-detail-mode { overflow: visible !important; }
+html:has(#screen-annual.annual-detail-mode.active),
+body:has(#screen-annual.annual-detail-mode.active) { overflow-x: clip !important; overflow-y: visible !important; }
+#screen-annual .annual-field-switcher > span b { font-size: 12px; line-height: 1.45; }
+#screen-annual .annual-field-switcher > span small { font-size: 11px; line-height: 1.4; font-weight: 500; }
+#screen-annual [data-annual-record-year] { display: block; color: var(--ui-accent); font-size: 13px; line-height: 1.6; font-weight: 650; }
+#screen-annual .annual-record-detail-section { border-radius: 0; background: transparent; box-shadow: none; padding: 16px 0; border-bottom: 1px solid var(--ui-rule); }
+#screen-annual .annual-record-detail-section h3 { margin: 0 0 12px; font-size: 16px; color: var(--ui-ink); }
+#screen-annual .annual-record-detail-row { padding-block: 9px; gap: 12px; line-height: 1.6; }
+#screen-annual .annual-record-detail-row > span { color: var(--ui-muted); font-size: 13px; }
+#screen-annual .annual-record-detail-memo { font-size: 14px; line-height: 1.8; white-space: pre-wrap; }
+
+/* Shared masters remain one familiar destination, grouped by purpose. */
+#screen-data .screen-head { text-align: left; }
+#screen-data .screen-head h2 { margin-top: 4px; }
+#screen-data .settings-menu { padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+#screen-data .settings-menu > .section-title { align-items: flex-start; text-align: left; margin: 20px 0 6px; }
+#screen-data .settings-menu > .section-title .muted { font-size: 12px; }
+#screen-data .common-master-grid { gap: 12px; }
+#screen-data .common-master-group { grid-column: 1 / -1; margin: 12px 0 0; padding: 8px 0; font-size: 15px; line-height: 1.5; color: var(--ui-ink); border-bottom: 1px solid var(--ui-rule); }
+#screen-data .common-master-card { border-radius: 8px; min-height: 150px; padding: 16px 8px 12px; gap: 6px; box-shadow: none; }
+#screen-data .common-master-card img { width: 62px; height: 62px; border-radius: 8px; background: transparent; }
+#screen-data .common-master-card b { font-size: 15px; line-height: 1.45; overflow-wrap: anywhere; }
+#screen-data .common-master-card small { font-size: 12px; line-height: 1.5; color: var(--ui-muted); font-weight: 500; }
+#screen-data .common-master-card em { font-size: 11px; line-height: 1.4; border-radius: 4px; }
+
+#screen-outlook .outlook-field-card { border-radius: 8px; box-shadow: none; }
+#screen-outlook .outlook-card-head h3 { font-size: 18px; line-height: 1.45; }
+#screen-outlook .outlook-estimates dt { color: var(--ui-muted); font-size: 12px; line-height: 1.5; }
+#screen-outlook .outlook-estimates dd { font-size: 17px; line-height: 1.5; }
+@media (min-width: 901px) {
+  #screen-data .common-master-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  #screen-annual .annual-field-pick-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 430px) {
+  #screen-home .home-decision-section-head { flex-wrap: wrap; gap: 10px; }
+  #screen-home .home-decision-section-head select { flex: 1 1 170px; font-size: 12px; }
+  .screen :is(.form-actions, .ts-actions, .recipe-ledger-actions) { flex-wrap: wrap; }
+}
