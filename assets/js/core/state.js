@@ -2148,6 +2148,20 @@
       const index = record.materialId ? d.materials.findIndex((item) => item.materialId === record.materialId) : -1;
       if (record.materialId && index < 0) throw new Error("資材が見つかりません。台帳を開き直してください。");
       const previous = index >= 0 ? d.materials[index] : {};
+      record = Object.fromEntries(Object.entries(record).filter(([,value]) => value !== undefined));
+      if (Array.isArray(previous.stocktakes) && previous.stocktakes.length && record.unit !== undefined && String(record.unit).trim() !== String(previous.unit || "").trim()) {
+        throw new Error("在庫確認履歴がある資材の管理単位は変更できません。別単位の資材は新しく登録してください。");
+      }
+      if (Array.isArray(previous.stocktakes) && previous.stocktakes.length && record.stocktakes !== undefined) {
+        if (!Array.isArray(record.stocktakes)) throw new Error("在庫確認履歴の形式を確認してください。");
+        previous.stocktakes.forEach(old => {
+          const next = record.stocktakes.find(row => row.stocktakeId === old.stocktakeId);
+          const withoutCancellation = row => Object.fromEntries(Object.entries(row).filter(([key]) => key !== "deletedAt"));
+          if (!next || JSON.stringify(withoutCancellation(next)) !== JSON.stringify(withoutCancellation(old)) || old.deletedAt && next.deletedAt !== old.deletedAt) {
+            throw new Error("在庫確認の過去履歴は上書きできません。訂正または取り消しを使ってください。");
+          }
+        });
+      }
       record = { ...previous, ...record };
       if (!String(record.name || "").trim()) throw new Error("資材名を入力してください。");
       const normalized = {
@@ -2177,6 +2191,7 @@
     return mutate((d) => {
       if (!d.materials.some((m) => m.materialId === materialId)) throw new Error("資材が見つかりません。");
       const material = d.materials.find(m => m.materialId === materialId);
+      if (material.stocktakes !== undefined && (!Array.isArray(material.stocktakes) || material.stocktakes.length)) throw new Error("在庫確認履歴のある資材は削除できません。在庫の修正は『在庫を合わせる』から行ってください。");
       if (material.purchases !== undefined && (!Array.isArray(material.purchases) || material.purchases.length)) throw new Error("購入履歴のある資材は削除できません。購入履歴を確認・編集してください。");
       if (Object.entries(d).some(([key, value]) => key !== "materials" && hasMasterReference(value, "materialId", materialId))) throw new Error("作業記録・予定・除草体系で参照されている資材は削除できません。履歴を保持するため、資材の編集をご利用ください。");
       d.materials = d.materials.filter((m) => m.materialId !== materialId);

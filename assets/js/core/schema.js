@@ -5,7 +5,7 @@
   const U = RiceOS.utils;
 
   const SCHEMA_VERSION = 17;
-  const APP_VERSION = "20261107_ver305";
+  const APP_VERSION = "20261108_ver307";
   const STORE_KEY = "rice_os_v8_stable";
   const BACKUP_KEY = "rice_os_v8_stable_backup";
   const RELEASE_BACKUPS_KEY = "rice_os_v8_stable_release_backups";
@@ -772,6 +772,36 @@
 
   function normalizeMaterial(input) {
     const m = input || {};
+    if (m.stocktakes !== undefined) {
+      const ids = new Set();
+      const validDay = date => {
+        const time = typeof date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(date) ? Date.parse(`${date}T00:00:00Z`) : NaN;
+        return Number(date && date.slice(0, 4)) >= 1900 && Number(date && date.slice(0, 4)) <= 2200 && Number.isFinite(time) && new Date(time).toISOString().slice(0, 10) === date;
+      };
+      const validTime = time => typeof time === "string" && Boolean(time) && Number.isFinite(Date.parse(time));
+      const validQuantity = q => typeof q === "number" && Number.isFinite(q) && q >= 0 && q <= Number.MAX_SAFE_INTEGER;
+      if (!Array.isArray(m.stocktakes)) throw new Error("在庫確認履歴の形式を確認してください。元のデータは変更していません。");
+      m.stocktakes.forEach(row => {
+        if (!row || typeof row !== "object" || typeof row.stocktakeId !== "string" || !row.stocktakeId.trim() || ids.has(row.stocktakeId)
+          || !validDay(row.date) || !validQuantity(row.quantity) || typeof row.unit !== "string" || !row.unit.trim() || !validTime(row.createdAt)
+          || !String(m.unit || "").trim() || row.unit.trim() !== String(m.unit || "").trim()
+          || row.sequence !== undefined && (!Number.isSafeInteger(row.sequence) || row.sequence < 0)
+          || ["previousQuantity","adjustment"].some(key => row[key] !== undefined && row[key] !== null && (typeof row[key] !== "number" || !Number.isFinite(row[key]) || Math.abs(row[key]) > Number.MAX_SAFE_INTEGER * 2))
+          || row.deletedAt !== undefined && !validTime(row.deletedAt)
+          || row.supersedesId !== undefined && (typeof row.supersedesId !== "string" || !row.supersedesId.trim() || row.supersedesId === row.stocktakeId)
+          || !row.snapshot || typeof row.snapshot !== "object") throw new Error("在庫確認履歴の日付・数量・単位・IDを確認してください。");
+        ids.add(row.stocktakeId);
+        ["purchases", "usage"].forEach(key => {
+          const entries = row.snapshot[key], keys = new Set();
+          if (!Array.isArray(entries)) throw new Error("在庫確認時の履歴照合情報を確認してください。");
+          entries.forEach(entry => {
+            if (!entry || typeof entry.id !== "string" || !entry.id.trim() || keys.has(entry.id) || !validDay(entry.date) || entry.date > row.date
+              || !(entry.quantity === null || validQuantity(entry.quantity)) || typeof entry.unit !== "string") throw new Error("在庫確認時の履歴照合情報が不正です。");
+            keys.add(entry.id);
+          });
+        });
+      });
+    }
     if (m.purchases !== undefined) {
       const ids = new Set();
       if (!Array.isArray(m.purchases)) throw new Error("資材の購入履歴の形式を確認してください。元のデータは変更していません。");

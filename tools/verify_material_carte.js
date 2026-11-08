@@ -17,7 +17,7 @@ global.CustomEvent = class {};
 Object.defineProperty(global, "navigator", { value: {}, configurable: true });
 const memory = new Map();
 global.localStorage = { getItem: (k) => memory.get(k) || null, setItem: (k, v) => memory.set(k, String(v)), removeItem: (k) => memory.delete(k) };
-for (const file of ["core/utils", "core/schema", "core/storage", "core/state", "core/herbicide", "screens/materials"]) {
+for (const file of ["core/utils", "core/schema", "core/storage", "core/state", "core/herbicide", "core/material-purchases", "core/material-stock", "screens/materials"]) {
   vm.runInThisContext(fs.readFileSync(`assets/js/${file}.js`, "utf8"));
 }
 RiceOS.utils.setOptions = () => {};

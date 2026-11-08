@@ -34,9 +34,16 @@
   }
   function renderArchiveEntry(row) {
     const main = row.raw || {};
-    const info = main.material || main.machine || row.target || "";
     const fieldId = (row.fieldIds || []).find(id => state.field(id));
-    return `<button type="button" class="annual-archive-preview" data-annual-record-open-kind="${U.attr(row.kind)}" data-annual-record-open-id="${U.attr(row.id)}" data-annual-record-open-label="${U.attr(row.title)}" ${!selectedFieldId && fieldId ? `data-annual-material-field="${U.attr(fieldId)}"` : ""}><time>${U.escapeHTML(U.fd(row.date))}</time><span><b>${U.escapeHTML(row.title)}</b>${info ? `<small>${U.escapeHTML(info)}</small>` : ""}</span><span aria-hidden="true">›</span></button>`;
+    const fieldIds = Array.from(new Set(row.fieldIds || []));
+    const offField = main.targetScope === "offField" || row.targetScope === "offField" || (row.kind === "other" && !fieldIds.length);
+    const targets = Array.from(new Set(fieldIds.map(id => {
+      const field = state.field(id);
+      return field && String(field.name || "").trim() || "対象未確認";
+    })));
+    const target = offField ? "圃場外" : targets.join("、") || "対象未確認";
+    const info = main.material || main.machine || (!fieldIds.length && !["圃場外","対象なし",target].includes(row.target) ? row.target : "");
+    return `<button type="button" class="annual-archive-preview" data-annual-record-open-kind="${U.attr(row.kind)}" data-annual-record-open-id="${U.attr(row.id)}" data-annual-record-open-label="${U.attr(row.title)}" ${!selectedFieldId && fieldId ? `data-annual-material-field="${U.attr(fieldId)}"` : ""}><time>${U.escapeHTML(U.fd(row.date))}</time><span><b>${U.escapeHTML(row.title)}</b><small class="annual-archive-target" aria-label="${U.attr(`対象: ${target}`)}">${U.escapeHTML(target)}</small>${info ? `<small>${U.escapeHTML(info)}</small>` : ""}</span><span aria-hidden="true">›</span></button>`;
   }
   let nextSeasonIdeaDraft = false;
   let seasonNoteDraft = null;

@@ -359,20 +359,25 @@
       added[key] = additions.length;
       skipped[key] = (incoming[key] || []).length - additions.length;
     });
-    // Purchase IDs merge independently; material values and existing purchases win.
+    // Nested ledger IDs merge independently; existing versions win conflicts.
     const incomingMaterials = new Map((incoming.materials || []).map(material => [material.materialId, material]));
     merged.materials = (merged.materials || []).map(material => {
       const source = incomingMaterials.get(material.materialId);
-      if (!source || !Array.isArray(source.purchases)) return material;
-      const purchases = Array.isArray(material.purchases) ? material.purchases : [];
-      const ids = new Set(purchases.map(row => String(row && row.purchaseId || "")));
-      const additions = source.purchases.filter(row => {
-        const id = String(row && row.purchaseId || "");
-        if (!id || ids.has(id)) return false;
-        ids.add(id);
-        return true;
+      if (!source) return material;
+      let result = material;
+      [["purchases", "purchaseId"], ["stocktakes", "stocktakeId"]].forEach(([key, idKey]) => {
+        if (!Array.isArray(source[key])) return;
+        const existing = Array.isArray(material[key]) ? material[key] : [];
+        const ids = new Set(existing.map(row => String(row && row[idKey] || "")));
+        const additions = source[key].filter(row => {
+          const id = String(row && row[idKey] || "");
+          if (!id || ids.has(id)) return false;
+          ids.add(id);
+          return true;
+        });
+        if (additions.length) result = { ...result, [key]: [...existing, ...additions] };
       });
-      return additions.length ? { ...material, purchases: [...purchases, ...additions] } : material;
+      return result;
     });
     // Fields are de-duplicated by ID, but their annual reflections are nested.
     // Merge notes separately so a backup cannot silently lose a year's insight.

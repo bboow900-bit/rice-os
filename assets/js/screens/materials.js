@@ -5,13 +5,14 @@
   let materialId = "", purchaseId = "", purchaseScope = "", bound = false;
   let purchaseDraft = null, materialOriginal = "", purchaseOriginal = "";
   let materialError = "", purchaseError = "", listError = "";
+  let stockDraft = null, stockOriginal = "", stockError = "";
   const history = [];
   const inputs = {mSeason:"season",mCategory:"category",mName:"name",mFormalName:"formalName",mFormulation:"formulation",mUnit:"unit",mRegistrationNumber:"registrationNumber",mProductUrl:"productUrl",mDeliveryDate:"deliveryDate",mCarryover:"carryover",mOrdered:"ordered",mUsed:"used",mRemaining:"remaining",mMemo:"nextYearMemo"};
   const purchaseKeys = ["date","season","supplier","quantity","unit","unitPrice","totalAmount","memo"];
   const material = id => state.data().materials.find(row => row.materialId === id);
   const money = value => typeof value === "number" && Number.isFinite(value) ? `${value.toLocaleString("ja-JP")}円` : "価格未記録";
   const errorText = fallback => state.lastError?.message || String(state.lastError || fallback);
-  function snapshot() { return {view,materialId,purchaseId,purchaseScope}; }
+  function snapshot() { return {view,materialId,purchaseId,purchaseScope,scrollY:window.scrollY || 0}; }
   function notify() { if (window.dispatchEvent) window.dispatchEvent(new CustomEvent("riceos:navigationchange")); }
   function move(next, values = {}) {
     history.push(snapshot()); view = next;
@@ -19,10 +20,12 @@
     if (values.purchaseId !== undefined) purchaseId = values.purchaseId;
     if (values.purchaseScope !== undefined) purchaseScope = values.purchaseScope;
     listError = ""; render(); notify();
+    if (typeof window.scrollTo === "function") window.scrollTo({top:0,behavior:"instant"});
   }
   function restorePrevious() {
     const previous = history.pop() || {view:"list",materialId:"",purchaseId:"",purchaseScope:""};
     ({view,materialId,purchaseId,purchaseScope} = previous); render(); notify();
+    if (typeof window.scrollTo === "function") window.scrollTo({top:previous.scrollY || 0,behavior:"instant"});
   }
   function safeProductUrl(value) {
     if (typeof value !== "string" || !/^https?:\/\//i.test(value.trim())) return "";
@@ -47,6 +50,8 @@
     return `<details class="material-carte"><summary>使用カルテ</summary>${works.map(work => `<article class="material-carte-work"><b>${U.escapeHTML(U.fd(work.date))}</b><div>対象圃場: ${U.escapeHTML((work.fieldIds || []).map(fieldName).join("・") || "未記録")}</div><div>量: ${U.escapeHTML(work.amount || "未記録")}</div>${work.herbicidePurpose ? `<div>目的: ${U.escapeHTML(work.herbicidePurpose)}</div>` : ""}${work.memo ? `<div>${U.escapeHTML(work.memo)}</div>` : ""}</article>`).join("") || '<p class="muted">この年度の関連する使用実績はありません。</p>'}<h4>関連する体系の観察</h4>${[...observations.values()].sort((a,b) => String(a.date).localeCompare(String(b.date))).map(o => `<article class="material-carte-observation"><b>${U.escapeHTML(U.fd(o.date))} ${U.escapeHTML(o.status)}</b><div>${U.escapeHTML(fieldName(o.fieldId))} / ${U.escapeHTML(o.assignmentName || "体系名未記録")}</div><div>${U.escapeHTML(Array.isArray(o.weeds) ? o.weeds.join("・") : o.weeds || "")}</div>${o.memo ? `<div>${U.escapeHTML(o.memo)}</div>` : ""}</article>`).join("") || '<p class="muted">関連する観察記録はありません。</p>'}</details>`;
   }
   function values() { return Object.fromEntries(Object.entries(inputs).map(([id,key]) => [key,U.$(id).value])); }
+  function initialStockValues() { return {date:U.$("mStockDate").value,quantity:U.$("mStockQuantity").value,memo:U.$("mStockMemo").value}; }
+  function materialDraftState() { return {...values(),initialStock:initialStockValues()}; }
   function clearFields() {
     U.$("editMaterialId").value = "";
     Object.keys(inputs).forEach(id => { U.$(id).value = ""; });
@@ -54,11 +59,13 @@
     U.setOptions(U.$("mCategory"),S.MATERIAL_CATEGORIES,"肥料");
     U.$("mCategory").value = "肥料";
     U.$("saveMaterialButton").textContent = "資材を保存";
+    U.$("mStockDate").value = U.today(); U.$("mStockQuantity").value = ""; U.$("mStockMemo").value = "";
+    U.$("materialInitialStock").hidden = false; U.$("mUnit").readOnly = false;
     materialError = "";
   }
   function resetForm() {
     clearFields(); view = "list"; history.length = 0; materialId = ""; purchaseId = ""; purchaseScope = "";
-    purchaseDraft = null; purchaseError = ""; listError = ""; render(); notify();
+    purchaseDraft = null; purchaseError = ""; listError = ""; stockDraft = null; stockError = ""; render(); notify();
   }
   function editMaterial(id) {
     const row = id ? material(id) : null;
@@ -69,8 +76,10 @@
       U.setOptions(U.$("mCategory"),[...new Set([...S.MATERIAL_CATEGORIES,row.category])],row.category);
       Object.entries(inputs).forEach(([node,key]) => { U.$(node).value = row[key] ?? ""; });
       U.$("saveMaterialButton").textContent = "資材を更新";
+      const hasStock = Array.isArray(row.stocktakes) && row.stocktakes.length > 0;
+      U.$("materialInitialStock").hidden = hasStock; U.$("mUnit").readOnly = hasStock;
     }
-    materialOriginal = JSON.stringify(values());
+    materialOriginal = JSON.stringify(materialDraftState());
     move("material-edit",{materialId:id || ""}); return true;
   }
   function openPurchases(id) {
@@ -80,6 +89,9 @@
   function allPurchases() {
     if (!R.materialPurchases) return [];
     return state.data().materials.flatMap(m => R.materialPurchases.records(m.materialId).map(row => ({material:m,row})));
+  }
+  function materialYears(m) {
+    return [...new Set([m.season,...(m.purchases || []).map(row => row.season),...(m.stocktakes || []).map(row => String(row.date).slice(0,4)),...state.data().fieldWorks.filter(row => row.materialId === m.materialId && state.isActualFieldWork(row)).map(row => state.cropYearForRecord(row))].filter(Boolean).map(String))];
   }
   function capturePurchase() {
     const form = U.$("materialPurchaseForm");
@@ -99,14 +111,71 @@
   }
   function filters(purchases) {
     const data = state.data().materials;
-    const years = [...new Set((purchases ? allPurchases().map(item => item.row.season) : data.map(m => m.season)).map(String))].sort().reverse();
+    const years = [...new Set((purchases ? allPurchases().map(item => item.row.season) : data.flatMap(materialYears)).map(String))].sort().reverse();
     if (year !== "all" && !years.includes(year)) years.unshift(year);
     const categories = [...new Set([...S.MATERIAL_CATEGORIES,...data.map(m => m.category),...(category === "all" ? [] : [category])])];
     return `<div class="ml-filters"><label>年度<select id="mpViewYear"><option value="all"${year === "all" ? " selected" : ""}>全年度</option>${years.map(y => `<option value="${U.attr(y)}"${y === year ? " selected" : ""}>${U.escapeHTML(y)}年度</option>`).join("")}</select></label><label>分類<select id="materialsCategoryFilter"><option value="all">すべての分類</option>${categories.map(c => `<option value="${U.attr(c)}"${c === category ? " selected" : ""}>${U.escapeHTML(c)}</option>`).join("")}</select></label></div>`;
   }
   function materialDetail(m) {
     const url = safeProductUrl(m.productUrl);
-    return `<article class="ml-detail" data-material-detail="${U.attr(m.materialId)}"><h3>${U.escapeHTML(m.name || "名称未入力")}</h3><p>${U.escapeHTML(m.season)}年度 / ${U.escapeHTML(m.category)}</p><dl>${[["正式名称",m.formalName],["剤型・規格",m.formulation],["管理単位",m.unit],["納品日",m.deliveryDate],["前年繰越",m.carryover],["今年購入（旧欄）",m.ordered],["使用数（手入力）",m.used],["在庫（手入力）",m.remaining]].map(([label,value]) => `<div><dt>${label}</dt><dd>${U.escapeHTML(value === "" || value == null ? "未記録" : value)}</dd></div>`).join("")}</dl>${m.registrationNumber || ["除草剤","防除剤","殺虫殺菌剤"].includes(m.category) ? `<p>登録番号 ${U.escapeHTML(m.registrationNumber || "未登録")}</p>` : ""}<div class="material-reference-links">${["除草剤","防除剤","殺虫殺菌剤"].includes(m.category) ? '<a href="https://pesticide.maff.go.jp/" target="_blank" rel="noopener noreferrer">農薬登録情報（公式）</a>' : ""}${url ? `<a href="${U.attr(url)}" target="_blank" rel="noopener noreferrer">メーカー登録URL</a>` : ""}</div>${m.nextYearMemo ? `<p>${U.escapeHTML(m.nextYearMemo)}</p>` : ""}<div class="ml-actions"><button type="button" class="primary" data-material-edit="${U.attr(m.materialId)}">編集</button><button type="button" class="secondary" data-material-purchases="${U.attr(m.materialId)}">購入履歴</button><button type="button" class="secondary" data-material-delete="${U.attr(m.materialId)}">削除</button></div>${usageCarte(m)}</article>`;
+    const summary = R.materialStock.summary(m.materialId);
+    const stock = summary.quantity === null ? (summary.stocktake ? "集計保留" : "在庫未登録") : `${stockNumber(summary.quantity)} ${summary.unit}`;
+    const legacy = [["前年繰越",m.carryover],["今年購入（旧欄）",m.ordered],["使用数（手入力）",m.used],["在庫（手入力）",m.remaining]];
+    const warnings = summary.warnings.filter(w => w.code !== "no_stocktake");
+    return `<article class="ml-detail" data-material-detail="${U.attr(m.materialId)}"><h3>${U.escapeHTML(m.name || "名称未入力")}</h3><p>${U.escapeHTML(m.season)}年度 / ${U.escapeHTML(m.category)}</p>
+      <section class="ms-current" aria-label="現在庫"><span>現在庫</span><strong data-material-stock-quantity>${U.escapeHTML(stock)}</strong>
+        ${summary.stocktake ? `<small>確認 ${U.escapeHTML(summary.stocktake.date)}：${U.escapeHTML(stockNumber(summary.stocktake.quantity))} ${U.escapeHTML(summary.unit)}</small><p>確認後の購入 ＋${U.escapeHTML(stockNumber(summary.purchased))} / 使用 −${U.escapeHTML(stockNumber(summary.used))} ${U.escapeHTML(summary.unit)}</p>` : '<p>現物を確認した在庫数は、まだ登録されていません。</p>'}
+        ${warnings.length ? `<div class="ms-warning" role="status">${warnings.map(w => U.escapeHTML(stockWarning(w))).join("<br>")}</div>` : ""}
+        <div class="ml-actions"><button type="button" class="primary" data-ms-new="${U.attr(m.materialId)}">${summary.stocktake ? "在庫を合わせる" : "現在の在庫を登録"}</button><button type="button" class="secondary" data-ms-purchase="${U.attr(m.materialId)}">購入を追加</button></div>
+      </section>
+      <details class="ms-section" open><summary>製品情報</summary><dl>${[["正式名称",m.formalName],["剤型・規格",m.formulation],["管理単位",m.unit],["納品日",m.deliveryDate]].map(([label,value]) => `<div><dt>${label}</dt><dd>${U.escapeHTML(value === "" || value == null ? "未記録" : value)}</dd></div>`).join("")}</dl>${m.registrationNumber || ["除草剤","防除剤","殺虫殺菌剤"].includes(m.category) ? `<p>登録番号 ${U.escapeHTML(m.registrationNumber || "未登録")}</p>` : ""}<div class="material-reference-links">${["除草剤","防除剤","殺虫殺菌剤"].includes(m.category) ? '<a href="https://pesticide.maff.go.jp/" target="_blank" rel="noopener noreferrer">農薬登録情報（公式）</a>' : ""}${url ? `<a href="${U.attr(url)}" target="_blank" rel="noopener noreferrer">メーカー登録URL</a>` : ""}</div>${m.nextYearMemo ? `<p>${U.escapeHTML(m.nextYearMemo)}</p>` : ""}<button type="button" class="secondary" data-material-edit="${U.attr(m.materialId)}">製品情報を編集</button></details>
+      ${stockHistory(m,summary)}
+      <details class="ms-section"><summary>旧台帳の入力値（現在庫には加算しません）</summary><dl>${legacy.map(([label,value]) => `<div><dt>${label}</dt><dd>${U.escapeHTML(value === "" || value == null ? "未記録" : value)}</dd></div>`).join("")}</dl></details>
+      <div class="ml-actions"><button type="button" class="secondary" data-material-purchases="${U.attr(m.materialId)}">購入履歴を一覧で見る</button><button type="button" class="secondary" data-material-delete="${U.attr(m.materialId)}">資材を削除</button></div>${usageCarte(m)}</article>`;
+  }
+  function stockNumber(value) { return Number(value).toLocaleString("ja-JP",{maximumFractionDigits:20}); }
+  function stockWarning(w) {
+    const labels = {negative_stock:"在庫がマイナスです。購入・使用・確認数をご確認ください。",unknown_quantity:"使用量の総量を確認できない記録があります。",unknown_or_mismatched_unit:"単位が一致しない記録があります。袋とkgなどは換算していません。",invalid_transaction_id:"履歴IDが不明または重複しています。",invalid_date:"日付を確認できない履歴があります。",invalid_stocktake:"在庫確認履歴を確認してください。",quantity_overflow:"数量が計算可能な範囲を超えています。"};
+    return `${w.date ? `${w.date}：` : ""}${labels[w.code] || "履歴を確認できないため在庫の集計を保留しています。"}`;
+  }
+  function stockHistory(m,summary) {
+    const purchases = R.materialPurchases.records(m.materialId).slice().sort((a,b) => b.date.localeCompare(a.date));
+    const rows = summary.ledger.filter(row => row.kind === "usage").sort((a,b) => String(b.date).localeCompare(String(a.date)));
+    const checks = (m.stocktakes || []).slice().sort((a,b) => String(b.date).localeCompare(String(a.date)) || String(b.createdAt).localeCompare(String(a.createdAt)) || Number(b.sequence || 0) - Number(a.sequence || 0) || String(b.stocktakeId).localeCompare(String(a.stocktakeId)));
+    const superseded = new Set(checks.filter(row => !row.deletedAt).map(row => row.supersedesId).filter(Boolean));
+    return `<details class="ms-section"><summary>購入履歴 ${purchases.length}件</summary>${purchases.map(row => `<button type="button" class="ms-history-open" data-mp-open="${U.attr(row.purchaseId)}" data-mp-material="${U.attr(m.materialId)}"><span><b>${U.escapeHTML(row.date)} / ＋${U.escapeHTML(stockNumber(row.quantity))} ${U.escapeHTML(row.unit)}</b><small>${U.escapeHTML(row.supplier || "購入先未記録")} / ${money(R.materialPurchases.amount(row))}</small><small>${U.escapeHTML(stockLedgerLabel(summary.ledger.find(item => item.kind === "purchase" && item.id === row.purchaseId)))}</small></span><span aria-hidden="true">›</span></button>`).join("") || '<p>購入履歴はありません。</p>'}</details>
+      <details class="ms-section"><summary>使用履歴 ${rows.length}件</summary>${rows.map(row => { const work = state.data().fieldWorks.find(w => w.workId === row.id); return `<div class="ms-history-row"><b>${U.escapeHTML(row.date)} / ${U.escapeHTML(work?.workName || "作業")}</b><span>${U.escapeHTML(String(work?.amount || "使用量未記録"))}</span><small>${U.escapeHTML(row.included ? "現在庫に反映済み" : ["before_stocktake","stocktake_snapshot"].includes(row.reason) ? "確認在庫に含む" : row.reason === "future" ? "未来日のため未反映" : "数量・単位の確認が必要")}</small></div>`; }).join("") || '<p>この資材に紐づく使用履歴はありません。</p>'}</details>
+      <details class="ms-section" data-ms-history><summary>在庫確認履歴 ${checks.length}件</summary>${checks.map(row => stocktakeRow(row,summary.stocktake?.stocktakeId,superseded)).join("") || '<p>在庫確認履歴はありません。</p>'}</details>`;
+  }
+  function stocktakeRow(row,currentId,superseded) {
+    const change = typeof row.previousQuantity === "number" && typeof row.adjustment === "number"
+      ? `<small>${row.supersedesId ? "訂正前の確認" : "計算上"} ${U.escapeHTML(stockNumber(row.previousQuantity))} → ${U.escapeHTML(stockNumber(row.quantity))} ${U.escapeHTML(row.unit)}（差 ${row.adjustment > 0 ? "+" : ""}${U.escapeHTML(stockNumber(row.adjustment))}）</small>` : "";
+    return `<div class="ms-history-row" data-ms-stocktake="${U.attr(row.stocktakeId)}"><b>${U.escapeHTML(row.date)} / ${U.escapeHTML(stockNumber(row.quantity))} ${U.escapeHTML(row.unit)}</b><small>${row.deletedAt ? "取消済み" : superseded.has(row.stocktakeId) ? "訂正前" : row.stocktakeId === currentId ? "現在庫の基準" : "以前の確認"}</small>${change}${row.memo ? `<p>${U.escapeHTML(row.memo)}</p>` : ""}${!row.deletedAt && !superseded.has(row.stocktakeId) ? `<div class="ml-actions"><button type="button" class="secondary" data-ms-correct="${U.attr(row.stocktakeId)}">訂正</button><button type="button" class="secondary" data-ms-delete="${U.attr(row.stocktakeId)}">取り消す</button></div>` : ""}</div>`;
+  }
+  function stockLedgerLabel(row) {
+    if (row?.included) return "現在庫に反映済み";
+    if (["before_stocktake","stocktake_snapshot"].includes(row?.reason)) return "確認在庫に含む（再加算なし）";
+    if (row?.reason === "no_stocktake") return "在庫確認未登録";
+    if (row?.reason === "future") return "未来日のため未反映";
+    return "数量・単位の確認が必要";
+  }
+  function captureStock() {
+    const form = U.$("materialStockForm");
+    if (!form || !stockDraft) return;
+    ["date","quantity","memo"].forEach(key => { stockDraft[key] = form.elements.namedItem(key).value; });
+  }
+  function editStock(mid,id = "") {
+    const m = material(mid), row = id && (m?.stocktakes || []).find(item => item.stocktakeId === id && !item.deletedAt);
+    if (!m || id && !row) return;
+    if (!m.unit.trim()) { editMaterial(mid); U.$("mUnit").focus(); return; }
+    stockDraft = {stocktakeId:id,date:row?.date || U.today(),quantity:row ? String(row.quantity) : "",unit:m.unit || "",memo:row?.memo || ""};
+    stockOriginal = JSON.stringify(stockDraft); stockError = ""; move("stock-edit",{materialId:mid});
+  }
+  function stockForm(m) {
+    const d = stockDraft;
+    if (!d || !m) return "";
+    const summary = R.materialStock.summary(m.materialId);
+    return `<form id="materialStockForm" class="ms-form"><h3>${U.escapeHTML(m.name)}</h3><p>計算上の現在庫：${summary.quantity === null ? "未確定" : `${U.escapeHTML(stockNumber(summary.quantity))} ${U.escapeHTML(summary.unit)}`}</p><label>確認日<input type="date" name="date" required max="${U.attr(U.today())}" value="${U.attr(d.date)}"></label><label>現物を数えた在庫（${U.escapeHTML(d.unit || "管理単位未登録")}）<input type="number" name="quantity" min="0" step="any" inputmode="decimal" required value="${U.attr(d.quantity)}"></label><label>理由・確認メモ（任意）<textarea name="memo">${U.escapeHTML(d.memo)}</textarea></label><p class="ms-note">確認日以前の登録済み履歴は確認数に含みます。同じ日の確認後に追加した購入・使用は、そこから加減算します。</p><div class="ml-actions"><button type="button" class="secondary" data-ms-cancel>取消</button><button type="submit" class="primary">在庫確認を保存</button></div></form>`;
   }
   function purchaseDetail(row,m) {
     return `<article class="mp-detail" data-mp-detail="${U.attr(row.purchaseId)}"><h3>${U.escapeHTML(m.name)}の購入記録</h3><dl>${[["購入日",row.date],["年度",row.season],["分類",m.category],["仕入先",row.supplier || "未記録"],["数量",`${row.quantity} ${row.unit}`],["税込単価",money(row.unitPrice)],["単価×数量",money(R.materialPurchases.subtotal(row))],[row.totalAmount !== "" && row.totalAmount != null ? "税込実額" : "記録金額",money(R.materialPurchases.amount(row))]].map(([label,value]) => `<div><dt>${label}</dt><dd>${U.escapeHTML(value)}</dd></div>`).join("")}</dl>${row.memo ? `<p>${U.escapeHTML(row.memo)}</p>` : ""}<div class="mp-actions"><button type="button" class="primary" data-mp-edit="${U.attr(row.purchaseId)}" data-mp-material="${U.attr(m.materialId)}">編集</button><button type="button" class="secondary" data-mp-delete="${U.attr(row.purchaseId)}" data-mp-material="${U.attr(m.materialId)}">削除</button></div></article>`;
@@ -118,7 +187,7 @@
   }
   function setHidden(node, hidden) { if (node) node.hidden = hidden; }
   function render() {
-    const form = U.$("materialForm"), list = U.$("materialList"), purchases = U.$("materialPurchases");
+    const form = U.$("materialForm"), list = U.$("materialList"), purchases = U.$("materialPurchases"), stockEditor = U.$("materialStockEditor");
     if (!form || !list) return;
     let host = U.$("materialsLedgerHost");
     if (!host && document.createElement) { host = document.createElement("div"); host.id = "materialsLedgerHost"; form.before(host); }
@@ -127,11 +196,13 @@
     const m = material(materialId), cross = view === "list" && mode === "purchases";
     setHidden(form,view !== "material-edit"); setHidden(list,!["list","material-detail"].includes(view) || cross);
     setHidden(purchases,!(cross || view.startsWith("purchase-")));
-    const title = {"material-detail":"資材の詳細","material-edit":U.$("editMaterialId").value ? "資材を編集" : "資材を追加","purchase-list":m ? `${m.name}の購入履歴` : "購入履歴","purchase-detail":"購入記録の詳細","purchase-edit":purchaseId ? "購入記録を編集" : "購入記録を追加"}[view] || "資材と購入の台帳";
-    if (host) host.innerHTML = `<div class="ml-heading"><h3>${U.escapeHTML(title)}</h3>${view !== "list" ? '<button type="button" class="secondary" data-material-back>戻る</button>' : ""}</div>${view === "list" ? `<div class="ml-modes" role="group" aria-label="台帳の表示"><button type="button" data-material-mode="materials" aria-pressed="${mode === "materials"}">資材一覧</button><button type="button" data-material-mode="purchases" aria-pressed="${mode === "purchases"}">購入履歴</button></div>${filters(cross)}<div class="ml-actions"><button type="button" class="primary" ${cross ? "data-mp-new" : "data-material-new"}>＋ ${cross ? "購入を追加" : "資材を追加"}</button></div>` : view === "purchase-list" ? `${filters(true)}<button type="button" class="primary" data-mp-new>＋ 購入を追加</button>` : ""}<p class="ml-error" role="alert">${U.escapeHTML(view === "material-edit" ? materialError : view.startsWith("purchase-") ? purchaseError : listError)}</p>`;
+    setHidden(stockEditor,view !== "stock-edit");
+    if (stockEditor) stockEditor.innerHTML = view === "stock-edit" ? stockForm(m) : "";
+    const title = {"stock-edit":"在庫を合わせる","material-detail":"資材の詳細","material-edit":U.$("editMaterialId").value ? "資材を編集" : "資材を追加","purchase-list":m ? `${m.name}の購入履歴` : "購入履歴","purchase-detail":"購入記録の詳細","purchase-edit":purchaseId ? "購入記録を編集" : "購入記録を追加"}[view] || "資材と購入の台帳";
+    if (host) host.innerHTML = `<div class="ml-heading"><h3>${U.escapeHTML(title)}</h3>${view !== "list" ? '<button type="button" class="secondary" data-material-back>戻る</button>' : ""}</div>${view === "list" ? `<div class="ml-modes" role="group" aria-label="台帳の表示"><button type="button" data-material-mode="materials" aria-pressed="${mode === "materials"}">資材一覧</button><button type="button" data-material-mode="purchases" aria-pressed="${mode === "purchases"}">購入履歴</button></div>${filters(cross)}<div class="ml-actions"><button type="button" class="primary" ${cross ? "data-mp-new" : "data-material-new"}>＋ ${cross ? "購入を追加" : "資材を追加"}</button></div>` : view === "purchase-list" ? `${filters(true)}<button type="button" class="primary" data-mp-new>＋ 購入を追加</button>` : ""}<p class="ml-error" role="alert">${U.escapeHTML(view === "material-edit" ? materialError : view === "stock-edit" ? stockError : view.startsWith("purchase-") ? purchaseError : listError)}</p>`;
     if (view === "list" && !cross) {
-      const rows = state.data().materials.filter(row => (year === "all" || String(row.season) === year) && (category === "all" || row.category === category)).slice().sort((a,b) => Number(b.season)-Number(a.season));
-      list.innerHTML = rows.map(row => `<article class="ml-row" data-material-row="${U.attr(row.materialId)}"><button type="button" class="ml-open" data-material-open="${U.attr(row.materialId)}"><b>${U.escapeHTML(row.name || "名称未入力")}</b><small>${U.escapeHTML(row.season)}年度 / ${U.escapeHTML(row.category)}</small><span aria-hidden="true">›</span></button><button type="button" class="secondary" data-material-purchases="${U.attr(row.materialId)}">購入履歴</button></article>`).join("") || '<p class="empty">条件に合う資材はありません。</p>';
+      const rows = state.data().materials.filter(row => (year === "all" || materialYears(row).includes(year)) && (category === "all" || row.category === category)).slice().sort((a,b) => Number(b.season)-Number(a.season));
+      list.innerHTML = rows.map(row => { const s = R.materialStock.summary(row.materialId); return `<article class="ml-row" data-material-row="${U.attr(row.materialId)}"><button type="button" class="ml-open" data-material-open="${U.attr(row.materialId)}"><b>${U.escapeHTML(row.name || "名称未入力")}</b><small>${U.escapeHTML(row.season)}年度 / ${U.escapeHTML(row.category)}</small><strong>在庫：${U.escapeHTML(s.quantity === null ? s.stocktake ? "集計保留" : "未登録" : `${stockNumber(s.quantity)} ${s.unit}`)}</strong><span aria-hidden="true">›</span></button><button type="button" class="secondary" data-material-purchases="${U.attr(row.materialId)}">購入履歴</button></article>`; }).join("") || '<p class="empty">条件に合う資材はありません。</p>';
     } else if (view === "material-detail") list.innerHTML = m ? materialDetail(m) : '<p role="alert">この資材は見つかりません。戻って一覧を確認してください。</p>';
     else list.innerHTML = "";
     if (!purchases) return;
@@ -147,13 +218,15 @@
   function cancelEditor() {
     if (view === "material-edit") clearFields();
     if (view === "purchase-edit") { purchaseDraft = null; purchaseError = ""; }
+    if (view === "stock-edit") { stockDraft = null; stockError = ""; }
     restorePrevious();
   }
   function canHandleBack() { return view !== "list"; }
   function handleBack() {
     if (!canHandleBack()) return false;
     if (view === "purchase-edit") capturePurchase();
-    const dirty = view === "material-edit" ? JSON.stringify(values()) !== materialOriginal : view === "purchase-edit" ? JSON.stringify(purchaseDraft) !== purchaseOriginal : false;
+    if (view === "stock-edit") captureStock();
+    const dirty = view === "material-edit" ? JSON.stringify(materialDraftState()) !== materialOriginal : view === "purchase-edit" ? JSON.stringify(purchaseDraft) !== purchaseOriginal : view === "stock-edit" ? JSON.stringify(stockDraft) !== stockOriginal : false;
     if (dirty && !confirm("入力中の変更を取り消して戻りますか？")) return true;
     if (view.endsWith("-edit")) cancelEditor(); else restorePrevious();
     return true;
@@ -169,6 +242,18 @@
     const tab = match("[data-material-mode]");
     if (tab) { mode = tab.dataset.materialMode; render(); return; }
     if (match("[data-material-new]")) { editMaterial(""); return; }
+    const stockNew = match("[data-ms-new]");
+    if (stockNew) { editStock(stockNew.dataset.msNew); return; }
+    const stockCorrect = match("[data-ms-correct]");
+    if (stockCorrect) { editStock(materialId,stockCorrect.dataset.msCorrect); return; }
+    if (match("[data-ms-cancel]")) { handleBack(); return; }
+    const stockDelete = match("[data-ms-delete]");
+    if (stockDelete && confirm("この在庫確認を取り消しますか？履歴は残り、以前の在庫確認を基準に再計算します。")) {
+      if (!R.materialStock.deleteStocktake(materialId,stockDelete.dataset.msDelete)) listError = R.materialStock.lastError();
+      render(); return;
+    }
+    const stockPurchase = match("[data-ms-purchase]");
+    if (stockPurchase) { editPurchase("",stockPurchase.dataset.msPurchase); return; }
     const open = match("[data-material-open]");
     if (open) { move("material-detail",{materialId:open.dataset.materialOpen}); return; }
     const edit = match("[data-material-edit]");
@@ -202,7 +287,15 @@
     if (bound) return;
     bound = true;
     render();
-    ["materialsLedgerHost","materialList","materialPurchases"].forEach(id => U.$(id)?.addEventListener("click",click));
+    ["materialsLedgerHost","materialList","materialPurchases","materialStockEditor"].forEach(id => U.$(id)?.addEventListener("click",click));
+    U.$("materialStockEditor")?.addEventListener("input",captureStock);
+    U.$("materialStockEditor")?.addEventListener("submit",event => {
+      if (event.target.id !== "materialStockForm") return;
+      event.preventDefault(); captureStock();
+      const saved = stockDraft.stocktakeId ? R.materialStock.editStocktake(materialId,stockDraft.stocktakeId,stockDraft) : R.materialStock.saveStocktake(materialId,stockDraft);
+      if (!saved) { stockError = R.materialStock.lastError(); render(); return; }
+      stockDraft = null; stockError = ""; finishEdit("material-detail",materialId);
+    });
     U.$("materialsLedgerHost")?.addEventListener("change",event => {
       if (event.target.id === "mpViewYear") year = event.target.value;
       if (event.target.id === "materialsCategoryFilter") category = event.target.value;
@@ -235,7 +328,17 @@
       const productUrl = safeProductUrl(record.productUrl);
       if (record.productUrl.trim() && !productUrl) { materialError = "メーカー登録URLは、ユーザー名・パスワードを含まないhttpまたはhttpsのURLを入力してください。"; render(); U.$("mProductUrl").focus(); return; }
       const before = new Set(state.data().materials.map(m => m.materialId));
-      const saved = state.saveMaterial({...record,materialId:id,registrationNumber:record.registrationNumber.trim(),productUrl});
+      let stocktakes;
+      const initial = initialStockValues();
+      if (!U.$("materialInitialStock").hidden && initial.quantity.trim() !== "") {
+        try {
+          const base = {...material(id),...record,materialId:id};
+          stocktakes = [...(base.stocktakes || []),R.materialStock.prepareStocktake(base,{...initial,unit:record.unit})];
+        } catch (error) { materialError = error.message; render(); return; }
+      } else if (!U.$("materialInitialStock").hidden && initial.memo.trim()) {
+        materialError = "在庫確認メモを残す場合は、確認した在庫数も入力してください。"; render(); return;
+      }
+      const saved = state.saveMaterial({...record,materialId:id,registrationNumber:record.registrationNumber.trim(),productUrl,...(stocktakes ? {stocktakes} : {})});
       if (!saved) { materialError = errorText("資材を保存できませんでした。入力は保持しています。"); render(); return; }
       const mid = id || state.data().materials.find(m => !before.has(m.materialId))?.materialId;
       clearFields(); if (mid) finishEdit("material-detail",mid); else render();

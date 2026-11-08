@@ -17,7 +17,7 @@ global.CustomEvent = class {};
 Object.defineProperty(global, "navigator", { value: {}, configurable: true });
 const memory = new Map();
 global.localStorage = { getItem: key => memory.get(key) || null, setItem: (key, value) => memory.set(key, String(value)), removeItem: key => memory.delete(key) };
-for (const file of ["core/utils", "core/schema", "core/storage", "core/state", "screens/materials", "screens/recipes"]) vm.runInThisContext(fs.readFileSync(`assets/js/${file}.js`, "utf8"));
+for (const file of ["core/utils", "core/schema", "core/storage", "core/state", "core/material-purchases", "core/material-stock", "screens/materials", "screens/recipes"]) vm.runInThisContext(fs.readFileSync(`assets/js/${file}.js`, "utf8"));
 const state = RiceOS.state;
 const snapshot = () => JSON.stringify(state.data());
 function blocked(action, pattern) {
