@@ -36,7 +36,9 @@
     return { quantity: numeric(match[1]), unit: match[2].trim() };
   }
   function transactions(material) {
-    const purchases = (Array.isArray(material.purchases) ? material.purchases : []).map(p => ({ kind: "purchase", id: p.purchaseId, date: p.date, quantity: numeric(p.quantity), unit: typeof p.unit === "string" ? p.unit.trim() : "" }));
+    const purchases = (Array.isArray(material.purchases) ? material.purchases : []).flatMap(p => p.deliveryMode === "manual"
+      ? (p.receipts || []).filter(r => !r.deletedAt).map(r => ({kind:"purchase", id:p.purchaseId + ":receipt:" + r.receiptId, date:r.date, quantity:numeric(r.quantity), unit:r.unit}))
+      : [{ kind: "purchase", id: p.purchaseId, date: p.date, quantity: numeric(p.quantity), unit: typeof p.unit === "string" ? p.unit.trim() : "" }]);
     const usage = (R.state.data().fieldWorks || []).filter(w => w.materialId === material.materialId && material.materialId && R.state.isActualFieldWork(w) && !/計画/.test(String(w.workName || "")))
       .map(w => ({ kind: "usage", id: w.workId, date: w.date, ...usageAmount(w) }));
     return purchases.concat(usage);

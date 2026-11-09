@@ -6,9 +6,11 @@
   let purchaseDraft = null, materialOriginal = "", purchaseOriginal = "";
   let materialError = "", purchaseError = "", listError = "";
   let stockDraft = null, stockOriginal = "", stockError = "";
+  let receiptDraft = null, receiptOriginal = "";
+  let cancellationDraft = null, cancellationOriginal = "", pendingStatus = "all";
   const history = [];
-  const inputs = {mSeason:"season",mCategory:"category",mName:"name",mFormalName:"formalName",mFormulation:"formulation",mUnit:"unit",mRegistrationNumber:"registrationNumber",mProductUrl:"productUrl",mDeliveryDate:"deliveryDate",mCarryover:"carryover",mOrdered:"ordered",mUsed:"used",mRemaining:"remaining",mMemo:"nextYearMemo"};
-  const purchaseKeys = ["date","season","supplier","quantity","unit","unitPrice","totalAmount","memo"];
+  const inputs = {mSeason:"season",mCategory:"category",mName:"name",mFormalName:"formalName",mFormulation:"formulation",mUnit:"unit",mRegistrationNumber:"registrationNumber",mProductUrl:"productUrl",mCarryover:"carryover",mOrdered:"ordered",mUsed:"used",mRemaining:"remaining",mMemo:"nextYearMemo"};
+  const purchaseKeys = ["date","season","supplier","quantity","unit","unitPrice","totalAmount","expectedDeliveryDate","memo"];
   const material = id => state.data().materials.find(row => row.materialId === id);
   const money = value => typeof value === "number" && Number.isFinite(value) ? `${value.toLocaleString("ja-JP")}円` : "価格未記録";
   const errorText = fallback => state.lastError?.message || String(state.lastError || fallback);
@@ -65,7 +67,7 @@
   }
   function resetForm() {
     clearFields(); view = "list"; history.length = 0; materialId = ""; purchaseId = ""; purchaseScope = "";
-    purchaseDraft = null; purchaseError = ""; listError = ""; stockDraft = null; stockError = ""; render(); notify();
+    purchaseDraft = null; purchaseError = ""; listError = ""; stockDraft = null; stockError = ""; receiptDraft = null; cancellationDraft = null; render(); notify();
   }
   function editMaterial(id) {
     const row = id ? material(id) : null;
@@ -77,7 +79,7 @@
       Object.entries(inputs).forEach(([node,key]) => { U.$(node).value = row[key] ?? ""; });
       U.$("saveMaterialButton").textContent = "資材を更新";
       const hasStock = Array.isArray(row.stocktakes) && row.stocktakes.length > 0;
-      U.$("materialInitialStock").hidden = hasStock; U.$("mUnit").readOnly = hasStock;
+      U.$("materialInitialStock").hidden = hasStock; U.$("mUnit").readOnly = hasStock || (row.purchases || []).some(p => p.receipts?.length);
     }
     materialOriginal = JSON.stringify(materialDraftState());
     move("material-edit",{materialId:id || ""}); return true;
@@ -104,7 +106,7 @@
     const row = id ? R.materialPurchases.records(mid).find(item => item.purchaseId === id) : null;
     if (id && !row) return false;
     const m = material(mid);
-    purchaseDraft = row ? {...row,materialId:mid} : {materialId:mid || "",date:U.today(),season:year === "all" ? U.today().slice(0,4) : year,supplier:"",quantity:"",unit:m?.unit || "",unitPrice:"",totalAmount:"",memo:""};
+    purchaseDraft = row ? {...row,materialId:mid} : {materialId:mid || "",date:U.today(),season:year === "all" ? U.today().slice(0,4) : year,supplier:"",quantity:"",unit:m?.unit || "",unitPrice:"",totalAmount:"",expectedDeliveryDate:"",memo:""};
     purchaseKeys.forEach(key => { purchaseDraft[key] = String(purchaseDraft[key] ?? ""); });
     purchaseError = ""; purchaseOriginal = JSON.stringify(purchaseDraft);
     move("purchase-edit",{materialId:mid || "",purchaseId:id || ""}); return true;
@@ -123,17 +125,114 @@
     const legacy = [["前年繰越",m.carryover],["今年購入（旧欄）",m.ordered],["使用数（手入力）",m.used],["在庫（手入力）",m.remaining]];
     const warnings = summary.warnings.filter(w => w.code !== "no_stocktake");
     return `<article class="ml-detail" data-material-detail="${U.attr(m.materialId)}"><h3>${U.escapeHTML(m.name || "名称未入力")}</h3><p>${U.escapeHTML(m.season)}年度 / ${U.escapeHTML(m.category)}</p>
-      <section class="ms-current" aria-label="現在庫"><span>現在庫</span><strong data-material-stock-quantity>${U.escapeHTML(stock)}</strong>
-        ${summary.stocktake ? `<small>確認 ${U.escapeHTML(summary.stocktake.date)}：${U.escapeHTML(stockNumber(summary.stocktake.quantity))} ${U.escapeHTML(summary.unit)}</small><p>確認後の購入 ＋${U.escapeHTML(stockNumber(summary.purchased))} / 使用 −${U.escapeHTML(stockNumber(summary.used))} ${U.escapeHTML(summary.unit)}</p>` : '<p>現物を確認した在庫数は、まだ登録されていません。</p>'}
-        ${warnings.length ? `<div class="ms-warning" role="status">${warnings.map(w => U.escapeHTML(stockWarning(w))).join("<br>")}</div>` : ""}
+      <section class="ms-current" aria-label="現在庫"><span>現在庫</span><button type="button" class="ms-number" data-stock-evidence aria-label="現在庫の計算根拠を見る"><strong data-material-stock-quantity>${U.escapeHTML(stock)}</strong><small>計算根拠を見る ›</small></button>
+        ${supplySummary(m,summary)}
+        ${summary.stocktake ? `<small>確認 ${U.escapeHTML(summary.stocktake.date)}：${U.escapeHTML(stockNumber(summary.stocktake.quantity))} ${U.escapeHTML(summary.unit)}</small><p>確認後の入庫・旧購入 ＋${U.escapeHTML(stockNumber(summary.purchased))} / 使用 −${U.escapeHTML(stockNumber(summary.used))} ${U.escapeHTML(summary.unit)}</p>` : '<p>現物を確認した在庫数は、まだ登録されていません。</p>'}
+        ${warnings.length ? `<div class="ms-warning" role="status">${warnings.map(w => U.escapeHTML(stockWarning(w))).join("<br>")}${warnings.some(w => w.kind === "usage") ? '<button type="button" class="secondary" data-stock-evidence>該当する使用記録を確認・修正</button>' : ""}</div>` : ""}
         <div class="ml-actions"><button type="button" class="primary" data-ms-new="${U.attr(m.materialId)}">${summary.stocktake ? "在庫を合わせる" : "現在の在庫を登録"}</button><button type="button" class="secondary" data-ms-purchase="${U.attr(m.materialId)}">購入を追加</button></div>
       </section>
-      <details class="ms-section" open><summary>製品情報</summary><dl>${[["正式名称",m.formalName],["剤型・規格",m.formulation],["管理単位",m.unit],["納品日",m.deliveryDate]].map(([label,value]) => `<div><dt>${label}</dt><dd>${U.escapeHTML(value === "" || value == null ? "未記録" : value)}</dd></div>`).join("")}</dl>${m.registrationNumber || ["除草剤","防除剤","殺虫殺菌剤"].includes(m.category) ? `<p>登録番号 ${U.escapeHTML(m.registrationNumber || "未登録")}</p>` : ""}<div class="material-reference-links">${["除草剤","防除剤","殺虫殺菌剤"].includes(m.category) ? '<a href="https://pesticide.maff.go.jp/" target="_blank" rel="noopener noreferrer">農薬登録情報（公式）</a>' : ""}${url ? `<a href="${U.attr(url)}" target="_blank" rel="noopener noreferrer">メーカー登録URL</a>` : ""}</div>${m.nextYearMemo ? `<p>${U.escapeHTML(m.nextYearMemo)}</p>` : ""}<button type="button" class="secondary" data-material-edit="${U.attr(m.materialId)}">製品情報を編集</button></details>
+      <details class="ms-section" open><summary>製品情報</summary><dl>${[["正式名称",m.formalName],["剤型・規格",m.formulation],["管理単位",m.unit]].map(([label,value]) => `<div><dt>${label}</dt><dd>${U.escapeHTML(value === "" || value == null ? "未記録" : value)}</dd></div>`).join("")}</dl>${m.registrationNumber || ["除草剤","防除剤","殺虫殺菌剤"].includes(m.category) ? `<p>登録番号 ${U.escapeHTML(m.registrationNumber || "未登録")}</p>` : ""}<div class="material-reference-links">${["除草剤","防除剤","殺虫殺菌剤"].includes(m.category) ? '<a href="https://pesticide.maff.go.jp/" target="_blank" rel="noopener noreferrer">農薬登録情報（公式）</a>' : ""}${url ? `<a href="${U.attr(url)}" target="_blank" rel="noopener noreferrer">メーカー登録URL</a>` : ""}</div>${m.nextYearMemo ? `<p>${U.escapeHTML(m.nextYearMemo)}</p>` : ""}<button type="button" class="secondary" data-material-edit="${U.attr(m.materialId)}">製品情報を編集</button></details>
+      ${previousPurchases(m)}
       ${stockHistory(m,summary)}
       <details class="ms-section"><summary>旧台帳の入力値（現在庫には加算しません）</summary><dl>${legacy.map(([label,value]) => `<div><dt>${label}</dt><dd>${U.escapeHTML(value === "" || value == null ? "未記録" : value)}</dd></div>`).join("")}</dl></details>
       <div class="ml-actions"><button type="button" class="secondary" data-material-purchases="${U.attr(m.materialId)}">購入履歴を一覧で見る</button><button type="button" class="secondary" data-material-delete="${U.attr(m.materialId)}">資材を削除</button></div>${usageCarte(m)}</article>`;
   }
-  function stockNumber(value) { return Number(value).toLocaleString("ja-JP",{maximumFractionDigits:20}); }
+  function stockNumber(value) { return Number.isFinite(Number(value)) && Math.abs(Number(value)) <= Number.MAX_SAFE_INTEGER ? Number(value).toLocaleString("ja-JP",{maximumFractionDigits:20}) : "数量確認"; }
+  function supplySummary(m,stock) {
+    const purchases = R.materialPurchases.records(m.materialId);
+    const current = purchases.filter(row => row.deliveryMode === "manual");
+    const comparable = current.every(row => row.unit === m.unit);
+    const pending = R.materialPurchases.quantitySum(current.map(row => R.materialPurchases.deliverySummary(row).pending));
+    const combined = stock.quantity !== null && comparable ? R.materialPurchases.quantitySum([stock.quantity,pending]) : null;
+    const total = combined !== null && Number.isFinite(combined) && Math.abs(combined) <= Number.MAX_SAFE_INTEGER ? combined : null;
+    const y = year === "all" ? U.today().slice(0,4) : year;
+    const annual = purchases.filter(row => String(row.season) === String(y));
+    const units = [...new Set(annual.map(row => row.unit))];
+    const purchased = units.map(unit => `${stockNumber(R.materialPurchases.quantitySum(annual.filter(row => row.unit === unit).map(row => Number(row.quantity))))} ${unit}`).join(" / ") || "0";
+    return `<span class="ms-supply" data-material-supply><span>現在庫 ＋ 未納品数 ＝ 確保予定数</span><b>${U.escapeHTML(stock.quantity === null ? "在庫未確定" : stockNumber(stock.quantity))} ＋ ${U.escapeHTML(comparable && Number.isFinite(pending) ? stockNumber(pending) : "単位・数量確認")} ＝ ${U.escapeHTML(total === null ? "未確定" : `${stockNumber(total)} ${m.unit}`)}</b><small>${U.escapeHTML(y)}年度購入：${U.escapeHTML(purchased)}（現在庫には再加算しません）</small>${purchases.some(row => row.deliveryMode !== "manual") ? '<small>旧購入は従来の在庫計算を維持しています。未納品数には含めません。</small>' : ""}</span>`;
+  }
+  function deliveryLabel(row) {
+    if (row.deliveryMode !== "manual") return "旧購入・納品未確認（従来の在庫計算を維持）";
+    const d = R.materialPurchases.deliverySummary(row);
+    return `${d.pending > 0 ? `未納品 ${stockNumber(d.pending)} ${row.unit}` : d.cancelled > 0 ? "注文残なし" : "納品済み"}${d.cancelled > 0 ? ` / 注文取消 ${stockNumber(d.cancelled)} ${row.unit}` : ""} / 納品予定：${row.expectedDeliveryDate || "未定"}`;
+  }
+  function statusBadge(m) {
+    const stock = R.materialStock.summary(m.materialId);
+    const pendingRows = R.materialPurchases.records(m.materialId).filter(row => row.deliveryMode === "manual" && R.materialPurchases.deliverySummary(row).pending > 0);
+    const pending = pendingRows.length > 0;
+    const uncertain = stock.quantity === null || stock.quantity < 0 || pendingRows.some(row => row.unit !== m.unit);
+    return `<span class="mi-badges">${uncertain ? '<small class="mi-badge warning">確認が必要</small>' : `<small class="mi-badge">${stock.quantity > 0 ? "在庫あり" : "在庫なし"}</small>`}${pending ? '<small class="mi-badge water">納品待ち</small>' : ""}</span>`;
+  }
+  function previousPurchases(m) {
+    const y = Number(year === "all" ? U.today().slice(0,4) : year);
+    const rows = R.materialInsights?.previousPurchases(m.materialId,y) || [];
+    return `<details class="ms-section mi-previous"><summary>${y - 1}年度の購入と比較</summary>${rows.map(row => `<button type="button" class="ms-history-open" data-mp-open="${U.attr(row.purchaseId)}" data-mp-material="${U.attr(m.materialId)}"><span><b>${U.escapeHTML(row.date)} / ${U.escapeHTML(row.supplier || "購入先未記録")}</b><small>${U.escapeHTML(stockNumber(row.quantity))} ${U.escapeHTML(row.unit)} / ${money(R.materialPurchases.amount(row))}</small><small>${U.escapeHTML(deliveryLabel(row))}</small></span><span aria-hidden="true">›</span></button>`).join("") || `<p class="muted">この資材の${y - 1}年度の購入記録はありません。同名の別資材は自動で混ぜません。</p>`}</details>`;
+  }
+  function pendingList() {
+    const rows = R.materialInsights?.pendingPurchases({year,category,status:pendingStatus}) || [];
+    const labels = {waiting:"納品待ち",partial:"一部納品",overdue:"予定日超過"};
+    return `<section class="mi-pending" aria-label="未納品一覧"><p>${rows.length}件の未納品注文${year !== "all" ? ` / ${U.escapeHTML(year)}年度の注文` : " / 年度をまたぐ注文を含む"}</p>${rows.map(({material:m,row,delivery:d,status}) => `<article class="mi-order"><span class="mi-badge ${status === "overdue" ? "warning" : "water"}">${labels[status]}</span><button type="button" class="ml-open" data-mp-open="${U.attr(row.purchaseId)}" data-mp-material="${U.attr(m.materialId)}"><b>${U.escapeHTML(m.name)}</b><small>${U.escapeHTML(row.supplier || "購入先未記録")} / 注文 ${U.escapeHTML(row.date)}</small><strong>未納品 ${U.escapeHTML(stockNumber(d.pending))} ${U.escapeHTML(row.unit)}</strong><small>納品済 ${U.escapeHTML(stockNumber(d.received))} / 注文取消 ${U.escapeHTML(stockNumber(d.cancelled || 0))} ${U.escapeHTML(row.unit)}</small><small>納品予定：${U.escapeHTML(row.expectedDeliveryDate || "未定")}</small><span aria-hidden="true">›</span></button><div class="ml-actions"><button type="button" class="primary" data-pending-receive="${U.attr(row.purchaseId)}" data-mp-material="${U.attr(m.materialId)}">入庫を登録</button><button type="button" class="secondary" data-pending-cancel="${U.attr(row.purchaseId)}" data-mp-material="${U.attr(m.materialId)}">未納品分を取消</button></div></article>`).join("") || '<p class="empty">条件に合う未納品注文はありません。</p>'}<p class="ms-note">旧購入は納品状況を断定できないため、この一覧には含めません。</p></section>`;
+  }
+  function evidenceView(m) {
+    if (!m || !R.materialInsights) return '<p>在庫の根拠を取得できません。</p>';
+    const {summary:s,entries} = R.materialInsights.stockEvidence(m.materialId);
+    const uncertainUsage = s.warnings.some(w => w.kind === "usage");
+    const entryRows = entries.filter(row => row.kind !== "stocktake").map(row => {
+      const work = row.workId && state.data().fieldWorks.find(w => w.workId === row.workId);
+      const label = row.kind === "usage" ? work?.workName || "使用記録" : row.receiptId ? "入庫" : "旧購入";
+      const source = row.workId ? `data-stock-work="${U.attr(row.workId)}"` : row.purchaseId ? `data-mp-open="${U.attr(row.purchaseId)}" data-mp-material="${U.attr(m.materialId)}"` : "";
+      const text = row.kind === "usage" ? String(work?.amount ?? "数量未記録") : row.quantity === null ? "数量未記録" : `${stockNumber(row.quantity)} ${row.unit}`;
+      return `<${source ? "button type=\"button\"" : "div"} class="ms-history-open mi-evidence-row" ${source}><span><b>${U.escapeHTML(row.date || "日付未確認")} / ${U.escapeHTML(label)}</b><small>${U.escapeHTML(text)}</small><small>${U.escapeHTML(stockLedgerLabel(row))}</small></span>${source ? '<span aria-hidden="true">›</span>' : ""}</${source ? "button" : "div"}>`;
+    }).join("");
+    return `<article class="mi-evidence"><h3>${U.escapeHTML(m.name)}の在庫内訳</h3><p class="mi-equation">確認在庫 ${s.stocktake ? U.escapeHTML(stockNumber(s.stocktake.quantity)) : "未登録"} ＋ 入庫・旧購入 ${U.escapeHTML(stockNumber(s.purchased))} − 使用${uncertainUsage ? "（数量確認済み分）" : ""} ${U.escapeHTML(stockNumber(s.used))} ＝ ${s.quantity === null ? "集計保留" : U.escapeHTML(`${stockNumber(s.quantity)} ${s.unit}`)}</p>${s.warnings.length ? `<div class="ms-warning">${s.warnings.map(w => U.escapeHTML(stockWarning(w))).join("<br>")}</div>` : ""}${s.stocktake ? `<button type="button" class="ms-history-open" data-evidence-stocktake><span><b>基準の在庫確認 ${U.escapeHTML(s.stocktake.date)}</b><small>${U.escapeHTML(stockNumber(s.stocktake.quantity))} ${U.escapeHTML(s.unit)}</small></span><span aria-hidden="true">›</span></button>` : '<button type="button" class="primary" data-ms-new="' + U.attr(m.materialId) + '">現在の在庫を登録</button>'}<h4>入庫・使用の記録</h4>${entryRows || '<p>関連する入庫・使用記録はありません。</p>'}<p class="ms-note">在庫確認に含まれる記録は再加減算しません。数量・単位が不明な記録は、元の記録から確認できます。</p></article>`;
+  }
+  function editCancellation() {
+    const row = R.materialPurchases.records(materialId).find(p => p.purchaseId === purchaseId);
+    if (!row) return;
+    cancellationDraft = {date:U.today(),quantity:String(R.materialPurchases.deliverySummary(row).pending),reason:"",unit:row.unit};
+    cancellationOriginal = JSON.stringify(cancellationDraft); purchaseError = ""; move("cancellation-edit");
+  }
+  function captureCancellation() {
+    const form = U.$("materialCancellationForm");
+    if (form && cancellationDraft) ["date","quantity","reason"].forEach(key => { cancellationDraft[key] = form.elements.namedItem(key).value; });
+  }
+  function cancellationForm() {
+    const d = cancellationDraft;
+    if (!d) return "";
+    return `<form id="materialCancellationForm" class="mp-form"><h3>${U.escapeHTML(material(materialId)?.name)}の未納品分を取消</h3><label>取消日<input type="date" name="date" required max="${U.attr(U.today())}" value="${U.attr(d.date)}"></label><label>取消数（${U.escapeHTML(d.unit)}）<input type="number" name="quantity" min="0" step="any" required value="${U.attr(d.quantity)}"></label><label>取消理由<textarea name="reason" required>${U.escapeHTML(d.reason)}</textarea></label><p class="ms-note">元の注文数と入庫履歴は残します。請求・返金額は自動変更しません。必要に応じて購入記録の金額を確認してください。</p><div class="mp-actions"><button type="button" class="secondary" data-cancellation-back>戻る</button><button type="submit" class="primary">注文取消を保存</button></div></form>`;
+  }
+  function cancellationHistory(row) {
+    if (row.deliveryMode !== "manual") return "";
+    const d = R.materialPurchases.deliverySummary(row);
+    return `<section class="ms-section mi-cancellations"><h4>未納品分の注文取消</h4>${d.pending > 0 ? '<button type="button" class="secondary" data-cancellation-new>未納品分を取り消す</button>' : ""}${(row.cancellations || []).map(c => `<div class="ms-history-row"><b>${U.escapeHTML(c.date)} / ${U.escapeHTML(stockNumber(c.quantity))} ${U.escapeHTML(row.unit)}</b><small>${c.deletedAt ? "取消を取り消し済み" : "注文取消済み"}</small><p>${U.escapeHTML(c.reason)}</p>${!c.deletedAt ? `<button type="button" class="secondary" data-cancellation-undo="${U.attr(c.cancellationId)}">注文取消を取り消す</button>` : ""}</div>`).join("")}${d.cancelled > 0 ? '<p class="ms-warning">注文取消分も登録金額に含まれる場合があります。請求・返金額を確認し、必要なら購入記録の金額を編集してください。</p>' : ""}</section>`;
+  }
+  function purchaseTotals(rows) {
+    const groups = new Map();
+    rows.forEach(({row}) => {
+      const key = String(row.season), group = groups.get(key) || {total:0,unknown:0,count:0,cancelled:0};
+      const amount = R.materialPurchases.amount(row);
+      if (amount === null) group.unknown++; else group.total += amount;
+      if (R.materialPurchases.deliverySummary(row).cancelled > 0) group.cancelled++;
+      group.count++; groups.set(key,group);
+    });
+    return `<section class="mp-year-totals" aria-label="年度別購入費用">${[...groups].sort((a,b) => b[0].localeCompare(a[0])).map(([y,g]) => `<div><span>${U.escapeHTML(y)}年度の購入費用</span><strong>${Number.isSafeInteger(g.total) ? money(g.total) : "集計可能範囲を超えています"}</strong><small>${g.count}件${g.unknown ? ` / 価格未記録 ${g.unknown}件（合計に含めません）` : ""}</small>${g.cancelled ? `<small class="mi-finance-note">注文取消あり ${g.cancelled}件。登録金額をそのまま集計しています。請求・返金に合わせた金額編集の確認が必要です。</small>` : ""}</div>`).join("")}</section>`;
+  }
+  function captureReceipt() {
+    const form = U.$("materialReceiptForm");
+    if (form && receiptDraft) ["date","quantity","memo"].forEach(key => { receiptDraft[key] = form.elements.namedItem(key).value; });
+  }
+  function editReceipt(id = "") {
+    const row = R.materialPurchases.records(materialId).find(item => item.purchaseId === purchaseId);
+    if (!row) return;
+    const receipt = id && (row.receipts || []).find(item => item.receiptId === id && !item.deletedAt);
+    receiptDraft = {receiptId:id,date:receipt?.date || U.today(),quantity:String(receipt?.quantity ?? R.materialPurchases.deliverySummary(row).pending),unit:row.unit,memo:receipt?.memo || ""};
+    receiptOriginal = JSON.stringify(receiptDraft); purchaseError = ""; move("receipt-edit");
+  }
+  function receiptForm() {
+    const d = receiptDraft;
+    if (!d) return "";
+    return `<form id="materialReceiptForm" class="mp-form"><h3>${U.escapeHTML(material(materialId)?.name)}の納品・入庫</h3><label>実際の納品日<input name="date" type="date" required max="${U.attr(U.today())}" value="${U.attr(d.date)}"></label><label>入庫数（${U.escapeHTML(d.unit)}）<input name="quantity" type="number" min="0" step="any" required value="${U.attr(d.quantity)}"></label><label>メモ（任意）<textarea name="memo">${U.escapeHTML(d.memo)}</textarea></label><div class="mp-actions"><button type="button" class="secondary" data-receipt-cancel>取消</button><button type="submit" class="primary">入庫を保存</button></div></form>`;
+  }
   function stockWarning(w) {
     const labels = {negative_stock:"在庫がマイナスです。購入・使用・確認数をご確認ください。",unknown_quantity:"使用量の総量を確認できない記録があります。",unknown_or_mismatched_unit:"単位が一致しない記録があります。袋とkgなどは換算していません。",invalid_transaction_id:"履歴IDが不明または重複しています。",invalid_date:"日付を確認できない履歴があります。",invalid_stocktake:"在庫確認履歴を確認してください。",quantity_overflow:"数量が計算可能な範囲を超えています。"};
     return `${w.date ? `${w.date}：` : ""}${labels[w.code] || "履歴を確認できないため在庫の集計を保留しています。"}`;
@@ -175,15 +274,17 @@
     const d = stockDraft;
     if (!d || !m) return "";
     const summary = R.materialStock.summary(m.materialId);
-    return `<form id="materialStockForm" class="ms-form"><h3>${U.escapeHTML(m.name)}</h3><p>計算上の現在庫：${summary.quantity === null ? "未確定" : `${U.escapeHTML(stockNumber(summary.quantity))} ${U.escapeHTML(summary.unit)}`}</p><label>確認日<input type="date" name="date" required max="${U.attr(U.today())}" value="${U.attr(d.date)}"></label><label>現物を数えた在庫（${U.escapeHTML(d.unit || "管理単位未登録")}）<input type="number" name="quantity" min="0" step="any" inputmode="decimal" required value="${U.attr(d.quantity)}"></label><label>理由・確認メモ（任意）<textarea name="memo">${U.escapeHTML(d.memo)}</textarea></label><p class="ms-note">確認日以前の登録済み履歴は確認数に含みます。同じ日の確認後に追加した購入・使用は、そこから加減算します。</p><div class="ml-actions"><button type="button" class="secondary" data-ms-cancel>取消</button><button type="submit" class="primary">在庫確認を保存</button></div></form>`;
+    return `<form id="materialStockForm" class="ms-form"><h3>${U.escapeHTML(m.name)}</h3><p>計算上の現在庫：${summary.quantity === null ? "未確定" : `${U.escapeHTML(stockNumber(summary.quantity))} ${U.escapeHTML(summary.unit)}`}</p><label>確認日<input type="date" name="date" required max="${U.attr(U.today())}" value="${U.attr(d.date)}"></label><label>現物を数えた在庫（${U.escapeHTML(d.unit || "管理単位未登録")}）<input type="number" name="quantity" min="0" step="any" inputmode="decimal" required value="${U.attr(d.quantity)}"></label><label>理由・確認メモ（任意）<textarea name="memo">${U.escapeHTML(d.memo)}</textarea></label><p class="ms-note">確認日以前の登録済み入庫・使用は確認数に含みます。同じ日の確認後に追加した入庫・使用は、そこから加減算します。購入予定だけでは在庫は増えません。旧購入は従来の計算を維持します。</p><div class="ml-actions"><button type="button" class="secondary" data-ms-cancel>取消</button><button type="submit" class="primary">在庫確認を保存</button></div></form>`;
   }
   function purchaseDetail(row,m) {
-    return `<article class="mp-detail" data-mp-detail="${U.attr(row.purchaseId)}"><h3>${U.escapeHTML(m.name)}の購入記録</h3><dl>${[["購入日",row.date],["年度",row.season],["分類",m.category],["仕入先",row.supplier || "未記録"],["数量",`${row.quantity} ${row.unit}`],["税込単価",money(row.unitPrice)],["単価×数量",money(R.materialPurchases.subtotal(row))],[row.totalAmount !== "" && row.totalAmount != null ? "税込実額" : "記録金額",money(R.materialPurchases.amount(row))]].map(([label,value]) => `<div><dt>${label}</dt><dd>${U.escapeHTML(value)}</dd></div>`).join("")}</dl>${row.memo ? `<p>${U.escapeHTML(row.memo)}</p>` : ""}<div class="mp-actions"><button type="button" class="primary" data-mp-edit="${U.attr(row.purchaseId)}" data-mp-material="${U.attr(m.materialId)}">編集</button><button type="button" class="secondary" data-mp-delete="${U.attr(row.purchaseId)}" data-mp-material="${U.attr(m.materialId)}">削除</button></div></article>`;
+    const receiptRows = (row.receipts || []).map(r => `<div class="ms-history-row"><b>${U.escapeHTML(r.date)} / ${U.escapeHTML(stockNumber(r.quantity))} ${U.escapeHTML(r.unit)}</b><small>${r.deletedAt ? "取消済み" : "入庫登録済み"}</small>${r.memo ? `<p>${U.escapeHTML(r.memo)}</p>` : ""}${!r.deletedAt ? `<div class="ml-actions"><button type="button" class="secondary" data-receipt-edit="${U.attr(r.receiptId)}">編集</button><button type="button" class="secondary" data-receipt-delete="${U.attr(r.receiptId)}">取り消す</button></div>` : ""}</div>`).join("");
+    const delivery = `<section class="ms-section"><h4>納品・入庫</h4><p>${U.escapeHTML(deliveryLabel(row))}</p>${row.deliveryMode === "manual" ? `${R.materialPurchases.deliverySummary(row).pending > 0 ? '<button type="button" class="primary" data-receipt-new>納品・入庫を登録</button>' : ""}${receiptRows}` : ""}</section>`;
+    return `<article class="mp-detail" data-mp-detail="${U.attr(row.purchaseId)}"><h3>${U.escapeHTML(m.name)}の購入記録</h3><dl>${[["購入日",row.date],["年度",row.season],["分類",m.category],["仕入先",row.supplier || "未記録"],["数量",`${row.quantity} ${row.unit}`],["納品予定日",row.expectedDeliveryDate || "未定"],["税込単価",money(row.unitPrice)],["単価×数量",money(R.materialPurchases.subtotal(row))],[row.totalAmount !== "" && row.totalAmount != null ? "税込実額" : "記録金額",money(R.materialPurchases.amount(row))]].map(([label,value]) => `<div><dt>${label}</dt><dd>${U.escapeHTML(value)}</dd></div>`).join("")}</dl>${row.memo ? `<p>${U.escapeHTML(row.memo)}</p>` : ""}${delivery}<div class="mp-actions"><button type="button" class="primary" data-mp-edit="${U.attr(row.purchaseId)}" data-mp-material="${U.attr(m.materialId)}">編集</button><button type="button" class="secondary" data-mp-delete="${U.attr(row.purchaseId)}" data-mp-material="${U.attr(m.materialId)}">削除</button></div></article>`;
   }
   function purchaseForm() {
     const draft = purchaseDraft;
     if (!draft) return "";
-    return `<form id="materialPurchaseForm" class="mp-form"><h3>${draft.purchaseId ? "購入記録を編集" : "購入記録を追加"}</h3>${draft.purchaseId ? `<p>${U.escapeHTML(material(draft.materialId)?.name || "資材が見つかりません")}</p>` : `<label>資材<select name="materialId" required><option value="">保存済みの資材を選択</option>${state.data().materials.map(m => `<option value="${U.attr(m.materialId)}"${m.materialId === draft.materialId ? " selected" : ""}>${U.escapeHTML(m.name)} / ${U.escapeHTML(m.category)}</option>`).join("")}</select></label>`}<div class="mp-grid">${[["date","購入日","date","required"],["season","年度","number",'min="1900" max="2200" step="1" required'],["supplier","仕入先","text",""],["quantity","数量","number",'min="0" step="any" required'],["unit","単位","text","required"],["unitPrice","税込単価（円・任意）","number",'min="0" step="1"'],["totalAmount","税込総額（実額・任意）","number",'min="0" step="1"']].map(([name,label,type,attrs]) => `<label>${label}<input name="${name}" id="mp-${name}" type="${type}" ${attrs} value="${U.attr(draft[name] ?? "")}"></label>`).join("")}</div><label>メモ<textarea name="memo">${U.escapeHTML(draft.memo || "")}</textarea></label><p id="mpSubtotal" class="mp-subtotal">単価×数量：${money(R.materialPurchases.subtotal(draft))} ／ 記録金額：${money(R.materialPurchases.amount(draft))}</p><div class="mp-actions"><button type="button" class="secondary" data-mp-cancel>取消</button><button type="submit" class="primary">購入記録を保存</button></div></form>`;
+    return `<form id="materialPurchaseForm" class="mp-form"><h3>${draft.purchaseId ? "購入記録を編集" : "購入記録を追加"}</h3>${draft.purchaseId ? `<p>${U.escapeHTML(material(draft.materialId)?.name || "資材が見つかりません")}</p>` : `<label>資材<select name="materialId" required><option value="">保存済みの資材を選択</option>${state.data().materials.map(m => `<option value="${U.attr(m.materialId)}"${m.materialId === draft.materialId ? " selected" : ""}>${U.escapeHTML(m.name)} / ${U.escapeHTML(m.category)}</option>`).join("")}</select></label>`}<div class="mp-grid">${[["date","購入日","date","required"],["season","年度","number",'min="1900" max="2200" step="1" required'],["supplier","仕入先","text",""],["expectedDeliveryDate","納品予定日（空欄は未定）","date",""],["quantity","数量","number",'min="0" step="any" required'],["unit","単位","text","required"],["unitPrice","税込単価（円・任意）","number",'min="0" step="1"'],["totalAmount","税込総額（実額・任意）","number",'min="0" step="1"']].map(([name,label,type,attrs]) => `<label>${label}<input name="${name}" id="mp-${name}" type="${type}" ${attrs} value="${U.attr(draft[name] ?? "")}"></label>`).join("")}</div><label>メモ<textarea name="memo">${U.escapeHTML(draft.memo || "")}</textarea></label><p class="ms-note">購入の保存では入庫しません。実際に届いたら購入詳細から納品・入庫を登録します。</p><p id="mpSubtotal" class="mp-subtotal">単価×数量：${money(R.materialPurchases.subtotal(draft))} ／ 記録金額：${money(R.materialPurchases.amount(draft))}</p><div class="mp-actions"><button type="button" class="secondary" data-mp-cancel>取消</button><button type="submit" class="primary">購入記録を保存</button></div></form>`;
   }
   function setHidden(node, hidden) { if (node) node.hidden = hidden; }
   function render() {
@@ -193,32 +294,75 @@
     if (!host && document.createElement) { host = document.createElement("div"); host.id = "materialsLedgerHost"; form.before(host); }
     const categories = [...new Set([...S.MATERIAL_CATEGORIES,U.$("mCategory").value].filter(Boolean))];
     U.setOptions(U.$("mCategory"),categories,U.$("mCategory").value || "肥料");
-    const m = material(materialId), cross = view === "list" && mode === "purchases";
-    setHidden(form,view !== "material-edit"); setHidden(list,!["list","material-detail"].includes(view) || cross);
-    setHidden(purchases,!(cross || view.startsWith("purchase-")));
+    const m = material(materialId), cross = view === "list" && mode !== "materials", pending = cross && mode === "pending";
+    setHidden(form,view !== "material-edit"); setHidden(list,!["list","material-detail","stock-evidence"].includes(view) || cross);
+    setHidden(purchases,!(cross || view.startsWith("purchase-") || ["receipt-edit","cancellation-edit"].includes(view)));
     setHidden(stockEditor,view !== "stock-edit");
     if (stockEditor) stockEditor.innerHTML = view === "stock-edit" ? stockForm(m) : "";
-    const title = {"stock-edit":"在庫を合わせる","material-detail":"資材の詳細","material-edit":U.$("editMaterialId").value ? "資材を編集" : "資材を追加","purchase-list":m ? `${m.name}の購入履歴` : "購入履歴","purchase-detail":"購入記録の詳細","purchase-edit":purchaseId ? "購入記録を編集" : "購入記録を追加"}[view] || "資材と購入の台帳";
+    const title = {"stock-evidence":"在庫の計算根拠","stock-edit":"在庫を合わせる","material-detail":"資材の詳細","material-edit":U.$("editMaterialId").value ? "資材を編集" : "資材を追加","purchase-list":m ? `${m.name}の購入履歴` : "購入履歴","purchase-detail":"購入記録の詳細","purchase-edit":purchaseId ? "購入記録を編集" : "購入記録を追加"}[view] || "資材と購入の台帳";
     if (host) host.innerHTML = `<div class="ml-heading"><h3>${U.escapeHTML(title)}</h3>${view !== "list" ? '<button type="button" class="secondary" data-material-back>戻る</button>' : ""}</div>${view === "list" ? `<div class="ml-modes" role="group" aria-label="台帳の表示"><button type="button" data-material-mode="materials" aria-pressed="${mode === "materials"}">資材一覧</button><button type="button" data-material-mode="purchases" aria-pressed="${mode === "purchases"}">購入履歴</button></div>${filters(cross)}<div class="ml-actions"><button type="button" class="primary" ${cross ? "data-mp-new" : "data-material-new"}>＋ ${cross ? "購入を追加" : "資材を追加"}</button></div>` : view === "purchase-list" ? `${filters(true)}<button type="button" class="primary" data-mp-new>＋ 購入を追加</button>` : ""}<p class="ml-error" role="alert">${U.escapeHTML(view === "material-edit" ? materialError : view === "stock-edit" ? stockError : view.startsWith("purchase-") ? purchaseError : listError)}</p>`;
+    if (view === "list" && host) {
+      host.querySelector?.(".ml-modes")?.insertAdjacentHTML("beforeend",`<button type="button" data-material-mode="pending" aria-pressed="${pending}">納品待ち</button>`);
+      if (pending) host.insertAdjacentHTML?.("beforeend",`<label class="mi-pending-filter">納品状況<select id="materialPendingStatus">${[["all","すべて"],["waiting","納品待ち"],["partial","一部納品"],["overdue","予定日超過"]].map(([value,label]) => `<option value="${value}"${pendingStatus === value ? " selected" : ""}>${label}</option>`).join("")}</select></label>`);
+    }
     if (view === "list" && !cross) {
       const rows = state.data().materials.filter(row => (year === "all" || materialYears(row).includes(year)) && (category === "all" || row.category === category)).slice().sort((a,b) => Number(b.season)-Number(a.season));
       list.innerHTML = rows.map(row => { const s = R.materialStock.summary(row.materialId); return `<article class="ml-row" data-material-row="${U.attr(row.materialId)}"><button type="button" class="ml-open" data-material-open="${U.attr(row.materialId)}"><b>${U.escapeHTML(row.name || "名称未入力")}</b><small>${U.escapeHTML(row.season)}年度 / ${U.escapeHTML(row.category)}</small><strong>在庫：${U.escapeHTML(s.quantity === null ? s.stocktake ? "集計保留" : "未登録" : `${stockNumber(s.quantity)} ${s.unit}`)}</strong><span aria-hidden="true">›</span></button><button type="button" class="secondary" data-material-purchases="${U.attr(row.materialId)}">購入履歴</button></article>`; }).join("") || '<p class="empty">条件に合う資材はありません。</p>';
     } else if (view === "material-detail") list.innerHTML = m ? materialDetail(m) : '<p role="alert">この資材は見つかりません。戻って一覧を確認してください。</p>';
+    else if (view === "stock-evidence") list.innerHTML = evidenceView(m);
     else list.innerHTML = "";
+    if (view === "list" && !cross) list.querySelectorAll?.("[data-material-row]").forEach(node => {
+      const row = material(node.dataset.materialRow), button = node.querySelector(".ml-open");
+      if (row && button) button.insertAdjacentHTML("beforeend",statusBadge(row) + supplySummary(row,R.materialStock.summary(row.materialId)));
+    });
+    if (view === "material-detail" && m) list.querySelectorAll?.(".ms-history-open[data-mp-open]").forEach(node => {
+      if (node.closest(".mi-previous")) return;
+      const row = R.materialPurchases.records(m.materialId).find(item => item.purchaseId === node.dataset.mpOpen);
+      if (!row) return;
+      const title = node.querySelector("b"), status = node.querySelector("small:last-child");
+      if (title) title.textContent = `${row.date} / 購入 ${stockNumber(row.quantity)} ${row.unit}`;
+      if (status) status.textContent = deliveryLabel(row);
+    });
+    if (["receipt-edit","cancellation-edit"].includes(view) && host) {
+      const heading = host.querySelector("h3"), alert = host.querySelector('[role="alert"]');
+      if (heading) heading.textContent = view === "receipt-edit" ? "納品・入庫を登録" : "未納品分の注文取消";
+      if (alert) alert.textContent = purchaseError;
+    }
     if (!purchases) return;
-    if (cross || view === "purchase-list") {
+    if (pending) purchases.innerHTML = pendingList();
+    else if (cross || view === "purchase-list") {
       const rows = allPurchases().filter(item => (!purchaseScope || cross || item.material.materialId === purchaseScope) && (year === "all" || String(item.row.season) === year) && (category === "all" || item.material.category === category)).sort((a,b) => String(b.row.date).localeCompare(String(a.row.date)));
       purchases.innerHTML = `<div class="mp-history">${rows.map(({row,material:m}) => `<article class="mp-record" data-mp-record="${U.attr(row.purchaseId)}"><button type="button" class="ml-open" data-mp-open="${U.attr(row.purchaseId)}" data-mp-material="${U.attr(m.materialId)}"><b>${U.escapeHTML(m.name)}</b><small>${U.escapeHTML(row.date)} / ${U.escapeHTML(row.season)}年度 / ${U.escapeHTML(m.category)}</small><small>${U.escapeHTML(row.supplier || "仕入先未記録")} / ${U.escapeHTML(row.quantity)} ${U.escapeHTML(row.unit)}</small><strong>${money(R.materialPurchases.amount(row))}</strong><span aria-hidden="true">›</span></button></article>`).join("") || '<p class="empty">条件に合う購入記録はありません。</p>'}</div>`;
     } else if (view === "purchase-detail") {
       const row = m && R.materialPurchases?.records(materialId).find(item => item.purchaseId === purchaseId);
       purchases.innerHTML = row ? purchaseDetail(row,m) : '<p role="alert">この購入記録は見つかりません。戻って履歴を確認してください。</p>';
-    } else if (view === "purchase-edit") purchases.innerHTML = purchaseForm();
+      if (row) purchases.querySelector?.(".mp-detail")?.insertAdjacentHTML("beforeend",cancellationHistory(row));
+    } else if (view === "purchase-edit") {
+      purchases.innerHTML = purchaseForm();
+      if (purchaseDraft?.purchaseId && purchaseDraft.deliveryMode !== "manual") {
+        const note = purchases.querySelector?.(".ms-note");
+        if (note) note.textContent = "この旧購入は従来の在庫計算を維持します。数量・日付を変更すると、在庫確認後の集計も再計算されます。";
+      }
+    }
+    else if (view === "receipt-edit") purchases.innerHTML = receiptForm();
+    else if (view === "cancellation-edit") purchases.innerHTML = cancellationForm();
     else purchases.innerHTML = "";
+    if (cross && !pending || view === "purchase-list") {
+      const rows = allPurchases().filter(item => (!purchaseScope || cross || item.material.materialId === purchaseScope) && (year === "all" || String(item.row.season) === year) && (category === "all" || item.material.category === category));
+      purchases.insertAdjacentHTML?.("afterbegin",purchaseTotals(rows));
+      purchases.querySelectorAll?.("[data-mp-record]").forEach(node => {
+        const mid = node.querySelector("[data-mp-material]")?.dataset.mpMaterial;
+        const item = rows.find(item => item.row.purchaseId === node.dataset.mpRecord && item.material.materialId === mid);
+        if (item) node.querySelector(".ml-open")?.insertAdjacentHTML("beforeend",`<small class="mp-delivery-status">${U.escapeHTML(deliveryLabel(item.row))}</small>`);
+      });
+    }
   }
   function cancelEditor() {
     if (view === "material-edit") clearFields();
     if (view === "purchase-edit") { purchaseDraft = null; purchaseError = ""; }
     if (view === "stock-edit") { stockDraft = null; stockError = ""; }
+    if (view === "receipt-edit") { receiptDraft = null; purchaseError = ""; }
+    if (view === "cancellation-edit") { cancellationDraft = null; purchaseError = ""; }
     restorePrevious();
   }
   function canHandleBack() { return view !== "list"; }
@@ -226,6 +370,16 @@
     if (!canHandleBack()) return false;
     if (view === "purchase-edit") capturePurchase();
     if (view === "stock-edit") captureStock();
+    if (view === "cancellation-edit") {
+      captureCancellation();
+      if (JSON.stringify(cancellationDraft) !== cancellationOriginal && !confirm("入力中の変更を取り消して戻りますか？")) return true;
+      cancelEditor(); return true;
+    }
+    if (view === "receipt-edit") {
+      captureReceipt();
+      if (JSON.stringify(receiptDraft) !== receiptOriginal && !confirm("入力中の変更を取り消して戻りますか？")) return true;
+      cancelEditor(); return true;
+    }
     const dirty = view === "material-edit" ? JSON.stringify(materialDraftState()) !== materialOriginal : view === "purchase-edit" ? JSON.stringify(purchaseDraft) !== purchaseOriginal : view === "stock-edit" ? JSON.stringify(stockDraft) !== stockOriginal : false;
     if (dirty && !confirm("入力中の変更を取り消して戻りますか？")) return true;
     if (view.endsWith("-edit")) cancelEditor(); else restorePrevious();
@@ -239,6 +393,46 @@
     const target = event.target;
     const match = selector => target.closest(selector);
     if (match("[data-material-back]")) { handleBack(); return; }
+    if (match("[data-stock-evidence]")) { move("stock-evidence"); return; }
+    if (match("[data-evidence-stocktake]")) {
+      restorePrevious();
+      const details = U.$("materialList")?.querySelector?.("[data-ms-history]");
+      if (details) { details.open = true; details.scrollIntoView({block:"center"}); }
+      return;
+    }
+    const sourceWork = match("[data-stock-work]");
+    if (sourceWork) {
+      const work = state.data().fieldWorks.find(w => w.workId === sourceWork.dataset.stockWork);
+      if (!work || work.materialId !== materialId) { listError = "使用記録が見つかりません。"; render(); return; }
+      R.app.openInput("field-work","materials",{nested:true});
+      R.screens.fieldWork.editWork(work.workId);
+      document.querySelector('#screen-field-work [data-work-mode-select="detail"]')?.click();
+      U.$("fwAmount")?.focus();
+      U.$("fwAmount")?.scrollIntoView({block:"center"});
+      return;
+    }
+    const pendingAction = match("[data-pending-receive],[data-pending-cancel]");
+    if (pendingAction) {
+      move("purchase-detail",{materialId:pendingAction.dataset.mpMaterial,purchaseId:pendingAction.dataset.pendingReceive || pendingAction.dataset.pendingCancel});
+      if (pendingAction.dataset.pendingReceive) editReceipt(); else editCancellation();
+      return;
+    }
+    if (match("[data-cancellation-new]")) { editCancellation(); return; }
+    if (match("[data-cancellation-back]")) { handleBack(); return; }
+    const cancellationUndo = match("[data-cancellation-undo]");
+    if (cancellationUndo && confirm("この注文取消を取り消して、未納品数へ戻しますか？")) {
+      purchaseError = R.materialPurchases.deleteCancellation(materialId,purchaseId,cancellationUndo.dataset.cancellationUndo) ? "" : R.materialPurchases.lastError;
+      render(); return;
+    }
+    if (match("[data-receipt-new]")) { editReceipt(); return; }
+    const receiptEdit = match("[data-receipt-edit]");
+    if (receiptEdit) { editReceipt(receiptEdit.dataset.receiptEdit); return; }
+    if (match("[data-receipt-cancel]")) { handleBack(); return; }
+    const receiptDelete = match("[data-receipt-delete]");
+    if (receiptDelete && confirm("この入庫を取り消しますか？取消履歴は残ります。")) {
+      purchaseError = R.materialPurchases.deleteReceipt(materialId,purchaseId,receiptDelete.dataset.receiptDelete) ? "" : R.materialPurchases.lastError;
+      render(); return;
+    }
     const tab = match("[data-material-mode]");
     if (tab) { mode = tab.dataset.materialMode; render(); return; }
     if (match("[data-material-new]")) { editMaterial(""); return; }
@@ -299,11 +493,14 @@
     U.$("materialsLedgerHost")?.addEventListener("change",event => {
       if (event.target.id === "mpViewYear") year = event.target.value;
       if (event.target.id === "materialsCategoryFilter") category = event.target.value;
+      if (event.target.id === "materialPendingStatus") pendingStatus = event.target.value;
       render();
     });
     U.$("cancelMaterialEdit").addEventListener("click",cancelEditor);
     const host = U.$("materialPurchases");
     host?.addEventListener("input",() => {
+      captureCancellation();
+      captureReceipt();
       capturePurchase();
       const summary = U.$("mpSubtotal");
       if (summary && purchaseDraft) summary.textContent = `単価×数量：${money(R.materialPurchases.subtotal(purchaseDraft))} ／ 記録金額：${money(R.materialPurchases.amount(purchaseDraft))}`;
@@ -313,6 +510,16 @@
       if (event.target.name === "materialId" && purchaseDraft && !purchaseDraft.unit) { purchaseDraft.unit = material(purchaseDraft.materialId)?.unit || ""; render(); }
     });
     host?.addEventListener("submit",event => {
+      if (event.target.id === "materialCancellationForm") {
+        event.preventDefault(); captureCancellation();
+        if (!R.materialPurchases.saveCancellation(materialId,purchaseId,cancellationDraft)) { purchaseError = R.materialPurchases.lastError; render(); return; }
+        cancellationDraft = null; purchaseError = ""; finishEdit("purchase-detail",materialId,purchaseId); return;
+      }
+      if (event.target.id === "materialReceiptForm") {
+        event.preventDefault(); captureReceipt();
+        if (!R.materialPurchases.saveReceipt(materialId,purchaseId,receiptDraft)) { purchaseError = R.materialPurchases.lastError; render(); return; }
+        receiptDraft = null; purchaseError = ""; finishEdit("purchase-detail",materialId,purchaseId); return;
+      }
       if (event.target.id !== "materialPurchaseForm") return;
       event.preventDefault(); capturePurchase();
       const mid = purchaseDraft.materialId;

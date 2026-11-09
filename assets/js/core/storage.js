@@ -377,6 +377,19 @@
         });
         if (additions.length) result = { ...result, [key]: [...existing, ...additions] };
       });
+      if (Array.isArray(result.purchases) && Array.isArray(source.purchases)) {
+        result = {...result, purchases:result.purchases.map(purchase => {
+          const incomingPurchase = source.purchases.find(p => p.purchaseId === purchase.purchaseId);
+          if (purchase.deliveryMode !== "manual" || incomingPurchase?.deliveryMode !== "manual") return purchase;
+          let result = purchase;
+          [["receipts", "receiptId"], ["cancellations", "cancellationId"]].forEach(([key, idKey]) => {
+            const existing = purchase[key] || [], ids = new Set(existing.map(r => r[idKey]));
+            const additions = (incomingPurchase[key] || []).filter(r => !ids.has(r[idKey]));
+            if (additions.length) result = {...result, [key]:[...existing, ...additions]};
+          });
+          return result;
+        })};
+      }
       return result;
     });
     // Fields are de-duplicated by ID, but their annual reflections are nested.

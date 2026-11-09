@@ -10,24 +10,25 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="稲作カルテ">
-  <link rel="manifest" href="manifest.webmanifest?v=20261108_ver307">
+  <link rel="manifest" href="manifest.webmanifest?v=20261109_ver309">
   <link rel="icon" href="assets/icons/icon-192.png">
   <link rel="apple-touch-icon" href="assets/icons/icon-192.png">
   <title>稲作カルテ</title>
-  <link rel="stylesheet" href="assets/css/app.css?v=20261108_ver307">
-  <link rel="stylesheet" href="assets/css/field-management.css?v=20261108_ver307">
-  <link rel="stylesheet" href="assets/css/pop-shell.css?v=20261108_ver307">
-  <link rel="stylesheet" href="assets/css/home-pop.css?v=20261108_ver307">
-  <link rel="stylesheet" href="assets/css/annual-pop.css?v=20261108_ver307">
-  <link rel="stylesheet" href="assets/css/herbicide-master.css?v=20261108_ver307">
-  <link rel="stylesheet" href="assets/css/material-purchases.css?v=20261108_ver307">
-  <link rel="stylesheet" href="assets/css/field-herbicide.css?v=20261108_ver307">
-  <link rel="stylesheet" href="assets/css/backup-center.css?v=20261108_ver307">
-  <link rel="stylesheet" href="assets/css/materials-ledger.css?v=20261108_ver307">
-  <link rel="stylesheet" href="assets/css/seeder-settings.css?v=20261108_ver307">
-  <link rel="stylesheet" href="assets/css/review-ledger.css?v=20261108_ver307">
-  <link rel="stylesheet" href="assets/css/season-theme.css?v=20261108_ver307">
-  <link rel="stylesheet" href="assets/css/ui-rhythm.css?v=20261108_ver307">
+  <link rel="stylesheet" href="assets/css/app.css?v=20261109_ver309">
+  <link rel="stylesheet" href="assets/css/field-management.css?v=20261109_ver309">
+  <link rel="stylesheet" href="assets/css/pop-shell.css?v=20261109_ver309">
+  <link rel="stylesheet" href="assets/css/home-pop.css?v=20261109_ver309">
+  <link rel="stylesheet" href="assets/css/annual-pop.css?v=20261109_ver309">
+  <link rel="stylesheet" href="assets/css/herbicide-master.css?v=20261109_ver309">
+  <link rel="stylesheet" href="assets/css/material-purchases.css?v=20261109_ver309">
+  <link rel="stylesheet" href="assets/css/field-herbicide.css?v=20261109_ver309">
+  <link rel="stylesheet" href="assets/css/backup-center.css?v=20261109_ver309">
+  <link rel="stylesheet" href="assets/css/materials-ledger.css?v=20261109_ver309">
+  <link rel="stylesheet" href="assets/css/seeder-settings.css?v=20261109_ver309">
+  <link rel="stylesheet" href="assets/css/review-ledger.css?v=20261109_ver309">
+  <link rel="stylesheet" href="assets/css/season-theme.css?v=20261109_ver309">
+  <link rel="stylesheet" href="assets/css/ui-rhythm.css?v=20261109_ver309">
+  <link rel="stylesheet" href="assets/css/annual-review-ui.css?v=20261109_ver309">
   <style>
     #storageBootFailure[hidden] { display: none !important; }
     #storageBootFailure { position: fixed; inset: 0; z-index: 2147483647; display: grid; align-content: center; background: #f7faf7; color: #243b2d; padding: 24px; }
@@ -477,7 +478,7 @@
       <section class="screen" id="screen-annual" data-title="年間履歴">
         <div class="screen-head annual-phone-head">
           <h2>年間履歴</h2>
-          <label class="annual-year-button"><span>▣</span><select id="annualYear"></select></label>
+          <label class="annual-year-button"><span>対象年度</span><select id="annualYear" aria-label="振り返る対象年度"></select></label>
           <button class="secondary icon-button annual-menu-button" type="button" aria-label="メニュー">☰</button>
         </div>
         <div class="timeline" id="annualTimeline"></div>
@@ -505,7 +506,6 @@
               <label>管理単位<input id="mUnit" placeholder="例: kg、袋、L"></label>
               <label>農薬登録番号<input id="mRegistrationNumber" inputmode="numeric"></label>
               <label>メーカー製品ページURL<input id="mProductUrl" type="url" inputmode="url" placeholder="https://" autocomplete="off"></label>
-              <label>納品日<input id="mDeliveryDate" type="date"></label>
             </div>
           </details>
           <details class="form-section" id="materialInitialStock" open>
@@ -891,14 +891,14 @@
 
   <div id="toast" class="toast hidden" role="status"></div>
 
-  <script src="assets/js/core/utils.js?v=20261108_ver307"></script>
-  <script src="assets/js/core/schema.js?v=20261108_ver307"></script>
-  <script src="assets/js/core/storage.js?v=20261108_ver307"></script>
-  <script src="assets/js/core/backup-export.js?v=20261108_ver307"></script>
+  <script src="assets/js/core/utils.js?v=20261109_ver309"></script>
+  <script src="assets/js/core/schema.js?v=20261109_ver309"></script>
+  <script src="assets/js/core/storage.js?v=20261109_ver309"></script>
+  <script src="assets/js/core/backup-export.js?v=20261109_ver309"></script>
   <section id="storageBootFailure" hidden role="alert" aria-labelledby="storageBootFailureTitle">
     <div><h1 id="storageBootFailureTitle">保存データを読み込めませんでした</h1><p>データを上書きせず、起動を停止しました。保存領域の状態を確認してから再読み込みしてください。</p><button id="storageBootReload" type="button">再読み込み</button></div>
   </section>
-  <script src="assets/js/core/state.js?v=20261108_ver307"></script>
+  <script src="assets/js/core/state.js?v=20261109_ver309"></script>
   <script id="storageBootGuard">
     (function () {
       "use strict";
@@ -929,46 +929,47 @@
       if (reload && typeof reload.focus === "function") reload.focus();
     })();
   </script>
-  <script src="assets/js/core/herbicide.js?v=20261108_ver307"></script>
-  <script src="assets/js/core/material-purchases.js?v=20261108_ver307"></script>
-  <script src="assets/js/core/material-stock.js?v=20261108_ver307"></script>
-  <script src="assets/js/core/seeder-settings.js?v=20261108_ver307"></script>
-  <script src="assets/js/core/agro.js?v=20261108_ver307"></script>
-  <script src="assets/js/core/outlook.js?v=20261108_ver307"></script>
-  <script src="assets/js/core/record-actions.js?v=20261108_ver307"></script>
-  <script src="assets/js/core/calendar.js?v=20261108_ver307"></script>
-  <script src="assets/js/core/alerts.js?v=20261108_ver307"></script>
-  <script src="assets/js/core/weather.js?v=20261108_ver307"></script>
-  <script src="assets/js/core/harvest-weather.js?v=20261108_ver307"></script>
-  <script src="assets/js/core/navigation.js?v=20261108_ver307"></script>
-  <script src="assets/js/core/pwa.js?v=20261108_ver307"></script>
-  <script src="assets/js/ui/season-art.js?v=20261108_ver307"></script>
-  <script src="assets/js/screens/home.js?v=20261108_ver307"></script>
-  <script src="assets/js/screens/calendar.js?v=20261108_ver307"></script>
-  <script src="assets/js/screens/bottom-sheet.js?v=20261108_ver307"></script>
-  <script src="assets/js/screens/recipes.js?v=20261108_ver307"></script>
-  <script src="assets/js/screens/fields.js?v=20261108_ver307"></script>
-  <script src="assets/js/screens/field-work.js?v=20261108_ver307"></script>
-  <script src="assets/js/screens/fertilizer.js?v=20261108_ver307"></script>
-  <script src="assets/js/screens/growth.js?v=20261108_ver307"></script>
-  <script src="assets/js/screens/dry-period.js?v=20261108_ver307"></script>
-  <script src="assets/js/screens/irrigation.js?v=20261108_ver307"></script>
-  <script src="assets/js/screens/photos.js?v=20261108_ver307"></script>
-  <script src="assets/js/screens/other-work.js?v=20261108_ver307"></script>
-  <script src="assets/js/screens/herbicide.js?v=20261108_ver307"></script>
-  <script src="assets/js/screens/annual.js?v=20261108_ver307"></script>
-  <script src="assets/js/screens/materials.js?v=20261108_ver307"></script>
-  <script src="assets/js/screens/results.js?v=20261108_ver307"></script>
-  <script src="assets/js/screens/harvest-performance.js?v=20261108_ver307"></script>
-  <script src="assets/js/screens/notices.js?v=20261108_ver307"></script>
-  <script src="assets/js/screens/outlook.js?v=20261108_ver307"></script>
-  <script src="assets/js/screens/machines.js?v=20261108_ver307"></script>
-  <script src="assets/js/screens/tractor-settings.js?v=20261108_ver307"></script>
-  <script src="assets/js/screens/transplanter-settings.js?v=20261108_ver307"></script>
-  <script src="assets/js/screens/seeder-settings.js?v=20261108_ver307"></script>
-  <script src="assets/js/screens/data.js?v=20261108_ver307"></script>
-  <script src="assets/js/screens/shipments.js?v=20261108_ver307"></script>
-  <script src="assets/js/ui/season-theme.js?v=20261108_ver307"></script>
-  <script src="assets/js/app.js?v=20261108_ver307"></script>
+  <script src="assets/js/core/herbicide.js?v=20261109_ver309"></script>
+  <script src="assets/js/core/material-purchases.js?v=20261109_ver309"></script>
+  <script src="assets/js/core/material-stock.js?v=20261109_ver309"></script>
+  <script src="assets/js/core/material-insights.js?v=20261109_ver309"></script>
+  <script src="assets/js/core/seeder-settings.js?v=20261109_ver309"></script>
+  <script src="assets/js/core/agro.js?v=20261109_ver309"></script>
+  <script src="assets/js/core/outlook.js?v=20261109_ver309"></script>
+  <script src="assets/js/core/record-actions.js?v=20261109_ver309"></script>
+  <script src="assets/js/core/calendar.js?v=20261109_ver309"></script>
+  <script src="assets/js/core/alerts.js?v=20261109_ver309"></script>
+  <script src="assets/js/core/weather.js?v=20261109_ver309"></script>
+  <script src="assets/js/core/harvest-weather.js?v=20261109_ver309"></script>
+  <script src="assets/js/core/navigation.js?v=20261109_ver309"></script>
+  <script src="assets/js/core/pwa.js?v=20261109_ver309"></script>
+  <script src="assets/js/ui/season-art.js?v=20261109_ver309"></script>
+  <script src="assets/js/screens/home.js?v=20261109_ver309"></script>
+  <script src="assets/js/screens/calendar.js?v=20261109_ver309"></script>
+  <script src="assets/js/screens/bottom-sheet.js?v=20261109_ver309"></script>
+  <script src="assets/js/screens/recipes.js?v=20261109_ver309"></script>
+  <script src="assets/js/screens/fields.js?v=20261109_ver309"></script>
+  <script src="assets/js/screens/field-work.js?v=20261109_ver309"></script>
+  <script src="assets/js/screens/fertilizer.js?v=20261109_ver309"></script>
+  <script src="assets/js/screens/growth.js?v=20261109_ver309"></script>
+  <script src="assets/js/screens/dry-period.js?v=20261109_ver309"></script>
+  <script src="assets/js/screens/irrigation.js?v=20261109_ver309"></script>
+  <script src="assets/js/screens/photos.js?v=20261109_ver309"></script>
+  <script src="assets/js/screens/other-work.js?v=20261109_ver309"></script>
+  <script src="assets/js/screens/herbicide.js?v=20261109_ver309"></script>
+  <script src="assets/js/screens/annual.js?v=20261109_ver309"></script>
+  <script src="assets/js/screens/materials.js?v=20261109_ver309"></script>
+  <script src="assets/js/screens/results.js?v=20261109_ver309"></script>
+  <script src="assets/js/screens/harvest-performance.js?v=20261109_ver309"></script>
+  <script src="assets/js/screens/notices.js?v=20261109_ver309"></script>
+  <script src="assets/js/screens/outlook.js?v=20261109_ver309"></script>
+  <script src="assets/js/screens/machines.js?v=20261109_ver309"></script>
+  <script src="assets/js/screens/tractor-settings.js?v=20261109_ver309"></script>
+  <script src="assets/js/screens/transplanter-settings.js?v=20261109_ver309"></script>
+  <script src="assets/js/screens/seeder-settings.js?v=20261109_ver309"></script>
+  <script src="assets/js/screens/data.js?v=20261109_ver309"></script>
+  <script src="assets/js/screens/shipments.js?v=20261109_ver309"></script>
+  <script src="assets/js/ui/season-theme.js?v=20261109_ver309"></script>
+  <script src="assets/js/app.js?v=20261109_ver309"></script>
 </body>
 </html>

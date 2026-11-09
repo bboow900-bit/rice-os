@@ -3,7 +3,7 @@ const assert = require("node:assert/strict"), fs = require("node:fs"), path = re
 const root = path.resolve(__dirname, "..");
 const read = file => fs.readFileSync(path.join(root, file), "utf8");
 const index = read("index.html"), sw = read("service-worker.js");
-for (const file of ["pop-shell.css", "home-pop.css", "annual-pop.css"]) {
+for (const file of ["pop-shell.css", "home-pop.css", "annual-pop.css", "annual-review-ui.css"]) {
   assert(index.includes(`assets/css/${file}?v=`), `${file} must be loaded`);
   assert(sw.includes(`./assets/css/${file}?v=`), `${file} must be cached`);
   assert(fs.existsSync(path.join(root, "assets/css", file)));

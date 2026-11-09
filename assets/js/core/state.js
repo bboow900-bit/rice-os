@@ -2149,6 +2149,26 @@
       if (record.materialId && index < 0) throw new Error("資材が見つかりません。台帳を開き直してください。");
       const previous = index >= 0 ? d.materials[index] : {};
       record = Object.fromEntries(Object.entries(record).filter(([,value]) => value !== undefined));
+      if (previous.purchases?.some(p => p.receipts?.length || p.cancellations?.length) && record.unit !== undefined && String(record.unit).trim() !== String(previous.unit || "").trim()) {
+        throw new Error("納品・注文取消履歴がある資材の管理単位は変更できません。別単位の資材は新しく登録してください。");
+      }
+      if (Array.isArray(previous.purchases) && record.purchases !== undefined) {
+        if (!Array.isArray(record.purchases)) throw new Error("購入履歴の形式を確認してください。");
+        previous.purchases.forEach(old => {
+          const next = record.purchases.find(p => p.purchaseId === old.purchaseId);
+          if (next && next.deliveryMode !== old.deliveryMode) throw new Error("既存購入の納品方式は変更できません。");
+          if (!old.receipts?.length && !old.cancellations?.length) return;
+          if (!next || next.quantity < old.quantity || next.unit !== old.unit) throw new Error("納品・注文取消履歴のある購入の削除・数量縮小・単位変更はできません。");
+          (old.cancellations || []).forEach(cancellation => {
+            const updated = next.cancellations?.find(r => r.cancellationId === cancellation.cancellationId);
+            if (!updated || cancellation.deletedAt && JSON.stringify(updated) !== JSON.stringify(cancellation)) throw new Error("注文取消履歴は削除できません。取り消しを使ってください。");
+          });
+          (old.receipts || []).forEach(receipt => {
+            const updated = next.receipts?.find(r => r.receiptId === receipt.receiptId);
+            if (!updated || receipt.deletedAt && JSON.stringify(updated) !== JSON.stringify(receipt)) throw new Error("入庫履歴は削除できません。取り消しを使ってください。");
+          });
+        });
+      }
       if (Array.isArray(previous.stocktakes) && previous.stocktakes.length && record.unit !== undefined && String(record.unit).trim() !== String(previous.unit || "").trim()) {
         throw new Error("在庫確認履歴がある資材の管理単位は変更できません。別単位の資材は新しく登録してください。");
       }

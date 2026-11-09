@@ -24,7 +24,7 @@ const { chromium } = require("C:/Users/Keisuke/.cache/codex-runtimes/codex-prima
     const current = async text => assert.equal(await page.locator("[data-material-stock-quantity]").innerText(), text);
     const raw = () => page.evaluate(() => localStorage.getItem(RiceOS.schema.STORE_KEY));
     await current("10 袋");
-    const purchase = async (quantity,unit="袋") => {
+    const purchase = async (quantity,unit="袋",receive=true) => {
       await page.locator("[data-ms-purchase]").click();
       await page.locator('#materialPurchaseForm [name="date"]').fill("2026-11-08");
       await page.locator('#materialPurchaseForm [name="quantity"]').fill(String(quantity));
@@ -33,6 +33,14 @@ const { chromium } = require("C:/Users/Keisuke/.cache/codex-runtimes/codex-prima
       await page.locator('#materialPurchaseForm [type="submit"]').click();
       await page.locator(".mp-detail").waitFor();
       const pid = await page.locator("[data-mp-detail]").getAttribute("data-mp-detail");
+      if (receive) {
+        await page.locator("[data-receipt-new]").click();
+        await page.locator('#materialReceiptForm [name="date"]').fill("2026-11-08");
+        await page.locator('#materialReceiptForm [name="quantity"]').fill(String(quantity));
+        await page.locator('#materialReceiptForm [type="submit"]').click();
+        await page.locator(`[data-mp-detail="${pid}"]`).waitFor();
+        assert.equal(await page.evaluate(({mid,pid}) => RiceOS.materialPurchases.deliverySummary(RiceOS.materialPurchases.records(mid).find(p => p.purchaseId === pid)).received,{mid:id,pid}),quantity);
+      }
       await page.locator("#appBackButton").click();
       await page.locator("[data-material-detail]").waitFor();
       return pid;
@@ -84,7 +92,17 @@ const { chromium } = require("C:/Users/Keisuke/.cache/codex-runtimes/codex-prima
     assert.equal(await page.locator('#materialStockForm [name="quantity"]').inputValue(),"7"); assert.equal(await raw(),beforeCancel);
     await page.evaluate(() => { Storage.prototype.setItem = window.qaStockSet; delete window.qaStockSet; });
     approve = true; await page.locator("[data-ms-cancel]").click(); approve = false;
-    const mismatch = await purchase(1,"kg"); await current("集計保留"); assert.match(await page.locator(".ms-warning").innerText(),/単位/);
+    const mismatch = await purchase(1,"kg",false); await current("13 袋");
+    const beforeMismatch = await raw();
+    const guard = await page.evaluate(({mid,pid}) => {
+      const check = unit => {
+        const saved = RiceOS.materialPurchases.saveReceipt(mid,pid,{date:"2026-11-08",quantity:1,unit,memo:"単位ガード確認"});
+        return {saved,error:RiceOS.materialPurchases.lastError};
+      };
+      return {purchaseMismatch:check("袋"),masterMismatch:check("kg")};
+    },{mid:id,pid:mismatch});
+    for (const result of Object.values(guard)) { assert.equal(result.saved,null); assert.match(result.error,/単位/); }
+    assert.equal(await raw(),beforeMismatch); await current("13 袋");
     await page.locator(".ms-section").filter({hasText:"購入履歴"}).locator("summary").click();
     await page.locator(`[data-mp-open="${mismatch}"]`).click();
     approve = true; await page.locator("[data-mp-delete]").click(); approve = false; await current("13 袋");
@@ -113,7 +131,7 @@ const { chromium } = require("C:/Users/Keisuke/.cache/codex-runtimes/codex-prima
     await page.locator("#saveMaterialButton").click(); await current("5 袋");
     assert.equal(await page.evaluate(mid => RiceOS.state.data().materials.find(m => m.materialId === mid).remaining,legacy),"旧在庫7");
     assert.deepEqual(errors,[]);
-    console.log(`PASS material stock UI ${width}: product+baseline, purchase+, group use once, recount, edit preservation, cancel/failure, unit mismatch and histories`);
+    console.log(`PASS material stock UI ${width}: product+baseline, manual receipt+, group use once, recount, edit preservation, cancel/failure, pending mismatch isolation, receipt purchase/master unit guards and histories`);
     await context.close();
   } } finally { await browser.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });

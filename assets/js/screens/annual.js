@@ -43,7 +43,7 @@
     })));
     const target = offField ? "圃場外" : targets.join("、") || "対象未確認";
     const info = main.material || main.machine || (!fieldIds.length && !["圃場外","対象なし",target].includes(row.target) ? row.target : "");
-    return `<button type="button" class="annual-archive-preview" data-annual-record-open-kind="${U.attr(row.kind)}" data-annual-record-open-id="${U.attr(row.id)}" data-annual-record-open-label="${U.attr(row.title)}" ${!selectedFieldId && fieldId ? `data-annual-material-field="${U.attr(fieldId)}"` : ""}><time>${U.escapeHTML(U.fd(row.date))}</time><span><b>${U.escapeHTML(row.title)}</b><small class="annual-archive-target" aria-label="${U.attr(`対象: ${target}`)}">${U.escapeHTML(target)}</small>${info ? `<small>${U.escapeHTML(info)}</small>` : ""}</span><span aria-hidden="true">›</span></button>`;
+    return `<button type="button" class="annual-archive-preview" data-annual-record-open-kind="${U.attr(row.kind)}" data-annual-record-open-id="${U.attr(row.id)}" data-annual-record-open-label="${U.attr(row.title)}" ${!selectedFieldId && fieldId ? `data-annual-material-field="${U.attr(fieldId)}"` : ""}><time datetime="${U.attr(row.date)}">${U.escapeHTML(annualListDate(row.date, [main.startDate, main.actualEndDate, main.endDate]))}</time><span><b>${U.escapeHTML(row.title)}</b><small class="annual-archive-target" aria-label="${U.attr(`対象: ${target}`)}">${U.escapeHTML(target)}</small>${info ? `<small>${U.escapeHTML(info)}</small>` : ""}</span><span aria-hidden="true">›</span></button>`;
   }
   let nextSeasonIdeaDraft = false;
   let seasonNoteDraft = null;
@@ -330,9 +330,9 @@
     const planned = item.startDate && item.endDate ? U.daysBetween(item.startDate, item.endDate) : "";
     const actual = item.startDate && item.actualEndDate ? U.daysBetween(item.startDate, item.actualEndDate) : "";
     return [
-      item.startDate ? `開始 ${U.fd(item.startDate)}` : "",
-      item.endDate ? `予定 ${U.fd(item.endDate)}` : "",
-      item.actualEndDate ? `完了 ${U.fd(item.actualEndDate)}` : "",
+      item.startDate ? `開始 ${annualListDate(item.startDate, [item.endDate, item.actualEndDate])}` : "",
+      item.endDate ? `予定 ${annualListDate(item.endDate, [item.startDate])}` : "",
+      item.actualEndDate ? `完了 ${annualListDate(item.actualEndDate, [item.startDate])}` : "",
       planned !== "" ? `予定${planned}日` : "",
       actual !== "" ? `実績${actual}日` : ""
     ].filter(Boolean);
@@ -457,6 +457,14 @@
     return U.$("annualYear") && U.$("annualYear").value || String(new Date().getFullYear());
   }
 
+  function annualListDate(value, relatedDates = []) {
+    if (!isTimelineDate(value)) return U.fd(value);
+    const year = value.slice(0, 4);
+    const showYear = yearValue() === "all" || year !== String(yearValue())
+      || relatedDates.some(date => isTimelineDate(date) && date.slice(0, 4) !== year);
+    return `${showYear ? `${Number(year)}/` : ""}${Number(value.slice(5, 7))}/${Number(value.slice(8, 10))}`;
+  }
+
   function rowsForYear(rows) {
     const year = yearValue();
     return rows.filter((row) => year === "all" || String(row.season) === String(year));
@@ -521,7 +529,7 @@
     const factDates = records => {
       const dates = records.map(row=>row.date).filter(isTimelineDate).sort();
       if (!dates.length) return "実績なし";
-      const short = date => `${yearValue() === "all" ? `${Number(date.slice(0,4))}/` : ""}${Number(date.slice(5,7))}/${Number(date.slice(8,10))}`;
+      const short = date => annualListDate(date, dates);
       return dates[0] === dates.at(-1) ? short(dates[0]) : `${short(dates[0])}〜${short(dates.at(-1))}`;
     };
     return `
@@ -764,7 +772,7 @@
     const harvestLabel = harvest.status === "complete" ? `収穫済み・${Number(harvest.date.slice(5, 7))}/${Number(harvest.date.slice(8, 10))}`
       : harvest.status === "partial" ? "稲刈り一部実施" : harvest.status === "legacy" ? "完了区分未確認" : "";
     const harvestBadge = harvestLabel ? `<span class="harvest-list-badge ${U.attr(harvest.status)}" data-harvest-status="${U.attr(harvest.status)}">${U.escapeHTML(harvestLabel)}</span>` : "";
-    const last = stats.lastDate ? U.fd(stats.lastDate) : "記録なし";
+    const last = stats.lastDate ? annualListDate(stats.lastDate) : "記録なし";
     const stage = annualStageForField(field);
     const riceStage = riceStageNumberForField(field);
     const district = field.district ? ` / ${U.escapeHTML(field.district)}` : "";
@@ -1066,7 +1074,7 @@
     return `
       <div class="annual-karte-source-row">
         <span>${U.escapeHTML(label)}</span>
-        <b>${date ? U.escapeHTML(U.fd(date)) : U.escapeHTML(emptyText || "未登録")}</b>
+        <b>${date ? U.escapeHTML(annualListDate(date)) : U.escapeHTML(emptyText || "未登録")}</b>
         <small>${date ? U.escapeHTML(sourceText || "作業記録から自動取得") : "田植え作業を登録してください"}</small>
       </div>
     `;
@@ -1151,8 +1159,8 @@
             <h3>幼穂・出穂の実測</h3>
           </div>
           <div class="annual-kv-list">
-            ${targetLine("最新の幼穂確認", panicleLog ? `${panicleLog.panicleLengthMm}mm（${U.fd(panicleLog.date)} 実測）` : "未記録")}
-            ${targetLine("出穂日", headingDate ? `${U.fd(headingDate)}（実測）` : "未記録")}
+            ${targetLine("最新の幼穂確認", panicleLog ? `${panicleLog.panicleLengthMm}mm（${annualListDate(panicleLog.date)} 実測）` : "未記録")}
+            ${targetLine("出穂日", headingDate ? `${annualListDate(headingDate)}（実測）` : "未記録")}
             ${targetLine("記録の扱い", "この画面では実測のみを表示")}
           </div>
         </section>
@@ -1260,7 +1268,7 @@
           return `
             <article class="annual-growth-row">
               <div>
-                <b>${U.escapeHTML(U.fd(date))}</b>
+                <b>${U.escapeHTML(annualListDate(date))}</b>
                 <span>田植後 ${U.escapeHTML(String(U.daysAfterPlanting(field, date) || "-"))}日</span>
               </div>
               <dl>
@@ -1297,7 +1305,7 @@
         <div class="annual-entry-main annual-work-main">
           <span class="annual-kind-icon ${row.kind === "fieldWork" ? "annual-work-icon" : ""}">${row.kind === "fieldWork" && /草刈り/.test(row.title) ? '<img class="annual-entry-svg" src="assets/images/light-icons/mowing-worker.png" alt="草刈り作業">' : row.kind === "fieldWork" ? iconSvg(workIconClass(row.title), "annual-entry-svg") : U.escapeHTML(row.kindIcon || row.kindLabel.slice(0, 1))}</span>
           <div class="annual-entry-title">
-            <time>${showDate ? U.escapeHTML(U.fd(row.date)) : ""}</time>
+            <time>${showDate ? U.escapeHTML(annualListDate(row.date)) : ""}</time>
             <b>${U.escapeHTML(row.title)}</b>
             <span>${U.escapeHTML(detail || row.target || "対象なし")}</span>
           </div>
@@ -1387,7 +1395,7 @@
     return `<section class="water-movement-timeline annual-water-movement-timeline" aria-label="${U.attr(`${period.label}の期間内の水の動き`)}">
       <div class="water-movement-timeline-head"><b>水の動き</b><small>${U.escapeHTML(summary)}</small></div>
       <div class="water-movement-timeline-bar">${timeline.segments.map((item) => `<span class="${U.attr(item.phase)} ${item.active ? "active" : ""}" style="--movement-days:${U.attr(String(item.days))}"><b>${U.escapeHTML(label(item.phase))}</b><em>${U.escapeHTML(`${item.days}日`)}</em></span>`).join("")}</div>
-      <div class="water-movement-timeline-dates"><span>${U.escapeHTML(U.fd(timeline.segments[0].startDate))}</span><span>${U.escapeHTML(timeline.active ? "継続中" : U.fd(timeline.segments.at(-1).displayEndDate))}</span></div>
+      <div class="water-movement-timeline-dates"><span>${U.escapeHTML(annualListDate(timeline.segments[0].startDate, [timeline.segments.at(-1).displayEndDate]))}</span><span>${U.escapeHTML(timeline.active ? "継続中" : annualListDate(timeline.segments.at(-1).displayEndDate, [timeline.segments[0].startDate]))}</span></div>
     </section>`;
   }
 
@@ -1463,7 +1471,7 @@
       <div>${movements.map((movement) => {
         const rawDays = movement.endDate ? waterPeriodDays(movement.startDate, movement.endDate) : "";
         const days = rawDays === "" ? "" : Number(rawDays) + 1;
-        return `<p><b>${U.escapeHTML(waterMovementLabel(period, movement.phase))}</b><span>${U.escapeHTML(U.fd(movement.startDate))} ${movement.endDate ? `- ${U.escapeHTML(U.fd(movement.endDate))}` : "- 継続中"}${days !== "" ? ` / ${days}日` : ""}</span></p>`;
+        return `<p><b>${U.escapeHTML(waterMovementLabel(period, movement.phase))}</b><span>${U.escapeHTML(annualListDate(movement.startDate, [movement.endDate]))} ${movement.endDate ? `- ${U.escapeHTML(annualListDate(movement.endDate, [movement.startDate]))}` : "- 継続中"}${days !== "" ? ` / ${days}日` : ""}</span></p>`;
       }).join("")}</div>
     </details>` : "";
     return `
@@ -1474,9 +1482,9 @@
           <strong>${actualDays !== "" ? `実績 ${actualDays}日` : (plannedDays ? `目安 ${plannedDays}日` : "期間確認")}</strong>
         </div>
         <div class="annual-water-period-dates">
-          <span><small>開始</small><b>${U.escapeHTML(period.startDate ? U.fd(period.startDate) : "未記録")}</b></span>
-          <span><small>予定終了</small><b>${U.escapeHTML(period.plannedEndDate ? U.fd(period.plannedEndDate) : "未設定")}</b></span>
-          <span><small>実績終了</small><b>${U.escapeHTML(completed ? U.fd(period.actualEndDate) : (dateOrderInvalid ? "日付要確認" : (period.actualEndDate ? "日付要確認" : (active ? "継続中" : "未記録"))))}</b></span>
+          <span><small>開始</small><b>${U.escapeHTML(period.startDate ? annualListDate(period.startDate, [period.plannedEndDate, period.actualEndDate]) : "未記録")}</b></span>
+          <span><small>予定終了</small><b>${U.escapeHTML(period.plannedEndDate ? annualListDate(period.plannedEndDate, [period.startDate]) : "未設定")}</b></span>
+          <span><small>実績終了</small><b>${U.escapeHTML(completed ? annualListDate(period.actualEndDate, [period.startDate]) : (dateOrderInvalid ? "日付要確認" : (period.actualEndDate ? "日付要確認" : (active ? "継続中" : "未記録"))))}</b></span>
         </div>
         ${plannedDays ? `<div class="annual-water-period-progress"><i><em style="width:${progress}%"></em></i><span>予定 ${plannedDays}日${progressDays !== "" ? ` / ${completed ? "実績" : "経過"} ${progressDays}日` : ""}</span></div>` : ""}
         ${supportsMovements ? renderWaterMovementTimeline(period, displayEnd) : ""}
@@ -1489,8 +1497,8 @@
 
   function renderLegacyWaterReviewRow(period) {
     const dates = period.startDate && period.actualEndDate
-      ? `${U.fd(period.startDate)} - ${U.fd(period.actualEndDate)}`
-      : (period.startDate ? `${U.fd(period.startDate)} 開始` : `${U.fd(period.actualEndDate)} 終了記録`);
+      ? `${annualListDate(period.startDate, [period.actualEndDate])} - ${annualListDate(period.actualEndDate, [period.startDate])}`
+      : (period.startDate ? `${annualListDate(period.startDate)} 開始` : `${annualListDate(period.actualEndDate)} 終了記録`);
     const canImport = Boolean(period.startDate && period.actualEndDate && !period.migrated);
     return `
       <article class="annual-water-review ${period.migrated ? "migrated" : ""}">
@@ -1548,7 +1556,7 @@
             <article>
               ${photo.photoData ? `<img src="${U.attr(photo.photoData)}" alt="">` : `<div>${U.escapeHTML(photo.photo || "写真メモ")}</div>`}
               <b>${U.escapeHTML(photo.title)}</b>
-              <span>${U.escapeHTML(U.fd(photo.date))}</span>
+              <span>${U.escapeHTML(annualListDate(photo.date))}</span>
             </article>
           `).join("")}
         </div>` : '<div class="empty">写真はまだありません。</div>'}
@@ -1734,7 +1742,7 @@
   function timelineDateParts(value, includeYear) {
     if (!isTimelineDate(value)) return { text: "", day: "", weekday: "" };
     const date = new Date(`${value}T00:00:00`);
-    const prefix = includeYear ? `${date.getFullYear()}/` : "";
+    const prefix = includeYear || yearValue() === "all" || String(date.getFullYear()) !== String(yearValue()) ? `${date.getFullYear()}/` : "";
     const day = `${prefix}${date.getMonth() + 1}/${date.getDate()}`;
     const weekday = `（${["日", "月", "火", "水", "木", "金", "土"][date.getDay()]}）`;
     return { text: `${day}${weekday}`, day, weekday };
@@ -1867,8 +1875,8 @@
     } else if (entry.tone === "water") {
       const start = row.startDate || row.date || "";
       const end = row.actualEndDate || "";
-      if (start) facts.push(`開始 ${U.fd(start)}`);
-      if (end) facts.push(`完了 ${U.fd(end)}`);
+      if (start) facts.push(`開始 ${annualListDate(start, [end])}`);
+      if (end) facts.push(`完了 ${annualListDate(end, [start])}`);
     }
     const memo = String(row.memo || row.observationSummary || "").trim();
     return `<article class="annual-year-flow-entry ${U.attr(entry.tone)}${entry.milestone ? " milestone" : ""}${expanded ? " expanded" : ""}"><div class="annual-year-flow-main"><button type="button" class="annual-year-flow-open" data-annual-record-open-kind="${U.attr(entry.editKind)}" data-annual-record-open-id="${U.attr(id)}" data-annual-record-open-label="${U.attr(entry.label)}"><span class="annual-year-flow-title"><em>${U.escapeHTML(entry.milestone ? "節目" : entry.category || "記録")}</em><b>${U.escapeHTML(entry.label)}</b><strong aria-hidden="true">›</strong></span><span class="annual-year-flow-detail">${U.escapeHTML(entry.detail)}</span>${entry.stageFact ? `<span class="annual-year-flow-stage-fact">${U.escapeHTML(entry.stageFact)}</span>` : ""}${entry.days !== "" && entry.days != null ? `<span class="annual-year-flow-days">${U.escapeHTML(String(entry.days))}日間</span>` : ""}</button><button type="button" class="annual-year-flow-menu" aria-label="${U.escapeHTML(entry.label)}の編集・削除" title="編集・削除" data-annual-flow-menu-kind="${U.attr(entry.editKind)}" data-annual-flow-menu-id="${U.attr(id)}" data-annual-flow-menu-label="${U.attr(entry.label)}">⋮</button></div><button type="button" class="annual-year-flow-summary-toggle" data-annual-flow-summary="${U.attr(key)}" aria-expanded="${expanded ? "true" : "false"}">${expanded ? "要約を閉じる" : "要約を表示"}</button>${expanded ? `<div class="annual-year-flow-summary"><div class="annual-year-flow-summary-metrics">${facts.slice(0, 4).map((fact) => `<span>${U.escapeHTML(fact)}</span>`).join("") || "<span>要約できる補足情報はありません</span>"}</div>${memo ? `<p>${U.escapeHTML(memo)}</p>` : ""}</div>` : ""}</article>`;
@@ -2138,11 +2146,11 @@
     const groups = state.materialUsageForYear(year, { cropYear: true }).map((group) => ({
       ...group, works: group.works.filter((work) => !field || (work.fieldIds || []).includes(field.fieldId))
     })).filter((group) => group.works.length);
-    return `<details class="annual-used-materials"><summary>使用した資材 <small>${U.escapeHTML(year)}年 / ${groups.length}種類</small></summary>${groups.length ? groups.map((group) => `<section class="annual-material-group"><h4>${U.escapeHTML(group.name)}${!group.materialId ? '<small>未紐付け</small>' : ""}</h4><p class="annual-material-brief">${group.works.length}回使用 / ${U.escapeHTML([...group.works].map(work => work.date).sort()[0] || "")}〜${U.escapeHTML([...group.works].map(work => work.date).sort().at(-1) || "")}</p><details><summary>使用記録を確認</summary>${group.works.map((work) => {
+    return `<details class="annual-used-materials"><summary>使用した資材 <small>${U.escapeHTML(year)}年 / ${groups.length}種類</small></summary>${groups.length ? groups.map((group) => `<section class="annual-material-group"><h4>${U.escapeHTML(group.name)}${!group.materialId ? '<small>未紐付け</small>' : ""}</h4><p class="annual-material-brief">${group.works.length}回使用 / ${U.escapeHTML(annualListDate([...group.works].map(work => work.date).sort()[0] || "", group.works.map(work => work.date)))}〜${U.escapeHTML(annualListDate([...group.works].map(work => work.date).sort().at(-1) || "", group.works.map(work => work.date)))}</p><details><summary>使用記録を確認</summary>${group.works.map((work) => {
       const fieldId = field ? field.fieldId : (work.fieldIds || []).find((id) => state.field(id));
       const fields = (work.fieldIds || []).map((id) => state.field(id)?.name || id).join("・");
-      if (work.targetScope === "offField") return `<button type="button" class="annual-material-work" data-annual-record-open-kind="fieldWork" data-annual-record-open-id="${U.attr(work.workId)}" data-annual-record-open-label="${U.attr(work.workName)}"><span>${U.escapeHTML(work.date)} / 圃場外</span><b>${U.escapeHTML(work.workName || "作業")}</b><span>${U.escapeHTML([work.material, work.amount].filter(Boolean).join(" / "))}</span></button>`;
-      return `<button type="button" class="annual-material-work" data-annual-record-open-kind="fieldWork" data-annual-record-open-id="${U.attr(work.workId)}" data-annual-record-open-label="${U.attr(work.workName)}" ${!field && fieldId ? `data-annual-material-field="${U.attr(fieldId)}"` : ""} ${!fieldId ? "disabled" : ""}><span>${U.escapeHTML(work.date)} / ${U.escapeHTML(fields || "圃場未設定")}</span><b>${U.escapeHTML(work.workName || "作業")}</b><span>${U.escapeHTML([work.material, work.amount].filter(Boolean).join(" / "))}</span></button>`;
+      if (work.targetScope === "offField") return `<button type="button" class="annual-material-work" data-annual-record-open-kind="fieldWork" data-annual-record-open-id="${U.attr(work.workId)}" data-annual-record-open-label="${U.attr(work.workName)}"><span>${U.escapeHTML(annualListDate(work.date))} / 圃場外</span><b>${U.escapeHTML(work.workName || "作業")}</b><span>${U.escapeHTML([work.material, work.amount].filter(Boolean).join(" / "))}</span></button>`;
+      return `<button type="button" class="annual-material-work" data-annual-record-open-kind="fieldWork" data-annual-record-open-id="${U.attr(work.workId)}" data-annual-record-open-label="${U.attr(work.workName)}" ${!field && fieldId ? `data-annual-material-field="${U.attr(fieldId)}"` : ""} ${!fieldId ? "disabled" : ""}><span>${U.escapeHTML(annualListDate(work.date))} / ${U.escapeHTML(fields || "圃場未設定")}</span><b>${U.escapeHTML(work.workName || "作業")}</b><span>${U.escapeHTML([work.material, work.amount].filter(Boolean).join(" / "))}</span></button>`;
     }).join("")}</details></section>`).join("") : '<p class="muted">この年の資材使用記録はありません。</p>'}</details>`;
   }
 

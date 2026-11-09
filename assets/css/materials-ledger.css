@@ -46,3 +46,31 @@
   #screen-materials #materialForm .form-grid.dense, #screen-materials #materialPurchases .mp-grid { grid-template-columns: minmax(0,1fr); }
   #screen-materials #materialPurchases :is(input,select,textarea) { font-size: 16px; min-height: 44px; }
 }
+/* Purchase commitments stay separate from physical stock. */
+#screen-materials .ms-supply{display:grid;gap:6px;padding:12px 0;min-width:0;white-space:normal;overflow-wrap:anywhere;line-height:1.5}
+#screen-materials .ms-current>.ms-supply{display:grid}
+#screen-materials .ms-supply b{font-size:16px;color:var(--text,#183c2a)}
+#screen-materials .ms-supply small{display:block;font-size:12px;line-height:1.6;white-space:normal;overflow-wrap:anywhere}
+#screen-materials .ml-open>.ms-supply{grid-column:1 / -1;grid-row:auto;font-size:13px;align-self:stretch}
+#screen-materials .mp-year-totals{display:grid;gap:12px;margin:12px 0 20px}
+#screen-materials .mp-year-totals>div{display:grid;gap:6px;border-left:3px solid var(--accent,#398659);padding:12px;background:var(--surface,#fff);min-width:0;overflow-wrap:anywhere}
+#screen-materials .mp-year-totals strong{font-size:24px;line-height:1.3}
+#screen-materials .mp-delivery-status{white-space:normal;overflow-wrap:anywhere;line-height:1.6}
+#screen-materials .ml-modes{grid-template-columns:repeat(3,minmax(0,1fr))}
+#screen-materials .ml-modes button{padding:8px 4px;font-size:13px;min-width:0;white-space:normal;line-height:1.4}
+#screen-materials .mi-badges,#screen-materials .ml-open>.mi-badges{display:flex;flex-wrap:wrap;gap:6px;grid-column:1;grid-row:auto;font-size:12px}
+#screen-materials .mi-badge{display:inline-block;padding:4px 8px;border-radius:4px;background:#edf5ed;color:#315b36;font-size:12px;line-height:1.5;font-weight:600}
+#screen-materials .mi-badge.water{background:#e9f4fa;color:#235a72}
+#screen-materials .mi-badge.warning,#screen-materials .mi-finance-note{background:#fff5df;color:#795018}
+#screen-materials .mi-order{padding:16px 0;border-bottom:1px solid var(--season-line,#dbe6df);min-width:0}
+#screen-materials .mi-order .ml-actions{justify-content:flex-start}
+#screen-materials .mi-order button{min-height:44px;border-radius:8px}
+#screen-materials .mi-pending-filter{display:grid;gap:6px;margin:12px 0;font-size:13px}
+#screen-materials .mi-pending-filter select{min-width:0;width:100%;min-height:44px;font-size:16px}
+#screen-materials .mi-equation{font-size:18px;line-height:1.7;border-left:3px solid var(--season-accent,#398659);padding:12px;overflow-wrap:anywhere}
+#screen-materials .mi-evidence-row>span{min-width:0}
+#screen-materials .ms-warning button{display:block;margin-top:10px;white-space:normal}
+#screen-materials .mi-cancellations{padding:14px 0;line-height:1.7;overflow-wrap:anywhere}
+#screen-materials .ms-number{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;width:100%;background:transparent;box-shadow:none;border:0;padding:6px 0;text-align:left;color:var(--season-accent,#286848);min-height:48px}
+#screen-materials .ms-number strong{font-size:28px;line-height:1.4;overflow-wrap:anywhere}
+#screen-materials .ms-number small{font-size:12px;line-height:1.5}

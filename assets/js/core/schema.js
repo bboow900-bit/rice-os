@@ -5,7 +5,7 @@
   const U = RiceOS.utils;
 
   const SCHEMA_VERSION = 17;
-  const APP_VERSION = "20261108_ver307";
+  const APP_VERSION = "20261109_ver309";
   const STORE_KEY = "rice_os_v8_stable";
   const BACKUP_KEY = "rice_os_v8_stable_backup";
   const RELEASE_BACKUPS_KEY = "rice_os_v8_stable_release_backups";
@@ -817,6 +817,44 @@
           throw new Error("資材の購入履歴に不正な日付・数量・金額または重複IDがあります。元のデータは変更していません。");
         }
         ids.add(row.purchaseId);
+        const validDay = value => {
+          const time = typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value) ? Date.parse(value + "T00:00:00Z") : NaN;
+          return value >= "1900-01-01" && value <= "2200-12-31" && Number.isFinite(time) && new Date(time).toISOString().slice(0, 10) === value;
+        };
+        if (row.deliveryMode !== undefined && row.deliveryMode !== "manual"
+          || row.expectedDeliveryDate !== undefined && row.expectedDeliveryDate !== "" && !validDay(row.expectedDeliveryDate)
+          || row.deliveryMode === "manual" && (!Array.isArray(row.receipts) || typeof row.expectedDeliveryDate !== "string")
+          || row.deliveryMode === undefined && row.receipts !== undefined) throw new Error("購入履歴の納品方式・予定日を確認してください。");
+        const receiptIds = new Set(), quantities = [];
+        if (row.cancellations !== undefined && (row.deliveryMode !== "manual" || !Array.isArray(row.cancellations))) throw new Error("購入履歴の注文取消形式を確認してください。");
+        const cancellationIds = new Set();
+        (row.cancellations || []).forEach(cancellation => {
+          if (!cancellation || typeof cancellation.cancellationId !== "string" || !cancellation.cancellationId.trim() || cancellationIds.has(cancellation.cancellationId)
+            || !validDay(cancellation.date) || cancellation.date > U.today()
+            || typeof cancellation.quantity !== "number" || !Number.isFinite(cancellation.quantity) || cancellation.quantity <= 0 || cancellation.quantity > Number.MAX_SAFE_INTEGER
+            || typeof cancellation.reason !== "string" || !cancellation.reason.trim()
+            || typeof cancellation.createdAt !== "string" || !Number.isFinite(Date.parse(cancellation.createdAt))
+            || cancellation.deletedAt !== undefined && (typeof cancellation.deletedAt !== "string" || !Number.isFinite(Date.parse(cancellation.deletedAt)))) throw new Error("購入履歴の注文取消日・数量・理由・IDを確認してください。");
+          cancellationIds.add(cancellation.cancellationId);
+          if (!cancellation.deletedAt) quantities.push(cancellation.quantity);
+        });
+        (row.receipts || []).forEach(receipt => {
+          if (!receipt || typeof receipt.receiptId !== "string" || !receipt.receiptId.trim() || receiptIds.has(receipt.receiptId)
+            || !validDay(receipt.date) || receipt.date > U.today()
+            || typeof receipt.quantity !== "number" || !Number.isFinite(receipt.quantity) || receipt.quantity <= 0 || receipt.quantity > Number.MAX_SAFE_INTEGER
+            || receipt.unit !== row.unit || typeof receipt.memo !== "string"
+            || typeof receipt.createdAt !== "string" || !Number.isFinite(Date.parse(receipt.createdAt))
+            || receipt.deletedAt !== undefined && (typeof receipt.deletedAt !== "string" || !Number.isFinite(Date.parse(receipt.deletedAt)))) throw new Error("購入履歴の入庫日・数量・単位・IDを確認してください。");
+          receiptIds.add(receipt.receiptId);
+          if (!receipt.deletedAt) quantities.push(receipt.quantity);
+        });
+        // Compare decimal quantities exactly, including fractional split deliveries.
+        const parts = [...quantities, -row.quantity].map(q => {
+          const [m, e = "0"] = String(q).toLowerCase().split("e");
+          return {n:BigInt(m.replace(".", "")), s:(m.split(".")[1] || "").length - Number(e)};
+        });
+        const scale = parts.reduce((n, p) => Math.max(n, p.s), 0);
+        if (parts.reduce((n, p) => n + p.n * 10n ** BigInt(scale - p.s), 0n) > 0n) throw new Error("購入数量を超える入庫・注文取消履歴があります。");
       });
     }
     return {
