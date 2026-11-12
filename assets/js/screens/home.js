@@ -191,6 +191,17 @@
     return String(dateText || U.today()).slice(0, 4);
   }
 
+  function cultivationFor(field, dateText) {
+    return RiceOS.cultivation && RiceOS.cultivation.forField ? RiceOS.cultivation.forField(field, dateText || U.today()) : null;
+  }
+
+  function cultivationDateText(event) {
+    if (!event || !event.date) return "記録不足";
+    const range = event.range || {};
+    const dates = range.start && range.end && range.start !== range.end ? `${U.fd(range.start)}〜${U.fd(range.end)}` : U.fd(event.date);
+    return `${dates}（${event.kind === "actual" ? "実測" : "推定"}）`;
+  }
+
   function panicleLogForYear(fieldId, year, asOfDate) {
     return state.growthSummaryFor
       ? state.growthSummaryFor(fieldId, year, { asOfDate }).panicleLog
@@ -809,8 +820,14 @@
     const waterDay = homeWaterDayText(field, dateText);
     const notes = harvest.completed && state.seasonNotesForField ? state.seasonNotesForField(field.fieldId, cropYear(dateText), { includeCarryover: true }) : [];
     const reviewStatus = notes.some(note => String(note.text || "").trim()) ? "振り返りメモあり" : "振り返りメモ未記録";
+    const headingDate = actualHeadingDate(field, dateText);
+    const panicle = panicleLogForYear(field.fieldId, cropYear(dateText), dateText);
+    const eventAge = harvest.completed ? "収穫済み" : headingDate
+      ? `出穂から${U.daysBetween(headingDate, dateText)}日`
+      : panicle && panicle.date ? `幼穂確認から${U.daysBetween(panicle.date, dateText)}日` : "";
     return `
       <div class="home-stage-summary">
+        ${eventAge ? `<strong class="home-event-age">${U.escapeHTML(eventAge)}</strong>` : ""}
         <div class="home-stage-observed">
           <span class="home-stage-observed-label">${harvest.completed ? "現在の状態" : "現場ステージ"}</span>
           <b>${U.escapeHTML(observed)}</b>
@@ -929,6 +946,7 @@
     const cached = heatCache.get(key);
     const heading = actualHeadingDate(field, context.endDate);
     const reference = harvestReferenceFor(field);
+    const common = cultivationFor(field, dateText);
     const target = heading ? reference.target : accumulatedTempTarget(field);
     const saved = harvestHeatSnapshot(field, context, heading);
     if (saved) return { title: `${Math.round(saved.total)}℃`, note: `収穫時積算 / 出穂翌日〜${U.fd(context.endDate)} / 保存済み ${saved.count}日分`, percent: progressPercent(saved.total, target) };
@@ -941,8 +959,8 @@
     if (accumulated.total === "") return { title: "気温データなし", note: "対象期間の確定した日平均気温がありません", percent: 0 };
     return {
       title: `${Math.round(accumulated.total)}℃`,
-      note: context.completed ? `収穫時積算 / ${U.fd(context.endDate)}まで ${heatCoverageLabel(accumulated)}` : heading ? `出穂翌日から ${heatCoverageLabel(accumulated)} / 目安 ${reference.label}` : `田植後 ${U.daysBetween(planting, dateText)}日 / ${heatCoverageLabel(accumulated)} / 出穂目安 ${target}℃`,
-      percent: progressPercent(accumulated.total, target)
+      note: context.completed ? `収穫時積算 / ${U.fd(context.endDate)}まで ${heatCoverageLabel(accumulated)}` : heading ? `出穂翌日から ${heatCoverageLabel(accumulated)} / 目安 ${reference.label}` : common ? `田植後 ${U.daysBetween(planting, dateText)}日 / ${heatCoverageLabel(accumulated)} / 出穂目安 ${cultivationDateText(common.heading)}` : `田植後 ${U.daysBetween(planting, dateText)}日 / ${heatCoverageLabel(accumulated)} / 出穂目安 ${target}℃`,
+      percent: common && !heading ? 0 : progressPercent(accumulated.total, target)
     };
   }
 
@@ -1206,11 +1224,12 @@
       <section class="home-decision-hero">
         <button type="button" class="primary" data-home-quick-record><span class="home-pop-add-symbol" aria-hidden="true">+</span><span>記録を追加</span></button>
       </section>
+      <h3 class="home-summary-heading">今日の状況</h3>
       <section class="home-decision-summary" aria-label="今日の状況">
-        <button type="button" data-home-summary-action="candidate" ${candidates.length ? "" : "disabled"}><img class="home-pop-stat-icon" src="assets/images/light-icons/rice-panicle.png" alt="" aria-hidden="true"><b>${U.escapeHTML(String(candidates.length))}</b><span>確認候補</span><small>${candidates.length ? "入力を選ぶ" : "候補なし"}</small></button>
-        <button type="button" data-home-summary-action="overdue" ${overdue.length ? "" : "disabled"}><img class="home-pop-stat-icon" src="assets/images/light-icons/farm-calendar.png" alt="" aria-hidden="true"><b>${U.escapeHTML(String(overdue.length))}</b><span>期限超過</span><small>${overdue.length ? "予定を確認" : "遅れなし"}</small></button>
-        <button type="button" data-home-summary-action="today"><img class="home-pop-stat-icon" src="assets/images/light-icons/karte-notebook.png" alt="" aria-hidden="true"><b>${U.escapeHTML(String(todayEntries.length))}</b><span>今日の記録</span><small>記録を追加</small></button>
-        <button type="button" data-home-summary-action="water" ${activeWaterCount(U.today()) ? "" : "disabled"}><img class="home-pop-stat-icon" src="assets/images/light-icons/water-gate.png" alt="" aria-hidden="true"><b>${U.escapeHTML(String(activeWaterCount(U.today())))}</b><span>進行中の水管理</span><small>${activeWaterCount(U.today()) ? "水管理を開く" : "進行中なし"}</small></button>
+        <button type="button" data-home-summary-action="candidate" ${candidates.length ? "" : "disabled"}><span>確認候補</span><b>${candidates.length}<small>件</small></b><i aria-hidden="true">›</i></button>
+        <button type="button" data-home-summary-action="overdue" ${overdue.length ? "" : "disabled"}><span>期限超過</span><b>${overdue.length}<small>件</small></b><i aria-hidden="true">›</i></button>
+        <button type="button" data-home-summary-action="today"><span>今日の記録</span><b>${todayEntries.length}<small>件</small></b><i aria-hidden="true">›</i></button>
+        <button type="button" data-home-summary-action="water" ${activeWaterCount(U.today()) ? "" : "disabled"}><span>進行中の水管理</span><b>${activeWaterCount(U.today())}<small>圃場</small></b><i aria-hidden="true">›</i></button>
       </section>
       ${homeCandidatesExpanded ? renderCandidateCard() : ""}
       ${renderTodayPlans(U.today())}
@@ -1409,11 +1428,13 @@
   }
 
   function accumulatedTempTarget(field) {
+    if (RiceOS.cultivation) return 0;
     const variety = field ? state.variety(field.varietyId) : null;
     return U.number(variety && variety.headingAccumulatedTempTarget, 1600) || 1600;
   }
 
   function panicleTempTarget(field) {
+    if (RiceOS.cultivation) return 0;
     const variety = field ? state.variety(field.varietyId) : null;
     return U.number(variety && variety.panicleAccumulatedTempTarget, 1000) || 1000;
   }
@@ -1565,6 +1586,8 @@
   function headingDateInfo(field, cached, planting, headingTarget, dateText) {
     const actual = actualHeadingDate(field, dateText);
     if (actual) return { date: actual, source: "出穂確認", actual: true };
+    const common = cultivationFor(field, dateText);
+    if (common) return { ...common.heading, actual: common.heading.kind === "actual" };
     const currentPanicleLog = panicleLogForYear(field.fieldId, cropYear(dateText), dateText);
     const panicle = RiceOS.agro && RiceOS.agro.panicleEstimate && currentPanicleLog
       ? RiceOS.agro.panicleEstimate(field, currentPanicleLog.panicleLengthMm, currentPanicleLog.date)
@@ -1665,6 +1688,17 @@
     const panicleTarget = panicleTempTarget(field);
     const key = heatCacheKey(field, planting, U.today());
     const cached = heatCache.get(key);
+    const common = cultivationFor(field, context.endDate);
+    if (common) {
+      const accumulated = cached && !cached.error ? accumulatedFromRows(cached.rows, planting, context.endDate) : { total: "", count: 0 };
+      return `<div class="farm-heat-stack" data-heat-field="${U.attr(field.fieldId)}">
+        <section class="farm-heat-meter" data-cultivation-milestones>
+          <div class="farm-heat-meter-head"><div><b>生育の目安</b><small>${U.escapeHTML(common.predictedStage.basis)}</small></div></div>
+          <dl>${[["幼穂形成目安",common.panicle],["出穂目安",common.heading],["追肥参考時期",common.topDressing]].map(([label,event]) => `<div><dt>${U.escapeHTML(label)}</dt><dd>${U.escapeHTML(cultivationDateText(event))}</dd></div>`).join("")}</dl>
+          <p>${U.escapeHTML(accumulated.total === "" ? "田植後の積算気温は未取得" : `田植後の積算気温 ${Math.round(accumulated.total)}℃ / ${heatCoverageLabel(accumulated)}`)}</p>
+        </section>${renderRipeningHeatMeter(field, cached, planting, 0)}
+      </div>`;
+    }
     const actual = cached && !cached.error ? accumulatedFromRows(cached.rows, planting, context.endDate) : { total: "", count: 0 };
     const total = actual.total;
     const count = actual.count;
@@ -1823,8 +1857,9 @@
     const herbicideDays = varietyDayTarget(variety, "herbicideDaysAfterPlanting", 7);
     const panicleDays = varietyDayTarget(variety, "panicleInitiationDaysAfterPlanting", 60);
     const headingDays = varietyDayTarget(variety, "headingDaysAfterPlanting", 85);
-    const panicleTemp = variety && variety.panicleAccumulatedTempTarget || "";
-    const headingTemp = variety && variety.headingAccumulatedTempTarget || "";
+    const common = cultivationFor(field, U.today());
+    const panicleTemp = !common && variety && variety.panicleAccumulatedTempTarget || "";
+    const headingTemp = !common && variety && variety.headingAccumulatedTempTarget || "";
     const headingDate = actualHeadingDate(field, U.today());
     const currentPanicleLog = panicleLogForYear(field.fieldId, year, U.today());
     const panicle = RiceOS.agro && RiceOS.agro.panicleEstimate && currentPanicleLog
@@ -1862,7 +1897,11 @@
         note: herbicide ? `${U.fd(herbicide.date)} ${herbicide.workName}` : `初期剤は田植え後${herbicideDays}日前後を目安に確認`,
         percent: herbicide ? 100 : (dap === "" ? 0 : progressPercent(dap, herbicideDays))
       },
-      currentPanicleLog ? null : {
+      common ? {
+        tone: "amber", icon: "🌿", title: "幼穂形成目安",
+        value: cultivationDateText(common.panicle), note: common.panicle.source,
+        percent: common.panicle.kind === "actual" ? 100 : 0
+      } : currentPanicleLog ? null : {
         tone: "amber",
         icon: "🌿",
         title: "幼穂形成期",
@@ -1870,7 +1909,11 @@
         note: previousPanicle ? `前年確認 ${U.fd(previousPanicle.log.date)} / 今年は現地で確認` : (panicleTemp ? `日数目安 ${panicleDays}日 / 積算気温目標 ${panicleTemp}` : `田植え後${panicleDays}日前後を目安に確認`),
         percent: dap === "" ? 0 : progressPercent(dap, panicleDays)
       },
-      {
+      common ? {
+        tone: "green", icon: "🌾", title: "出穂目安",
+        value: cultivationDateText(common.heading), note: common.heading.source,
+        percent: common.heading.kind === "actual" ? 100 : 0
+      } : {
         tone: "green",
         icon: "🌾",
         title: headingDate ? "出穂" : "出穂目安",
@@ -1880,6 +1923,7 @@
           : (panicle && panicle.supported ? `幼穂${panicle.lengthMm}mm / ${U.fd(panicle.date)}ごろ` : (currentPanicleLog ? `幼穂確認 ${U.fd(currentPanicleLog.date)} / 出穂確認へ` : (headingTemp ? `日数目安 ${headingDays}日 / 積算気温目標 ${headingTemp}` : `田植え後${headingDays}日前後を目安に確認`))),
         percent: headingDate ? 100 : (panicle && panicle.supported && planting ? progressPercent(dap, Math.max(1, U.daysBetween(planting, panicle.date))) : (dap === "" ? 0 : progressPercent(dap, headingDays)))
       },
+      ...(common ? [{ tone: "green", icon: "🧪", title: "追肥参考時期", value: cultivationDateText(common.topDressing), note: common.topDressing.source, percent: 0 }] : []),
       {
         tone: headingDate ? "orange" : "amber",
         icon: "🌾",

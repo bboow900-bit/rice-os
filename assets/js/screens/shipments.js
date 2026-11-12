@@ -205,6 +205,7 @@
       <div class="shipment-detail-head"><button type="button" class="secondary icon-button" data-shipment-back aria-label="一覧へ戻る">‹</button><h3>${U.escapeHTML(row.recipient || "相手先未設定")}</h3></div>
       <div class="shipment-detail-meta"><span class="pill info">${U.escapeHTML(KINDS[row.kind] || "出荷")}</span><span>${U.escapeHTML(U.fd(row.date))}</span><span>${U.escapeHTML(row.season)}年産</span></div>
       <div class="shipment-detail-rice">${U.escapeHTML(RICE_TYPES[row.riceType] || "種類未設定")} / ${U.escapeHTML(varietyName(row.varietyId))}</div>
+      <p>等級：${U.escapeHTML(row.grade == null || String(row.grade).trim() === "" ? "不明" : String(row.grade))}${row.destinationName && row.destinationName !== row.recipient ? ` / 出荷先：${U.escapeHTML(row.destinationName)}` : ""}</p>
       <div class="shipment-detail-total">${hasPackages(row) ? `<strong>${numberText(total.kg)}kg</strong><span>${numberText(total.bags)}袋</span>` : '<strong>未集計</strong><span>袋内訳未登録</span>'}</div>
       ${row.quantity || row.amount ? `<dl class="shipment-legacy-info">${row.quantity ? `<div><dt>旧記録の数量</dt><dd>${U.escapeHTML(row.quantity)}</dd></div>` : ""}${row.amount ? `<div><dt>旧記録の金額</dt><dd>${U.escapeHTML(row.amount)}</dd></div>` : ""}</dl>` : ""}
       <dl class="shipment-package-detail">${(row.packages || []).map((item) => `<div><dt>${numberText(item.kg)}kg袋</dt><dd>${numberText(item.bags)}袋 / ${numberText(Number(item.kg) * Number(item.bags))}kg</dd></div>`).join("")}</dl>
@@ -231,6 +232,8 @@
         <label class="shipment-price-label${draft.kind === "gift" ? " hidden" : ""}" data-shipment-price-label${draft.kind === "gift" ? " hidden" : ""}>1俵（60kg）の価格（円）<input id="shipmentPricePer60Kg" name="pricePer60Kg" type="number" inputmode="numeric" min="0" step="1" value="${U.attr(draft.pricePer60Kg ?? "")}"></label>
         <label>品種<select id="shipmentVariety" name="varietyId">${option("", "未設定", draft.varietyId)}${draft.varietyId && !varieties.some((item) => item.varietyId === draft.varietyId) ? option(draft.varietyId, "保存済みの品種", draft.varietyId) : ""}${varieties.map((item) => option(item.varietyId, item.name, draft.varietyId)).join("")}</select></label>
         <label>米の種類<select id="shipmentRiceType" name="riceType">${Object.entries(RICE_TYPES).map(([key, label]) => option(key, label, draft.riceType)).join("")}</select></label>
+        <label>等級（任意）<input id="shipmentGrade" name="grade" list="shipmentGrades" value="${U.attr(draft.grade ?? "")}"><datalist id="shipmentGrades"><option value="1等"><option value="2等"><option value="3等"><option value="規格外"></datalist></label>
+        <label>出荷先名（相手先と異なる場合）<input id="shipmentDestinationName" name="destinationName" value="${U.attr(draft.destinationName ?? "")}"></label>
       </div>${suggestions("shipmentRecipients")}
       <section class="shipment-packages"><h4>袋の内訳</h4><div id="shipmentPackages">${draft.packages.map(packageEditor).join("")}</div>
         <div class="shipment-package-picks" role="group" aria-label="袋を追加">${[30, 10, 5].map((kg) => `<button type="button" class="secondary" data-shipment-add-package="${kg}">＋ ${kg}kg</button>`).join("")}<button type="button" class="secondary" data-shipment-add-package="custom">＋ その他</button></div>
@@ -261,12 +264,15 @@
     host.dataset.shipmentView = view;
     syncBack();
   }
-  function openNew(date) {
+  function openNew(date, scope = {}) {
     selectedId = "";
     editorOrigin = "list";
     errorMessage = "";
     const recordDate = typeof date === "string" && date ? date : U.today();
     draft = { date: recordDate, season: String(state.defaultShipmentCropYear(recordDate)), kind: "shipment", recipient: "", pricePer60Kg: "", varietyId: "", riceType: "brown", packages: [{ kg: "30", bags: "" }], memo: "" };
+    if (RiceOS.schema.validCropYear(scope.season)) draft.season = String(scope.season);
+    if (typeof scope.varietyId === "string") draft.varietyId = scope.varietyId;
+    if (Object.hasOwn(KINDS, scope.kind)) draft.kind = scope.kind;
     view = "editor";
     render();
   }
@@ -293,7 +299,7 @@
   function captureDraft() {
     const form = U.$("shipmentForm");
     if (!draft || !form) return;
-    ["date", "season", "kind", "recipient", "varietyId", "riceType", "memo", "pricePer60Kg"].forEach((key) => { draft[key] = form.elements.namedItem(key).value; });
+    ["date", "season", "kind", "recipient", "varietyId", "riceType", "memo", "pricePer60Kg", "grade", "destinationName"].forEach((key) => { draft[key] = form.elements.namedItem(key).value; });
     draft.packages = Array.from(form.querySelectorAll("[data-shipment-package]")).map((item, index) => ({ ...draft.packages[index], kg: item.querySelector("[data-shipment-kg]").value, bags: item.querySelector("[data-shipment-bags]").value }));
   }
   function showError(message, id) {
@@ -325,7 +331,15 @@
     const priceText = String(draft.pricePer60Kg ?? "").trim();
     if (priceText && !validRate(priceText)) { showError("1俵（60kg）の価格は0以上の整数（円）で入力してください。", "shipmentPricePer60Kg"); return null; }
     if (priceText && !Number.isSafeInteger(Math.round(total.kg * Number(priceText) / 60))) { showError("売上金額が大きすぎます。単価と重量を確認してください。"); return null; }
-    return { ...draft, pricePer60Kg: priceText ? Number(priceText) : "", season: Number(draft.season), recipient: draft.recipient.trim(), memo: draft.memo.trim(), packages };
+    const payload = { ...draft, pricePer60Kg: priceText ? Number(priceText) : "", season: Number(draft.season), recipient: draft.recipient.trim(), memo: draft.memo.trim(), packages };
+    if (String(draft.grade ?? "").trim()) payload.grade = String(draft.grade).trim();
+    else if (selectedId && Object.hasOwn(record(selectedId) || {}, "grade")) payload.grade = "";
+    else delete payload.grade;
+    const destination = String(draft.destinationName ?? "").trim();
+    if (destination && destination !== payload.recipient) payload.destinationName = destination;
+    else if (selectedId && Object.hasOwn(record(selectedId) || {}, "destinationName")) payload.destinationName = "";
+    else delete payload.destinationName;
+    return payload;
   }
   function saveDraft() {
     if (saving) return;

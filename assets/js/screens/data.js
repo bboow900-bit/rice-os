@@ -85,6 +85,7 @@
       results: (data.varietyResults || []).length,
       milling: (data.millingRecords || []).length,
       shipments: (data.shipments || []).length,
+      harvestLedger: (data.millingRecords || []).length + (data.shipments || []).length + (data.varietyResults || []).length + (data.shipmentIssues || []).length,
       machines: (data.machines || []).filter((item) => item.status !== "使用停止").length,
       tractorProfiles: (data.tractorProfiles || []).length,
       seeder: RiceOS.seederSettings ? RiceOS.seederSettings.profilesFor().length : 0
@@ -246,6 +247,12 @@
   }
 
   function bind() {
+    U.$$("[data-open-harvest-ledger]").forEach(button => {
+      button.addEventListener("click", () => {
+        if (RiceOS.navigation) RiceOS.navigation.clear();
+        RiceOS.app.openInput("harvest-ledger", "data");
+      });
+    });
     U.$$("[data-open-shipment-ledger]").forEach(button => {
       button.addEventListener("click", () => {
         if (RiceOS.navigation) RiceOS.navigation.clear();

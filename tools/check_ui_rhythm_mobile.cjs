@@ -38,12 +38,12 @@ const { chromium } = require("C:/Users/Keisuke/.cache/codex-runtimes/codex-prima
       await page.locator('[data-annual-hub-panel="compare"]').waitFor();
       await nav("data");
       assert.equal(await page.locator(".common-master-group").count(), 4);
-      assert.equal(await page.locator(".common-master-grid > button").count(), 14);
+      assert.equal(await page.locator(".common-master-grid > button").count(), 13);
       await shot("masters");
-      for (let index = 0; index < 14; index++) {
+      for (let index = 0; index < 13; index++) {
         await nav("data");
         const button = page.locator(".common-master-grid > button").nth(index);
-        const target = await button.getAttribute("data-jump-screen") || (await button.getAttribute("data-open-milling-ledger") !== null ? "results" : "shipments");
+        const target = await button.getAttribute("data-jump-screen") || (await button.getAttribute("data-open-harvest-ledger") !== null ? "harvest-ledger" : await button.getAttribute("data-open-milling-ledger") !== null ? "results" : "shipments");
         await button.click();
         await page.locator(`#screen-${target}.active`).waitFor();
         const hasBack = await page.locator("#appBackButton").isVisible();
@@ -68,7 +68,7 @@ const { chromium } = require("C:/Users/Keisuke/.cache/codex-runtimes/codex-prima
       await page.locator("#screen-home.active").waitFor();
       assert.equal(await raw(), baseline, "Viewing, tab switching and cancelled forms must not change records");
       assert.deepEqual(errors, []);
-      console.log(`PASS UI rhythm ${width}: 14 master routes/back, field settings, review tabs, input/back, no writes`);
+      console.log(`PASS UI rhythm ${width}: 13 master routes/back, field settings, review tabs, input/back, no writes`);
       await context.close();
     }
   } finally { await browser.close(); }

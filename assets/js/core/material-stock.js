@@ -27,6 +27,7 @@
     return material;
   }
   function usageAmount(work) {
+    if (work.materialUsageSnapshot) return {quantity:work.materialUsageSnapshot.quantity, unit:work.materialUsageSnapshot.unit};
     const explicit = typeof work.unit === "string" && work.unit.trim() || typeof work.amountUnit === "string" && work.amountUnit.trim() || "";
     const direct = numeric(work.amount);
     if (direct !== null) return { quantity: direct, unit: explicit };
@@ -36,9 +37,15 @@
     return { quantity: numeric(match[1]), unit: match[2].trim() };
   }
   function transactions(material) {
+    const purchaseAmount = (p, row) => {
+      const unit = typeof row.unit === "string" ? row.unit.trim() : "";
+      const quantity = numeric(row.quantity);
+      const converted = R.materialQuantities ? R.materialQuantities.convert(quantity, unit, material.unit, p.packagingSnapshot) : unit === material.unit ? quantity : null;
+      return converted !== null ? {quantity:converted,unit:material.unit} : {quantity,unit};
+    };
     const purchases = (Array.isArray(material.purchases) ? material.purchases : []).flatMap(p => p.deliveryMode === "manual"
-      ? (p.receipts || []).filter(r => !r.deletedAt).map(r => ({kind:"purchase", id:p.purchaseId + ":receipt:" + r.receiptId, date:r.date, quantity:numeric(r.quantity), unit:r.unit}))
-      : [{ kind: "purchase", id: p.purchaseId, date: p.date, quantity: numeric(p.quantity), unit: typeof p.unit === "string" ? p.unit.trim() : "" }]);
+      ? (p.receipts || []).filter(r => !r.deletedAt).map(r => ({kind:"purchase", id:p.purchaseId + ":receipt:" + r.receiptId, date:r.date, ...purchaseAmount(p,r)}))
+      : [{ kind: "purchase", id: p.purchaseId, date: p.date, ...purchaseAmount(p,p) }]);
     const usage = (R.state.data().fieldWorks || []).filter(w => w.materialId === material.materialId && material.materialId && R.state.isActualFieldWork(w) && !/計画/.test(String(w.workName || "")))
       .map(w => ({ kind: "usage", id: w.workId, date: w.date, ...usageAmount(w) }));
     return purchases.concat(usage);

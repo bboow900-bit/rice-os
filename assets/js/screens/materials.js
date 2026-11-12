@@ -8,6 +8,7 @@
   let stockDraft = null, stockOriginal = "", stockError = "";
   let receiptDraft = null, receiptOriginal = "";
   let cancellationDraft = null, cancellationOriginal = "", pendingStatus = "all";
+  let planYear = "", costYear = "", planDraft = null, planOriginal = "", planError = "";
   const history = [];
   const inputs = {mSeason:"season",mCategory:"category",mName:"name",mFormalName:"formalName",mFormulation:"formulation",mUnit:"unit",mRegistrationNumber:"registrationNumber",mProductUrl:"productUrl",mCarryover:"carryover",mOrdered:"ordered",mUsed:"used",mRemaining:"remaining",mMemo:"nextYearMemo"};
   const purchaseKeys = ["date","season","supplier","quantity","unit","unitPrice","totalAmount","expectedDeliveryDate","memo"];
@@ -51,7 +52,11 @@
     }
     return `<details class="material-carte"><summary>使用カルテ</summary>${works.map(work => `<article class="material-carte-work"><b>${U.escapeHTML(U.fd(work.date))}</b><div>対象圃場: ${U.escapeHTML((work.fieldIds || []).map(fieldName).join("・") || "未記録")}</div><div>量: ${U.escapeHTML(work.amount || "未記録")}</div>${work.herbicidePurpose ? `<div>目的: ${U.escapeHTML(work.herbicidePurpose)}</div>` : ""}${work.memo ? `<div>${U.escapeHTML(work.memo)}</div>` : ""}</article>`).join("") || '<p class="muted">この年度の関連する使用実績はありません。</p>'}<h4>関連する体系の観察</h4>${[...observations.values()].sort((a,b) => String(a.date).localeCompare(String(b.date))).map(o => `<article class="material-carte-observation"><b>${U.escapeHTML(U.fd(o.date))} ${U.escapeHTML(o.status)}</b><div>${U.escapeHTML(fieldName(o.fieldId))} / ${U.escapeHTML(o.assignmentName || "体系名未記録")}</div><div>${U.escapeHTML(Array.isArray(o.weeds) ? o.weeds.join("・") : o.weeds || "")}</div>${o.memo ? `<div>${U.escapeHTML(o.memo)}</div>` : ""}</article>`).join("") || '<p class="muted">関連する観察記録はありません。</p>'}</details>`;
   }
-  function values() { return Object.fromEntries(Object.entries(inputs).map(([id,key]) => [key,U.$(id).value])); }
+  function values() {
+    const base = Object.fromEntries(Object.entries(inputs).map(([id,key]) => [key,U.$(id).value]));
+    const unit = U.$("mPackUnit")?.value?.trim() || "", quantity = U.$("mPackQuantity")?.value || "", baseUnit = U.$("mPackBaseUnit")?.value?.trim() || "";
+    return {...base,packaging:unit || quantity || baseUnit ? {unit,quantity:Number(quantity),baseUnit} : null};
+  }
   function initialStockValues() { return {date:U.$("mStockDate").value,quantity:U.$("mStockQuantity").value,memo:U.$("mStockMemo").value}; }
   function materialDraftState() { return {...values(),initialStock:initialStockValues()}; }
   function clearFields() {
@@ -63,11 +68,12 @@
     U.$("saveMaterialButton").textContent = "資材を保存";
     U.$("mStockDate").value = U.today(); U.$("mStockQuantity").value = ""; U.$("mStockMemo").value = "";
     U.$("materialInitialStock").hidden = false; U.$("mUnit").readOnly = false;
+    ["mPackUnit","mPackQuantity","mPackBaseUnit"].forEach(id => { if (U.$(id)) U.$(id).value = ""; });
     materialError = "";
   }
   function resetForm() {
     clearFields(); view = "list"; history.length = 0; materialId = ""; purchaseId = ""; purchaseScope = "";
-    purchaseDraft = null; purchaseError = ""; listError = ""; stockDraft = null; stockError = ""; receiptDraft = null; cancellationDraft = null; render(); notify();
+    purchaseDraft = null; purchaseError = ""; listError = ""; stockDraft = null; stockError = ""; receiptDraft = null; cancellationDraft = null; planDraft = null; planError = ""; render(); notify();
   }
   function editMaterial(id) {
     const row = id ? material(id) : null;
@@ -77,6 +83,9 @@
       U.$("editMaterialId").value = id;
       U.setOptions(U.$("mCategory"),[...new Set([...S.MATERIAL_CATEGORIES,row.category])],row.category);
       Object.entries(inputs).forEach(([node,key]) => { U.$(node).value = row[key] ?? ""; });
+      if (U.$("mPackUnit")) U.$("mPackUnit").value = row.packaging?.unit || "";
+      if (U.$("mPackQuantity")) U.$("mPackQuantity").value = row.packaging?.quantity ?? "";
+      if (U.$("mPackBaseUnit")) U.$("mPackBaseUnit").value = row.packaging?.baseUnit || "";
       U.$("saveMaterialButton").textContent = "資材を更新";
       const hasStock = Array.isArray(row.stocktakes) && row.stocktakes.length > 0;
       U.$("materialInitialStock").hidden = hasStock; U.$("mUnit").readOnly = hasStock || (row.purchases || []).some(p => p.receipts?.length);
@@ -106,7 +115,7 @@
     const row = id ? R.materialPurchases.records(mid).find(item => item.purchaseId === id) : null;
     if (id && !row) return false;
     const m = material(mid);
-    purchaseDraft = row ? {...row,materialId:mid} : {materialId:mid || "",date:U.today(),season:year === "all" ? U.today().slice(0,4) : year,supplier:"",quantity:"",unit:m?.unit || "",unitPrice:"",totalAmount:"",expectedDeliveryDate:"",memo:""};
+    purchaseDraft = row ? {...row,materialId:mid} : {materialId:mid || "",date:U.today(),season:year === "all" ? U.today().slice(0,4) : year,supplier:"",quantity:"",unit:m?.packaging?.unit || m?.unit || "",unitPrice:"",totalAmount:"",expectedDeliveryDate:"",memo:""};
     purchaseKeys.forEach(key => { purchaseDraft[key] = String(purchaseDraft[key] ?? ""); });
     purchaseError = ""; purchaseOriginal = JSON.stringify(purchaseDraft);
     move("purchase-edit",{materialId:mid || "",purchaseId:id || ""}); return true;
@@ -131,6 +140,7 @@
         ${warnings.length ? `<div class="ms-warning" role="status">${warnings.map(w => U.escapeHTML(stockWarning(w))).join("<br>")}${warnings.some(w => w.kind === "usage") ? '<button type="button" class="secondary" data-stock-evidence>該当する使用記録を確認・修正</button>' : ""}</div>` : ""}
         <div class="ml-actions"><button type="button" class="primary" data-ms-new="${U.attr(m.materialId)}">${summary.stocktake ? "在庫を合わせる" : "現在の在庫を登録"}</button><button type="button" class="secondary" data-ms-purchase="${U.attr(m.materialId)}">購入を追加</button></div>
       </section>
+      <section class="mp-resources"><h4>費用と翌年の準備</h4>${m.packaging ? `<p>購入規格：1${U.escapeHTML(m.packaging.unit)} ＝ ${U.escapeHTML(stockNumber(m.packaging.quantity))}${U.escapeHTML(m.packaging.baseUnit)}</p>` : '<p class="muted">購入規格は未登録です。異なる単位を自動換算しません。</p>'}<div class="ml-actions"><button type="button" class="secondary" data-material-costs="${U.attr(m.materialId)}">購入費と使用費</button><button type="button" class="secondary" data-material-preparation>翌年の購入準備</button></div></section>
       <details class="ms-section" open><summary>製品情報</summary><dl>${[["正式名称",m.formalName],["剤型・規格",m.formulation],["管理単位",m.unit]].map(([label,value]) => `<div><dt>${label}</dt><dd>${U.escapeHTML(value === "" || value == null ? "未記録" : value)}</dd></div>`).join("")}</dl>${m.registrationNumber || ["除草剤","防除剤","殺虫殺菌剤"].includes(m.category) ? `<p>登録番号 ${U.escapeHTML(m.registrationNumber || "未登録")}</p>` : ""}<div class="material-reference-links">${["除草剤","防除剤","殺虫殺菌剤"].includes(m.category) ? '<a href="https://pesticide.maff.go.jp/" target="_blank" rel="noopener noreferrer">農薬登録情報（公式）</a>' : ""}${url ? `<a href="${U.attr(url)}" target="_blank" rel="noopener noreferrer">メーカー登録URL</a>` : ""}</div>${m.nextYearMemo ? `<p>${U.escapeHTML(m.nextYearMemo)}</p>` : ""}<button type="button" class="secondary" data-material-edit="${U.attr(m.materialId)}">製品情報を編集</button></details>
       ${previousPurchases(m)}
       ${stockHistory(m,summary)}
@@ -138,11 +148,64 @@
       <div class="ml-actions"><button type="button" class="secondary" data-material-purchases="${U.attr(m.materialId)}">購入履歴を一覧で見る</button><button type="button" class="secondary" data-material-delete="${U.attr(m.materialId)}">資材を削除</button></div>${usageCarte(m)}</article>`;
   }
   function stockNumber(value) { return Number.isFinite(Number(value)) && Math.abs(Number(value)) <= Number.MAX_SAFE_INTEGER ? Number(value).toLocaleString("ja-JP",{maximumFractionDigits:20}) : "数量確認"; }
+  function selectedSeason() { return year === "all" ? U.today().slice(0,4) : year; }
+  function referenceMoney(value) { return typeof value === "number" && Number.isFinite(value) ? `${value.toLocaleString("ja-JP",{maximumFractionDigits:2})}円` : "未算出"; }
+  function seasonSelect(id,value,extra = []) {
+    const current = Number(U.today().slice(0,4));
+    const years = [...new Set([current - 1,current,current + 1,current + 2,current + 3,Number(value),...extra.map(Number)].filter(v => Number.isInteger(v) && v >= 1900 && v <= 2200))].sort((a,b) => b - a);
+    return `<label class="mi-pending-filter">対象年度<select id="${id}">${years.map(y => `<option value="${y}"${String(y) === String(value) ? " selected" : ""}>${y}年度</option>`).join("")}</select></label>`;
+  }
+  function costReason(reason) {
+    return ({historical_cost_unknown:"過去の単価を保存していない記録",quantity_unknown:"使用量・換算規格を確認できません",no_actual_receipt:"使用日以前の入庫実績がありません",order_cancelled:"注文取消があり金額の確認が必要です",price_unit_unknown:"単価の単位を換算できません",price_unknown:"購入価格が未記録です",price_conflict:"同日の参考単価が一致していません",actual_receipt_reference:"使用日以前の入庫に基づく参考額",invalid_usage_snapshot:"保存した費用根拠を確認できません"})[reason] || "参考額の根拠が不足しています";
+  }
+  function costsView() {
+    const service = R.materialPlanning;
+    if (!service) return '<p role="alert">費用の集計機能を読み込めませんでした。</p>';
+    const y = costYear || selectedSeason(), result = service.annualCosts(materialId,y);
+    const extra = state.data().materials.flatMap(m => (m.purchases || []).map(p => p.season)).concat(state.data().fieldWorks.map(w => state.cropYearForRecord(w)));
+    return `<article class="mp-costs"><h3>${materialId ? U.escapeHTML(material(materialId)?.name || "資材未確認") : "全資材"}の費用</h3>${seasonSelect("materialCostYear",y,extra)}<div class="mp-cost-totals"><section><span>購入費（購入年度）</span><strong>${referenceMoney(result.purchaseCost)}</strong><small>${result.purchaseCount}件${result.unpricedPurchases ? ` / 価格未記録 ${result.unpricedPurchases}件を除く判明分` : ""}</small></section><section><span>使用費（栽培年度・参考額）</span><strong>${referenceMoney(result.usageCost)}</strong><small>${result.usageCount}件${result.unpricedUses ? ` / 未算出 ${result.unpricedUses}件を除く判明分` : ""}</small></section></div><details class="ms-section"><summary>費用の集計方法・注意点</summary><p class="ms-note">購入した年と使った年は別です。台帳に紐づく資材のみを集計します。使用費は記録保存時の入庫・単価の参考値で、会計上の原価評価ではありません。過去の単価が不明な記録は0円にしません。注文取消による返金は購入記録の金額で確認します。</p></details><h4>使用記録と費用の根拠</h4>${result.usageRows.map(row => {
+      const w = row.work, snapshot = w.materialUsageSnapshot;
+      const m = material(w.materialId), source = snapshot?.sourcePurchaseId && (m?.purchases || []).find(p => p.purchaseId === snapshot.sourcePurchaseId);
+      return `<button type="button" class="ms-history-open" data-stock-work="${U.attr(w.workId)}"><span><b>${U.escapeHTML(U.fd(w.date))} / ${U.escapeHTML(w.workName || "作業")}</b><small>${U.escapeHTML(m?.name || w.material || "資材未確認")} / ${U.escapeHTML((w.fieldIds || []).map(id => state.field(id)?.name || "圃場未確認").join("・") || "圃場外")}</small><small>使用量 ${row.quantity === null ? U.escapeHTML(String(w.amount ?? "未記録")) : U.escapeHTML(`${stockNumber(row.quantity)} ${row.unit}`)} / ${referenceMoney(row.cost)}</small><small>${U.escapeHTML(costReason(row.reason))}</small>${typeof snapshot?.unitCost === "number" ? `<small>保存時の参考単価 ${referenceMoney(snapshot.unitCost)} / ${U.escapeHTML(snapshot.unit)}</small>` : ""}${source ? `<small>参照入庫 ${U.escapeHTML(snapshot.sourceDate)} / ${U.escapeHTML(source.supplier || "購入先未記録")}</small>` : ""}</span><span aria-hidden="true">›</span></button>`;
+    }).join("") || '<p class="empty">この年度の資材使用記録はありません。</p>'}</article>`;
+  }
+  function preparationView() {
+    if (!R.materialPlanning) return '<p role="alert">購入準備の機能を読み込めませんでした。</p>';
+    const y = planYear || String(Number(selectedSeason()) + 1);
+    const rows = state.data().materials.filter(m => category === "all" || m.category === category);
+    const extra = state.data().materials.flatMap(m => (m.purchasePlans || []).map(p => p.season));
+    return `<article class="mp-preparation">${seasonSelect("materialPlanYear",y,extra)}<p>${U.escapeHTML(category === "all" ? "全資材" : category)} / 未納品は年度をまたぐ注文も含めた現在値です。</p>${rows.map(m => {
+      const p = R.materialPlanning.planning(m.materialId,y), count = value => value === null ? "未確認" : `${stockNumber(value)} ${U.escapeHTML(p.unit)}`;
+      return `<section class="mp-preparation-row" data-material-plan="${U.attr(m.materialId)}"><h4>${U.escapeHTML(m.name)}</h4><dl><div><dt>${p.previousYear}年度の使用量</dt><dd>${p.previousUsageCount === 0 ? "記録なし" : count(p.previousUsage)}${p.unknownUses ? `（数量不明 ${p.unknownUses}件）` : ""}</dd></div><div><dt>現在庫</dt><dd>${count(p.stock)}</dd></div><div><dt>未納品数</dt><dd>${count(p.pending)}</dd></div><div><dt>確保予定数</dt><dd>${count(p.secured)}</dd></div><div><dt>${U.escapeHTML(y)}年度の購入予定</dt><dd>${p.plan ? `${U.escapeHTML(stockNumber(p.plan.quantity))} ${U.escapeHTML(p.plan.unit)}` : "未設定"}</dd></div></dl>${p.plan?.memo ? `<p>${U.escapeHTML(p.plan.memo)}</p>` : ""}<button type="button" class="secondary" data-plan-edit="${U.attr(m.materialId)}">${p.plan ? "購入予定を編集" : "購入予定量を決める"}</button></section>`;
+    }).join("") || '<p class="empty">対象の資材がありません。</p>'}<p class="ms-note">前年の使用量は比較材料です。作付面積や使い方に合わせて購入予定量を決めます。保存しても発注・入庫・在庫の加算は行いません。</p></article>`;
+  }
+  function editPlan(mid) {
+    const y = planYear || String(Number(selectedSeason()) + 1), m = material(mid);
+    if (!m) return;
+    const p = R.materialPlanning.planning(mid,y);
+    const changedUnit = Boolean(p.plan && p.plan.unit !== m.unit);
+    planDraft = {...(p.plan || {}),season:Number(y),quantity:p.plan && !changedUnit ? String(p.plan.quantity) : "",unit:m.unit,memo:p.plan?.memo || "",unitWarning:changedUnit ? `以前の計画は${p.plan.quantity} ${p.plan.unit}です。管理単位が変わったため、新しい単位で数量を入力してください。` : ""};
+    planOriginal = JSON.stringify(planDraft); planError = ""; move("plan-edit",{materialId:mid});
+  }
+  function capturePlan() {
+    const form = U.$("materialPlanForm");
+    if (form && planDraft) ["quantity","memo"].forEach(key => { planDraft[key] = form.elements.namedItem(key).value; });
+  }
+  function planForm() {
+    const d = planDraft;
+    if (!d) return "";
+    return `<form id="materialPlanForm" class="mp-form"><h3>${U.escapeHTML(material(materialId)?.name || "資材未確認")}</h3><p>${d.season}年度の購入予定</p>${d.unitWarning ? `<p class="ms-warning">${U.escapeHTML(d.unitWarning)}</p>` : ""}<label>自分で決める購入予定量（${U.escapeHTML(d.unit || "管理単位未登録")}）<input name="quantity" type="number" min="0" step="any" required value="${U.attr(d.quantity)}"></label><label>判断メモ<textarea name="memo">${U.escapeHTML(d.memo)}</textarea></label><p class="ms-note">0も登録できます。購入履歴・在庫には加算しません。</p><div class="mp-actions"><button type="button" class="secondary" data-plan-cancel>戻る</button><button type="submit" class="primary">購入予定を保存</button></div></form>`;
+  }
+  function purchasePendingInStockUnit(row,m) {
+    const value = R.materialPurchases.deliverySummary(row).pending;
+    return R.materialQuantities ? R.materialQuantities.convert(value,row.unit,m.unit,row.packagingSnapshot) : row.unit === m.unit ? value : null;
+  }
   function supplySummary(m,stock) {
     const purchases = R.materialPurchases.records(m.materialId);
     const current = purchases.filter(row => row.deliveryMode === "manual");
-    const comparable = current.every(row => row.unit === m.unit);
-    const pending = R.materialPurchases.quantitySum(current.map(row => R.materialPurchases.deliverySummary(row).pending));
+    const remaining = current.filter(row => R.materialPurchases.deliverySummary(row).pending > 0).map(row => purchasePendingInStockUnit(row,m));
+    const comparable = remaining.every(value => value !== null);
+    const pending = comparable ? R.materialPurchases.quantitySum(remaining) : 0;
     const combined = stock.quantity !== null && comparable ? R.materialPurchases.quantitySum([stock.quantity,pending]) : null;
     const total = combined !== null && Number.isFinite(combined) && Math.abs(combined) <= Number.MAX_SAFE_INTEGER ? combined : null;
     const y = year === "all" ? U.today().slice(0,4) : year;
@@ -160,7 +223,7 @@
     const stock = R.materialStock.summary(m.materialId);
     const pendingRows = R.materialPurchases.records(m.materialId).filter(row => row.deliveryMode === "manual" && R.materialPurchases.deliverySummary(row).pending > 0);
     const pending = pendingRows.length > 0;
-    const uncertain = stock.quantity === null || stock.quantity < 0 || pendingRows.some(row => row.unit !== m.unit);
+    const uncertain = stock.quantity === null || stock.quantity < 0 || pendingRows.some(row => purchasePendingInStockUnit(row,m) === null);
     return `<span class="mi-badges">${uncertain ? '<small class="mi-badge warning">確認が必要</small>' : `<small class="mi-badge">${stock.quantity > 0 ? "在庫あり" : "在庫なし"}</small>`}${pending ? '<small class="mi-badge water">納品待ち</small>' : ""}</span>`;
   }
   function previousPurchases(m) {
@@ -295,7 +358,7 @@
     const categories = [...new Set([...S.MATERIAL_CATEGORIES,U.$("mCategory").value].filter(Boolean))];
     U.setOptions(U.$("mCategory"),categories,U.$("mCategory").value || "肥料");
     const m = material(materialId), cross = view === "list" && mode !== "materials", pending = cross && mode === "pending";
-    setHidden(form,view !== "material-edit"); setHidden(list,!["list","material-detail","stock-evidence"].includes(view) || cross);
+    setHidden(form,view !== "material-edit"); setHidden(list,!["list","material-detail","stock-evidence","cost-summary","plan-list","plan-edit"].includes(view) || cross);
     setHidden(purchases,!(cross || view.startsWith("purchase-") || ["receipt-edit","cancellation-edit"].includes(view)));
     setHidden(stockEditor,view !== "stock-edit");
     if (stockEditor) stockEditor.innerHTML = view === "stock-edit" ? stockForm(m) : "";
@@ -304,12 +367,21 @@
     if (view === "list" && host) {
       host.querySelector?.(".ml-modes")?.insertAdjacentHTML("beforeend",`<button type="button" data-material-mode="pending" aria-pressed="${pending}">納品待ち</button>`);
       if (pending) host.insertAdjacentHTML?.("beforeend",`<label class="mi-pending-filter">納品状況<select id="materialPendingStatus">${[["all","すべて"],["waiting","納品待ち"],["partial","一部納品"],["overdue","予定日超過"]].map(([value,label]) => `<option value="${value}"${pendingStatus === value ? " selected" : ""}>${label}</option>`).join("")}</select></label>`);
+      host.insertAdjacentHTML?.("beforeend",'<div class="ml-actions mp-insight-links"><button type="button" class="secondary" data-material-costs="">購入費と使用費</button><button type="button" class="secondary" data-material-preparation>翌年の購入準備</button></div>');
+    }
+    if (["cost-summary","plan-list","plan-edit"].includes(view) && host) {
+      const heading = host.querySelector?.("h3"), alert = host.querySelector?.('[role="alert"]');
+      if (heading) heading.textContent = view === "cost-summary" ? "購入費と使用費" : view === "plan-edit" ? "購入予定を編集" : "翌年の購入準備";
+      if (alert) alert.textContent = planError;
     }
     if (view === "list" && !cross) {
       const rows = state.data().materials.filter(row => (year === "all" || materialYears(row).includes(year)) && (category === "all" || row.category === category)).slice().sort((a,b) => Number(b.season)-Number(a.season));
       list.innerHTML = rows.map(row => { const s = R.materialStock.summary(row.materialId); return `<article class="ml-row" data-material-row="${U.attr(row.materialId)}"><button type="button" class="ml-open" data-material-open="${U.attr(row.materialId)}"><b>${U.escapeHTML(row.name || "名称未入力")}</b><small>${U.escapeHTML(row.season)}年度 / ${U.escapeHTML(row.category)}</small><strong>在庫：${U.escapeHTML(s.quantity === null ? s.stocktake ? "集計保留" : "未登録" : `${stockNumber(s.quantity)} ${s.unit}`)}</strong><span aria-hidden="true">›</span></button><button type="button" class="secondary" data-material-purchases="${U.attr(row.materialId)}">購入履歴</button></article>`; }).join("") || '<p class="empty">条件に合う資材はありません。</p>';
     } else if (view === "material-detail") list.innerHTML = m ? materialDetail(m) : '<p role="alert">この資材は見つかりません。戻って一覧を確認してください。</p>';
     else if (view === "stock-evidence") list.innerHTML = evidenceView(m);
+    else if (view === "cost-summary") list.innerHTML = costsView();
+    else if (view === "plan-list") list.innerHTML = preparationView();
+    else if (view === "plan-edit") list.innerHTML = planForm();
     else list.innerHTML = "";
     if (view === "list" && !cross) list.querySelectorAll?.("[data-material-row]").forEach(node => {
       const row = material(node.dataset.materialRow), button = node.querySelector(".ml-open");
@@ -363,6 +435,7 @@
     if (view === "stock-edit") { stockDraft = null; stockError = ""; }
     if (view === "receipt-edit") { receiptDraft = null; purchaseError = ""; }
     if (view === "cancellation-edit") { cancellationDraft = null; purchaseError = ""; }
+    if (view === "plan-edit") { planDraft = null; planError = ""; }
     restorePrevious();
   }
   function canHandleBack() { return view !== "list"; }
@@ -370,6 +443,11 @@
     if (!canHandleBack()) return false;
     if (view === "purchase-edit") capturePurchase();
     if (view === "stock-edit") captureStock();
+    if (view === "plan-edit") {
+      capturePlan();
+      if (JSON.stringify(planDraft) !== planOriginal && !confirm("入力中の変更を取り消して戻りますか？")) return true;
+      cancelEditor(); return true;
+    }
     if (view === "cancellation-edit") {
       captureCancellation();
       if (JSON.stringify(cancellationDraft) !== cancellationOriginal && !confirm("入力中の変更を取り消して戻りますか？")) return true;
@@ -393,6 +471,12 @@
     const target = event.target;
     const match = selector => target.closest(selector);
     if (match("[data-material-back]")) { handleBack(); return; }
+    const costButton = match("[data-material-costs]");
+    if (costButton) { costYear = selectedSeason(); planError = ""; move("cost-summary",{materialId:costButton.dataset.materialCosts}); return; }
+    if (match("[data-material-preparation]")) { planYear = String(Number(selectedSeason()) + 1); planError = ""; move("plan-list",{materialId:""}); return; }
+    const planEdit = match("[data-plan-edit]");
+    if (planEdit) { editPlan(planEdit.dataset.planEdit); return; }
+    if (match("[data-plan-cancel]")) { handleBack(); return; }
     if (match("[data-stock-evidence]")) { move("stock-evidence"); return; }
     if (match("[data-evidence-stocktake]")) {
       restorePrevious();
@@ -403,7 +487,7 @@
     const sourceWork = match("[data-stock-work]");
     if (sourceWork) {
       const work = state.data().fieldWorks.find(w => w.workId === sourceWork.dataset.stockWork);
-      if (!work || work.materialId !== materialId) { listError = "使用記録が見つかりません。"; render(); return; }
+      if (!work || materialId && work.materialId !== materialId) { listError = "使用記録が見つかりません。"; render(); return; }
       R.app.openInput("field-work","materials",{nested:true});
       R.screens.fieldWork.editWork(work.workId);
       document.querySelector('#screen-field-work [data-work-mode-select="detail"]')?.click();
@@ -482,6 +566,18 @@
     bound = true;
     render();
     ["materialsLedgerHost","materialList","materialPurchases","materialStockEditor"].forEach(id => U.$(id)?.addEventListener("click",click));
+    U.$("materialList")?.addEventListener("input",capturePlan);
+    U.$("materialList")?.addEventListener("change",event => {
+      if (event.target.id === "materialCostYear") { costYear = event.target.value; render(); }
+      if (event.target.id === "materialPlanYear") { planYear = event.target.value; render(); }
+    });
+    U.$("materialList")?.addEventListener("submit",event => {
+      if (event.target.id !== "materialPlanForm") return;
+      event.preventDefault(); capturePlan();
+      const saved = R.materialPlanning.savePlan(materialId,planDraft);
+      if (!saved) { planError = R.materialPlanning.lastError; render(); return; }
+      planDraft = null; planError = ""; finishEdit("plan-list","");
+    });
     U.$("materialStockEditor")?.addEventListener("input",captureStock);
     U.$("materialStockEditor")?.addEventListener("submit",event => {
       if (event.target.id !== "materialStockForm") return;
@@ -507,7 +603,7 @@
     });
     host?.addEventListener("change",event => {
       capturePurchase();
-      if (event.target.name === "materialId" && purchaseDraft && !purchaseDraft.unit) { purchaseDraft.unit = material(purchaseDraft.materialId)?.unit || ""; render(); }
+      if (event.target.name === "materialId" && purchaseDraft && !purchaseDraft.unit) { const m = material(purchaseDraft.materialId); purchaseDraft.unit = m?.packaging?.unit || m?.unit || ""; render(); }
     });
     host?.addEventListener("submit",event => {
       if (event.target.id === "materialCancellationForm") {

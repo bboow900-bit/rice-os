@@ -5,7 +5,7 @@
   const U = RiceOS.utils;
 
   const SCHEMA_VERSION = 17;
-  const APP_VERSION = "20261109_ver309";
+  const APP_VERSION = "20261112_ver313";
   const STORE_KEY = "rice_os_v8_stable";
   const BACKUP_KEY = "rice_os_v8_stable_backup";
   const RELEASE_BACKUPS_KEY = "rice_os_v8_stable_release_backups";
@@ -43,6 +43,16 @@
     topDressingName: "",
     topDressingAmount: "",
     topDressingTiming: "",
+    topDressingDaysBeforeHeading: "",
+    hotWaterTemperatureC: "60",
+    hotWaterDurationMinutes: "10",
+    hotWaterBatchKg: "5",
+    soakingWaterTemperatureC: "12",
+    soakingAccumulatedWaterTempMin: "100",
+    soakingAccumulatedWaterTempMax: "120",
+    germinationTemperatureC: "28",
+    germinationHoursMin: "24",
+    germinationHoursMax: "48",
     pestControlPlan: "",
     targetTillers: "18〜22本",
     herbicideDaysAfterPlanting: "7",
@@ -204,6 +214,7 @@
     "種籾注文",
     "塩水選",
     "温湯殺菌",
+    "温湯消毒",
     "薬剤消毒",
     "浸種",
     "催芽",
@@ -581,8 +592,43 @@
     return { plannedDate: validDate ? date : "", reason: WORK_TIMING_REASONS.includes(r.reason) ? r.reason : "", memo: String(r.memo || "") };
   }
 
+  function validateSeedPreparation(s) {
+    const blank = v => v === undefined || v === null || typeof v === "string" && !v.trim();
+    if (!s || typeof s !== "object" || Array.isArray(s) || typeof s.varietyId !== "string"
+      || !["hotWater","soaking","germination"].includes(s.process)
+      || !s.settingsSnapshot || typeof s.settingsSnapshot !== "object" || Array.isArray(s.settingsSnapshot)) throw Error("種子準備の品種・工程・保存設定を確認してください。");
+    ["temperatureC","durationMinutes","batchKg","actualWaterTemperatureC","actualBatchKg"].forEach(k => {
+      const v = s[k];
+      if (!blank(v) && (!["string","number"].includes(typeof v) || !/^[+]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(String(v).trim()) || !Number.isFinite(Number(v)) || Number(v) <= 0)) throw Error("種子準備の温度・時間・数量は正の数で入力してください。");
+    });
+    ["budState","memo"].forEach(k => { if (!blank(s[k]) && typeof s[k] !== "string") throw Error("種子準備の状態・メモを確認してください。"); });
+    ["startAt","endAt"].forEach(k => {
+      const v = s[k];
+      if (blank(v)) return;
+      if (typeof v !== "string" || !/^\d{4}-\d{2}-\d{2}(?:T(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d{1,3})?)?(?:Z|[+-](?:[01]\d|2[0-3]):[0-5]\d)?)?$/.test(v)
+        || !materialDay(v.slice(0,10)) || !Number.isFinite(Date.parse(v))) throw Error("種子準備の開始・終了日時を確認してください。");
+    });
+    if (!blank(s.startAt) && !blank(s.endAt) && Date.parse(s.endAt) < Date.parse(s.startAt)) throw Error("種子準備の終了日時は開始日時以降にしてください。");
+  }
   function normalizeFieldWork(input) {
     const w = input || {};
+    if (w.seedPreparation !== undefined && w.seedPreparation !== null) validateSeedPreparation(w.seedPreparation);
+    if (w.materialUsageSnapshot !== undefined && w.materialUsageSnapshot !== null) {
+      const s = w.materialUsageSnapshot;
+      if (!s || typeof s !== "object" || Array.isArray(s) || s.version !== 1
+        || !["materialId", "amount", "date", "unit", "sourcePurchaseId", "sourceReceiptId", "sourceDate", "reason", "recordedAt"].every(k => typeof s[k] === "string")
+        || !s.materialId.trim() || !materialDay(s.date) || !s.reason.trim()
+        || s.materialId !== String(w.materialId || "") || s.date !== String(w.date || U.today()) || s.amount !== String(w.amount ?? "")
+        || !s.unit.trim() && (s.quantity !== null || s.cost !== null)
+        || s.quantity === null && s.cost !== null
+        || !Number.isFinite(Date.parse(s.recordedAt)) || s.sourceDate !== "" && !materialDay(s.sourceDate)
+        || ![s.quantity, s.cost].every(v => v === null || typeof v === "number" && Number.isFinite(v) && v >= 0 && v <= Number.MAX_SAFE_INTEGER)) throw new Error("Invalid material usage snapshot");
+      validateMaterialPackaging(s.packaging);
+      if (["unitCost", "sourceAmount", "sourceQuantity"].some(key => s[key] !== undefined && s[key] !== null
+        && (typeof s[key] !== "number" || !Number.isFinite(s[key]) || s[key] < 0 || s[key] > Number.MAX_SAFE_INTEGER))
+        || s.sourceQuantity !== undefined && s.sourceQuantity !== null && s.sourceQuantity === 0
+        || s.sourceUnit !== undefined && typeof s.sourceUnit !== "string") throw new Error("Invalid material usage cost basis");
+    }
     const offField = w.targetScope === "offField";
     const date = String(w.date || U.today());
     const harvestSnapshots = (offField ? [] : ensureArray(w.harvestSnapshots)).map((snapshot) => {
@@ -639,6 +685,12 @@
     }).filter((snapshot) => snapshot.fieldId);
     return {
       workId: String(w.workId || w.id || U.id("work", date)),
+      ...(w.varietyId !== undefined ? {varietyId:String(w.varietyId || "")} : {}),
+      ...(w.varietyProfile !== undefined ? {varietyProfile:String(w.varietyProfile || "")} : {}),
+      ...(w.seedPreparation !== undefined ? {seedPreparation:U.clone(w.seedPreparation)} : {}),
+      ...(w.materialUsageSnapshot !== undefined ? {materialUsageSnapshot: U.clone(w.materialUsageSnapshot)} : {}),
+      ...(w.unit !== undefined ? {unit:w.unit} : {}),
+      ...(w.amountUnit !== undefined ? {amountUnit:w.amountUnit} : {}),
       type: "fieldWork",
       targetScope: offField ? "offField" : "field",
       date,
@@ -675,7 +727,7 @@
       herbicideLinks: (offField ? [] : ensureArray(w.herbicideLinks)).filter((link) => link && link.fieldId && link.assignmentId && link.stepId).map((link) => ({ fieldId: String(link.fieldId), assignmentId: String(link.assignmentId), stepId: String(link.stepId) })),
       herbicideCategory: String(w.herbicideCategory || ""),
       herbicidePurpose: String(w.herbicidePurpose || ""),
-      amount: String(w.amount || ""),
+      amount: String(w.amount ?? ""),
       fertilizerRateKg10a: String(w.fertilizerRateKg10a || ""),
       fertilizerTotalKg: String(w.fertilizerTotalKg || ""),
       fertilizerBagCount: String(w.fertilizerBagCount || ""),
@@ -713,6 +765,8 @@
       || (g.tillerCount !== undefined && String(g.tillerCount) !== "" ? "tillering" : "");
     return {
       logId: String(g.logId || g.id || U.id("growth", date)),
+      ...(g.varietyId !== undefined ? {varietyId:String(g.varietyId || "")} : {}),
+      ...(g.varietyProfile !== undefined ? {varietyProfile:String(g.varietyProfile || "")} : {}),
       type: "growthLog",
       date,
       // 年度は日付から再計算する。旧JSONの stale season で年間履歴が混ざらないようにする。
@@ -770,8 +824,34 @@
     };
   }
 
+  function materialDay(value) {
+    const time = typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value) ? Date.parse(value + "T00:00:00Z") : NaN;
+    return value >= "1900-01-01" && value <= "2200-12-31" && Number.isFinite(time) && new Date(time).toISOString().slice(0, 10) === value;
+  }
+  function validateMaterialPackaging(p) {
+    if (p === null) return;
+    if (!p || typeof p !== "object" || Array.isArray(p)
+      || ![p.unit, p.baseUnit].every(v => typeof v === "string" && v.trim() && v === v.trim()) || p.unit === p.baseUnit
+      || typeof p.quantity !== "number" || !Number.isFinite(p.quantity) || p.quantity <= 0 || p.quantity > Number.MAX_SAFE_INTEGER) throw new Error("Invalid material packaging");
+  }
   function normalizeMaterial(input) {
     const m = input || {};
+    if (m.packaging !== undefined) validateMaterialPackaging(m.packaging);
+    if (m.packaging && String(m.unit || "").trim() && ![m.packaging.unit, m.packaging.baseUnit].includes(String(m.unit).trim())) {
+      throw new Error("資材の管理単位「" + m.unit + "」を、購入規格の単位「" + m.packaging.unit + "」または内容量の単位「" + m.packaging.baseUnit + "」と一致させてください。");
+    }
+    if (m.purchasePlans !== undefined) {
+      const ids = new Set();
+      if (!Array.isArray(m.purchasePlans)) throw new Error("Invalid purchase plans");
+      m.purchasePlans.forEach(p => {
+        if (!p || typeof p !== "object" || Array.isArray(p) || typeof p.planId !== "string" || !p.planId.trim() || ids.has(p.planId)
+          || !Number.isInteger(p.season) || p.season < 1900 || p.season > 2200
+          || typeof p.quantity !== "number" || !Number.isFinite(p.quantity) || p.quantity < 0 || p.quantity > Number.MAX_SAFE_INTEGER
+          || typeof p.unit !== "string" || !p.unit.trim() || typeof p.memo !== "string"
+          || ![p.createdAt, p.updatedAt].every(v => typeof v === "string" && v.trim() && Number.isFinite(Date.parse(v)))) throw new Error("Invalid purchase plan");
+        ids.add(p.planId);
+      });
+    }
     if (m.stocktakes !== undefined) {
       const ids = new Set();
       const validDay = date => {
@@ -806,6 +886,7 @@
       const ids = new Set();
       if (!Array.isArray(m.purchases)) throw new Error("資材の購入履歴の形式を確認してください。元のデータは変更していません。");
       m.purchases.forEach(row => {
+        if (row && row.packagingSnapshot !== undefined) validateMaterialPackaging(row.packagingSnapshot);
         const date = row && row.date;
         const time = typeof date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(date) ? Date.parse(`${date}T00:00:00Z`) : NaN;
         const validMoney = value => value === "" || value === undefined || value === null || typeof value === "number" && Number.isSafeInteger(value) && value >= 0;

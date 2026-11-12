@@ -1,4 +1,4 @@
-﻿{
+{
   "name": "稲作カルテ",
   "short_name": "稲作カルテ",
   "description": "圃場カルテ、栽培レシピ、生育記録、写真記録、年間履歴を管理する稲作管理アプリ。",
@@ -11,16 +11,16 @@
   "theme_color": "#29a861",
   "icons": [
     {
-      "src": "assets/icons/icon-192.png",
+      "src": "assets/icons/rice-sun-v1-192.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     },
     {
-      "src": "assets/icons/icon-512.png",
+      "src": "assets/icons/rice-sun-v1-512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     }
   ]
 }

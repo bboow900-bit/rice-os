@@ -1094,6 +1094,12 @@
   function saveFieldWork(record) {
     return mutate((d) => {
       const previous = record.workId ? d.fieldWorks.find((work) => work.workId === record.workId) : null;
+      if (previous) {
+        record = {...record};
+        ["material", "materialId", "amount", "unit", "amountUnit", "date"].forEach(key => {
+          if (record[key] === undefined && previous[key] !== undefined && (key !== "materialId" || record.material === previous.material)) record[key] = previous[key];
+        });
+      }
       const date = record.date || (record.date === undefined && previous && previous.transplanterSettingsSnapshot ? previous.date : U.today());
       const targets = workTargets(d, record, previous);
       const offField = targets.targetScope === "offField";
@@ -1207,7 +1213,9 @@
         materialId: record.materialId === undefined
           ? (previous && String(previous.material || "") === String(record.material || "") ? previous.materialId || "" : "")
           : String(record.materialId || ""),
-        amount: record.amount || "",
+        amount: record.amount ?? "",
+        ...(record.unit !== undefined ? {unit:record.unit} : {}),
+        ...(record.amountUnit !== undefined ? {amountUnit:record.amountUnit} : {}),
         herbicideLinks: U.clone(herbicideLinks),
         herbicideCategory: record.herbicideCategory === undefined ? (previous && previous.herbicideCategory || "") : String(record.herbicideCategory || ""),
         herbicidePurpose: record.herbicidePurpose === undefined ? (previous && previous.herbicidePurpose || "") : String(record.herbicidePurpose || ""),
@@ -1235,6 +1243,16 @@
         updatedAt: U.now()
       };
       const index = d.fieldWorks.findIndex((w) => w.workId === normalized.workId);
+      if (record.seedPreparation !== undefined) normalized.seedPreparation = U.clone(record.seedPreparation);
+      else if (previous && previous.seedPreparation !== undefined) normalized.seedPreparation = U.clone(previous.seedPreparation);
+      const quantityKeys = ["material", "materialId", "amount", "unit", "amountUnit"];
+      const quantityChanged = !previous || quantityKeys.some(key => String(record[key] ?? "") !== String(previous[key] ?? ""));
+      const dateChanged = previous && normalized.date !== previous.date;
+      if (quantityChanged || dateChanged) {
+        const material = d.materials.find(m => m.materialId === normalized.materialId);
+        if (material && window.RiceOS.materialQuantities) normalized.materialUsageSnapshot = window.RiceOS.materialQuantities.usageSnapshot(material, {...normalized, unit:record.unit, amountUnit:record.amountUnit}, previous, !quantityChanged && dateChanged);
+        else if (previous && previous.materialUsageSnapshot !== undefined) normalized.materialUsageSnapshot = null;
+      } else if (previous && previous.materialUsageSnapshot !== undefined) normalized.materialUsageSnapshot = U.clone(previous.materialUsageSnapshot);
       const snapshot = workScheduleSnapshot(d, record, previous, normalized);
       if (snapshot || record.scheduleSnapshot === null) normalized.scheduleSnapshot = snapshot;
       if (record.timingReview !== undefined) normalized.timingReview = S.normalizeTimingReview(record.timingReview, true);
@@ -1930,9 +1948,17 @@
       record = { ...existing, ...Object.fromEntries(Object.entries(record).filter(([, value]) => value !== undefined)) };
       const logId = record.logId || U.id("growth", date);
       const previous = d.growthLogs.find((g) => g.logId === logId) || null;
+      // A previous season's variety cannot be inferred from today's field master.
+      const observedVariety = !previous && U.season(date) === U.season(U.today())
+        && d.varieties.find(v => v.varietyId === d.fields.find(f => f.fieldId === record.fieldId)?.varietyId);
+      const varietyEvidence = previous ? {
+        ...(previous.varietyId !== undefined ? {varietyId:previous.varietyId} : {}),
+        ...(previous.varietyProfile !== undefined ? {varietyProfile:previous.varietyProfile} : {})
+      } : observedVariety ? {varietyId:observedVariety.varietyId,varietyProfile:observedVariety.name} : {};
       const leafColorScore = String(record.leafColorScore || RiceOS.schema.leafColorScoreFromText(record.leafColor || ""));
       const normalized = {
         logId,
+        ...varietyEvidence,
         type: "growthLog",
         date,
         season: U.season(date),
@@ -2157,6 +2183,7 @@
         previous.purchases.forEach(old => {
           const next = record.purchases.find(p => p.purchaseId === old.purchaseId);
           if (next && next.deliveryMode !== old.deliveryMode) throw new Error("既存購入の納品方式は変更できません。");
+          if (next && JSON.stringify(next.packagingSnapshot) !== JSON.stringify(old.packagingSnapshot)) throw new Error("購入時の規格は変更できません。");
           if (!old.receipts?.length && !old.cancellations?.length) return;
           if (!next || next.quantity < old.quantity || next.unit !== old.unit) throw new Error("納品・注文取消履歴のある購入の削除・数量縮小・単位変更はできません。");
           (old.cancellations || []).forEach(cancellation => {

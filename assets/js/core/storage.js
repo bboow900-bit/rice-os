@@ -365,7 +365,7 @@
       const source = incomingMaterials.get(material.materialId);
       if (!source) return material;
       let result = material;
-      [["purchases", "purchaseId"], ["stocktakes", "stocktakeId"]].forEach(([key, idKey]) => {
+      [["purchases", "purchaseId"], ["stocktakes", "stocktakeId"], ["purchasePlans", "planId"]].forEach(([key, idKey]) => {
         if (!Array.isArray(source[key])) return;
         const existing = Array.isArray(material[key]) ? material[key] : [];
         const ids = new Set(existing.map(row => String(row && row[idKey] || "")));

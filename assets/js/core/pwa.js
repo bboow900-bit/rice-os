@@ -3,7 +3,7 @@
 
   const RiceOS = window.RiceOS = window.RiceOS || {};
   const NOTIFIED_KEY = "rice_os_notified_alerts";
-  const APP_VERSION = "20261109_ver309";
+  const APP_VERSION = "20261112_ver313";
   const UPDATE_RELOAD_KEY = "rice_os_pwa_reload_version";
 
   let deferredPrompt = null;
@@ -78,8 +78,8 @@
     if (!canNotify() || Notification.permission !== "granted") return false;
     const registration = await navigator.serviceWorker.ready;
     await registration.showNotification(title, {
-      icon: "assets/icons/icon-192.png",
-      badge: "assets/icons/icon-192.png",
+      icon: "assets/icons/rice-sun-v1-192.png",
+      badge: "assets/icons/rice-sun-v1-192.png",
       data: { url: location.href },
       ...options
     });

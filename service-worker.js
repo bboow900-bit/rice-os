@@ -1,5 +1,5 @@
-const CACHE_NAME = "rice-karte-20261109-309";
-const APP_VERSION = "20261109_ver309";
+const CACHE_NAME = "rice-karte-20261112-313";
+const APP_VERSION = "20261112_ver313";
 const CACHE_PREFIX = "rice-karte-";
 const RETAINED_APP_CACHES = 2;
 
@@ -21,6 +21,7 @@ const APP_SHELL = [
   `./assets/css/materials-ledger.css?v=${APP_VERSION}`,
   `./assets/css/seeder-settings.css?v=${APP_VERSION}`,
   `./assets/css/review-ledger.css?v=${APP_VERSION}`,
+  `./assets/css/readable-ledgers.css?v=${APP_VERSION}`,
   `./assets/css/season-theme.css?v=${APP_VERSION}`,
   `./assets/css/ui-rhythm.css?v=${APP_VERSION}`,
   `./assets/css/annual-review-ui.css?v=${APP_VERSION}`,
@@ -30,6 +31,11 @@ const APP_SHELL = [
   `./assets/js/core/material-purchases.js?v=${APP_VERSION}`,
   `./assets/js/core/material-stock.js?v=${APP_VERSION}`,
   `./assets/js/core/material-insights.js?v=${APP_VERSION}`,
+  `./assets/js/core/material-quantities.js?v=${APP_VERSION}`,
+  `./assets/js/core/material-planning.js?v=${APP_VERSION}`,
+  `./assets/js/core/cultivation.js?v=${APP_VERSION}`,
+  `./assets/js/core/harvest-ledger.js?v=${APP_VERSION}`,
+  `./assets/js/screens/harvest-ledger.js?v=${APP_VERSION}`,
   `./assets/js/ui/season-art.js?v=${APP_VERSION}`,
   "./assets/images/ui-pop/rice-sowing.png",
   "./assets/images/ui-pop/rice-growing.png",
@@ -130,8 +136,10 @@ const APP_SHELL = [
   `./assets/js/screens/data.js?v=${APP_VERSION}`,
   `./assets/js/app.js?v=${APP_VERSION}`,
   `./assets/js/screens/shipments.js?v=${APP_VERSION}`,
-  "./assets/icons/icon-192.png",
-  "./assets/icons/icon-512.png"
+  "./assets/icons/rice-sun-v1-32.png",
+  "./assets/icons/rice-sun-v1-180.png",
+  "./assets/icons/rice-sun-v1-192.png",
+  "./assets/icons/rice-sun-v1-512.png"
 ];
 
 self.addEventListener("install", (event) => {

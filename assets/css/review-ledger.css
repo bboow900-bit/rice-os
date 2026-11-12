@@ -25,6 +25,10 @@
 #screen-recipes .recipe-readonly dl { display:grid; gap:8px; }
 #screen-recipes .recipe-readonly dl > div { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:12px; font-size:13px; }
 #screen-recipes .recipe-readonly dd { margin:0; overflow-wrap:anywhere; }
+#screen-recipes .recipe-readonly dt { min-width:0; overflow-wrap:anywhere; }
+#screen-recipes .recipe-readonly p { line-height:1.6; overflow-wrap:anywhere; }
+#screen-recipes [data-recipe-adopt] { max-width:100%; white-space:normal; }
+#recipeValidationError:not(:empty) { padding:12px; color:#963a21; background:#fff1e9; border-left:3px solid #c86539; }
 #screen-recipes .recipe-ledger-actions { display:flex; flex-wrap:wrap; gap:8px; margin:12px 0; }
 .profile-ledger-detail { padding: 16px 0; border-block: 1px solid #d4e4d9; color: #28523b; }
 .profile-ledger-detail h3, .profile-ledger-detail p { overflow-wrap: anywhere; white-space: pre-wrap; }

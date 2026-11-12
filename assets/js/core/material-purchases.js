@@ -65,7 +65,9 @@
       if (record.receiptId && !previous) throw Error("入庫履歴が見つかりません。");
       const quantity = number(record.quantity), unit = typeof record.unit === "string" ? record.unit.trim() : "";
       if (!validDate(record.date) || record.date > U.today()) throw Error("実在する入庫日を入力してください。未来入庫はできません。");
-      if (quantity === null || quantity <= 0 || quantity > Number.MAX_SAFE_INTEGER || unit !== purchase.unit || unit !== String(material(id).unit || "").trim()) throw Error("入庫数量と購入時・資材登録の単位を確認してください。");
+      const masterUnit = String(material(id).unit || "").trim();
+      const converted = R.materialQuantities ? R.materialQuantities.convert(quantity, unit, masterUnit, purchase.packagingSnapshot) : unit === masterUnit ? quantity : null;
+      if (quantity === null || quantity <= 0 || quantity > Number.MAX_SAFE_INTEGER || unit !== purchase.unit || converted === null) throw Error("入庫数量と購入時・資材登録の単位を確認してください。");
       if (sum([...receipts.filter(r => !r.deletedAt && r !== previous).map(r => r.quantity), ...(purchase.cancellations || []).filter(r => !r.deletedAt).map(r => r.quantity), quantity]) > purchase.quantity) throw Error("入庫数と注文取消数の合計が購入数量を超えています。");
       const saved = {...previous, receiptId:previous?.receiptId || U.id("receipt", record.date), date:record.date, quantity, unit, memo:String(record.memo || ""), createdAt:previous?.createdAt || U.now()};
       const nextReceipts = previous ? receipts.map(r => r === previous ? saved : r) : [...receipts, saved];
@@ -138,7 +140,7 @@
       if (expectedDeliveryDate !== "" && !validDate(expectedDeliveryDate)) throw Error("納品予定日を確認してください。未定の場合は空欄にしてください。");
       if ((previous.receipts?.length || previous.cancellations?.length) && (quantity < previous.quantity || record.unit.trim() !== previous.unit)) throw Error("納品・注文取消履歴のある購入の数量縮小・単位変更はできません。");
       const saved = {...previous, purchaseId:previous.purchaseId || U.id("purchase", record.date), date:record.date, season, supplier:String(record.supplier || "").trim(), quantity, unit:record.unit.trim(), unitPrice, totalAmount, memo:String(record.memo || ""), createdAt:previous.createdAt || U.now(), updatedAt:U.now()};
-      if (!previous.purchaseId) Object.assign(saved, {deliveryMode:"manual", expectedDeliveryDate, receipts:[]});
+      if (!previous.purchaseId) Object.assign(saved, {deliveryMode:"manual", expectedDeliveryDate, receipts:[], packagingSnapshot:U.clone(material(id).packaging || null)});
       else saved.expectedDeliveryDate = expectedDeliveryDate;
       const next = rows.slice(), index = previous.purchaseId ? rows.indexOf(previous) : -1;
       if (index >= 0) next[index] = saved; else next.push(saved);

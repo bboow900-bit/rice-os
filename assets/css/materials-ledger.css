@@ -74,3 +74,19 @@
 #screen-materials .ms-number{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;width:100%;background:transparent;box-shadow:none;border:0;padding:6px 0;text-align:left;color:var(--season-accent,#286848);min-height:48px}
 #screen-materials .ms-number strong{font-size:28px;line-height:1.4;overflow-wrap:anywhere}
 #screen-materials .ms-number small{font-size:12px;line-height:1.5}
+#screen-materials .mp-resources{padding:14px 0;border-bottom:1px solid var(--season-line,#dbe6df)}
+#screen-materials .mp-cost-totals{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:16px 0}
+#screen-materials .mp-cost-totals section{display:grid;align-content:start;gap:8px;min-width:0;padding:12px 0;border-block:1px solid var(--season-line,#dbe6df)}
+#screen-materials .mp-cost-totals strong{font-size:23px;line-height:1.4;overflow-wrap:anywhere}
+#screen-materials .mp-cost-totals span,#screen-materials .mp-cost-totals small{font-size:12px;line-height:1.6;overflow-wrap:anywhere}
+#screen-materials .mp-costs>h3,#screen-materials .mp-preparation h4{font-size:18px;line-height:1.5;overflow-wrap:anywhere}
+#screen-materials .mp-preparation-row{padding:18px 0;border-bottom:1px solid var(--season-line,#dbe6df);min-width:0}
+#screen-materials .mp-preparation-row dl>div{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px;padding:7px 0;font-size:13px;line-height:1.6}
+#screen-materials .mp-preparation-row dd{font-weight:600}
+#screen-materials .mp-preparation-row p{white-space:pre-wrap;overflow-wrap:anywhere;font-size:13px;line-height:1.7}
+#screen-materials .mp-preparation-row button{min-height:44px;border-radius:8px}
+#screen-materials .mp-insight-links button{font-size:13px;min-height:44px;white-space:normal}
+#screen-materials #materialPlanForm{display:grid;gap:14px}
+#screen-materials #materialPlanForm label{display:grid;gap:6px;line-height:1.6}
+#screen-materials #materialPlanForm :is(input,textarea){box-sizing:border-box;width:100%;min-width:0;min-height:44px;font-size:16px;padding:10px;border:1px solid var(--season-line,#c8dacf);border-radius:8px;background:white}
+#screen-materials #materialPlanForm textarea{min-height:100px}

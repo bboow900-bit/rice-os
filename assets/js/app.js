@@ -31,6 +31,7 @@
     "results",
     "harvest-performance",
     "shipments",
+    "harvest-ledger",
     "other-work"
   ]);
 
@@ -73,7 +74,9 @@
     U.$$(".screen").forEach((section) => {
       section.classList.toggle("active", section.id === `screen-${screenId}`);
     });
-    const navScreen = ["machines", "tractor-settings", "transplanter-settings", "seeder-settings", "herbicide"].includes(screenId) ? "data" : ["shipments", "harvest-performance"].includes(screenId) ? "annual" : screenId;
+    const harvestChild = ["results", "shipments"].includes(screenId)
+      && (inputOriginScreen === "harvest-ledger" || inputOriginParents.includes("harvest-ledger"));
+    const navScreen = harvestChild || ["machines", "tractor-settings", "transplanter-settings", "seeder-settings", "herbicide", "harvest-ledger"].includes(screenId) ? "data" : ["shipments", "harvest-performance"].includes(screenId) ? "annual" : screenId;
     U.$$(".nav-item").forEach((button) => {
       button.classList.toggle("active", button.dataset.screen === navScreen);
     });

@@ -50,7 +50,8 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE || "C:/Users/Keisuke/.cac
    const src=selector=>page.locator(selector+" img").getAttribute("src");
    assert.notEqual(await src('[data-jump-screen="materials"]'),await src('[data-jump-screen="herbicide"]'));
    assert.notEqual(await src('[data-jump-screen="machines"]'),await src('[data-jump-screen="tractor-settings"]'));
-   assert.notEqual(await src('[data-open-milling-ledger]'),await src('[data-open-shipment-ledger]'));
+   assert.equal(await page.locator('[data-open-harvest-ledger]').count(),1);
+   assert.equal(await page.locator('[data-open-milling-ledger],[data-open-shipment-ledger]').count(),0);
    for(const img of await page.locator(".common-master-card img").all())await img.evaluate(el=>el.decode());
    assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
    await page.screenshot({path:path.join(os.tmpdir(),`rice-ledger-masters-${width}.png`)});

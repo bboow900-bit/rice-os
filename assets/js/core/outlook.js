@@ -104,8 +104,8 @@
   function confidence(key) {
     const rows = {
       high: { key: "high", label: "高", detail: "今年の実測を根拠にしています" },
-      medium: { key: "medium", label: "中", detail: "今年の幼穂長と前年実績を根拠にしています" },
-      low: { key: "low", label: "低", detail: "前年実績を中心にした参考値です" },
+      medium: { key: "medium", label: "中", detail: "今年の観察を起点にした参考値です" },
+      low: { key: "low", label: "低", detail: "品種マスター・過去記録を根拠にした参考値です" },
       missing: { key: "missing", label: "記録不足", detail: "予測に必要な記録が不足しています" }
     };
     return rows[key] || rows.missing;
@@ -416,6 +416,7 @@
     const field = state().field(fieldId);
     if (!field) return null;
     const year = yearOf(asOf);
+    const cultivation = RiceOS.cultivation && RiceOS.cultivation.forField ? RiceOS.cultivation.forField(field, asOf) : null;
     const planting = state().plantingDateForField(field.fieldId, year);
     const summary = state().growthSummaryFor(field.fieldId, year, { asOfDate: asOf });
     const headingActual = summary.headingDate || state().headingDateForField(field.fieldId, year, asOf);
@@ -425,11 +426,12 @@
       ? agro().panicleEstimate(field, summary.panicleLog.panicleLengthMm, summary.panicleLog.date)
       : null;
     const sameField = previousFieldHeading(field, planting, year);
-    const sameVariety = previousVarietyHeading(field, planting, year);
+    const sameVariety = cultivation ? null : previousVarietyHeading(field, planting, year);
     const stage = agro().seasonStageForField ? agro().seasonStageForField(field, asOf) : { current: null, certainty: "記録待ち" };
     const water = agro().managementStatus ? agro().managementStatus(field, asOf) : { label: "水管理は未記録" };
     let heading = { kind: "missing", date: "", range: dateRange(""), label: "記録不足", source: "" };
     if (headingActual) heading = { kind: "actual", date: headingActual, range: dateRange(headingActual), label: "実測済", source: "今年の出穂日" };
+    else if (cultivation) heading = U.clone(cultivation.heading);
     else if (panicle && panicle.supported && panicle.date) {
       heading = {
         kind: "panicle", date: panicle.date,
@@ -469,17 +471,27 @@
       { ...weather.thermal, contextAsOf: weather.thermal.asOf, asOf }) : null;
     const sources = [
       source("current", "今年実測", headingActual || harvestActual ? 5 : panicle && panicle.supported ? 3 : 0, headingActual ? `出穂日 ${U.fd(headingActual)}` : panicle && panicle.supported ? `幼穂長 ${panicle.lengthMm}mm` : "未記録", headingActual || harvestActual || panicle && panicle.supported),
-      source("fieldPrevious", "前年圃場実績", sameField ? 3 : 0, sameField ? `前年品種は当時の記録で未確認 / 田植え後 ${sameField.days}日で出穂` : "前年実績なし", sameField),
-      source("varietyPrevious", "現在の同品種の前年実績", sameVariety ? 2 : 0, sameVariety ? `${sameVariety.count}圃場の中央値: 田植え後 ${sameVariety.days}日` : "同品種実績なし", sameVariety),
+      ...(cultivation ? [
+        source("cultivation", heading.label || "共通の出穂目安", heading.kind === "actual" ? 5 : heading.kind === "panicle" ? 3 : heading.kind === "missing" ? 0 : 2, heading.source || "記録不足", Boolean(heading.date)),
+        source("master", "品種マスター", cultivation.master.heading !== null ? 2 : 0,
+          cultivation.master.heading !== null ? `田植後 ${cultivation.master.heading}日 / 出穂の参考値` : "出穂日数未設定", cultivation.master.heading !== null),
+        source("history", "過去の品種確認済み実測", cultivation.history.heading.rows.length ? 2 : 0,
+          cultivation.history.heading.rows.length ? `${cultivation.history.heading.years.length}年 / 平均 田植後 ${Math.round(cultivation.history.heading.mean * 10) / 10}日` : "採用できる実測なし", cultivation.history.heading.rows.length)
+      ] : [
+        source("fieldPrevious", "前年圃場実績", sameField ? 3 : 0, sameField ? `前年品種は当時の記録で未確認 / 田植え後 ${sameField.days}日で出穂` : "前年実績なし", sameField),
+        source("varietyPrevious", "現在の同品種の前年実績", sameVariety ? 2 : 0, sameVariety ? `${sameVariety.count}圃場の中央値: 田植え後 ${sameVariety.days}日` : "同品種実績なし", sameVariety)
+      ]),
       source("fukushima", "福島県情報", 2, `${heatTarget(field).label}を収穫目安の参考に表示`, true),
       source("weather", "気象データ", weather && weather.available ? 2 : 0, weather && weather.detail || "未取得", Boolean(weather && weather.available)),
       source("normal", "同時期の平均気温", weather && weather.normalAvailable ? 1 : 0, weather && weather.normalDetail || "未取得", Boolean(weather && weather.normalAvailable))
     ];
     return {
-      field, asOf, planting, stage, water, heading, harvest, calibration, thermalCalibration, thermalProjection, sources, confidence: confidence(confidenceKey),
+      field, asOf, planting, stage, water, heading, harvest, cultivation,
+      panicle: cultivation && U.clone(cultivation.panicle), topDressing: cultivation && U.clone(cultivation.topDressing),
+      calibration, thermalCalibration, thermalProjection, sources, confidence: confidence(confidenceKey),
       difference: difference === "" ? "" : Number(difference),
       regional: { variety: varietyName(field), harvestTarget: heatTarget(field), sources: FUKUSHIMA_SOURCES },
-      missing: !heading.date ? "予測精度を上げるには、幼穂長または出穂日の記録が必要です。" : "",
+      missing: !heading.date ? "出穂目安に必要な記録・品種情報が不足しています。" : "",
       snapshot: {
         fieldId: field.fieldId,
         season: year,
@@ -494,6 +506,7 @@
         actualHeadingDate: headingActual || "",
         actualHarvestDate: harvestActual || "",
         basis: {
+          ...(cultivation ? { cultivation: U.clone(cultivation) } : {}),
           growthLogId: summary.panicleLog && summary.panicleLog.logId || "",
           previousFieldSeason: sameField ? String(Number(year) - 1) : "",
           previousVarietyCount: sameVariety ? sameVariety.count : 0,

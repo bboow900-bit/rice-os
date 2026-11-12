@@ -33,6 +33,66 @@
   let timingReviewPresent = false;
   let timingDisableAutoCapture = false;
   let timingReviewOpen = false;
+  let seedDraft = null;
+  let seedTouched = false;
+  let seedReferenceDirty = false;
+  const SEED_PROCESSES = {"温湯殺菌":"hotWater","温湯消毒":"hotWater","浸種":"soaking","催芽":"germination"};
+  const SEED_SETTINGS = {
+    hotWater:[["hotWaterTemperatureC","目安水温（℃）"],["hotWaterDurationMinutes","目安時間（分）"],["hotWaterBatchKg","目安処理量（kg）"]],
+    soaking:[["soakingWaterTemperatureC","目安水温（℃）"],["soakingAccumulatedWaterTempMin","積算水温の下限（℃・日）"],["soakingAccumulatedWaterTempMax","積算水温の上限（℃・日）"]],
+    germination:[["germinationTemperatureC","目安温度（℃）"],["germinationHoursMin","目安時間の下限（時間）"],["germinationHoursMax","目安時間の上限（時間）"]]
+  };
+  function loadSeedPreparation(work) {
+    seedDraft = work?.seedPreparation ? U.clone(work.seedPreparation) : null;
+    seedTouched = false;
+    seedReferenceDirty = false;
+    renderSeedPreparation();
+  }
+  function renderSeedPreparation() {
+    const form = U.$("fieldWorkForm"); if (!form) return;
+    let host = U.$("fwSeedPreparation");
+    if (!host) {
+      host = document.createElement("details"); host.id = "fwSeedPreparation"; host.className = "ts-work-settings";
+      const basic = form.querySelector("details.form-section"); if (basic) basic.after(host); else form.appendChild(host);
+    }
+    const process = SEED_PROCESSES[U.$("fwName")?.value];
+    host.hidden = !process; host.classList.toggle("hidden",!process);
+    if (!process) { host.innerHTML = ""; return; }
+    if (seedDraft && seedDraft.process !== process) { seedDraft = null; seedTouched = true; }
+    const varieties = state.data().varieties || [];
+    const unknown = seedDraft && !varieties.some(v => v.varietyId === seedDraft.varietyId);
+    const options = varieties.map(v => `<option value="${U.attr(v.varietyId)}"${seedDraft?.varietyId === v.varietyId ? " selected" : ""}>${U.escapeHTML(v.name)}</option>`).join("");
+    const settingRows = seedDraft ? SEED_SETTINGS[process].map(([key,label]) => `<div>${label}：${U.escapeHTML(String(seedDraft.settingsSnapshot?.[key] ?? "未設定"))}</div>`).join("") : "";
+    const inputs = [["actualWaterTemperatureC","実際の水温（℃）","number"],["actualBatchKg","実際の処理量（kg）","number"],["startAt","開始日時","datetime-local"],["endAt","終了日時","datetime-local"],["budState","芽の状態","text"]];
+    host.innerHTML = `<summary>種子準備の実績（任意）</summary><label>品種<select id="fwSeedVariety"><option value=""${seedDraft ? "" : " selected"}>記録しない</option>${unknown ? `<option selected value="${U.attr(seedDraft.varietyId)}">保存済みの品種</option>` : ""}${options}</select></label>${seedDraft ? `<div>${settingRows}</div><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));gap:8px">${inputs.map(([key,label,type]) => `<label>${label}<input id="fwSeed_${key}" data-seed-field="${key}" type="${type}"${type === "number" ? ' min="0" step="any" inputmode="decimal"' : ""} value="${U.attr(seedDraft[key] ?? "")}"></label>`).join("")}</div><label>種子準備メモ<textarea id="fwSeed_memo" data-seed-field="memo">${U.escapeHTML(seedDraft.memo || "")}</textarea></label>` : ""}`;
+  }
+  function renderSeedReferenceButton() {
+    const host = U.$("fwSeedPreparation");
+    if (!host || !seedDraft) return;
+    const saved = state.data().fieldWorks.find(w => w.workId === U.$("editFieldWorkId")?.value);
+    if (!saved?.seedPreparation || !Object.keys(seedReferenceValues(saved.seedPreparation)).length) return;
+    const button = document.createElement("button"); button.type = "button"; button.id = "fwSeedReference";
+    button.textContent = "保存済み実績を品種目安の編集へ";
+    button.disabled = seedReferenceDirty || !RiceOS.screens?.recipes?.openReferenceDraft;
+    button.title = "入力変更がある場合は先に作業を保存してください";
+    host.appendChild(button);
+  }
+  function seedWorkPayload() {
+    const process = SEED_PROCESSES[U.$("fwName")?.value];
+    if (seedDraft && seedDraft.process === process) return {seedPreparation:U.clone(seedDraft)};
+    return seedTouched ? {seedPreparation:null} : {};
+  }
+  function seedReferenceValues(seed) {
+    const values = {}, temperature = Number(seed.actualWaterTemperatureC), batch = Number(seed.actualBatchKg);
+    if (Number.isFinite(temperature) && temperature > 0) values[seed.process === "hotWater" ? "hotWaterTemperatureC" : seed.process === "soaking" ? "soakingWaterTemperatureC" : "germinationTemperatureC"] = String(seed.actualWaterTemperatureC);
+    if (seed.process === "hotWater" && Number.isFinite(batch) && batch > 0) values.hotWaterBatchKg = String(seed.actualBatchKg);
+    const minutes = (Date.parse(seed.endAt) - Date.parse(seed.startAt)) / 60000;
+    if (Number.isFinite(minutes) && minutes > 0) {
+      if (seed.process === "hotWater") values.hotWaterDurationMinutes = String(minutes);
+      if (seed.process === "germination") values.germinationHoursMin = values.germinationHoursMax = String(minutes / 60);
+    }
+    return values;
+  }
   const TIMING_REASONS = {rain:"雨",surface:"圃場の状態・乾き",machine:"機械",labor:"人手",schedule:"作業日程",intentional:"意図して変更",material:"資材",other:"その他"};
 
   function loadTimingReview(work, schedule) {
@@ -127,6 +187,8 @@
   }
 
   function renderTractorSettings() {
+    renderSeedPreparation();
+    renderSeedReferenceButton();
     if (typeof renderTransplanterSettings === "function") renderTransplanterSettings();
     const form = U.$("fieldWorkForm"), module = RiceOS.screens?.tractorSettings;
     if (!form || !module || typeof state.tractorWorkTypeForName !== "function") return;
@@ -283,6 +345,7 @@
   }
 
   function loadHarvestReview(work) {
+    loadSeedPreparation(work);
     if (typeof loadTractorSettings === "function") loadTractorSettings(work);
     harvestTimingDrafts = U.clone(work && work.harvestTimingByField || {});
     harvestTimingSelection = "";
@@ -439,9 +502,7 @@
     const variety = selectedVarietyForWork();
     if (!variety) return "";
     if (workName === "基肥・元肥") return [variety.baseFertilizerName, variety.baseFertilizerAmount].filter(Boolean).join(" ");
-    if (workName === "除草剤") return variety.initialHerbicide || variety.midHerbicide || "";
     if (workName === "追肥") return [variety.topDressingName, variety.topDressingAmount].filter(Boolean).join(" ");
-    if (workName === "防除") return variety.pestControlPlan || variety.initialInsecticide || "";
     return "";
   }
 
@@ -1067,6 +1128,19 @@
     };
     U.$("fieldWorkForm").addEventListener("input",captureTiming);
     U.$("fieldWorkForm").addEventListener("change",captureTiming);
+    const markSeedReferenceDirty = () => {
+      seedReferenceDirty = true;
+      const button = U.$("fwSeedReference"); if (button) button.disabled = true;
+    };
+    U.$("fieldWorkForm").addEventListener("input",markSeedReferenceDirty);
+    U.$("fieldWorkForm").addEventListener("change",markSeedReferenceDirty);
+    U.$("fieldWorkForm").addEventListener("click",event => {
+      if (!event.target.closest("#fwSeedReference")) return;
+      const saved = state.data().fieldWorks.find(w => w.workId === U.$("editFieldWorkId").value);
+      if (seedReferenceDirty || !saved?.seedPreparation || JSON.stringify(saved.seedPreparation) !== JSON.stringify(seedDraft)) { alert("変更した作業を先に保存してください。"); return; }
+      const values = seedReferenceValues(saved.seedPreparation);
+      RiceOS.screens.recipes?.openReferenceDraft?.(saved.seedPreparation.varietyId,values);
+    });
     U.$("fieldWorkForm").addEventListener("input",event => {
       if (event.target.id === "fwCropYear") renderTransplanterSettings();
       if (!transplanterDraft || !event.target.closest("#fwTransplanterSettings")) return;
@@ -1098,6 +1172,22 @@
         tractorDraft = snapshot; tractorTouched = true; renderTractorSettings();
       }
       if (event.target.id === "fwName" || event.target.id === "fwTargetScope") renderTractorSettings();
+    });
+    U.$("fieldWorkForm").addEventListener("input",event => {
+      if (seedDraft && event.target.dataset.seedField) { seedDraft[event.target.dataset.seedField] = event.target.value; seedTouched = true; }
+    });
+    U.$("fieldWorkForm").addEventListener("change",event => {
+      if (event.target.id !== "fwSeedVariety") return;
+      const variety = state.data().varieties.find(v => v.varietyId === event.target.value);
+      const process = SEED_PROCESSES[U.$("fwName").value];
+      seedTouched = true;
+      if (!variety || !process) seedDraft = null;
+      else seedDraft = {varietyId:variety.varietyId,process,
+        temperatureC:String(variety[process === "hotWater" ? "hotWaterTemperatureC" : process === "soaking" ? "soakingWaterTemperatureC" : "germinationTemperatureC"] ?? ""),
+        durationMinutes:process === "hotWater" ? String(variety.hotWaterDurationMinutes ?? "") : "",
+        batchKg:process === "hotWater" ? String(variety.hotWaterBatchKg ?? "") : "",
+        startAt:"",endAt:"",actualWaterTemperatureC:"",actualBatchKg:"",budState:"",memo:"",settingsSnapshot:U.clone(variety)};
+      renderSeedPreparation();
     });
     U.$("fieldWorkForm").addEventListener("input", invalidateWorkWeather, true);
     U.$("fieldWorkForm").addEventListener("change", invalidateWorkWeather, true);
@@ -1341,6 +1431,7 @@
         hours: U.$("fwHours").value,
         machine: U.$("fwMachine").value,
         ...(typeof tractorWorkPayload === "function" ? tractorWorkPayload() : {}),
+        ...seedWorkPayload(),
         ...(typeof transplanterWorkPayload === "function" ? transplanterWorkPayload() : {}),
         material: U.$("fwMaterial").value,
         materialId: U.$("fwMaterial").value === linkedMaterialName ? U.$("fwMaterialId").value : "",
@@ -1404,7 +1495,7 @@
         U.$("fwHours").value = work.hours || "";
         U.$("fwMachine").value = work.machine || "";
         U.$("fwMaterial").value = work.material || "";
-        renderMaterialPicker("");
+        renderMaterialPicker(work.materialId || "");
         U.$("fwAmount").value = work.amount || "";
         U.$("fwWeather").value = "";
         U.$("fwWeatherAutoJson").value = "";

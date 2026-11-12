@@ -18,18 +18,22 @@
   let savedMillingId = "";
   let ledgerView = "milling-list", detailId = "", editorReturn = null, editorBaseline = "";
   let resultError = "";
+  let millingOriginOnly = false;
   const ledgerHistory = [];
 
   const viewState = () => ({view:ledgerView,id:detailId});
   function syncNavigation() { if (RiceOS.app?.syncBackButton) RiceOS.app.syncBackButton(); }
   function goView(view,id = "") {
+    millingOriginOnly = false;
     ledgerHistory.push(viewState()); ledgerView = view; detailId = id; render(); syncNavigation();
   }
   function startEditor(kind) {
+    millingOriginOnly = false;
     if (ledgerView !== `${kind}-edit`) editorReturn = ledgerView.startsWith(`${kind}-`) ? viewState() : {view:`${kind}-list`,id:""};
     ledgerView = `${kind}-edit`; detailId = ""; syncNavigation();
   }
   function finishEditor(kind,id) {
+    millingOriginOnly = false;
     const target = editorReturn || {view:`${kind}-list`,id:""};
     if (target.view === `${kind}-detail` && target.id === id) {
       ledgerView = target.view; detailId = id;
@@ -40,11 +44,15 @@
     editorReturn = null; render(); syncNavigation();
   }
   function cancelEditor() {
+    const originOnly = millingOriginOnly && ledgerView === "milling-edit";
+    millingOriginOnly = false;
     const kind = ledgerView.split("-")[0], target = editorReturn || {view:`${kind}-list`,id:""};
     if (kind === "milling") resetMilling();
     if (kind === "issue") resetIssue();
     if (kind === "result") { resetForm(); resultError = ""; }
-    ledgerView = target.view; detailId = target.id; editorReturn = null; render(); syncNavigation();
+    ledgerView = target.view; detailId = target.id; editorReturn = null;
+    if (originOnly) { ledgerView = "milling-list"; detailId = ""; ledgerHistory.length = 0; }
+    render(); syncNavigation();
   }
   function editorValue() {
     if (ledgerView === "milling-edit") return JSON.stringify(millingDraft);
@@ -56,12 +64,15 @@
     if (!canHandleBack()) return false;
     if (ledgerView.endsWith("-edit")) {
       if (editorValue() !== editorBaseline && !confirm("入力中の変更を取り消して戻りますか？")) return true;
+      const originOnly = millingOriginOnly && ledgerView === "milling-edit";
       cancelEditor();
+      if (originOnly) return false;
     } else {
       const previous = ledgerHistory.pop(); ledgerView = previous.view; detailId = previous.id; render(); syncNavigation();
     }
     return true;
   }
+  function requestBack() { if (!handleBack() && RiceOS.app?.back) RiceOS.app.back(); }
   function visible(node,show) {
     if (!node) return;
     node.hidden = !show;
@@ -264,7 +275,7 @@
   }
 
   function openMilling() { startEditor("milling"); millingLedgerMode = false; millingFormVisible = true; resetMilling(); readMilling(); editorBaseline = editorValue(); U.$("millingForm").scrollIntoView({ block: "start",behavior: "smooth" }); }
-  function openMillingForYear(season, varietyId) {
+  function openMillingForYear(season, varietyId, opts = {}) {
     if (!RiceOS.schema.validCropYear(season) || varietyId && !state.variety(varietyId)) return false;
     const hasDraft = millingDraft && (millingOriginal || millingDraft.varietyId || millingDraft.packages.length || Number(millingDraft.looseKg) > 0 || String(millingDraft.memo || "").trim());
     if (hasDraft && !confirm("入力中の籾摺り記録があります。新しい収量入力へ切り替えますか？")) return false;
@@ -277,9 +288,18 @@
     millingViewYear = String(season);
     renderMilling();
     readMilling(); editorBaseline = editorValue();
+    millingOriginOnly = opts.originOnly === true;
+    return true;
+  }
+  function openMillingDetail(id) {
+    if (!millingRows().some(row => row.millingId === id)) return false;
+    ledgerView = "milling-list"; detailId = ""; ledgerHistory.length = 0; editorReturn = null;
+    millingLedgerMode = true; millingFormVisible = false;
+    goView("milling-detail", id);
     return true;
   }
   function openMillingLedger() {
+    millingOriginOnly = false;
     ledgerView = "milling-list"; detailId = ""; ledgerHistory.length = 0; editorReturn = null;
     if (U.$("legacyHarvestResults")) U.$("legacyHarvestResults").open = false;
     millingLedgerMode = true; millingFormVisible = false; renderMilling();
@@ -345,7 +365,7 @@
       if (!button) { const row = event.target.closest("[data-milling-id]"); if (row) goView("milling-detail",row.dataset.millingId); return; }
       if (button.hasAttribute("data-milling-open")) { goView("milling-detail",button.dataset.millingOpen); return; }
       if (button.hasAttribute("data-milling-new")) { startEditor("milling"); millingFormVisible = true; savedMillingId = ""; resetMilling(); if (millingLedgerMode && /^\d{4}$/.test(millingViewYear)) { millingDraft.season = millingViewYear; renderMilling(); } readMilling(); editorBaseline = editorValue(); return; }
-      if (button.hasAttribute("data-milling-cancel")) { cancelEditor(); return; }
+      if (button.hasAttribute("data-milling-cancel")) { if (millingOriginOnly) requestBack(); else cancelEditor(); return; }
       if (button.hasAttribute("data-milling-add-package")) { readMilling(); millingDraft.packages.push({ kg: button.dataset.millingAddPackage,bags: "1" }); renderMilling(); return; }
       if (button.hasAttribute("data-milling-remove-package")) { readMilling(); millingDraft.packages.splice(Number(button.dataset.millingRemovePackage),1); renderMilling(); return; }
       if (button.dataset.millingAction === "edit") { editMillingRecord(button.dataset.id); return; }
@@ -509,9 +529,10 @@
         if (ledgerView === "milling-edit") readMilling();
         if (ledgerView === "issue-edit") readIssue();
         if (ledgerView.endsWith("-edit") && editorValue() !== editorBaseline && !confirm("入力中の変更を取り消して台帳を切り替えますか？")) return;
+        millingOriginOnly = false;
         ledgerView = `${tab.dataset.resultsLedger}-list`; detailId = ""; ledgerHistory.length = 0; editorReturn = null; render(); return;
       }
-      if (event.target.closest("[data-results-back]")) { handleBack(); return; }
+      if (event.target.closest("[data-results-back]")) { requestBack(); return; }
       const add = event.target.closest("[data-results-new]");
       if (!add) return;
       if (add.dataset.resultsNew === "milling") { openMilling(); if (/^\d{4}$/.test(millingViewYear)) { millingDraft.season = millingViewYear; renderMilling(); readMilling(); editorBaseline = editorValue(); } }
@@ -563,5 +584,5 @@
   }
 
   RiceOS.screens = RiceOS.screens || {};
-  RiceOS.screens.results = { render, bind, resetForm, editResult, editMillingRecord, openMilling, openMillingForYear, openMillingLedger, showMillingForm, openShipmentIssues, canHandleBack, handleBack };
+  RiceOS.screens.results = { render, bind, resetForm, editResult, editMillingRecord, openMilling, openMillingForYear, openMillingDetail, openMillingLedger, showMillingForm, openShipmentIssues, canHandleBack, handleBack };
 })();

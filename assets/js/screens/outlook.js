@@ -25,6 +25,10 @@
   }
 
   function stageLabel(outlook) {
+    if (outlook.cultivation && outlook.stage && outlook.stage.fieldStage) {
+      const fieldStage = outlook.stage.fieldStage;
+      return fieldStage.current ? `${fieldStage.current.label}（${fieldStage.evidence}）` : "現場記録なし";
+    }
     const current = outlook.stage && outlook.stage.current;
     const label = current && (current.label || current.name) || "生育記録待ち";
     const certainty = outlook.stage && outlook.stage.certainty || "推定";
@@ -33,7 +37,39 @@
 
   function dateText(entry) {
     if (!entry || !entry.date) return "記録不足";
-    return entry.kind === "actual" ? `${U.fd(entry.date)}（実測済）` : entry.range.label;
+    if (entry.kind === "actual") return `${U.fd(entry.date)}（実測済）`;
+    const range = entry.range || {};
+    const dates = range.start && range.end && range.start !== range.end ? `${U.fd(range.start)}〜${U.fd(range.end)}` : U.fd(entry.date);
+    return `${dates}（推定）`;
+  }
+
+  function predictedStageText(outlook) {
+    const stage = outlook.stage && outlook.stage.outlookStage;
+    return stage && stage.current ? `生育推定: ${stage.current.label} / ${stage.basis || ""}` : "生育推定: 記録不足";
+  }
+
+  function cultivationEvidence(outlook) {
+    const model = outlook.cultivation;
+    if (!model) return "";
+    const stats = (key, label) => {
+      const h = model.history && model.history[key];
+      if (!h) return "";
+      const rows = Array.isArray(h.rows) ? h.rows : [];
+      const years = Array.isArray(h.years) ? h.years.length : 0;
+      const fieldCount = new Set(rows.map(row => row.fieldId)).size;
+      return `<p>${U.escapeHTML(label)}: ${years}年 / ${fieldCount}圃場 / ${rows.length}圃場年${h.mean !== null && h.mean !== undefined ? ` / 平均 田植後${U.escapeHTML(Math.round(h.mean * 10) / 10)}日 / ばらつき ${U.escapeHTML(h.min)}〜${U.escapeHTML(h.max)}日` : " / 記録なし"}</p><small>${U.escapeHTML(h.rule || "")}</small>`;
+    };
+    const master = model.master || {};
+    const average = (key, event, label) => event && event.kind === "combined"
+      ? `<p>${U.escapeHTML(label)}: （品種目安 ${U.escapeHTML(master[key])}日 ＋ 過去平均 ${U.escapeHTML(Math.round(model.history[key].mean * 10) / 10)}日）÷ 2 ＝ 田植後${U.escapeHTML(Math.round(event.daysAfterPlanting * 10) / 10)}日</p>` : "";
+    return `<details data-outlook-cultivation-evidence><summary>生育目安の根拠</summary>
+      <p>品種マスター: 幼穂形成 ${U.escapeHTML(master.panicle ?? "未設定")}日 / 出穂 ${U.escapeHTML(master.heading ?? "未設定")}日（田植後） / 追肥参考 出穂前${U.escapeHTML(master.topDressing ?? "未設定")}日</p>
+      ${stats("panicle", "幼穂形成の過去実測")}${stats("heading", "出穂の過去実測")}
+      ${average("panicle", model.panicle, "幼穂形成")}${average("heading", model.heading, "出穂")}
+      <p>${U.escapeHTML(model.predictedStage && model.predictedStage.basis || "")}</p>
+      ${(model.sources || []).map(item => `<p>${U.escapeHTML(typeof item === "string" ? item : item.detail || item.label || "")}</p>`).join("")}
+      <small>参考幅は統計的な信頼区間ではありません。</small>
+    </details>`;
   }
 
   function persist(rows) {
@@ -56,10 +92,13 @@
           <div><small>${U.escapeHTML(varietyName(field))} / ${U.escapeHTML(field.areaA ? `${field.areaA}a` : "面積未登録")}</small><h3>${U.escapeHTML(field.name)}</h3></div>
           <span class="outlook-confidence ${U.attr(outlook.confidence.key)}">信頼度 ${U.escapeHTML(outlook.confidence.label)}</span>
         </div>
-        <div class="outlook-now"><span>現在</span><b>${U.escapeHTML(stageLabel(outlook))}</b></div>
+        <div class="outlook-now"><span>${outlook.cultivation ? "現場記録" : "現在"}</span><b>${U.escapeHTML(stageLabel(outlook))}</b></div>
+        ${outlook.cultivation ? `<small>${U.escapeHTML(predictedStageText(outlook))}</small>` : ""}
         <dl class="outlook-estimates">
-          <div><dt>出穂</dt><dd>${U.escapeHTML(dateText(outlook.heading))}</dd></div>
-          <div><dt>収穫目安</dt><dd>${U.escapeHTML(dateText(outlook.harvest))}</dd></div>
+          ${outlook.cultivation ? `<div><dt>幼穂形成目安</dt><dd class="${outlook.panicle?.date ? "" : "is-missing"}">${U.escapeHTML(dateText(outlook.panicle))}</dd></div>` : ""}
+          <div><dt>出穂目安</dt><dd class="${outlook.heading?.date ? "" : "is-missing"}">${U.escapeHTML(dateText(outlook.heading))}</dd></div>
+          ${outlook.cultivation ? `<div><dt>追肥参考時期</dt><dd class="${outlook.topDressing?.date ? "" : "is-missing"}">${U.escapeHTML(dateText(outlook.topDressing))}</dd></div>` : ""}
+          <div><dt>収穫目安</dt><dd class="${outlook.harvest?.date ? "" : "is-missing"}">${U.escapeHTML(dateText(outlook.harvest))}</dd></div>
         </dl>
         ${outlook.calibration && outlook.calibration.status === "applied" ? '<small class="outlook-calibration-badge">この圃場の履歴を参考に暫定補正</small>' : ""}
         <div class="outlook-card-foot"><span>${U.escapeHTML(outlook.water && outlook.water.label || "水管理は未記録")}</span><b>詳細　›</b></div>
@@ -156,22 +195,26 @@
           <div><p class="eyebrow">${U.escapeHTML(varietyName(outlook.field))}</p><h2>${U.escapeHTML(outlook.field.name)}の見通し</h2></div>
         </div>
         <div class="outlook-detail-hero">
-          <small>現在ステージ</small><b>${U.escapeHTML(stageLabel(outlook))}</b><span>${U.escapeHTML(outlook.water && outlook.water.label || "水管理は未記録")}</span>
+          <small>${outlook.cultivation ? "現場記録" : "現在ステージ"}</small><b>${U.escapeHTML(stageLabel(outlook))}</b><span>${U.escapeHTML(outlook.water && outlook.water.label || "水管理は未記録")}</span>
+          ${outlook.cultivation ? `<span>${U.escapeHTML(predictedStageText(outlook))}</span>` : ""}
         </div>
         <section class="outlook-detail-section"><h3>見通し</h3>
           <div class="outlook-detail-grid">
-            <div><small>出穂予測</small><b>${U.escapeHTML(dateText(outlook.heading))}</b><span>${U.escapeHTML(outlook.heading.source || "")}</span></div>
+            ${outlook.cultivation ? `<div><small>幼穂形成目安</small><b>${U.escapeHTML(dateText(outlook.panicle))}</b><span>${U.escapeHTML(outlook.panicle.source || "")}</span></div>` : ""}
+            <div><small>出穂目安</small><b>${U.escapeHTML(dateText(outlook.heading))}</b><span>${U.escapeHTML(outlook.heading.source || "")}</span></div>
+            ${outlook.cultivation ? `<div><small>追肥参考時期</small><b>${U.escapeHTML(dateText(outlook.topDressing))}</b><span>${U.escapeHTML(outlook.topDressing.source || "")}</span></div>` : ""}
             <div><small>収穫目安</small><b>${U.escapeHTML(dateText(outlook.harvest))}</b><span>${U.escapeHTML(outlook.harvest.source || "")}</span></div>
             <div><small>信頼度</small><b>${U.escapeHTML(outlook.confidence.label)}</b><span>${U.escapeHTML(outlook.confidence.detail)}</span></div>
             <div><small>前年との差</small><b>${U.escapeHTML(differenceText(outlook))}</b></div>
           </div>
           ${outlook.missing ? `<p class="outlook-missing">${U.escapeHTML(outlook.missing)}</p>` : ""}
+          ${cultivationEvidence(outlook)}
         </section>
         ${calibrationDetail(outlook)}
         ${thermalDetail(outlook)}
-        <section class="outlook-detail-section"><h3>見通しの根拠</h3>
+        <section class="outlook-detail-section"><details><summary>見通しの根拠</summary>
           <div class="outlook-source-list">${outlook.sources.map((item) => `<div class="outlook-source ${item.available ? "available" : ""}"><span>${U.escapeHTML(item.label)}</span><b>${stars(item.strength)}</b><small>${U.escapeHTML(item.detail)}</small></div>`).join("")}</div>
-        </section>
+        </details></section>
         <section class="outlook-detail-section regional-reference"><h3>福島県の一般目安</h3>
           <p><b>${U.escapeHTML(regional.variety)}</b>　収穫期の参考: ${U.escapeHTML(regional.harvestTarget.label)}（出穂後の積算気温）</p>
           <div>${regional.sources.map((item) => `<a href="${U.attr(item.url)}" target="_blank" rel="noopener">${U.escapeHTML(item.label)}　›</a>`).join("")}</div>
@@ -204,7 +247,8 @@
   }
 
   function weatherKey(location, today) {
-    const headings = RiceOS.outlook.all().map(row => [row.field.fieldId, row.heading.kind, row.heading.date, row.harvest.kind, row.harvest.date]);
+    const headings = RiceOS.outlook.all().map(row => [row.field.fieldId, row.heading.kind, row.heading.date, row.harvest.kind, row.harvest.date,
+      row.cultivation || null, row.regional && row.regional.harvestTarget || null]);
     const observations = (state.data().growthLogs || []).filter(row => row.headingObserved === true).map(row => [row.fieldId, row.date]).sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
     return JSON.stringify([today, location && location.latitude, location && location.longitude, headings, observations]);
   }

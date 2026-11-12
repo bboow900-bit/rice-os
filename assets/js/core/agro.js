@@ -55,12 +55,15 @@
       const valueNumber = Number(value);
       return Number.isFinite(valueNumber) && valueNumber > 0 ? valueNumber : fallback;
     };
-    const minimum = numberOr(variety && variety.ripeningAccumulatedTempMin, matched.minimum);
-    const maximum = Math.max(minimum, numberOr(variety && variety.ripeningAccumulatedTempMax, matched.maximum));
-    const target = numberOr(variety && variety.ripeningAccumulatedTempTarget, matched.target);
-    const daysMin = numberOr(variety && variety.harvestDaysAfterHeadingMin, matched.daysMin);
-    const daysMax = Math.max(daysMin, numberOr(variety && variety.harvestDaysAfterHeadingMax, matched.daysMax));
-    const hasRecipeOverride = Boolean(variety && [
+    const commonOverrides = RiceOS.cultivation && RiceOS.cultivation.harvestOverrides;
+    const overrides = commonOverrides ? commonOverrides(variety) || {} : variety || {};
+    const target = numberOr(overrides.ripeningAccumulatedTempTarget ?? overrides.target, matched.target);
+    const shift = target - matched.target;
+    const minimum = commonOverrides ? Math.max(target / 2, matched.minimum + shift) : numberOr(overrides.ripeningAccumulatedTempMin, matched.minimum);
+    const maximum = commonOverrides ? Math.max(minimum, matched.maximum + shift) : Math.max(minimum, numberOr(overrides.ripeningAccumulatedTempMax, matched.maximum));
+    const daysMin = commonOverrides ? matched.daysMin : numberOr(overrides.harvestDaysAfterHeadingMin, matched.daysMin);
+    const daysMax = commonOverrides ? matched.daysMax : Math.max(daysMin, numberOr(overrides.harvestDaysAfterHeadingMax, matched.daysMax));
+    const hasRecipeOverride = commonOverrides ? overrides.ripeningAccumulatedTempTarget !== undefined : Boolean(variety && [
       "ripeningAccumulatedTempTarget", "ripeningAccumulatedTempMin", "ripeningAccumulatedTempMax",
       "harvestDaysAfterHeadingMin", "harvestDaysAfterHeadingMax"
     ].some((key) => String(variety[key] || "").trim()));
@@ -281,7 +284,11 @@
     return "booting";
   }
 
-  function estimatedHeading(field, plantingDate, year) {
+  function estimatedHeading(field, plantingDate, year, dateText) {
+    if (RiceOS.cultivation && RiceOS.cultivation.forField) {
+      const heading = RiceOS.cultivation.forField(field, dateText || U.today()).heading;
+      return heading && heading.date ? { ...heading, basis: heading.source || heading.label || "" } : null;
+    }
     if (!plantingDate) return null;
     const previousYear = Number(year) - 1;
     const ownPlanting = plantingDateInYear(field.fieldId, previousYear);
@@ -633,10 +640,13 @@
     // An explicit heading observation remains a factual anchor even when it
     // falls outside the usual planting-to-heading range.
     const factualHeadingReference = recordedHeadingDate ? { date: recordedHeadingDate, basis: "今年の出穂日" } : null;
-    const historicalHeading = !factualHeadingReference && !headingDate ? estimatedHeading(field, planting, year) : null;
+    const common = RiceOS.cultivation && RiceOS.cultivation.forField ? RiceOS.cultivation.forField(field, date) : null;
+    const historicalHeading = !factualHeadingReference && !headingDate
+      ? (common ? common.heading && common.heading.date ? { ...common.heading, basis: common.heading.source || common.heading.label || "" } : null : estimatedHeading(field, planting, year, date)) : null;
     const headingReference = factualHeadingReference || (headingDate ? { date: headingDate, basis: "今年の出穂日" }
       : (historicalHeading ? { date: historicalHeading.date, basis: historicalHeading.basis } : null));
-    const prediction = headingReference ? {
+    const prediction = common ? (common.predictedStage && STAGE_INDEX[common.predictedStage.key]
+      ? { key: common.predictedStage.key, date: common.predictedStage.anchorDate || "", basis: common.predictedStage.basis || "" } : null) : headingReference ? {
       key: estimatedStageKey(U.daysBetween(headingReference.date, date)),
       date: headingReference.date,
       basis: headingReference.basis
