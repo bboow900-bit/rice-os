@@ -39,7 +39,7 @@
     const closed = stored && (last ? last.action === "closed" : Boolean(stored.closedAt && !stored.reopenedAt));
     const works = data().fieldWorks.filter(row => cropYearForRecord(row) === value);
     const harvests = works.filter(row => isHarvestWork(row) && isActualFieldWork(row));
-    const shipmentsCount = (data().shipments || []).filter(row => Number(row.season) === value).length;
+    const shipmentsCount = (data().shipments || []).filter(row => Number(row.season) === value && ["shipment", "sale", "gift"].includes(row.kind)).length;
     const settlementSnapshot = history.filter(event => event.action === "closed" && event.settlement).at(-1)?.settlement || null;
     const settlementChanged = settlementSnapshot ? settlementSnapshot.fingerprint !== cropYearSettlementFor(value).fingerprint : null;
     return U.clone({ year: value, closed: Boolean(closed), status: closed ? "closed" : "open", closedAt: stored && stored.closedAt || "",
@@ -62,7 +62,7 @@
     const sum = (rows, key) => { if (rows.some(r => r[key] === null)) return null; const total = rows.reduce((n, r) => n + r[key], 0); return Number.isFinite(total) ? total : null; };
     const missingMilling = milling.some(r => !r.varietyId || millingRecordTotals(r).kg === null || millingRecordTotals(r).kg <= 0);
     const receivedKg = !milling.length || missingMilling ? null : sum(stock, "receivedKg");
-    const missingDispatch = shipments.some(r => ["shipment", "sale", "gift"].includes(r.kind) && r.riceType !== "white" && (!r.varietyId || r.inventoryRiceTypeUnverified || r.riceType !== "brown" || !inventoryPackageTotals(r.packages) || !r.packages.length));
+    const missingDispatch = shipments.some(r => ["shipment", "sale", "gift", "household"].includes(r.kind) && r.riceType !== "white" && (!r.varietyId || r.inventoryRiceTypeUnverified || r.riceType !== "brown" || !inventoryPackageTotals(r.packages) || !r.packages.length));
     const dispatchedKg = missingDispatch ? null : sum(stock, "dispatchedKg");
     const quantity = { receivedKg, dispatchedKg, remainingKg: receivedKg === null || dispatchedKg === null ? null : receivedKg - dispatchedKg, whiteShipmentCount: shipments.filter(r => r.riceType === "white" && !r.inventoryRiceTypeUnverified).length, unquantifiedCount: stock.reduce((n, r) => n + r.unquantifiedCount, 0) + milling.filter(r => !r.varietyId).length, unclassifiedCount: shipments.filter(r => !r.varietyId).length };
     const sales = { amountYen: 0, pricedCount: 0, unpricedCount: 0, unquantifiedCount: 0 };
@@ -117,7 +117,7 @@
     if (closure.status === "closed" && (options.refresh !== true || closure.settlementSnapshot && !closure.settlementChanged && closure.settlementSnapshot.note === note)) return data();
     return mutate(d => {
       if (!S.validCropYear(year) || options.switchToNext === true && Number(year) === 2200) throw new Error("締める年度と翌年度を1900〜2200年で指定してください。");
-      if (closure.status !== "closed" && !d.shipments.some(row => Number(row.season) === Number(year))) throw new Error("この年度の出荷・販売・配布記録を1件以上保存してから締めてください。");
+      if (closure.status !== "closed" && !d.shipments.some(row => Number(row.season) === Number(year) && ["shipment", "sale", "gift"].includes(row.kind))) throw new Error("この年度の出荷・販売・配布記録を1件以上保存してから締めてください。");
       const backup = storage.createYearClosureBackup(year);
       const rows = d.meta.cropYearClosures = S.normalizeCropYearClosures(d.meta.cropYearClosures);
       let row = rows.find(item => Number(item.year) === Number(year));
@@ -3786,7 +3786,7 @@
       result.hasHarvest = true;
     }
     for (const row of data().shipments || []) {
-      if (row.season !== Number(season) || !["shipment", "sale", "gift"].includes(row.kind)) continue;
+      if (row.season !== Number(season) || !["shipment", "sale", "gift", "household"].includes(row.kind)) continue;
       if (!row.varietyId) { result.unclassifiedCount++; continue; }
       if (row.varietyId !== varietyId) continue;
       if (row.inventoryRiceTypeUnverified) { result.unquantifiedCount++; continue; }
@@ -3813,6 +3813,8 @@
 
   function saveShipment(record) {
     const input = record || {};
+    const previousKind = input.shipmentId && (data().shipments || []).find(row => row.shipmentId === input.shipmentId)?.kind;
+    const household = (input.kind === undefined ? previousKind : input.kind) === "household";
     let shipmentId;
     const saved = mutate((d) => {
       d.shipments = d.shipments || [];
@@ -3827,7 +3829,7 @@
       shipmentId = normalized.shipmentId;
       if (index >= 0) d.shipments[index] = normalized;
       else d.shipments.push(normalized);
-    }, "出荷記録を保存しました");
+    }, household ? "自家用の取り分けを保存しました" : "出荷記録を保存しました");
     return saved ? U.clone(saved.shipments.find((row) => row.shipmentId === shipmentId)) : null;
   }
 

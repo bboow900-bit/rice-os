@@ -26,7 +26,7 @@
     const shipments = valid ? state.shipments().filter(row => row.season === Number(season) && row.varietyId === varietyId) : [];
     const milling = valid ? state.millingRecordsFor({ season, varietyId }) : [];
     const legacy = valid ? (state.data().varietyResults || []).filter(row => row.season === Number(season) && row.varietyId === varietyId) : [];
-    const totals = { outgoingKg: 0, giftKg: 0, salesYen: 0, pricedCount: 0, unpricedCount: 0 };
+    const totals = { outgoingKg: 0, giftKg: 0, householdKg: 0, salesYen: 0, pricedCount: 0, unpricedCount: 0 };
     const add = (key, value, integer) => {
       if (totals[key] === null) return;
       const sum = totals[key] + value;
@@ -35,7 +35,7 @@
     shipments.forEach(row => {
       const kg = packageKg(row);
       // Match riceStockFor's brown-rice eligibility; never convert white rice.
-      if (kg !== null && row.riceType === "brown" && !row.inventoryRiceTypeUnverified && ["shipment", "sale", "gift"].includes(row.kind)) add(row.kind === "gift" ? "giftKg" : "outgoingKg", kg);
+      if (kg !== null && row.riceType === "brown" && !row.inventoryRiceTypeUnverified && ["shipment", "sale", "gift", "household"].includes(row.kind)) add(row.kind === "household" ? "householdKg" : row.kind === "gift" ? "giftKg" : "outgoingKg", kg);
       if (!["shipment", "sale"].includes(row.kind)) return;
       const price = row.pricePer60Kg;
       const amount = kg === null ? null : Math.round(kg * Number(price) / 60);
@@ -43,7 +43,7 @@
         add("salesYen", amount, true); totals.pricedCount++;
       } else totals.unpricedCount++;
     });
-    const history = [...shipments.map(row => ({ type: "shipment", id: row.shipmentId, date: row.date, label: row.recipient || "相手先未設定", kg: packageKg(row), kind: row.kind })),
+    const history = [...shipments.map(row => ({ type: "shipment", id: row.shipmentId, date: row.date, label: row.kind === "household" ? "自家用" : row.recipient || "相手先未設定", kg: packageKg(row), kind: row.kind })),
       ...milling.map(row => ({ type: "milling", id: row.millingId, date: row.date, label: "収量", kg: state.millingRecordTotals(row).kg }))]
       .sort((a, b) => String(b.date).localeCompare(String(a.date)) || String(a.id).localeCompare(String(b.id)));
     return { season: Number(season), varietyId, stock, ...totals,

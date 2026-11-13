@@ -4,7 +4,8 @@
   const RiceOS = window.RiceOS = window.RiceOS || {};
   const U = RiceOS.utils;
   const state = RiceOS.state;
-  const KINDS = { shipment: "出荷", sale: "販売", gift: "おすそ分け" };
+  const KINDS = { shipment: "出荷", sale: "販売", gift: "おすそ分け", household: "自家用" };
+  const isNonSale = kind => kind === "gift" || kind === "household";
   const RICE_TYPES = { brown: "玄米", white: "白米" };
   let view = "list";
   let selectedId = "";
@@ -30,7 +31,7 @@
   function yen(value) { return value == null || !Number.isSafeInteger(Number(value)) ? "集計範囲外" : `¥${Number(value).toLocaleString("ja-JP")}`; }
   function salesFor(row) {
     const result = { amount: 0, priced: 0, missing: 0, missingBags: 0, legacy: 0 };
-    if (row.kind === "gift") return result;
+    if (isNonSale(row.kind)) return result;
     if (!hasPackages(row)) { result.legacy = 1; return result; }
     const price = row.pricePer60Kg;
     const total = totals(row.packages);
@@ -171,7 +172,7 @@
     return `<section class="shipment-year-totals" aria-label="玄米の残量"><div class="shipment-list-head"><h3>玄米の残量</h3><button type="button" class="secondary" data-shipment-harvests>収量・対応費</button></div><p class="shipment-total-scope">年産・品種別 / 全相手先・全出荷区分</p>${[...groups.values()].sort((a, b) => Number(b.season) - Number(a.season)).map(group => {
       const stock = state.riceStockFor(group.season, group.varietyId);
       const remainingUnits = stock.remainingKg == null ? "残量は集計範囲外" : `${numberText(stock.remainingKg / 60)}俵 / 30kg袋換算 ${numberText(stock.remainingKg / 30)}袋`;
-      return `<div class="shipment-year-total" data-rice-stock="${U.attr(`${group.season}|${group.varietyId}`)}"><div class="shipment-total-head"><b>${U.escapeHTML(group.season)}年産 / ${U.escapeHTML(varietyName(group.varietyId))}</b></div><div class="shipment-size-totals"><span>籾摺り後 <b>${numberText(stock.receivedKg)}kg</b></span><span>出荷・配布 <b>${numberText(stock.dispatchedKg)}kg</b></span><span>残量 <b>${numberText(stock.remainingKg)}kg</b></span></div><p>${remainingUnits}</p>${stock.remainingKg < 0 ? '<p class="shipment-error">出荷数量が収量を超えています。収量・品種・年産の記録を確認できます。</p>' : ""}${stock.whiteShipmentCount ? `<p class="shipment-legacy-info">白米出荷 ${stock.whiteShipmentCount}件は玄米残量に未反映</p>` : ""}${stock.unquantifiedCount || stock.unclassifiedCount ? `<p class="shipment-legacy-info">数量不足 ${stock.unquantifiedCount || 0}件 / 品種未設定 ${stock.unclassifiedCount || 0}件は未反映</p>` : ""}${stock.issueCount ? `<p>出荷の対応費（記録分） ${yen(stock.issueCostYen)} / ${stock.issueCount}件${stock.issueUnpricedCount ? ` / 費用未入力 ${stock.issueUnpricedCount}件` : ""}</p>` : ""}</div>`;
+      return `<div class="shipment-year-total" data-rice-stock="${U.attr(`${group.season}|${group.varietyId}`)}"><div class="shipment-total-head"><b>${U.escapeHTML(group.season)}年産 / ${U.escapeHTML(varietyName(group.varietyId))}</b></div><div class="shipment-size-totals"><span>籾摺り後 <b>${numberText(stock.receivedKg)}kg</b></span><span>出荷・配布・自家用 <b>${numberText(stock.dispatchedKg)}kg</b></span><span>残量 <b>${numberText(stock.remainingKg)}kg</b></span></div><p>${remainingUnits}</p>${stock.remainingKg < 0 ? '<p class="shipment-error">出荷・配布・自家用の数量が収量を超えています。収量・品種・年産の記録を確認できます。</p>' : ""}${stock.whiteShipmentCount ? `<p class="shipment-legacy-info">白米の記録 ${stock.whiteShipmentCount}件は玄米残量に未反映</p>` : ""}${stock.unquantifiedCount || stock.unclassifiedCount ? `<p class="shipment-legacy-info">数量不足 ${stock.unquantifiedCount || 0}件 / 品種未設定 ${stock.unclassifiedCount || 0}件は未反映</p>` : ""}${stock.issueCount ? `<p>出荷の対応費（記録分） ${yen(stock.issueCostYen)} / ${stock.issueCount}件${stock.issueUnpricedCount ? ` / 費用未入力 ${stock.issueUnpricedCount}件` : ""}</p>` : ""}</div>`;
     }).join("") || '<p class="empty">籾摺り後の収量はまだ登録されていません。</p>'}</section>`;
   }
 
@@ -180,7 +181,7 @@
     const seasons = Array.from(new Set([U.today().slice(0, 4), filters.season === "all" ? "" : filters.season, ...rows().map((row) => String(row.season)), ...(state.millingRecordsFor ? state.millingRecordsFor().map(row => String(row.season)) : [])]))
       .filter(Boolean).sort((a, b) => Number(b) - Number(a));
     return `<div class="shipment-ledger">
-      <div class="shipment-list-head"><h3>出荷台帳</h3><button type="button" class="primary" data-shipment-new>＋ 記録を追加</button></div>
+      <div class="shipment-list-head"><h3>お米の行き先</h3><button type="button" class="primary" data-shipment-new>＋ 記録を追加</button></div>
       <div class="shipment-filters">
         <label>収穫年<select id="shipmentFilterSeason" data-shipment-filter="season">${option("all", "全収穫年", filters.season)}${seasons.map((year) => option(year, `${year}年産`, filters.season)).join("")}</select></label>
         <label>相手先<input id="shipmentFilterRecipient" data-shipment-filter="recipient" type="search" list="shipmentFilterRecipients" value="${U.attr(filters.recipient)}" placeholder="相手先で検索"></label>
@@ -196,7 +197,7 @@
         const sales = salesFor(row);
         return `<button type="button" class="shipment-card" data-shipment-open="${U.attr(row.shipmentId)}" aria-label="${U.attr(`${row.date} ${row.recipient || "相手先未設定"}の記録を開く`)}">
           <span class="shipment-card-main"><span class="shipment-card-date">${U.escapeHTML(U.fd(row.date))} <span class="pill info">${U.escapeHTML(KINDS[row.kind] || "出荷")}</span></span><b>${U.escapeHTML(row.recipient || "相手先未設定")}</b><small>${U.escapeHTML(`${row.season}年産 / ${RICE_TYPES[row.riceType] || "種類未設定"} / ${varietyName(row.varietyId)}`)}</small><span class="shipment-card-packages">${counted ? U.escapeHTML(packageText(row.packages)) : "袋内訳未登録"}</span></span>
-          <span class="shipment-card-side">${counted ? `<strong>${numberText(total.kg)}kg</strong><small>${numberText(total.bags)}袋</small>` : '<strong>未集計</strong>'}${row.kind !== "gift" && (sales.priced || sales.missing) ? salesHtml(sales) : ""}<span aria-hidden="true">›</span></span></button>`;
+          <span class="shipment-card-side">${counted ? `<strong>${numberText(total.kg)}kg</strong><small>${numberText(total.bags)}袋</small>` : '<strong>未集計</strong>'}${!isNonSale(row.kind) && (sales.priced || sales.missing) ? salesHtml(sales) : ""}<span aria-hidden="true">›</span></span></button>`;
       }).join("") : '<div class="empty shipment-empty">この条件の記録はありません。</div>'}</div></div>`;
   }
   function renderDetail(row) {
@@ -205,11 +206,11 @@
       <div class="shipment-detail-head"><button type="button" class="secondary icon-button" data-shipment-back aria-label="一覧へ戻る">‹</button><h3>${U.escapeHTML(row.recipient || "相手先未設定")}</h3></div>
       <div class="shipment-detail-meta"><span class="pill info">${U.escapeHTML(KINDS[row.kind] || "出荷")}</span><span>${U.escapeHTML(U.fd(row.date))}</span><span>${U.escapeHTML(row.season)}年産</span></div>
       <div class="shipment-detail-rice">${U.escapeHTML(RICE_TYPES[row.riceType] || "種類未設定")} / ${U.escapeHTML(varietyName(row.varietyId))}</div>
-      <p>等級：${U.escapeHTML(row.grade == null || String(row.grade).trim() === "" ? "不明" : String(row.grade))}${row.destinationName && row.destinationName !== row.recipient ? ` / 出荷先：${U.escapeHTML(row.destinationName)}` : ""}</p>
+      ${row.kind === "household" ? '<p>自家用として取り分けた数量です。収穫量・反収・売上は変わりません。</p>' : `<p>等級：${U.escapeHTML(row.grade == null || String(row.grade).trim() === "" ? "不明" : String(row.grade))}${row.destinationName && row.destinationName !== row.recipient ? ` / 出荷先：${U.escapeHTML(row.destinationName)}` : ""}</p>`}
       <div class="shipment-detail-total">${hasPackages(row) ? `<strong>${numberText(total.kg)}kg</strong><span>${numberText(total.bags)}袋</span>` : '<strong>未集計</strong><span>袋内訳未登録</span>'}</div>
       ${row.quantity || row.amount ? `<dl class="shipment-legacy-info">${row.quantity ? `<div><dt>旧記録の数量</dt><dd>${U.escapeHTML(row.quantity)}</dd></div>` : ""}${row.amount ? `<div><dt>旧記録の金額</dt><dd>${U.escapeHTML(row.amount)}</dd></div>` : ""}</dl>` : ""}
       <dl class="shipment-package-detail">${(row.packages || []).map((item) => `<div><dt>${numberText(item.kg)}kg袋</dt><dd>${numberText(item.bags)}袋 / ${numberText(Number(item.kg) * Number(item.bags))}kg</dd></div>`).join("")}</dl>
-      ${row.kind !== "gift" ? `<div class="shipment-detail-sales">${validRate(row.pricePer60Kg ?? "") ? `<p>1俵（60kg） ${yen(row.pricePer60Kg)}</p>` : ""}${salesHtml(salesFor(row))}</div>` : ""}
+      ${!isNonSale(row.kind) ? `<div class="shipment-detail-sales">${validRate(row.pricePer60Kg ?? "") ? `<p>1俵（60kg） ${yen(row.pricePer60Kg)}</p>` : ""}${salesHtml(salesFor(row))}</div>` : ""}
       ${row.memo ? `<div class="shipment-memo">${U.escapeHTML(row.memo)}</div>` : ""}
       <p id="shipmentError" class="shipment-error" role="alert"${errorMessage ? "" : " hidden"}>${U.escapeHTML(errorMessage)}</p>
       <div class="form-actions shipment-detail-actions"><button type="button" class="primary" data-shipment-edit>編集</button><button type="button" class="danger" data-shipment-delete>削除</button></div></section>`;
@@ -223,17 +224,17 @@
   function renderEditor() {
     const varieties = state.varieties();
     return `<form id="shipmentForm" class="stack-form shipment-editor" novalidate>
-      <div class="shipment-editor-head"><button type="button" class="secondary icon-button" data-shipment-back aria-label="入力を取り消す">‹</button><h3>${selectedId ? "記録を編集" : "出荷・配布を記録"}</h3></div>
+      <div class="shipment-editor-head"><button type="button" class="secondary icon-button" data-shipment-back aria-label="入力を取り消す">‹</button><h3>${selectedId ? "記録を編集" : "お米の行き先を記録"}</h3></div>
       <div class="form-grid dense shipment-basic-fields">
         <label>日付<input id="shipmentDate" name="date" type="date" value="${U.attr(draft.date)}" required></label>
         <label>収穫年（年産）<input id="shipmentSeason" name="season" type="number" inputmode="numeric" min="1900" max="2200" step="1" value="${U.attr(draft.season)}" required></label>
         <label>区分<select id="shipmentKind" name="kind">${Object.entries(KINDS).map(([key, label]) => option(key, label, draft.kind)).join("")}</select></label>
-        <label>出荷先・配布先<input id="shipmentRecipient" name="recipient" list="shipmentRecipients" value="${U.attr(draft.recipient)}" placeholder="例：販売先、親戚・知人の名前" required></label>
-        <label class="shipment-price-label${draft.kind === "gift" ? " hidden" : ""}" data-shipment-price-label${draft.kind === "gift" ? " hidden" : ""}>1俵（60kg）の価格（円）<input id="shipmentPricePer60Kg" name="pricePer60Kg" type="number" inputmode="numeric" min="0" step="1" value="${U.attr(draft.pricePer60Kg ?? "")}"></label>
+        <label data-shipment-recipient-label ${draft.kind === "household" ? 'hidden class="hidden"' : ""}>出荷先・配布先<input id="shipmentRecipient" name="recipient" list="shipmentRecipients" value="${U.attr(draft.recipient)}" placeholder="例：販売先、親戚・知人の名前" ${draft.kind === "household" ? "" : "required"}></label>
+        <label class="shipment-price-label${isNonSale(draft.kind) ? " hidden" : ""}" data-shipment-price-label${isNonSale(draft.kind) ? " hidden" : ""}>1俵（60kg）の価格（円）<input id="shipmentPricePer60Kg" name="pricePer60Kg" type="number" inputmode="numeric" min="0" step="1" value="${U.attr(draft.pricePer60Kg ?? "")}"></label>
         <label>品種<select id="shipmentVariety" name="varietyId">${option("", "未設定", draft.varietyId)}${draft.varietyId && !varieties.some((item) => item.varietyId === draft.varietyId) ? option(draft.varietyId, "保存済みの品種", draft.varietyId) : ""}${varieties.map((item) => option(item.varietyId, item.name, draft.varietyId)).join("")}</select></label>
         <label>米の種類<select id="shipmentRiceType" name="riceType">${Object.entries(RICE_TYPES).map(([key, label]) => option(key, label, draft.riceType)).join("")}</select></label>
-        <label>等級（任意）<input id="shipmentGrade" name="grade" list="shipmentGrades" value="${U.attr(draft.grade ?? "")}"><datalist id="shipmentGrades"><option value="1等"><option value="2等"><option value="3等"><option value="規格外"></datalist></label>
-        <label>出荷先名（相手先と異なる場合）<input id="shipmentDestinationName" name="destinationName" value="${U.attr(draft.destinationName ?? "")}"></label>
+        <label data-shipment-business-label ${draft.kind === "household" ? 'hidden class="hidden"' : ""}>等級（任意）<input id="shipmentGrade" name="grade" list="shipmentGrades" value="${U.attr(draft.grade ?? "")}"><datalist id="shipmentGrades"><option value="1等"><option value="2等"><option value="3等"><option value="規格外"></datalist></label>
+        <label data-shipment-business-label ${draft.kind === "household" ? 'hidden class="hidden"' : ""}>出荷先名（相手先と異なる場合）<input id="shipmentDestinationName" name="destinationName" value="${U.attr(draft.destinationName ?? "")}"></label>
       </div>${suggestions("shipmentRecipients")}
       <section class="shipment-packages"><h4>袋の内訳</h4><div id="shipmentPackages">${draft.packages.map(packageEditor).join("")}</div>
         <div class="shipment-package-picks" role="group" aria-label="袋を追加">${[30, 10, 5].map((kg) => `<button type="button" class="secondary" data-shipment-add-package="${kg}">＋ ${kg}kg</button>`).join("")}<button type="button" class="secondary" data-shipment-add-package="custom">＋ その他</button></div>
@@ -244,13 +245,18 @@
   }
   function editorTotal() {
     const total = totals(draft.packages);
-    return `${numberText(total.kg)}kg / ${numberText(total.bags)}袋${draft.kind === "gift" ? "" : ` / ${salesHtml(salesFor(draft))}`}`;
+    return `${numberText(total.kg)}kg / ${numberText(total.bags)}袋${isNonSale(draft.kind) ? "" : ` / ${salesHtml(salesFor(draft))}`}`;
   }
   function syncEditorTotals() {
     root().querySelectorAll("[data-shipment-price-label]").forEach((label) => {
-      label.hidden = draft.kind === "gift";
-      label.classList.toggle("hidden", draft.kind === "gift");
+      label.hidden = isNonSale(draft.kind);
+      label.classList.toggle("hidden", isNonSale(draft.kind));
     });
+    root().querySelectorAll("[data-shipment-recipient-label],[data-shipment-business-label]").forEach(label => {
+      label.hidden = draft.kind === "household";
+      label.classList.toggle("hidden", draft.kind === "household");
+    });
+    U.$("shipmentRecipient").required = draft.kind !== "household";
     U.$("shipmentPackageTotal").innerHTML = editorTotal();
   }
   function syncBack() {
@@ -314,7 +320,8 @@
     const parsed = new Date(`${date}T00:00:00Z`);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !Number.isFinite(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== date) { showError("有効な日付を入力してください。", "shipmentDate"); return null; }
     if (!/^\d{4}$/.test(String(draft.season)) || Number(draft.season) < 1900 || Number(draft.season) > 2200) { showError("収穫年を1900〜2200の整数で入力してください。", "shipmentSeason"); return null; }
-    if (!draft.recipient.trim()) { showError("出荷先・配布先を入力してください。", "shipmentRecipient"); return null; }
+    if (draft.kind !== "household" && !draft.recipient.trim()) { showError("出荷先・配布先を入力してください。", "shipmentRecipient"); return null; }
+    if (draft.kind === "household" && !draft.varietyId) { showError("自家用に取り分ける品種を選択してください。", "shipmentVariety"); return null; }
     if (!Object.hasOwn(KINDS, draft.kind) || !Object.hasOwn(RICE_TYPES, draft.riceType)) { showError("区分と米の種類を選択してください。"); return null; }
     if (!draft.packages.length) { showError("袋の内訳を追加してください。"); return null; }
     const packages = [];
@@ -328,10 +335,10 @@
     }
     const total = totals(packages);
     if (!Number.isFinite(total.kg) || !Number.isSafeInteger(total.bags)) { showError("袋の数量が大きすぎます。内訳を確認してください。"); return null; }
-    const priceText = String(draft.pricePer60Kg ?? "").trim();
+    const priceText = draft.kind === "household" ? "" : String(draft.pricePer60Kg ?? "").trim();
     if (priceText && !validRate(priceText)) { showError("1俵（60kg）の価格は0以上の整数（円）で入力してください。", "shipmentPricePer60Kg"); return null; }
     if (priceText && !Number.isSafeInteger(Math.round(total.kg * Number(priceText) / 60))) { showError("売上金額が大きすぎます。単価と重量を確認してください。"); return null; }
-    const payload = { ...draft, pricePer60Kg: priceText ? Number(priceText) : "", season: Number(draft.season), recipient: draft.recipient.trim(), memo: draft.memo.trim(), packages };
+    const payload = { ...draft, pricePer60Kg: priceText ? Number(priceText) : "", season: Number(draft.season), recipient: draft.kind === "household" ? "自家用" : draft.recipient.trim(), memo: draft.memo.trim(), packages };
     if (String(draft.grade ?? "").trim()) payload.grade = String(draft.grade).trim();
     else if (selectedId && Object.hasOwn(record(selectedId) || {}, "grade")) payload.grade = "";
     else delete payload.grade;

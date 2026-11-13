@@ -200,7 +200,7 @@
       entries.push({
         kind: "shipment",
         tone: "shipment",
-        title: x.kind === "gift" ? "おすそ分け" : x.kind === "sale" ? "販売" : "出荷",
+        title: x.kind === "household" ? "自家用" : x.kind === "gift" ? "おすそ分け" : x.kind === "sale" ? "販売" : "出荷",
         subtitle: [typeof x.recipient === "string" ? x.recipient.trim() : "",
           /^[1-9]\d{3}$/.test(String(x.season || "")) ? `${x.season}年産` : "",
           x.riceType === "brown" ? "玄米" : x.riceType === "white" ? "白米" : "", summary].filter(Boolean).join(" / "),

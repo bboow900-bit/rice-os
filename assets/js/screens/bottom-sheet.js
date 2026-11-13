@@ -87,7 +87,7 @@
         <span>${U.escapeHTML(entry.subtitle || "")}</span>
         ${entry.memo ? `<small>${U.escapeHTML(entry.memo)}</small>` : ""}
         ${entry.hasPhoto ? '<span class="pill info">写真あり</span>' : ""}
-        ${entry.kind === "shipment" && entry.record.shipmentId ? `<button class="secondary" type="button" data-sheet-open-shipment="${U.attr(entry.record.shipmentId)}">出荷の詳細を見る</button>` : ""}
+        ${entry.kind === "shipment" && entry.record.shipmentId ? `<button class="secondary" type="button" data-sheet-open-shipment="${U.attr(entry.record.shipmentId)}">${entry.record.kind === "household" ? "自家用の詳細を見る" : "出荷の詳細を見る"}</button>` : ""}
         ${id ? `
           <div class="record-actions mini-actions">
             ${canCompleteSchedule ? `<button class="primary" type="button" data-sheet-action="${isWaterConfirmation ? "confirm" : "complete"}" data-kind="${U.attr(entry.kind)}" data-id="${U.attr(id)}">${isWaterConfirmation ? "確認済みにする" : "実施を記録"}</button>` : ""}

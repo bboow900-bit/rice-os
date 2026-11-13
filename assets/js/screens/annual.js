@@ -866,7 +866,7 @@
       const q = value.quantity || {}, sales = value.sales || {}, costs = value.costs || {};
       return `<dl class="annual-settlement-values">
         ${scope !== "finance" ? `<div><dt>籾摺り収量</dt><dd>${num(q.receivedKg, "kg")}</dd></div>
-        <div><dt>玄米の出荷・配布</dt><dd>${num(q.dispatchedKg, "kg")}</dd></div>
+        <div><dt>玄米の出荷・配布・自家用</dt><dd>${num(q.dispatchedKg, "kg")}</dd></div>
         <div><dt>玄米残量（記録分）</dt><dd>${num(q.remainingKg, "kg")}</dd></div>` : ""}
         ${scope !== "quantity" ? `<div><dt>売上（単価記録分）</dt><dd>${sales.pricedCount ? num(sales.amountYen, "円") : "単価付き記録なし"}</dd></div>
         <div><dt>対応費用（記録分）</dt><dd>${costs.recordedCount > costs.unpricedCount ? num(costs.amountYen, "円") : "費用記録なし"}</dd></div>

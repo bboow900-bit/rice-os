@@ -5,7 +5,7 @@
   const U = RiceOS.utils;
 
   const SCHEMA_VERSION = 17;
-  const APP_VERSION = "20261112_ver313";
+  const APP_VERSION = "20261113_ver314";
   const STORE_KEY = "rice_os_v8_stable";
   const BACKUP_KEY = "rice_os_v8_stable_backup";
   const RELEASE_BACKUPS_KEY = "rice_os_v8_stable_release_backups";
@@ -1191,8 +1191,9 @@
       const parsedDate = new Date(`${date}T00:00:00Z`);
       if (typeof s.date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(date) || !Number.isFinite(parsedDate.getTime()) || parsedDate.toISOString().slice(0, 10) !== date) throw new Error("有効な日付を入力してください。");
       if (!["number", "string"].includes(typeof s.season) || !/^[1-9]\d{3}$/.test(season)) throw new Error("収穫年度を入力してください。");
-      if (!recipient) throw new Error("出荷先・相手先を入力してください。");
-      if (!["shipment", "sale", "gift"].includes(s.kind)) throw new Error("出荷・販売・贈答の区分を選択してください。");
+      if (!recipient && s.kind !== "household") throw new Error("出荷先・相手先を入力してください。");
+      if (!["shipment", "sale", "gift", "household"].includes(s.kind)) throw new Error("出荷・販売・贈答・自家用の区分を選択してください。");
+      if (s.kind === "household" && (typeof s.varietyId !== "string" || !s.varietyId.trim())) throw new Error("自家用に取り分ける品種を選択してください。");
       if (!["brown", "white"].includes(s.riceType)) throw new Error("玄米・白米の区分を選択してください。");
       if (!packages.length) throw new Error("袋の重量と袋数を1件以上入力してください。");
     }
@@ -1202,7 +1203,7 @@
       type: "shipment",
       date,
       season: U.number(s.season, U.season(date)),
-      kind: ["shipment", "sale", "gift"].includes(s.kind) ? s.kind : "shipment",
+      kind: ["shipment", "sale", "gift", "household"].includes(s.kind) ? s.kind : "shipment",
       recipient,
       varietyId: String(s.varietyId || ""),
       riceType: ["brown", "white"].includes(s.riceType) ? s.riceType : "brown",

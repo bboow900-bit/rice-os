@@ -199,7 +199,7 @@
     }
     const stock = state.riceStockFor(year,millingDraft.varietyId);
     if (!stock) { host.innerHTML = '<p class="muted">参考在庫を確認できません。</p>'; return; }
-    host.innerHTML = `<h4>${year}年産の参考在庫</h4><div class="milling-stock-values">${[["籾摺り後",stock.receivedKg],["出荷済み玄米",stock.dispatchedKg],["差引参考在庫",stock.remainingKg]].map(([label,kg]) => `<div><small>${label}</small><b>${numberText(kg)}kg</b><small>${typeof kg === "number" && Number.isFinite(kg) ? `${numberText(kg / 60)}俵（60kg）` : "数量未確認"}</small></div>`).join("")}</div>
+    host.innerHTML = `<h4>${year}年産の参考在庫</h4><div class="milling-stock-values">${[["籾摺り後",stock.receivedKg],["出荷・配布・自家用",stock.dispatchedKg],["差引参考在庫",stock.remainingKg]].map(([label,kg]) => `<div><small>${label}</small><b>${numberText(kg)}kg</b><small>${typeof kg === "number" && Number.isFinite(kg) ? `${numberText(kg / 60)}俵（60kg）` : "数量未確認"}</small></div>`).join("")}</div>
       ${stock.remainingKg < 0 ? '<p class="milling-warning">差引がマイナスです。収量・出荷の記録を確認してください。</p>' : ""}
       <p class="muted">白米出荷 ${numberText(stock.whiteShipmentCount)}件は重量換算せず除外。数量不明 ${numberText(stock.unquantifiedCount)}件・品種未分類 ${numberText(stock.unclassifiedCount)}件は集計対象外。</p>`;
   }
@@ -240,7 +240,7 @@
     return `<section id="millingLedgerStock"><h4>年度・品種別の参考在庫</h4><p class="muted">全圃場・全相手先・全出荷区分。白米は重量換算せず除外。</p>${[...groups.values()].map(row => {
       const stock = state.riceStockFor(Number(row.season),row.varietyId);
       if (!stock) return "";
-      return `<div class="record"><b>${U.escapeHTML(row.season)}年産 / ${U.escapeHTML(state.variety(row.varietyId)?.name || row.varietyId)}</b><p>登録収量 ${numberText(stock.receivedKg)}kg / 出荷・配布 ${numberText(stock.dispatchedKg)}kg / 差引参考在庫 ${numberText(stock.remainingKg)}kg</p><p class="muted">白米除外 ${numberText(stock.whiteShipmentCount)}件 / 数量不明 ${numberText(stock.unquantifiedCount)}件 / 品種未分類 ${numberText(stock.unclassifiedCount)}件</p>${stock.remainingKg < 0 ? '<p class="milling-warning">差引がマイナスです。記録を確認してください。</p>' : ""}</div>`;
+      return `<div class="record"><b>${U.escapeHTML(row.season)}年産 / ${U.escapeHTML(state.variety(row.varietyId)?.name || row.varietyId)}</b><p>登録収量 ${numberText(stock.receivedKg)}kg / 出荷・配布・自家用 ${numberText(stock.dispatchedKg)}kg / 差引参考在庫 ${numberText(stock.remainingKg)}kg</p><p class="muted">白米除外 ${numberText(stock.whiteShipmentCount)}件 / 数量不明 ${numberText(stock.unquantifiedCount)}件 / 品種未分類 ${numberText(stock.unclassifiedCount)}件</p>${stock.remainingKg < 0 ? '<p class="milling-warning">差引がマイナスです。記録を確認してください。</p>' : ""}</div>`;
     }).join("") || '<p class="empty">この年度の収量は未登録です。</p>'}</section>`;
   }
 
