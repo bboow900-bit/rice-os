@@ -1,0 +1,61 @@
+/* The yearly story is factual; styling never infers a crop stage or water action. */
+#screen-annual .annual-story { padding: 16px 0 24px; border: 0; border-radius: 0; background: #fff; box-shadow: none; }
+#screen-annual .annual-story .annual-year-flow-head { align-items: center; gap: 12px; margin: 0; }
+#screen-annual .annual-story .annual-year-flow-head h3 { font-size: 23px; font-weight: 700; margin: 2px 0 8px; color: var(--reading-ink,#203c30); }
+#screen-annual .annual-story .annual-year-flow-head :is(span,small) { font-size: 12px; font-weight: 400; color: #586a5f; }
+#screen-annual .annual-story .annual-flow-field-context { margin: 0 0 8px; font-size: 14px; font-weight: 500; color: #324f3d; line-height: 1.6; }
+#screen-annual .annual-story .annual-year-flow-season { margin: 0; padding: 9px 0 12px; border: 0; border-bottom: 1px solid #dbe3dc; border-radius: 0; background: transparent; font-size: 13px; line-height: 1.6; font-weight: 500; }
+#screen-annual .annual-story .annual-record-focus { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 0; border: 1px solid #c2d2c6; border-radius: 6px; overflow: hidden; margin: 14px 0 18px; }
+#screen-annual .annual-story .annual-record-focus button { min-width: 0; min-height: 44px; padding: 9px 3px; border: 0; border-right: 1px solid #d6e0d8; border-radius: 0; background: #fff; color: #314d3b; font-size: 13px; line-height: 1.5; font-weight: 500; }
+#screen-annual .annual-story .annual-record-focus button:last-child { border-right: 0; }
+#screen-annual .annual-story .annual-record-focus button.active { background: var(--season-accent,#286848); color: #fff; }
+#screen-annual .annual-story .annual-year-flow-single { margin: 0; padding: 0; gap: 0; }
+#screen-annual .annual-story .annual-year-flow-single-row { grid-template-columns: 38px 12px minmax(0,1fr); column-gap: 5px; padding-bottom: 12px; align-items: stretch; }
+#screen-annual .annual-story .annual-year-flow-single-row > time { background: transparent; padding: 12px 0 0; font-size: 13px; font-weight: 600; line-height: 1.45; }
+#screen-annual .annual-story .annual-year-flow-single-row > time small { font-size: 10px; font-weight: 400; margin-top: 0; color: #5c6a60; }
+#screen-annual .annual-story .annual-year-flow-single-row > time span { display: block; overflow-wrap: anywhere; }
+#screen-annual .annual-story .annual-year-flow-single-row .annual-year-flow-rail::before { width: 1px; left: 5px; top: 14px; bottom: -26px; background: #d7e0da; }
+#screen-annual .annual-story .annual-year-flow-single-row:last-child .annual-year-flow-rail::before { height: 14px; bottom: auto; }
+#screen-annual .annual-story .annual-year-flow-single-row .annual-year-flow-rail i { width: 8px; height: 8px; left: 1px; top: 16px; border: 0; box-shadow: none; background: #7daa43; }
+#screen-annual .annual-story .annual-year-flow-single-row.water .annual-year-flow-rail i { background: #4ca8d3; }
+#screen-annual .annual-story .annual-year-flow-single-row.harvest .annual-year-flow-rail i { background: #cfaa30; }
+#screen-annual .annual-story .annual-year-flow-single-row.other .annual-year-flow-rail i { background: #88948b; }
+#screen-annual .annual-story .annual-year-flow-single-row.growth:has(.milestone) .annual-year-flow-rail i { top: 16px; left: 1px; width: 8px; height: 8px; box-shadow: none; background: #7daa43; }
+#screen-annual .annual-story .annual-year-flow-single-row .annual-year-flow-entry { display: block; min-width: 0; min-height: 0; margin: 0; border: 1px solid #d4ded3; border-left: 3px solid #81ac48; border-radius: 6px; box-shadow: none; background: #fff; overflow: hidden; }
+#screen-annual .annual-story .annual-year-flow-single-row.water .annual-year-flow-entry { border-color: #bedce9; border-left-color: #4ca8d3; background: #f1f9fe; }
+#screen-annual .annual-story .annual-year-flow-single-row.growth .annual-year-flow-entry { border-color: #d0dfc4; border-left-color: #80a947; background: #f7fbf2; }
+#screen-annual .annual-story .annual-year-flow-single-row.growth .annual-year-flow-entry.milestone { min-height: 0; border-left-width: 3px; background: #f5faf0; box-shadow: none; }
+#screen-annual .annual-story .annual-year-flow-single-row.harvest .annual-year-flow-entry { border-color: #e3d8b3; border-left-color: #d0ac36; background: #fffbed; }
+#screen-annual .annual-story .annual-year-flow-single-row.other .annual-year-flow-entry { border-color: #d8dfda; border-left-color: #89978c; background: #fff; }
+#screen-annual .annual-story .annual-year-flow-main { display: grid; grid-template-columns: minmax(0,1fr) 44px; align-items: stretch; }
+#screen-annual .annual-story .annual-year-flow-single-row .annual-year-flow-open { position: relative; display: grid; grid-template-columns: minmax(0,1fr); align-content: center; gap: 5px; width: 100%; min-width: 0; min-height: 64px; padding: 11px 18px 11px 9px; border: 0; border-radius: 0; background: transparent; box-shadow: none; color: #233e2e; }
+#screen-annual .annual-story .annual-year-flow-open:has(.annual-flow-milestone-art) { grid-template-columns: minmax(0,1fr) 40px; gap: 5px 6px; min-height: 80px; }
+#screen-annual .annual-story .annual-year-flow-title { grid-column: 1; display: flex; align-items: baseline; flex-wrap: wrap; gap: 3px 6px; min-width: 0; }
+#screen-annual .annual-story .annual-year-flow-title em { padding: 0; border: 0; border-radius: 0; background: transparent; color: #4b7338; font-size: 11px; font-style: normal; font-weight: 600; line-height: 1.5; }
+#screen-annual .annual-story .annual-year-flow-single-row.growth .annual-year-flow-entry.milestone .annual-year-flow-title em { color: #4b7338; background: transparent; }
+#screen-annual .annual-story .annual-year-flow-single-row.water .annual-year-flow-title em { background: transparent; color: #287e9c; }
+#screen-annual .annual-story .annual-year-flow-single-row.harvest .annual-year-flow-title em { background: transparent; color: #886515; }
+#screen-annual .annual-story .annual-year-flow-title b { flex: 1 1 70px; min-width: 0; font-size: 17px; font-weight: 700; line-height: 1.45; color: #203c30; }
+#screen-annual .annual-story .milestone .annual-year-flow-title b { font-size: 18px; }
+#screen-annual .annual-story .annual-year-flow-entry .annual-year-flow-title strong { display: block; position: absolute; right: 4px; top: 12px; color: #42604c; font-size: 22px; font-weight: 400; }
+#screen-annual .annual-story .annual-year-flow-detail { display: block; grid-column: 1; margin: 0; font-size: 13px; line-height: 1.6; font-weight: 400; color: #41584a; overflow-wrap: anywhere; }
+#screen-annual .annual-story .annual-year-flow-days { display: block; grid-column: 1; justify-self: start; padding: 0; margin: 0; border-radius: 0; background: transparent; color: #297c9c; font-size: 14px; line-height: 1.5; font-weight: 700; }
+#screen-annual .annual-story .annual-flow-milestone-art { grid-column: 2; grid-row: 1 / 3; align-self: center; width: 40px; height: 64px; object-fit: contain; pointer-events: none; }
+#screen-annual .annual-story .annual-year-flow-single-row .annual-year-flow-menu { width: 44px; min-width: 44px; min-height: 44px; height: auto; margin: 0; padding: 0; border: 0; border-radius: 0; background: transparent; color: #36523e; font-size: 24px; align-self: stretch; box-shadow: none; }
+#screen-annual .annual-story .annual-year-flow-summary-toggle { display: block; width: auto; max-width: calc(100% - 18px); min-height: 44px; margin: 0 9px 5px; padding: 7px 0; border: 0; border-radius: 0; background: transparent; color: #3e6d45; font-size: 12px; line-height: 1.5; text-align: left; font-weight: 500; }
+#screen-annual .annual-story .annual-year-flow-summary-toggle { box-shadow: none; }
+#screen-annual .annual-story .annual-year-flow-summary { display: block; margin: 0 9px 12px; padding: 10px 0 0; border-top: 1px solid #d5dfcf; background: transparent; }
+#screen-annual .annual-story .annual-year-flow-summary-metrics { display: grid; grid-template-columns: minmax(0,1fr); gap: 5px; }
+#screen-annual .annual-story .annual-year-flow-summary-metrics span { padding: 0; border-radius: 0; background: transparent; font-size: 13px; font-weight: 400; line-height: 1.6; }
+#screen-annual .annual-story .annual-year-flow-summary p { display: block; overflow: visible; -webkit-line-clamp: unset; margin: 8px 0 0; color: #344c3a; font-size: 14px; line-height: 1.7; font-weight: 400; white-space: pre-wrap; }
+#screen-annual .annual-story :is(button:focus-visible,summary:focus-visible) { outline: 3px solid #76a686; outline-offset: -3px; }
+#screen-annual .annual-flow-compare-link { padding: 12px 0; border: 0; border-top: 1px solid #dbe4dd; border-radius: 0; box-shadow: none; background: transparent; }
+#screen-annual .annual-flow-compare-link h3 { font-size: 17px; }
+#screen-annual .annual-flow-compare-link p { font-size: 13px; }
+@media (max-width: 380px) {
+  #screen-annual .annual-story .annual-year-flow-single-row { grid-template-columns: 34px 10px minmax(0,1fr); gap: 4px; }
+  #screen-annual .annual-story .annual-year-flow-single-row .annual-year-flow-rail::before { left: 4px; }
+  #screen-annual .annual-story .annual-year-flow-single-row .annual-year-flow-rail i { left: 0; }
+  #screen-annual .annual-story .annual-year-flow-open:has(.annual-flow-milestone-art) { grid-template-columns: minmax(0,1fr) 32px; }
+  #screen-annual .annual-story .annual-flow-milestone-art { width: 32px; height: 58px; }
+}

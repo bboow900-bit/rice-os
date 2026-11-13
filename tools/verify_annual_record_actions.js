@@ -97,7 +97,7 @@ assert(
   "Annual field switcher must stay reachable while reviewing a long record"
 );
 assert(
-  /data-annual-flow-summary=[\s\S]*要約を表示/.test(annual) && /const flowSummary = event\.target\.closest\("\[data-annual-flow-summary\]"\)/.test(annual),
+  /data-annual-flow-summary=[\s\S]*補足を見る/.test(annual) && /const flowSummary = event\.target\.closest\("\[data-annual-flow-summary\]"\)/.test(annual),
   "Annual flow must offer an explicit inline-summary control separate from the normal card tap"
 );
 assert(

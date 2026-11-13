@@ -93,6 +93,11 @@
 #screen-home .home-decision-section-head select { font-size: 13px; min-width: 0; }
 
 /* Harvest is an overview, not a second copy of any editable source record. */
+#screen-shipments .shipment-annual-sales { margin: 14px 0 22px; padding: 16px 0; border-block: 1px solid var(--reading-rule); }
+#screen-shipments .shipment-annual-sales h4 { margin: 0 0 8px; font-size: 16px; font-weight: 500; }
+#screen-shipments .shipment-annual-sales > strong { display: block; max-width: 100%; font-size: 34px; line-height: 1.3; font-weight: 700; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; color: var(--reading-ink); }
+#screen-shipments .shipment-annual-sales p { margin: 8px 0 0; font-size: 13px; line-height: 1.6; color: var(--reading-muted); }
+#screen-shipments .shipment-annual-sales .shipment-sales-missing { color: #875b16; }
 #screen-harvest-ledger { padding-bottom: calc(110px + env(safe-area-inset-bottom)); }
 #harvestLedgerContent { padding: 6px 0; background: #fff; }
 #screen-harvest-ledger .harvest-ledger { padding: 0 14px 24px; }

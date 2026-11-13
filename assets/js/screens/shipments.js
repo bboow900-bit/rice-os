@@ -176,6 +176,20 @@
     }).join("") || '<p class="empty">籾摺り後の収量はまだ登録されていません。</p>'}</section>`;
   }
 
+  function renderAnnualSales() {
+    const salesRows = rows().filter(row => (filters.season === "all" || String(row.season) === filters.season)
+      && ["shipment", "sale"].includes(row.kind));
+    const sales = salesTotal(salesRows);
+    const missing = sales.missing + sales.legacy;
+    const amount = sales.priced || !salesRows.length ? yen(sales.amount) : "未計算";
+    return `<section class="shipment-annual-sales" aria-label="年産の販売額合計" data-shipment-annual-sales>
+      <h4>${filters.season === "all" ? "全収穫年" : `${U.escapeHTML(filters.season)}年産`}の販売額合計</h4>
+      <strong data-shipment-annual-sales-amount>${amount}</strong>
+      <p>全相手先・全品種の出荷・販売${salesRows.length ? ` ${salesRows.length}件` : "・記録なし"}</p>
+      ${missing ? `<p class="shipment-sales-missing">金額未計算 ${missing}件（単価または袋内訳が未登録）${sales.priced ? "・計算できる記録分の合計です" : ""}</p>` : ""}
+    </section>`;
+  }
+
   function renderLedger() {
     const visible = filteredRows();
     const seasons = Array.from(new Set([U.today().slice(0, 4), filters.season === "all" ? "" : filters.season, ...rows().map((row) => String(row.season)), ...(state.millingRecordsFor ? state.millingRecordsFor().map(row => String(row.season)) : [])]))
@@ -187,6 +201,7 @@
         <label>相手先<input id="shipmentFilterRecipient" data-shipment-filter="recipient" type="search" list="shipmentFilterRecipients" value="${U.attr(filters.recipient)}" placeholder="相手先で検索"></label>
         <label>区分<select id="shipmentFilterKind" data-shipment-filter="kind">${option("all", "すべて", filters.kind)}${Object.entries(KINDS).map(([key, label]) => option(key, label, filters.kind)).join("")}</select></label>
       </div>${suggestions("shipmentFilterRecipients")}
+      ${renderAnnualSales()}
       ${renderPriceSettings()}
       ${renderRiceStock()}
       ${renderYearTotals(visible)}
