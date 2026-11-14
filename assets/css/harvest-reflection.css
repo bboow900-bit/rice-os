@@ -1,0 +1,14 @@
+.harvest-reflection { min-width: 0; }
+.harvest-final-judgment { border-left: 4px solid #b28b31; }
+.harvest-eyebrow { color: #52634e; font-size: 13px; }
+#screen-annual .harvest-final-judgment h3 { font-size: 24px; margin: 8px 0 12px; }
+.harvest-note { white-space: pre-wrap; overflow-wrap: anywhere; }
+.harvest-result-metrics { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin: 16px 0; }
+.harvest-result-metrics > div { min-width: 0; }
+.harvest-result-metrics dt { font-size: 13px; color: #52634e; }
+.harvest-result-metrics dd { margin: 8px 0; font-size: 26px; font-weight: 750; overflow-wrap: anywhere; }
+.harvest-result-metrics small { font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
+.harvest-reference { display: grid; gap: 6px; padding: 14px 0; border-top: 1px solid #dde4dc; overflow-wrap: anywhere; }
+.harvest-reference strong { color: #52634e; font-size: 18px; }
+.harvest-reference small { color: #52634e; }
+.harvest-handoff-facts { padding-left: 20px; line-height: 1.8; overflow-wrap: anywhere; }

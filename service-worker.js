@@ -1,9 +1,11 @@
-const CACHE_NAME = "rice-karte-20261114-318";
-const APP_VERSION = "20261114_ver318";
+const CACHE_NAME = "rice-karte-20261114-319";
+const APP_VERSION = "20261114_ver319";
 const CACHE_PREFIX = "rice-karte-";
 const RETAINED_APP_CACHES = 2;
 
 const APP_SHELL = [
+  `./assets/css/harvest-reflection.css?v=${APP_VERSION}`,
+  `./assets/js/core/harvest-review.js?v=${APP_VERSION}`,
   "./",
   `./index.html?v=${APP_VERSION}`,
   `./mobile.html?v=${APP_VERSION}`,

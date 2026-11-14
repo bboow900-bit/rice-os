@@ -2223,15 +2223,12 @@
   function renderReviewOverview(field) {
     const year = reviewYearValue();
     const previousYear = String(Number(year) - 1);
-    const snapshot = fieldYearSnapshot(field, year);
     return `
       ${renderYearFlow(field)}
       <button type="button" class="annual-shipment-entry annual-harvest-entry" data-annual-results><img src="assets/images/light-icons/rice-sack.png" alt=""><span><b>収穫・出荷</b><small>${U.escapeHTML(year)}年産 / ${U.escapeHTML(varietyName(field))}</small></span><span aria-hidden="true">›</span></button>
       <section class="annual-compare-launch annual-flow-compare-link"><div><span>振り返り</span><h3>今年と前年を比べる</h3><p>${U.escapeHTML(year)}年と${U.escapeHTML(previousYear)}年の節目・作業・水管理を、見やすく読み比べます。</p></div><button type="button" class="primary" data-annual-open-compare>比較を開く</button></section>
       ${renderUsedMaterials(field)}
       ${RiceOS.herbicideUI ? RiceOS.herbicideUI.renderReview(field, yearValue()) : ""}
-      ${renderEndSeasonReflection(field, snapshot)}
-      ${renderHarvestTotals(field, year)}
       ${renderSeasonNotes(field)}
       ${renderCarryoverNotes(field)}
     `;
@@ -2382,7 +2379,6 @@
         <div class="annual-compare-table"><div class="annual-compare-row annual-compare-label"><b>比較項目</b><b>${U.escapeHTML(currentYear)}年</b><b>${U.escapeHTML(previousYear)}年</b></div>${keyRows.map((row) => `<div class="annual-compare-row"><span>${U.escapeHTML(row[0])}</span><b class="${row[1] === "未記録" ? "missing" : ""}">${U.escapeHTML(row[1])}</b><b class="${row[2] === "未記録" ? "missing" : ""}">${U.escapeHTML(row[2])}</b></div>`).join("")}</div>
         <details class="annual-compare-details"><summary>すべての比較項目を見る (${detailRows.length})</summary><div class="annual-compare-table">${detailRows.map((row) => `<div class="annual-compare-row"><span>${U.escapeHTML(row[0])}</span><b class="${row[1] === "未記録" ? "missing" : ""}">${U.escapeHTML(row[1])}</b><b class="${row[2] === "未記録" ? "missing" : ""}">${U.escapeHTML(row[2])}</b></div>`).join("")}</div></details>
         ${renderYearFlow(field)}
-        ${renderEndSeasonReflection(field, current)}
         ${missing.length ? `<div class="annual-compare-check"><b>翌年比較のため、今年はここを残す</b><span>${U.escapeHTML(missing.join(" / "))}</span></div>` : '<div class="annual-compare-check complete"><b>比較に必要な基本記録がそろっています</b><span>来年の判断材料として使えます</span></div>'}
         ${renderSeasonNotes(field)}
         ${renderCarryoverNotes(field)}
@@ -2596,11 +2592,10 @@
   }
 
   function renderHarvestSnapshot(row, fieldId) {
-    const snapshot = (row.harvestSnapshots || []).find((item) => String(item.fieldId || "") === String(fieldId));
+    const matches = (row.harvestSnapshots || []).filter((item) => String(item.fieldId || "") === String(fieldId) && item.harvestDate === row.date);
+    const snapshot = matches.length === 1 ? matches[0] : null;
     if (!snapshot) return "";
     const water = snapshot.water || {};
-    const outlook = snapshot.outlook || {};
-    const thermal = snapshot.thermal || {};
     const waterRows = [
       annualRecordInfoRow("最終の入水", water.lastWateringDate ? `${U.fd(water.lastWateringDate)} ${water.lastWateringLabel || ""}` : "記録なし"),
       annualRecordInfoRow("入水から収穫", water.daysFromLastWatering ? `${water.daysFromLastWatering}日` : "記録なし"),
@@ -2609,28 +2604,42 @@
       annualRecordInfoRow("出穂から落水開始", water.elapsedDaysFromHeadingToDrain !== undefined && water.elapsedDaysFromHeadingToDrain !== "" ? `${water.elapsedDaysFromHeadingToDrain}日経過` : "記録なし"),
       water.rewateringAfterDrain ? annualRecordInfoRow("期間中の入水", "落水開始後に入水記録あり。連続して乾いていた期間ではありません。") : ""
     ].filter(Boolean).join("");
-    const error = outlook.errorDays === "" || outlook.errorDays === undefined || outlook.errorDays === null
-      ? ""
-      : !Number.isFinite(Number(outlook.errorDays)) ? ""
-        : Number(outlook.errorDays) === 0 ? "保存した目安日と同日"
-        : Number(outlook.errorDays) > 0 ? `見通しより${outlook.errorDays}日遅い` : `見通しより${Math.abs(Number(outlook.errorDays))}日早い`;
-    const outlookRows = outlook.predictedHarvestDate ? [
-      annualRecordInfoRow("直前の収穫目安", `${U.fd(outlook.predictedHarvestDate)}${outlook.predictedAsOf ? `（${U.fd(outlook.predictedAsOf)}時点）` : ""}`),
-      annualRecordInfoRow("保存時の日程差（条件未確認）", error || "比較できません")
-    ].filter(Boolean).join("") : annualRecordInfoRow("見通しとの比較", outlook.status || "見通し記録なし");
-    const thermalRows = thermal.total !== "" && thermal.total !== undefined && thermal.total !== null ? [
-      annualRecordInfoRow("出穂後積算", `${Math.round(Number(thermal.total))}℃${thermal.target !== "" && thermal.target !== undefined && thermal.target !== null ? ` / 目安 ${Math.round(Number(thermal.target))}℃` : ""}`),
-      annualRecordInfoRow("目安との差", thermal.difference === "" || thermal.difference === undefined || thermal.difference === null ? "-" : `${Number(thermal.difference) >= 0 ? "+" : ""}${thermal.difference}℃`),
-      annualRecordInfoRow("計算期間", thermal.startDate && thermal.endDate ? `${U.fd(thermal.startDate)} - ${U.fd(thermal.endDate)} / ${thermal.count || "-"}日分` : "-"),
-      annualRecordInfoRow("田植えから収穫", thermal.daysFromPlanting ? `${thermal.daysFromPlanting}日` : "田植え日未記録"),
-      annualRecordInfoRow("気象データ", `${harvestThermalDisplayStatus(row, fieldId, thermal)}${thermal.source ? ` / ${thermal.source}` : ""}`)
-    ].filter(Boolean).join("") : annualRecordInfoRow("出穂後積算", harvestThermalDisplayStatus(row, fieldId, thermal));
     return `
       <section class="annual-record-detail-section annual-harvest-snapshot"><h3>収穫時の水管理実績</h3><div class="annual-record-detail-rows">${waterRows}</div></section>
       ${renderHarvestWeather(row, snapshot, fieldId)}
-      <section class="annual-record-detail-section annual-harvest-snapshot"><h3>見通しとの比較</h3><div class="annual-record-detail-rows">${outlookRows}</div></section>
-      <section class="annual-record-detail-section annual-harvest-snapshot"><h3>収穫時の積算温度</h3><div class="annual-record-detail-rows">${thermalRows}</div></section>
     `;
+  }
+
+  function renderHarvestReflection(row, field) {
+    const model = RiceOS.harvestReview.describe(row, field.fieldId);
+    const esc = U.escapeHTML;
+    const comparison = (label, value) => `<div class="harvest-reference"><b>${esc(label)}</b>${value.available
+      ? `<strong>${esc(value.labelText)}</strong><span>${esc(U.fd(value.range.start))} ～ ${esc(U.fd(value.range.end))}</span>`
+      : `<span>比較できません</span><small>${esc(value.reason)}</small>`}</div>`;
+    const thermal = model.metrics.thermal;
+    const headingDate = state.headingDateForField(field.fieldId, U.season(row.date), row.date);
+    const headingDays = timelineDays(headingDate, row.date);
+    const saved = (row.harvestSnapshots || []).filter(item => item.fieldId === field.fieldId && item.harvestDate === row.date);
+    const busy = thermalRetries.has(`${row.workId}:${field.fieldId}`);
+    const thermalAction = saved.length === 1 && !state.isHarvestThermalComplete(row.workId, field.fieldId)
+      ? `<button type="button" class="secondary" data-harvest-thermal-retry="${U.attr(row.workId)}" data-harvest-field="${U.attr(field.fieldId)}"${busy ? " disabled" : ""}>${busy ? "積算を取得中…" : "積算温度を再取得"}</button>${busy ? `<button type="button" class="secondary" data-harvest-thermal-cancel="${U.attr(row.workId)}" data-harvest-field="${U.attr(field.fieldId)}">取得を取消</button>` : ""}` : "";
+    const status = row.harvestStatusByField && row.harvestStatusByField[field.fieldId];
+    return `<div class="harvest-reflection">
+      <section class="annual-record-detail-section harvest-final-judgment"><span class="harvest-eyebrow">${esc(field.name)} / 現場での最終判断</span><h3>${esc(model.assessment.recorded ? model.assessment.label : "刈取時期の評価は未登録")}</h3>
+        ${model.timing.idealStartDate || model.timing.idealEndDate ? `<p>見立てた適期 ${esc([model.timing.idealStartDate, model.timing.idealEndDate].filter(Boolean).map(U.fd).join(" ～ "))}</p>` : ""}
+        ${model.timing.delayReasonLabel ? `<p>日程の事情：${esc(model.timing.delayReasonLabel)}</p>` : ""}
+        ${model.timing.memo ? `<p class="harvest-note">${esc(model.timing.memo)}</p>` : ""}
+        <button type="button" class="secondary" data-annual-harvest-edit="${U.attr(row.workId)}" data-harvest-edit-section="timing">収穫実績・評価を編集</button>
+        ${!status ? `<button type="button" class="secondary" data-annual-harvest-confirm="${U.attr(row.workId)}" data-harvest-field="${U.attr(field.fieldId)}">この圃場の刈り取り完了を確認</button>` : ""}
+      </section>
+      <section class="annual-record-detail-section"><h3>収穫時の数字</h3><p class="muted">${esc(model.metrics.scopeLabel)}</p><dl class="harvest-result-metrics">
+        <div><dt>収量</dt><dd>${model.metrics.kg === null ? "未登録" : `${esc(model.metrics.kg)}<small> kg</small>`}</dd><small>${esc(model.metrics.basis || "測定条件未登録")}</small></div>
+        <div><dt>出穂後積算温度</dt><dd>${thermal.available ? `${esc(Math.round(thermal.total))}<small> ℃</small>` : "未確認"}</dd><small>${esc(thermal.label)}${thermal.legacy && thermal.partial ? " / 一部欠測・取得済み分のみ" : ""}</small></div>
+      </dl><p class="muted">${headingDays !== "" ? `登録された出穂日から${esc(headingDays)}日後の刈り取り` : "出穂日は未確認"}</p>${thermal.source ? `<p class="muted">${esc(thermal.source)}${thermal.startDate && thermal.endDate ? ` / ${esc(U.fd(thermal.startDate))} ～ ${esc(U.fd(thermal.endDate))}` : ""}</p>` : ""}${thermalAction}</section>
+      <section class="annual-record-detail-section"><h3>データ上の参考比較</h3><p class="muted">現場での適期判断とは別の比較です。</p>${comparison("保存した見通しの日程", model.comparison.day)}${comparison("積算温度からの目安期間", model.comparison.thermal)}</section>
+      <section class="annual-record-detail-section"><h3>来年に引き継ぐ材料</h3>${model.summaryLines.length ? `<ul class="harvest-handoff-facts">${model.summaryLines.map(line => `<li>${esc(line)}</li>`).join("")}</ul>` : `<p class="muted">現場での評価や気づきを残すと、来年の判断材料になります。</p>`}<p class="muted">入力済みの記録の要約です。日程の差だけで遅れや収量の原因を判断しません。</p></section>
+      <details class="annual-harvest-details"><summary>判断の根拠・水管理・天気の詳細</summary>${renderHarvestTiming(row, field.fieldId)}${renderHarvestReview(row)}${renderHarvestSnapshot(row, field.fieldId)}</details>
+    </div>`;
   }
 
   function renderAnnualRecordDetail(field, detail) {
@@ -2718,7 +2727,7 @@
     const recordYear = matchedRecord && matchedRecord.season || row.season || row.cropYear;
     const recordYearLabel = recordYear ? `${recordYear}年産の記録` : "年度未設定";
     const photos = annualRecordPhotos(row);
-    const harvestSnapshot = category === "収穫" && field ? renderHarvestTiming(row, field.fieldId) + renderHarvestReview(row) + renderHarvestSnapshot(row, field.fieldId) : "";
+    const harvestSnapshot = category === "収穫" && field ? renderHarvestReflection(row, field) : "";
     return `
       <section class="annual-record-detail" aria-label="${U.attr(title)}の実績詳細">
         <button type="button" class="annual-record-detail-back" data-annual-record-detail-back aria-label="一年の流れへ戻る">‹</button>
@@ -3115,7 +3124,7 @@
     ledger.setScope({ season: reviewYearValue(), varietyId: field?.varietyId || "", fieldIds: field ? [field.fieldId] : [], date: U.today() });
   }
 
-  function openHarvestWork(workId) {
+  function openHarvestWork(workId, section) {
     const fieldId = selectedFieldId;
     const work = state.data().fieldWorks.find((row) => row.workId === workId && (row.fieldIds || []).includes(fieldId));
     if (!work) return;
@@ -3127,7 +3136,10 @@
     RiceOS.app.openInput("field-work", "annual");
     RiceOS.screens.fieldWork.editWork(workId);
     U.$("fwHarvestReview").open = true;
-    U.$("fwHarvestYieldKg").focus();
+    if (section === "timing") {
+      U.$("fwHarvestTiming").open = true;
+      U.$("fwHarvestTiming").scrollIntoView({ block: "start" });
+    } else U.$("fwHarvestYieldKg").focus();
   }
 
   async function retryThermal(workId, fieldId) {
@@ -3585,7 +3597,7 @@
         return;
       }
       const harvestEdit = event.target.closest("[data-annual-harvest-edit]");
-      if (harvestEdit) { openHarvestWork(harvestEdit.dataset.annualHarvestEdit); return; }
+      if (harvestEdit) { openHarvestWork(harvestEdit.dataset.annualHarvestEdit, harvestEdit.dataset.harvestEditSection); return; }
       const thermalRetry = event.target.closest("[data-harvest-thermal-retry]");
       if (thermalRetry) { void retryThermal(thermalRetry.dataset.harvestThermalRetry, thermalRetry.dataset.harvestField); return; }
       const thermalCancel = event.target.closest("[data-harvest-thermal-cancel]");

@@ -49,6 +49,7 @@ memory.set(S.STORE_KEY, JSON.stringify(S.normalize({
 })));
 load("assets/js/core/storage.js");
 load("assets/js/core/state.js");
+load("assets/js/core/harvest-review.js");
 const state = context.RiceOS.state;
 const harvest = "\u7a32\u5208\u308a";
 const other = "\u8349\u5208\u308a";
@@ -152,7 +153,7 @@ test("planned drain boundaries: end-only plan excluded, explicit actual start re
     startDate: "2026-08-26", plannedStartDate: "2026-08-25", endDate: "2026-08-30" });
   assert.equal(waterWork("actual-plan-harvest", "c", "2026-09-10").finalDrainDate, "2026-08-26");
 });
-load("assets/js/screens/annual.js", "renderHarvestReview, renderHarvestSnapshot, renderAnnualRecordDetail");
+load("assets/js/screens/annual.js", "renderHarvestReview, renderHarvestSnapshot, renderAnnualRecordDetail, renderHarvestReflection");
 const annual = context.audit;
 for (const [hours, totalHours, expected] of [
   ["3\u6642\u9593", "", "3\u6642\u9593"], ["1\u6642\u959330\u5206", "", "1.5\u6642\u9593"],
@@ -256,6 +257,181 @@ test("literal Other off-field name remains editable", () => {
   assert.equal(element("fwCustomName").value, name);
   screen.prefillSchedule({ scheduleId: "literal-other-plan", targetScope: "offField", fieldIds: [], title: `${name}\u4e88\u5b9a` });
   assert.equal(element("fwCustomName").value, name);
+});
+const describe = context.RiceOS.harvestReview.describe;
+const U = context.RiceOS.utils;
+U.today = () => "2026-11-14";
+U.now = () => "2026-11-14T00:00:00Z";
+const reflectionWork = () => ({ ...base, cropYear: 2025, memo: "Original\n<script>not HTML</script>",
+  harvestTimingByField: { a: { assessment: "early", idealStartDate: "2026-09-11", idealEndDate: "2026-09-13", delayReason: "rain", memo: "operator reason" }, b: { assessment: "late" } },
+  harvestReview: { ...review } });
+function pureDescribe(work, fieldId) {
+  const before = JSON.stringify([work, state.data(), [...memory]]);
+  const setItem = context.localStorage.setItem, removeItem = context.localStorage.removeItem;
+  const fail = () => { throw Error("Read-only description attempted I/O"); };
+  context.localStorage.setItem = fail; context.localStorage.removeItem = fail; context.fetch = fail;
+  let result;
+  try { result = describe(work, fieldId); }
+  finally { context.localStorage.setItem = setItem; context.localStorage.removeItem = removeItem; }
+  assert.equal(JSON.stringify([work, state.data(), [...memory]]), before, "Description must not mutate work, state, or storage");
+  return result;
+}
+test("reflection DTO keeps per-field assessment, work crop year, exact memo and group scope", () => {
+  const work = reflectionWork(), dto = pureDescribe(work, "a");
+  assert.equal(dto.assessment.code, "early"); assert.equal(dto.assessment.recorded, true);
+  assert.equal(dto.assessment.evaluatedAt, ""); assert.equal(dto.year, "2025");
+  assert.equal(dto.sourceMemo, work.memo); assert.equal(dto.timing.memo, "operator reason");
+  assert.equal(dto.observations.shared, true); assert.match(dto.observations.scopeLabel, /共通/);
+  assert.equal(dto.metrics.kg, 1000.25); assert.equal(dto.metrics.areaA, 30);
+  assert.equal(dto.metrics.kgPer10a, 1000.25 / 30 * 10); assert.equal(dto.metrics.scope, "work");
+  assert.equal(pureDescribe(work, "b").metrics.kg, dto.metrics.kg, "Never allocate group totals");
+  assert.equal(pureDescribe(work, "b").assessment.code, "late");
+  assert(dto.summaryLines.includes(`元の作業メモ: ${work.memo}`));
+  dto.observations.surface = "changed"; dto.summaryLines.push("changed");
+  assert.equal(work.harvestReview.surface, review.surface);
+});
+test("unassociated, off-field, and non-harvest work never leaks field observations", () => {
+  for (const [work, id] of [[reflectionWork(), "c"], [{ ...reflectionWork(), targetScope: "offField" }, "a"], [{ ...reflectionWork(), workName: other }, "a"]]) {
+    const dto = pureDescribe(work, id); assert.equal(dto.associated, false); assert.equal(dto.assessment.recorded, false);
+    assert.equal(dto.observations.surface, ""); assert.equal(dto.metrics.kg, null); assert.equal(dto.sourceMemo, "");
+    assert.equal(dto.comparison.day.available, false); assert.deepEqual(plain(dto.summaryLines), []);
+  }
+});
+test("missing, zero, malformed, infinite, and overflow metrics are distinct", () => {
+  const work = reflectionWork();
+  work.harvestReview = {}; assert.equal(pureDescribe(work, "a").metrics.kg, null);
+  for (const value of ["", " ", null, true, {}, "no", -1, Infinity, "Infinity"]) {
+    work.harvestReview = { yieldKg: value, harvestAreaA: "10", yieldBasis: review.yieldBasis };
+    assert.equal(pureDescribe(work, "a").metrics.kg, null);
+  }
+  work.harvestReview = { yieldKg: "0", harvestAreaA: "10", yieldBasis: review.yieldBasis };
+  assert.equal(pureDescribe(work, "a").metrics.kgPer10a, 0);
+  work.harvestReview.harvestAreaA = "0"; assert.equal(pureDescribe(work, "a").metrics.kgPer10a, null);
+  work.harvestReview = { yieldKg: "100", harvestAreaA: "10", yieldBasis: "" };
+  assert.equal(pureDescribe(work, "a").metrics.kgPer10a, null);
+  work.harvestReview = { yieldKg: "1" + "0".repeat(307), harvestAreaA: ".1", yieldBasis: review.yieldBasis };
+  assert.equal(pureDescribe(work, "a").metrics.kgPer10a, null);
+  assert.equal(pureDescribe({}, "a").harvestDate, ""); assert.equal(pureDescribe({}, "a").year, "");
+});
+test("all recorded assessments including pending stay human-only; no invented summary", () => {
+  for (const code of ["early", "appropriate", "late", "pending", "invalid", "toString"]) {
+    const work = { ...base, harvestTimingByField: { a: { assessment: code } } };
+    const dto = pureDescribe(work, "a");
+    assert.equal(dto.assessment.recorded, ["early", "appropriate", "late", "pending"].includes(code));
+    assert.equal(dto.summaryLines.length, dto.assessment.recorded ? 1 : 0);
+    assert.equal(dto.timing.idealStartDate, "", "Never invent ideal dates from the assessment");
+  }
+});
+test("saved thermal requires unique field/date and distinguishes partial and legacy", () => {
+  const work = reflectionWork();
+  const snapshot = { fieldId: "a", harvestDate: base.date, thermal: { coverageVersion: 1, status: "確定", headingDate: "2026-09-07", startDate: "2026-09-08", endDate: base.date,
+    total: 0, count: "3", expectedDays: "3", source: "Open-Meteo Archive" } };
+  work.harvestSnapshots = [snapshot];
+  let thermal = pureDescribe(work, "a").metrics.thermal;
+  assert.equal(thermal.status, "complete"); assert.equal(thermal.total, 0); assert.equal(thermal.savedAt, "");
+  snapshot.thermal.count = "2"; thermal = pureDescribe(work, "a").metrics.thermal;
+  assert.equal(thermal.status, "partial"); assert.equal(thermal.partial, true);
+  delete snapshot.thermal.coverageVersion; assert.equal(pureDescribe(work, "a").metrics.thermal.status, "legacy");
+  snapshot.thermal.source = "Open-Meteo Forecast"; assert.equal(pureDescribe(work, "a").metrics.thermal.available, false);
+  snapshot.thermal.source = "Open-Meteo Archive"; snapshot.thermal.total = true;
+  assert.equal(pureDescribe(work, "a").metrics.thermal.total, null);
+  snapshot.thermal.total = 12; work.harvestSnapshots.push({ ...snapshot });
+  assert.equal(pureDescribe(work, "a").metrics.thermal.status, "ambiguous");
+  work.harvestSnapshots = [{ ...snapshot, fieldId: "b" }, { ...snapshot, harvestDate: "2026-09-09" }];
+  assert.equal(pureDescribe(work, "a").metrics.thermal.available, false);
+});
+test("legacy numeric thermal stays visible without modern metadata and cannot enable comparison", () => {
+  const work = reflectionWork();
+  const snapshot = { fieldId: "a", harvestDate: work.date, thermal: { total: "820.5" } };
+  work.harvestSnapshots = [snapshot];
+  let dto = pureDescribe(work, "a");
+  assert.equal(dto.metrics.thermal.available, true); assert.equal(dto.metrics.thermal.total, 820.5);
+  assert.equal(dto.metrics.thermal.status, "legacy"); assert.equal(dto.metrics.thermal.legacy, true);
+  assert.match(dto.metrics.thermal.label, /未検証/); assert.match(dto.metrics.thermal.label, /比較根拠には使用しません/);
+  assert.equal(dto.metrics.thermal.count, null); assert.equal(dto.metrics.thermal.expectedDays, null);
+  assert.equal(dto.metrics.thermal.savedAt, ""); assert.equal(dto.comparison.thermal.available, false);
+  snapshot.thermal.total = 0; assert.equal(pureDescribe(work, "a").metrics.thermal.total, 0);
+  for (const total of ["", " ", null, true, {}, Infinity, "bad"]) {
+    snapshot.thermal.total = total; assert.equal(pureDescribe(work, "a").metrics.thermal.available, false);
+  }
+  snapshot.thermal.total = 820.5;
+  for (const source of ["Open-Meteo Forecast", "seasonal", "予報"]) {
+    snapshot.thermal.source = source; assert.equal(pureDescribe(work, "a").metrics.thermal.available, false);
+  }
+  snapshot.thermal.source = ""; snapshot.thermal.status = "forecast";
+  assert.equal(pureDescribe(work, "a").metrics.thermal.available, false);
+  snapshot.thermal.status = "一部欠測";
+  assert.equal(pureDescribe(work, "a").metrics.thermal.partial, true);
+  snapshot.thermal.coverageVersion = 1;
+  assert.equal(pureDescribe(work, "a").metrics.thermal.available, false, "Modern data must still pass coverage validation");
+});
+test("comparison reuses real saved-preharvest validator, matches work ID, separates operator from offsets", () => {
+  const forecast = { snapshotId: "valid-before", fieldId: "a", season: "2026", asOf: "2026-09-01", savedAt: "2026-09-01T01:00:00Z",
+    headingKind: "actual", actualHeadingDate: "2026-08-01", harvestKind: "heading", harvestRange: { start: "2026-09-03", end: "2026-09-07" } };
+  const work = reflectionWork();
+  assert(state.replace(S.normalize({ fields: [{ fieldId: "a" }, { fieldId: "b" }], growthLogs: [{ fieldId: "a", date: "2026-08-01", headingObserved: true }],
+    fieldWorks: [work], meta: { activeCropYear: 2024, outlookSnapshots: [forecast] } })));
+  const saved = row();
+  let dto = pureDescribe(saved, "a");
+  assert.equal(dto.comparison.day.available, true); assert.equal(dto.comparison.day.offsetDays, 3);
+  assert.equal(dto.comparison.day.labelText, "目安期間の終了から3日後");
+  assert.equal(dto.assessment.code, "early"); assert.equal(dto.year, "2025");
+  assert.equal(dto.comparison.thermal.available, false); assert.match(dto.comparison.thermal.reason, /積算/);
+  assert(!dto.summaryLines.some(line => /3日後|刈り遅れ/.test(line)));
+  const snapshot = state.data().meta.outlookSnapshots[0];
+  snapshot.harvestRange = { start: "2026-09-13", end: "2026-09-15" };
+  assert.equal(pureDescribe(saved, "a").comparison.day.labelText, "目安期間の開始から3日前");
+  snapshot.harvestRange = { start: "2026-09-09", end: "2026-09-11" };
+  assert.equal(pureDescribe(saved, "a").comparison.day.relation, "inside");
+  snapshot.harvestRange = { start: "2026-02-30", end: "2026-09-11" };
+  assert.equal(pureDescribe(saved, "a").comparison.day.available, false);
+  snapshot.harvestRange = { start: "2026-09-03", end: "2026-09-07" };
+  for (const savedAt of ["2026-09-10T00:00:00Z", "2026-09-09T15:00:00Z", "2026-09-11T00:00:00Z", "invalid"]) {
+    snapshot.savedAt = savedAt; assert.equal(pureDescribe(saved, "a").comparison.day.available, false);
+  }
+  assert.equal(pureDescribe({ ...saved, workId: "different" }, "a").comparison.day.available, false);
+});
+test("thermal comparison uses validated ranges only, never raw snapshot errors or temperature division", () => {
+  const snapshot = state.data().meta.outlookSnapshots[0];
+  snapshot.savedAt = "2026-09-01T01:00:00Z";
+  snapshot.errorDays = 999;
+  state.data().meta.weatherLocation = { latitude: 37, longitude: 140 };
+  snapshot.basis = { thermalProjection: { status: "projected", asOf: "2026-09-01", headingDate: "2026-08-01", startDate: "2026-08-02", endDate: "2026-08-31",
+    retrievedAt: "2026-09-01T00:00:00Z", locationKey: "37|140", range: { start: "2026-09-11", end: "2026-09-16" },
+    forecastDays: 7, seasonalDays: 9, seasonalMinimumYears: 2, seasonalExpectedYears: 3,
+    historical: { complete: true, count: 30, expectedDays: 30, total: 600, source: "Open-Meteo Archive (reanalysis/model)" },
+    sources: { historical: ["Open-Meteo Archive"], forecast: ["Open-Meteo Forecast"], seasonal: ["Open-Meteo prior-year daily seasonal reference (reanalysis/model)"] } } };
+  let dto = pureDescribe(row(), "a");
+  assert.equal(dto.comparison.thermal.available, true); assert.equal(dto.comparison.thermal.offsetDays, -1);
+  assert.equal(dto.comparison.thermal.labelText, "目安期間の開始から1日前");
+  assert.equal(dto.comparison.day.offsetDays, 3); assert.equal(dto.assessment.code, "early");
+  snapshot.basis.thermalProjection.historical.count = 29;
+  dto = pureDescribe(row(), "a"); assert.equal(dto.comparison.thermal.available, false); assert.equal(dto.comparison.day.available, true);
+  snapshot.basis.thermalProjection.historical.count = 30;
+  state.data().meta.weatherLocation.latitude = 38;
+  assert.equal(pureDescribe(row(), "a").comparison.thermal.available, false);
+});
+test("integrated renderer escapes shared observations and preserves unverified legacy totals", () => {
+  const work = reflectionWork();
+  work.harvestReview.yieldKg = "0";
+  work.harvestSnapshots = [{ fieldId: "a", harvestDate: work.date, thermal: { total: "820.5" } }];
+  const before = JSON.stringify([work, state.data(), [...memory]]);
+  const html = annual.renderHarvestReflection(work, { fieldId: "a", name: "<script>field</script>" });
+  assert.match(html, /821<small> ℃/); assert.match(html, /旧保存値（未検証・比較根拠には使用しません）/);
+  assert.match(html, /対象圃場合計（圃場別には配分しません）/);
+  assert.match(html, /共通の観察/); assert.match(html, /0<small> kg/);
+  assert(!html.includes("<script>")); assert.match(html, /&lt;script&gt;/);
+  assert.match(html, /比較できません/); assert.match(html, /データ上の参考比較/);
+  assert.equal(JSON.stringify([work, state.data(), [...memory]]), before);
+});
+test("integrated renderer separates operator early assessment from validated after-range reference", () => {
+  const work = row(), before = JSON.stringify([state.data(), [...memory]]);
+  const html = annual.renderHarvestReflection(work, state.field("a"));
+  assert.match(html, /早かった/); assert.match(html, /目安期間の終了から3日後/);
+  assert.match(html, /現場での適期判断とは別の比較/); assert(!html.includes("刈り遅れ"));
+  assert.match(html, /比較できません/);
+  assert.equal(describe(work, "a").year, "2025");
+  assert.equal(JSON.stringify([state.data(), [...memory]]), before);
 });
 console.log(`Harvest review: ${passed} passed, ${failed} failed (UI source/VM checks; no browser verification).`);
 process.exitCode = failed ? 1 : 0;
