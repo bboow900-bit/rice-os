@@ -153,7 +153,7 @@ test("planned drain boundaries: end-only plan excluded, explicit actual start re
     startDate: "2026-08-26", plannedStartDate: "2026-08-25", endDate: "2026-08-30" });
   assert.equal(waterWork("actual-plan-harvest", "c", "2026-09-10").finalDrainDate, "2026-08-26");
 });
-load("assets/js/screens/annual.js", "renderHarvestReview, renderHarvestSnapshot, renderAnnualRecordDetail, renderHarvestReflection");
+load("assets/js/screens/annual.js", "renderHarvestReview, renderHarvestSnapshot, renderAnnualRecordDetail, renderHarvestReflection, renderHarvestRecap");
 const annual = context.audit;
 for (const [hours, totalHours, expected] of [
   ["3\u6642\u9593", "", "3\u6642\u9593"], ["1\u6642\u959330\u5206", "", "1.5\u6642\u9593"],
@@ -432,6 +432,80 @@ test("integrated renderer separates operator early assessment from validated aft
   assert.match(html, /比較できません/);
   assert.equal(describe(work, "a").year, "2025");
   assert.equal(JSON.stringify([state.data(), [...memory]]), before);
+});
+function recapFixture(works) {
+  assert(state.replace(S.normalize({ fields: ["a", "b", "c"].map(fieldId => ({ fieldId, name: fieldId })), fieldWorks: works })));
+}
+const recapWork = (workId, date, patch = {}) => ({ workId, date, cropYear: 2025, workName: harvest, fieldIds: ["a"], ...patch });
+function readonlyRecap(fieldId, year) {
+  const before = JSON.stringify([state.data(), [...memory]]);
+  const setItem = context.localStorage.setItem, removeItem = context.localStorage.removeItem;
+  const fail = () => { throw Error("Recap render attempted I/O"); };
+  context.localStorage.setItem = fail; context.localStorage.removeItem = fail; context.fetch = fail;
+  let html;
+  try { html = annual.renderHarvestRecap(state.field(fieldId), String(year)); }
+  finally { context.localStorage.setItem = setItem; context.localStorage.removeItem = removeItem; }
+  assert.equal(JSON.stringify([state.data(), [...memory]]), before, "Recap must not mutate records or storage");
+  return html;
+}
+test("overview recap selects latest actual work for field and crop year, keeps shared total and detail link", () => {
+  recapFixture([
+    recapWork("old", "2025-09-01", { harvestReview: { yieldKg: "999" } }),
+    recapWork("selected", "2026-01-02", { fieldIds: ["a", "b"], harvestReview: { yieldKg: "1200", harvestAreaA: "20", yieldBasis: review.yieldBasis },
+      harvestTimingByField: { a: { assessment: "early", memo: "<script>saved</script>" }, b: { assessment: "late" } },
+      harvestSnapshots: [{ fieldId: "a", harvestDate: "2026-01-02", thermal: { total: 800 } }] }),
+    recapWork("other-year", "2026-10-03", { cropYear: 2026 }),
+    recapWork("other-field", "2026-10-03", { fieldIds: ["c"] }),
+    recapWork("plan", "2026-10-03", { workName: "稲刈り予定" }),
+    recapWork("off-field", "2026-10-03", { targetScope: "offField" }),
+    recapWork("drain", "2026-10-03", { workName: "収穫前落水" })
+  ]);
+  const html = readonlyRecap("a", 2025);
+  assert.match(html, /data-annual-harvest-detail="selected"/);
+  assert.match(source("assets/js/screens/annual.js"), /openAnnualRecordDetail\("fieldWork", harvestDetail.dataset.annualHarvestDetail/);
+  assert.match(html, /2025年産/); assert.match(html, /1200 kg/); assert(!html.includes("600 kg"));
+  assert.match(html, /圃場別には配分しません/); assert.match(html, /早かった/);
+  assert.match(html, /旧保存値（未検証・比較根拠には使用しません）/);
+  assert.match(html, /比較できる事前記録なし/); assert.match(html, /現場の適期判断とは別/);
+  assert(!html.includes("<script>")); assert.match(html, /&lt;script&gt;/);
+  assert.equal(readonlyRecap("b", 2026), ""); assert.equal(readonlyRecap("a", 2024), "");
+  assert.match(readonlyRecap("b", 2025), /1200 kg/); assert.match(readonlyRecap("b", 2025), /遅かった/);
+});
+test("overview recap preserves zero and missing facts and remains read-only without saved review", () => {
+  recapFixture([recapWork("zero", "2025-09-01", { harvestReview: { yieldKg: "0" } })]);
+  assert.match(readonlyRecap("a", 2025), /0 kg/);
+  recapFixture([recapWork("missing", "2025-09-01")]);
+  const html = readonlyRecap("a", 2025);
+  assert.match(html, /評価未登録/); assert.match(html, /未登録/); assert.match(html, /data-annual-harvest-detail="missing"/);
+});
+test("overview recap excludes future and invalid dates from latest actual selection", () => {
+  recapFixture([recapWork("actual", "2025-09-01"), recapWork("future", "2026-12-01"), recapWork("invalid", "2026-99-99")]);
+  assert.match(readonlyRecap("a", 2025), /data-annual-harvest-detail="actual"/);
+});
+test("overview recap year agrees with DTO for legacy explicit season", () => {
+  const legacy = recapWork("legacy-season", "2026-01-02", { season: 2025 }); delete legacy.cropYear;
+  recapFixture([legacy]);
+  assert.equal(describe(state.data().fieldWorks[0], "a").year, "2025");
+  assert.match(readonlyRecap("a", 2025), /data-annual-harvest-detail="legacy-season"/);
+  assert.equal(readonlyRecap("a", 2026), "");
+});
+test("overview recap duplicate IDs stay consistent with the detail lookup", () => {
+  recapFixture([
+    recapWork("duplicate", "2025-09-01", { harvestReview: { yieldKg: "1100" } }),
+    recapWork("duplicate", "2025-09-02", { harvestReview: { yieldKg: "9900" } })
+  ]);
+  const detail = annual.renderAnnualRecordDetail(state.field("a"), { kind: "fieldWork", id: "duplicate" });
+  assert.match(detail, /1100/); assert(!detail.includes("9900"));
+  const html = readonlyRecap("a", 2025);
+  assert.match(html, /1100 kg/); assert(!html.includes("9900 kg"), "Do not show a different duplicate record from the detail button's destination");
+});
+test("overview recap distinguishes partial, complete, and legacy status per field", () => {
+  for (const [status, label] of [["partial", "一部刈取（圃場全体の完了ではありません）"], ["complete", "この圃場の刈取完了を記録済み"], [undefined, "刈取完了区分は未確認"]]) {
+    recapFixture([recapWork("status", "2025-09-01", { fieldIds: ["a", "b"],
+      ...(status ? { harvestStatusByField: { a: status, b: status === "partial" ? "complete" : "partial" } } : {}) })]);
+    assert(readonlyRecap("a", 2025).includes(`<p data-harvest-recap-status>${label}</p>`));
+    if (status === "partial") assert.match(readonlyRecap("b", 2025), /この圃場の刈取完了を記録済み/);
+  }
 });
 console.log(`Harvest review: ${passed} passed, ${failed} failed (UI source/VM checks; no browser verification).`);
 process.exitCode = failed ? 1 : 0;

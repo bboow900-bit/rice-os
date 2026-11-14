@@ -2226,12 +2226,41 @@
     return `
       ${renderYearFlow(field)}
       <button type="button" class="annual-shipment-entry annual-harvest-entry" data-annual-results><img src="assets/images/light-icons/rice-sack.png" alt=""><span><b>収穫・出荷</b><small>${U.escapeHTML(year)}年産 / ${U.escapeHTML(varietyName(field))}</small></span><span aria-hidden="true">›</span></button>
+      ${renderHarvestRecap(field, year)}
       <section class="annual-compare-launch annual-flow-compare-link"><div><span>振り返り</span><h3>今年と前年を比べる</h3><p>${U.escapeHTML(year)}年と${U.escapeHTML(previousYear)}年の節目・作業・水管理を、見やすく読み比べます。</p></div><button type="button" class="primary" data-annual-open-compare>比較を開く</button></section>
       ${renderUsedMaterials(field)}
       ${RiceOS.herbicideUI ? RiceOS.herbicideUI.renderReview(field, yearValue()) : ""}
       ${renderSeasonNotes(field)}
       ${renderCarryoverNotes(field)}
     `;
+  }
+
+  function renderHarvestRecap(field, year) {
+    const works = state.data().fieldWorks.filter(work => (work.fieldIds || []).includes(field.fieldId)
+      && String(state.cropYearForRecord(work)) === String(year) && state.isActualFieldWork(work)
+      && isTimelineDate(work.date) && work.date <= U.today()
+      && /稲刈り|収穫/.test(String(work.workName || "")) && !/落水/.test(String(work.workName || ""))
+      && annualRecordTarget(field, "fieldWork", work.workId)?.row === work)
+      .map(raw => ({ raw, date: raw.date, id: raw.workId }))
+      .sort((a, b) => String(b.date).localeCompare(String(a.date)) || String(a.id).localeCompare(String(b.id)));
+    if (!works.length) return "";
+    const work = works[0].raw;
+    const model = RiceOS.harvestReview.describe(work, field.fieldId);
+    const esc = U.escapeHTML, thermal = model.metrics.thermal;
+    const status = work.harvestStatusByField && work.harvestStatusByField[field.fieldId];
+    const statusLabel = status === "partial" ? "一部刈取（圃場全体の完了ではありません）"
+      : status === "complete" ? "この圃場の刈取完了を記録済み" : "刈取完了区分は未確認";
+    const reference = value => value.available
+      ? `${value.labelText}（${U.fd(value.range.start)} ～ ${U.fd(value.range.end)}）`
+      : "比較できる事前記録なし";
+    return `<section class="harvest-recap" aria-label="収穫の振り返り">
+      <header><span>${esc(year)}年産 / ${esc(field.name)}</span><h3>収穫の振り返り</h3><p>${esc(U.fd(work.date))}の稲刈り${works.length > 1 ? "（この年の最新記録）" : ""}</p><p data-harvest-recap-status>${esc(statusLabel)}</p></header>
+      <div class="harvest-recap-assessment"><small>現場での最終判断</small><strong>${esc(model.assessment.recorded ? model.assessment.label : "評価未登録")}</strong>${model.timing.memo ? `<p>${esc(model.timing.memo)}</p>` : ""}</div>
+      <dl class="harvest-recap-numbers"><div><dt>作業に記録した収量</dt><dd>${model.metrics.kg === null ? "未登録" : `${esc(model.metrics.kg)} kg`}</dd><small>${esc(model.metrics.scopeLabel)} / ${esc(model.metrics.basis || "測定条件未登録")}</small></div><div><dt>収穫時の出穂後積算温度</dt><dd>${thermal.available ? `${esc(Math.round(thermal.total))} ℃` : "未確認"}</dd><small>${esc(thermal.label)}${thermal.legacy && thermal.partial ? " / 一部欠測・取得済み分のみ" : ""}</small></div></dl>
+      <div class="harvest-recap-reference"><b>データ上の参考比較</b><p>保存した見通し：${esc(reference(model.comparison.day))}</p><p>積算温度の目安：${esc(reference(model.comparison.thermal))}</p><small>現場の適期判断とは別の参考情報です。</small></div>
+      ${model.summaryLines.length ? `<details><summary>来年に引き継ぐ材料</summary><ul class="harvest-handoff-facts">${model.summaryLines.map(line => `<li>${esc(line)}</li>`).join("")}</ul></details>` : '<p class="muted">現場の評価や気づきは、稲刈り詳細から記録できます。</p>'}
+      <button type="button" class="secondary" data-annual-harvest-detail="${U.attr(work.workId)}">稲刈りの詳細・評価を確認 <span aria-hidden="true">›</span></button>
+    </section>`;
   }
 
   function renderHarvestTimingComparison(field) {
@@ -3498,6 +3527,11 @@
       const harvestWeather = event.target.closest("[data-harvest-weather]");
       if (harvestWeather) {
         void fetchHarvestWeather(harvestWeather.dataset.harvestWeather, harvestWeather.dataset.harvestWeatherField);
+        return;
+      }
+      const harvestDetail = event.target.closest("[data-annual-harvest-detail]");
+      if (harvestDetail) {
+        openAnnualRecordDetail("fieldWork", harvestDetail.dataset.annualHarvestDetail, "稲刈り");
         return;
       }
       const recordOpen = event.target.closest("[data-annual-record-open-kind]");

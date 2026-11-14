@@ -2,6 +2,7 @@
 const assert = require("node:assert/strict");
 const path = require("node:path"), os = require("node:os");
 const { chromium } = require("C:/Users/Keisuke/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright");
+const appUrl = process.env.RICE_TEST_URL || "http://127.0.0.1:4182/index.html";
 (async () => {
   const browser = await chromium.launch({ headless: true, executablePath: "C:/Program Files/Google/Chrome/Application/chrome.exe" });
   try { for (const width of [360, 390, 1280]) {
@@ -9,8 +10,9 @@ const { chromium } = require("C:/Users/Keisuke/.cache/codex-runtimes/codex-prima
     try {
       const page = await context.newPage();
       await page.clock.setFixedTime(new Date("2026-11-14T03:00:00Z"));
-      await page.route("https://**/*", route => route.abort());
-      await page.goto("http://127.0.0.1:4182/index.html", { waitUntil: "networkidle" });
+      page.on("pageerror", error => console.error("BROWSER ERROR", error.stack));
+      await page.route("https://**/*", route => new URL(route.request().url()).origin === new URL(appUrl).origin ? route.continue() : route.abort());
+      await page.goto(appUrl, { waitUntil: "networkidle" });
       const fieldId = await page.evaluate(() => {
         const S = RiceOS.state, id = S.addField("亀石 右下（検証用）");
         const d = RiceOS.utils.clone(S.data());
@@ -27,7 +29,16 @@ const { chromium } = require("C:/Users/Keisuke/.cache/codex-runtimes/codex-prima
       await page.locator('#annualYear').selectOption('2026');
       await page.locator(`[data-annual-hub-open-field="${fieldId}"]:visible`).click();
       assert.doesNotMatch(await page.locator('#annualTimeline').innerText(), /収穫済み・今年の一区切り/);
-      await page.locator('[data-annual-record-open-id="reflection-primary"]:visible').click();
+      const recap = page.locator('.harvest-recap');
+      await recap.waitFor();
+      assert.match(await recap.innerText(), /収穫の振り返り/);
+      assert.match(await recap.innerText(), /適期/);
+      assert.match(await recap.innerText(), /1800 kg/);
+      assert.match(await recap.innerText(), /1030 ℃/);
+      await recap.scrollIntoViewIfNeeded();
+      await page.screenshot({ path: path.join(os.tmpdir(), `harvest-recap-primary-${width}.png`) });
+      assert.equal(await page.evaluate(() => localStorage.getItem(RiceOS.schema.STORE_KEY)), before);
+      await recap.locator('[data-annual-harvest-detail]').click();
       const detail = page.locator('.annual-record-detail');
       await detail.waitFor();
       const content = await detail.innerText();
