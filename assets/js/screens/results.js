@@ -33,6 +33,14 @@
     ledgerView = `${kind}-edit`; detailId = ""; syncNavigation();
   }
   function finishEditor(kind,id) {
+    if (kind === "milling" && millingOriginOnly) {
+      millingOriginOnly = false;
+      millingDraft = null; millingOriginal = null; editorBaseline = "";
+      ledgerView = "milling-list"; detailId = ""; editorReturn = null; ledgerHistory.length = 0;
+      render(); syncNavigation();
+      if (RiceOS.app?.back) RiceOS.app.back();
+      return;
+    }
     millingOriginOnly = false;
     const target = editorReturn || {view:`${kind}-list`,id:""};
     if (target.view === `${kind}-detail` && target.id === id) {
@@ -285,6 +293,15 @@
     resetMilling();
     millingDraft.season = String(season);
     millingDraft.varietyId = varietyId || "";
+    if (Array.isArray(opts.fieldIds)) millingDraft.fieldIds = [...new Set(opts.fieldIds)].filter(id => {
+      const field = state.field(id);
+      return field && (!varietyId || field.varietyId === varietyId);
+    });
+    const prefillDate = String(opts.date || "");
+    if (/^\d{4}-\d{2}-\d{2}$/.test(prefillDate)) {
+      const parsed = new Date(`${prefillDate}T00:00:00Z`);
+      if (Number.isFinite(parsed.getTime()) && parsed.toISOString().slice(0, 10) === prefillDate) millingDraft.date = prefillDate;
+    }
     millingViewYear = String(season);
     renderMilling();
     readMilling(); editorBaseline = editorValue();

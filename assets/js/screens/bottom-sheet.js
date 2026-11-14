@@ -14,6 +14,7 @@
   let scheduleFieldIds = [];
   let scheduleCropYearLegacy = false;
   let scheduleCropYearDirty = false;
+  let harvestScope = {};
 
   function entryId(entry) {
     if (entry.kind === "shipment") return "";
@@ -131,6 +132,7 @@
   function open(date, fieldId, target) {
     const selection = initialTarget(fieldId, target);
     selectedDate = date || U.today();
+    harvestScope = { season: target && (target.season || target.cropYear), varietyId: target && target.varietyId };
     selectedFieldId = selection.fieldId;
     workFieldIds = selection.fieldIds;
     scheduleFieldIds = [];
@@ -400,13 +402,13 @@
 
   function openScreen(screen, callback) {
     const fieldIds = targetFieldIds();
-    if (screen !== "results" && !fieldIds.length && !(screen === "field-work" && U.$("sheetTargetMode").value === "offField")) {
+    if (!["results", "harvest-ledger"].includes(screen) && !fieldIds.length && !(screen === "field-work" && U.$("sheetTargetMode").value === "offField")) {
       U.toast("記録する圃場またはグループを選択してください");
       return;
     }
     const originScreen = RiceOS.app && RiceOS.app.currentScreen ? RiceOS.app.currentScreen() : "home";
     close();
-    if (RiceOS.navigation && RiceOS.navigation.clear) RiceOS.navigation.clear();
+    if (screen !== "harvest-ledger" && RiceOS.navigation && RiceOS.navigation.clear) RiceOS.navigation.clear();
     if (RiceOS.app && RiceOS.app.openInput) RiceOS.app.openInput(screen, originScreen);
     else RiceOS.app.show(screen);
     if (typeof callback === "function") callback(fieldIds);
@@ -583,14 +585,15 @@
         });
       } else if (action === "schedule") {
         showScheduleForm();
-      } else if (action === "result") {
-        openScreen("results");
-      } else if (action === "shipment") {
-        const originScreen = RiceOS.app.currentScreen();
-        close();
-        if (RiceOS.navigation) RiceOS.navigation.clear();
-        RiceOS.app.openInput("shipments", originScreen);
-        RiceOS.screens.shipments.openNew(selectedDate);
+      } else if (action === "result" || action === "shipment") {
+        openScreen("harvest-ledger", fieldIds => {
+          const varieties = [...new Set(fieldIds.map(id => state.field(id)?.varietyId).filter(Boolean))];
+          RiceOS.screens.harvestLedger.setScope({
+            season: harvestScope.season || (state.defaultShipmentCropYear ? state.defaultShipmentCropYear(selectedDate) : selectedDate.slice(0, 4)),
+            varietyId: varieties.length === 1 ? varieties[0] : harvestScope.varietyId || "",
+            fieldIds, date: selectedDate
+          });
+        });
       }
     });
     if (U.$("sheetScheduleForm")) {

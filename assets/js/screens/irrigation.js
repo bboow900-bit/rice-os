@@ -973,5 +973,5 @@
   }
 
   RiceOS.screens = RiceOS.screens || {};
-  RiceOS.screens.irrigation = { render, bind, resetForm, prefillDate, prefillFields, prefillSchedule, editIrrigation: (id) => fillEdit("irrigation", id), enterLedger, canHandleBack, handleBack, preserveOnDataChange: true };
+  RiceOS.screens.irrigation = { render, bind, resetForm, prefillDate, prefillFields, prefillSchedule, editPeriod: (kind, id) => fillEdit(kind, id), editIrrigation: (id) => fillEdit("irrigation", id), enterLedger, canHandleBack, handleBack, preserveOnDataChange: true };
 })();

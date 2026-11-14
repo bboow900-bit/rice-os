@@ -21,11 +21,28 @@
   let annualSortValue = "updated";
   let workScopeFilter = "all";
   let recordFocus = "important";
+  let historyCategory = "all";
+  const HISTORY_CATEGORIES = [["all", "すべての種類"], ["work", "農作業"], ["growth", "生育"], ["water", "水管理"], ["photos", "写真あり"], ["other", "その他"]];
+
+  function historyMatches(entry, field, category = historyCategory) {
+    if (category === "all") return true;
+    if (category === "photos") {
+      const row = annualRecordTarget(field, entry.editKind, String(entry.editId || entry.id || ""))?.row;
+      return annualRecordPhotos(row).length > 0 || Boolean(row && row.photo);
+    }
+    if (category === "work") return ["work", "harvest"].includes(entry.tone);
+    return entry.tone === category;
+  }
+
+  function renderHistoryFilter() {
+    const label = HISTORY_CATEGORIES.find(([id]) => id === historyCategory)?.[1] || "すべての種類";
+    return `<details class="annual-history-filter"><summary title="履歴の種類を絞り込む"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16l-6.5 7.2v4.6l-3 1.6v-6.2L4 6z"></path></svg><span>${historyCategory === "all" ? "絞り込み" : U.escapeHTML(label)}</span></summary><div class="annual-history-filter-menu" role="group" aria-label="履歴の種類">${HISTORY_CATEGORIES.map(([id, name]) => `<button type="button" data-annual-history-category="${id}" aria-pressed="${historyCategory === id}">${U.escapeHTML(name)}${historyCategory === id ? '<span aria-hidden="true">✓</span>' : ""}</button>`).join("")}</div></details>`;
+  }
 
   function isRoutineRecord(row) {
     const raw = row.raw || row;
     if (raw.reviewImportant === true || row.milestone) return false;
-    if (row.kind === "growth") return !(raw.headingObserved || Number(raw.panicleLengthMm) > 0 || raw.stageConfirmed && raw.observedStage);
+    if ((row.kind || row.editKind) === "growth") return !(raw.headingObserved || Number(raw.panicleLengthMm) > 0 || raw.stageConfirmed && raw.observedStage);
     return /草刈|畦畔.*刈|見回り|見まわり|巡回|清掃|掃除/.test(String(row.title || row.label || raw.workName || ""));
   }
   function focusRecords(rows) { return rows.filter(row => recordFocus === "all" || (recordFocus === "routine" ? isRoutineRecord(row) : !isRoutineRecord(row))); }
@@ -956,7 +973,7 @@
     return `
       <div class="annual-v2-top">
         <header class="annual-pop-heading"><div><p class="annual-pop-kicker">一年を振り返る</p><h2>${yearValue() === "all" ? "これまでの記録" : Number(yearValue()) === Number(U.today().slice(0, 4)) ? "今年の記録" : `${U.escapeHTML(yearValue())}年の記録`}</h2></div><img class="annual-pop-rice" src="assets/images/ui-pop/harvest-rice.png" width="144" height="144" alt="" decoding="async"></header>
-        <button type="button" class="annual-shipment-entry" data-annual-harvest-performance><b>年産別の収穫成績</b><span>品種ごとの収量・面積を振り返る ›</span></button>
+        <button type="button" class="annual-shipment-entry annual-harvest-entry" data-annual-harvest-ledger><img src="assets/images/light-icons/rice-sack.png" alt=""><span><b>収穫・出荷</b><small>収量・販売額・お米の行き先を振り返る</small></span><span aria-hidden="true">›</span></button>
         <div class="annual-hub-tools"><button type="button" data-annual-hub-notes aria-expanded="${hubNotesOpen}" aria-controls="annualHubNotes">来年メモ</button></div>
         ${renderCropYearClosure()}
         <div class="annual-hub-nav" role="group" aria-label="振り返りの表示">
@@ -986,7 +1003,7 @@
         </section>
         ` : ""}
         ${topView === "work" ? `
-        <button type="button" class="annual-shipment-entry" data-annual-shipments><b>出荷・配布</b><span>渡した先・袋数の履歴を見る ›</span></button>
+        <button type="button" class="annual-shipment-entry" data-annual-harvest-ledger><b>収穫・出荷</b><span>収量・販売・配布の記録を見る ›</span></button>
         <details class="annual-hub-summary"><summary>サマリー</summary>${renderSummary(rows)}</details>
         ${renderWorkArchive(rows)}
         ${renderUsedMaterials()}
@@ -1564,25 +1581,8 @@
   }
 
   function renderTabs(field) {
-    const tabs = [
-      ["karte", "karte", "カルテ"],
-      ["growth", "growthTab", "生育記録"],
-      ["work", "workTab", "作業記録"],
-      ["water", "water", "水管理"],
-      ["photos", "photoTab", "写真"]
-    ];
-    return `
-      <div class="annual-field-tabs">
-        ${tabs.map(([id, icon, label]) => `<button type="button" class="${selectedTab === id ? "active" : ""}" data-annual-tab="${U.attr(id)}">${iconSvg(icon, "annual-tab-svg")}<span>${U.escapeHTML(label)}</span></button>`).join("")}
-      </div>
-      <div class="annual-field-tab-body">
-        ${selectedTab === "growth" ? renderGrowthTab(field) : ""}
-        ${selectedTab === "work" ? renderWorkTab(field) : ""}
-        ${selectedTab === "water" ? renderWaterTab(field) : ""}
-        ${selectedTab === "photos" ? renderPhotoTab(field) : ""}
-        ${selectedTab === "karte" ? renderKarteTab(field) : ""}
-      </div>
-    `;
+    if (selectedTab !== "water") return "";
+    return `<section class="annual-legacy-water-route"><header><h3>水管理の記録を照合</h3><button type="button" class="secondary" data-annual-return-flow>一年の流れへ戻る</button></header>${renderWaterTab(field)}</section>`;
   }
 
   function fieldYearRows(fieldId, year) {
@@ -1867,7 +1867,8 @@
     const manual = entry.editKind === "growth" && !heading && !panicle && row.stageConfirmed && row.observedStage;
     const harvest = entry.editKind === "fieldWork" && /収穫|稲刈り/.test(String(row.workName || "")) && !/落水/.test(String(row.workName || "")) && !crossYear;
     const badge = heading ? "現地観察" : panicle ? "実測" : manual ? "現地判断" : harvest ? "作業記録" : entry.category || "記録";
-    const art = heading ? 6 : panicle ? 5 : harvest ? 8 : 0;
+    const art = heading ? "heading" : panicle ? "panicle" : harvest ? "harvest" : "";
+    const milestoneBadge = Boolean(heading || panicle || harvest || manual);
     const primary = [];
     if (panicle) primary.push(`幼穂長 ${Number(row.panicleLengthMm).toFixed(1)}mm`);
     else if (entry.detail && entry.detail !== entry.label && entry.detail !== "作業記録" && entry.detail !== "その他の記録") primary.push(entry.detail);
@@ -1886,12 +1887,39 @@
         primary.push(`${heading ? "田植え" : "出穂"}から${days}日`);
       }
     }
-    if (harvest && state.isHarvestThermalComplete && state.isHarvestThermalComplete(id, field.fieldId)) {
-      const snapshots = (row.harvestSnapshots || []).filter(item => item.fieldId === field.fieldId && item.harvestDate === row.date);
-      const thermal = snapshots.length === 1 && snapshots[0].thermal;
-      if (thermal && thermal.total !== "" && thermal.total != null && Number.isFinite(Number(thermal.total)) && Number(thermal.total) >= 0) primary.push(`収穫時積算温度 ${Number(thermal.total).toLocaleString("ja-JP")}℃`);
+    let thermalText = "";
+    if (harvest) {
+      const saved = row.harvestSnapshots;
+      const snapshots = Array.isArray(saved) ? saved.filter(item => item && item.fieldId === field.fieldId && item.harvestDate === row.date) : [];
+      const thermal = snapshots.length === 1 ? snapshots[0].thermal : undefined;
+      const total = thermal && thermal.total;
+      const absent = !thermal || total === "" || total == null;
+      const numeric = typeof total === "number" || typeof total === "string" && /^(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i.test(total.trim());
+      const valid = !absent && numeric && Number.isFinite(Number(total)) && Number(total) >= 0;
+      const status = String(thermal && thermal.status || "");
+      const partial = ["partial", "missing", "一部欠測"].includes(status);
+      const preliminary = status === "当日速報";
+      const legacy = !status || ["legacy", "未保存"].includes(status);
+      const complete = valid && !partial && !preliminary && state.isHarvestThermalComplete && state.isHarvestThermalComplete(id, field.fieldId);
+      const ambiguous = snapshots.length > 1 || saved != null && !Array.isArray(saved)
+        || thermal != null && (typeof thermal !== "object" || Array.isArray(thermal));
+      if (ambiguous || !absent && !valid) thermalText = "収穫時積算温度 記録要確認";
+      else if (!valid) thermalText = "収穫時積算温度 未取得";
+      else {
+        const value = `${Number(total).toLocaleString("ja-JP")}℃`;
+        thermalText = complete ? `収穫時積算温度 ${value}`
+          : `保存済積算温度 ${value}${partial ? "（一部取得）" : preliminary ? "（当日速報）" : legacy ? "（旧記録）" : "（要確認）"}`;
+      }
     }
-    if (entry.tone === "water" && entry.days !== "" && entry.days != null) primary.push(`${entry.days}日間`);
+    let waterSummary = "";
+    if (entry.tone === "water") {
+      const start = entry.periodStartDate;
+      const end = entry.periodEndDate;
+      const range = start && end
+        ? `${timelineDateParts(start).day}開始 → ${timelineDateParts(end).day}完了`
+        : primary.join(" / ");
+      waterSummary = `${U.escapeHTML(range)}${entry.days !== "" && entry.days != null ? `、<strong class="annual-flow-duration">${U.escapeHTML(String(entry.days))}日間</strong>` : ""}`;
+    }
     const facts = [];
     if (entry.editKind === "fieldWork") {
       if (row.machine && row.material && row.machine !== row.material) facts.push(`機械 ${row.machine}`);
@@ -1902,8 +1930,19 @@
     }
     if (entry.stageFact) facts.push(entry.stageFact);
     const memo = String(row.memo || row.observationSummary || "").trim();
-    const extra = facts.length > 0 || Boolean(memo);
-    return `<article class="annual-year-flow-entry ${U.attr(entry.tone)}${entry.milestone || harvest ? " milestone" : ""}${expanded && extra ? " expanded" : ""}"><div class="annual-year-flow-main"><button type="button" class="annual-year-flow-open" data-annual-record-open-kind="${U.attr(entry.editKind)}" data-annual-record-open-id="${U.attr(id)}" data-annual-record-open-label="${U.attr(entry.label)}"><span class="annual-year-flow-title"><em>${U.escapeHTML(badge)}</em><b>${U.escapeHTML(entry.label)}</b><strong aria-hidden="true">›</strong></span>${primary.length ? `<span class="annual-year-flow-detail">${primary.map(value => U.escapeHTML(value)).join("<br>")}</span>` : ""}${art ? `<img class="annual-flow-milestone-art" src="assets/images/rice-stages/rice-stage-0${art}.png" alt="" loading="lazy">` : ""}</button><button type="button" class="annual-year-flow-menu" aria-label="${U.escapeHTML(entry.label)}の編集・削除" title="編集・削除" data-annual-flow-menu-kind="${U.attr(entry.editKind)}" data-annual-flow-menu-id="${U.attr(id)}" data-annual-flow-menu-label="${U.attr(entry.label)}">⋮</button></div>${extra ? `<button type="button" class="annual-year-flow-summary-toggle" data-annual-flow-summary="${U.attr(key)}" aria-expanded="${expanded ? "true" : "false"}">${expanded ? "補足を閉じる" : memo ? "メモあり・補足を見る" : "補足を見る"}</button>${expanded ? `<div class="annual-year-flow-summary"><div class="annual-year-flow-summary-metrics">${facts.map(fact => `<span>${U.escapeHTML(fact)}</span>`).join("")}</div>${memo ? `<p>${U.escapeHTML(memo)}</p>` : ""}</div>` : ""}` : ""}</article>`;
+    const extra = facts.some(fact => fact !== entry.stageFact) || Boolean(memo);
+    const supplement = extra ? `<div class="annual-flow-supplement"><button type="button" class="annual-year-flow-summary-toggle" data-annual-flow-summary="${U.attr(key)}" aria-expanded="${expanded ? "true" : "false"}">${expanded ? "補足を閉じる" : memo ? "メモあり・補足を見る" : "補足を見る"}<span aria-hidden="true">${expanded ? "⌃" : "›"}</span></button></div>` : "";
+    return `<article class="annual-year-flow-entry ${U.attr(entry.tone)}${entry.milestone || harvest ? " milestone" : ""}${expanded && extra ? " expanded" : ""}"><div class="annual-year-flow-main">
+      <button type="button" class="annual-year-flow-open" data-annual-record-open-kind="${U.attr(entry.editKind)}" data-annual-record-open-id="${U.attr(id)}" data-annual-record-open-label="${U.attr(entry.label)}">
+        <span class="annual-flow-category"><em class="annual-flow-category-label${milestoneBadge ? " annual-flow-milestone-badge" : ""}">${U.escapeHTML(badge)}</em></span>
+        <span class="annual-flow-copy"><span class="annual-year-flow-title"><b>${U.escapeHTML(entry.label)}</b></span>${waterSummary || primary.length ? `<span class="annual-year-flow-detail">${waterSummary || primary.map(value => U.escapeHTML(value).replace(/(\d+日)/g, '<span class="annual-flow-day-count">$1</span>')).join("<br>")}</span>` : ""}</span>
+        ${art ? `<span class="annual-flow-art" aria-hidden="true"><img class="annual-flow-milestone-art" src="assets/images/annual-story/annual-story-${art}.png" alt="" loading="lazy"></span>` : ""}
+        ${thermalText ? `<span class="annual-flow-thermal">${U.escapeHTML(thermalText)}</span>` : ""}
+        <strong class="annual-flow-chevron" aria-hidden="true">›</strong>
+      </button>
+      <button type="button" class="annual-year-flow-menu" aria-label="${U.escapeHTML(entry.label)}の編集・削除" title="編集・削除" data-annual-flow-menu-kind="${U.attr(entry.editKind)}" data-annual-flow-menu-id="${U.attr(id)}" data-annual-flow-menu-label="${U.attr(entry.label)}">⋮</button>
+      ${supplement}
+    </div>${expanded && extra ? `<div class="annual-year-flow-summary">${facts.length ? `<div class="annual-year-flow-summary-metrics">${facts.map(fact => `<span>${U.escapeHTML(fact)}</span>`).join("")}</div>` : ""}${memo ? `<p><b>メモ</b> / ${U.escapeHTML(memo)}</p>` : ""}</div>` : ""}</article>`;
   }
 
   function fieldYearTimeline(field, year) {
@@ -1952,21 +1991,23 @@
         });
       }
     });
-    const growthFacts = growth
-      .map((row) => ({ row, fact: observedGrowthFact(row) }))
-      .filter((item) => item.fact);
+    const growthFacts = growth.map((row) => ({ row, fact: observedGrowthFact(row) || {
+      date: String(row.date || ""), kind: "growth-observation", label: "生育記録",
+      detail: row.leafColor ? `葉色 ${row.leafColor}` : row.plantHeightCm || row.heightCm ? `草丈 ${row.plantHeightCm || row.heightCm}cm` : row.leafCount ? `葉数 ${row.leafCount}枚` : "観察記録",
+      stageFact: ""
+    } }));
     growthFacts.forEach(({ row, fact }) => entries.push({
       id: row.logId,
       editKind: "growth",
       reviewImportant: row.reviewImportant === true,
       date: fact.date,
       label: fact.label,
-      category: fact.kind === "manual-stage" ? "現場判定" : "生育実測",
+      category: fact.kind === "manual-stage" ? "現場判定" : fact.kind === "growth-observation" ? "生育記録" : "生育実測",
       tone: "growth",
       lane: "growth",
       detail: fact.detail,
       stageFact: fact.stageFact,
-      milestone: fact.kind
+      milestone: fact.kind === "growth-observation" ? "" : fact.kind
     }));
     others.forEach((row) => entries.push({
       id: row.otherWorkId,
@@ -1996,24 +2037,25 @@
     const planting = entries.find((entry) => /田植/.test(entry.label))?.date || "";
     const harvestStatus = state.harvestStatusForField(field.fieldId, year, U.today(), { cropYear: true });
     const harvest = harvestStatus.harvested ? harvestStatus.date : "";
-    const seasonLength = timelineDays(planting, harvest);
     const seasonText = planting
-      ? `${timelineDateParts(planting, true).text} → ${harvest ? `${timelineDateParts(harvest, true).text}${seasonLength !== "" ? ` / ${seasonLength}日` : ""}` : "収穫記録待ち"}`
+      ? `${timelineDateParts(planting).day} → ${harvest ? timelineDateParts(harvest).day : "収穫記録待ち"}`
       : "田植え記録待ち";
-    const timelineEntries = focusRecords(entries.filter((entry) => !entry.isWaterMarker));
+    const timelineEntries = focusRecords(entries.filter((entry) => !entry.isWaterMarker && historyMatches(entry, field)));
     const items = timelineEntries.map((entry, index) => {
       const date = timelineDateParts(entry.date);
+      const [dateYear, dateMonth, dateDay] = entry.date.split("-");
+      const timeLabel = `${dateYear !== String(year) || yearValue() === "all" ? `<small class="year">${U.escapeHTML(dateYear)}年</small>` : ""}<span>${U.escapeHTML(`${Number(dateMonth)}/${Number(dateDay)}`)}</span>`;
       const isRepeatedDate = index > 0 && timelineEntries[index - 1].date === entry.date;
       const tone = entry.tone === "water" ? "water" : entry.tone === "growth" ? "growth" : entry.tone === "harvest" ? "harvest" : entry.tone === "other" ? "other" : "work";
-      return `<li class="annual-year-flow-single-row ${U.attr(tone)}${isRepeatedDate ? " repeat" : ""}"><time datetime="${U.attr(entry.date)}"${isRepeatedDate ? ' class="annual-year-flow-repeat" aria-hidden="true"' : ""}><span>${U.escapeHTML(date.day)}</span><small>${U.escapeHTML(date.weekday)}</small></time><span class="annual-year-flow-rail" aria-hidden="true"><i></i></span>${renderExpandableFlowCard(field, entry, entries)}</li>`;
+      return `<li class="annual-year-flow-single-row ${U.attr(tone)}${isRepeatedDate ? " repeat" : ""}"><time datetime="${U.attr(entry.date)}"${isRepeatedDate ? ' class="annual-year-flow-repeat" aria-hidden="true"' : ""}>${timeLabel}<small>${U.escapeHTML(date.weekday)}</small></time><span class="annual-year-flow-rail" aria-hidden="true"><i></i></span>${renderExpandableFlowCard(field, entry, entries)}</li>`;
     }).join("");
     return `
       <section class="annual-year-flow annual-story" aria-label="${U.escapeHTML(year)}年の一年の流れ">
-        <p class="annual-flow-field-context">${U.escapeHTML(field.name)} / ${U.escapeHTML(varietyName(field))}${field.areaA ? ` / ${U.escapeHTML(field.areaA)}a` : ""}</p>
-        <div class="annual-year-flow-head"><div><span>${U.escapeHTML(year)}年の記録</span><h3>一年の流れ</h3></div><small>実績のみ</small></div>
-        <p class="annual-year-flow-season">${U.escapeHTML(seasonText)}</p>
+        <div class="annual-year-flow-head"><h3>一年の流れ</h3>${renderHistoryFilter()}</div>
+        <p class="annual-flow-field-context">${U.escapeHTML(field.name)} / ${U.escapeHTML(varietyName(field))}${field.areaA ? ` / ${U.escapeHTML(field.areaA)}a` : ""}</p><button type="button" class="annual-field-settings-link" data-annual-field-settings>圃場の設定 ›</button>
+        <p class="annual-year-flow-season"><span>${U.escapeHTML(seasonText)}</span><span class="annual-flow-actual-only">実績のみ</span></p>
         ${renderRecordFocus(["重要な記録", "繰り返し作業", "すべて"])}
-        ${items ? `<ol class="annual-year-flow-single">${items}</ol>` : '<p class="annual-year-flow-empty">田植え・水管理・出穂・収穫などの実績を残すと、ここに一年の流れが並びます。</p>'}
+        ${items ? `<ol class="annual-year-flow-single">${items}</ol>` : `<div class="annual-history-empty"><p>${historyCategory === "all" ? "この表示範囲の実績はまだありません。" : "この種類の記録はまだありません。"}</p><button type="button" data-annual-history-reset>すべての記録を見る</button></div>`}
       </section>
     `;
   }
@@ -2127,7 +2169,7 @@
           ${state.isHarvestThermalComplete(work.workId, field.fieldId) ? "" : `<button type="button" class="secondary" data-harvest-thermal-retry="${U.attr(work.workId)}" data-harvest-field="${U.attr(field.fieldId)}"${busy ? " disabled" : ""}>${busy ? "積算を取得中…" : "積算温度を再取得"}</button>${busy ? `<button type="button" class="secondary" data-harvest-thermal-cancel="${U.attr(work.workId)}" data-harvest-field="${U.attr(field.fieldId)}">取得を取消</button>` : ""}`}`;
       }
     }
-    return `<div class="annual-compare-check${harvestStatus.status === "complete" ? " complete" : ""}"><b>${harvestStatus.status === "complete" ? "収穫済み・今年の一区切り" : "収穫後の振り返り（完了区分未確認）"}</b>${metrics}${actions}<details class="annual-harvest-details"><summary>結果・記録の詳細</summary><ul>${facts.map((fact) => `<li>${U.escapeHTML(fact)}</li>`).join("")}</ul></details><button type="button" class="secondary" data-annual-results>品種集計の結果へ</button><button type="button" class="secondary" data-annual-reflection-focus>この年のひとことを入力</button></div>`;
+    return `<div class="annual-compare-check${harvestStatus.status === "complete" ? " complete" : ""}"><b>${harvestStatus.status === "complete" ? "収穫済み・今年の一区切り" : "収穫後の振り返り（完了区分未確認）"}</b>${metrics}${actions}<details class="annual-harvest-details"><summary>結果・記録の詳細</summary><ul>${facts.map((fact) => `<li>${U.escapeHTML(fact)}</li>`).join("")}</ul></details><button type="button" class="secondary" data-annual-reflection-focus>この年のひとことを入力</button></div>`;
   }
 
   function compareRecordCard(entry, year, field) {
@@ -2184,6 +2226,7 @@
     const snapshot = fieldYearSnapshot(field, year);
     return `
       ${renderYearFlow(field)}
+      <button type="button" class="annual-shipment-entry annual-harvest-entry" data-annual-results><img src="assets/images/light-icons/rice-sack.png" alt=""><span><b>収穫・出荷</b><small>${U.escapeHTML(year)}年産 / ${U.escapeHTML(varietyName(field))}</small></span><span aria-hidden="true">›</span></button>
       <section class="annual-compare-launch annual-flow-compare-link"><div><span>振り返り</span><h3>今年と前年を比べる</h3><p>${U.escapeHTML(year)}年と${U.escapeHTML(previousYear)}年の節目・作業・水管理を、見やすく読み比べます。</p></div><button type="button" class="primary" data-annual-open-compare>比較を開く</button></section>
       ${renderUsedMaterials(field)}
       ${RiceOS.herbicideUI ? RiceOS.herbicideUI.renderReview(field, yearValue()) : ""}
@@ -2365,7 +2408,7 @@
     const asOfDate = stageAsOfDateForField(field.fieldId);
     const dap = planting ? U.daysBetween(planting, asOfDate) : "";
     return `
-      <div class="annual-field-detail">
+      <div class="annual-field-detail${selectedTab === "karte" ? " annual-story-surface" : ""}">
         <div class="annual-detail-head">
           <div>
             <span>${U.escapeHTML(yearValue() === "all" ? `全年度 / 比較基準：${detailYear}年産` : `${detailYear}年産`)}の圃場履歴</span>
@@ -2374,8 +2417,7 @@
           </div>
           <button type="button" class="annual-detail-menu" aria-label="メニュー">…</button>
         </div>
-        ${renderYearCompare(field)}
-        ${renderTabs(field)}
+        ${selectedTab === "water" ? renderTabs(field) : renderYearCompare(field)}
         ${renderAnnualFab(field.fieldId)}
       </div>
     `;
@@ -2604,6 +2646,7 @@
     const date = isWater ? String(row.startDate || row.date || row.actualEndDate || "") : String(row.date || "");
     const fieldNames = kind === "fieldWork" ? (row.fieldIds || []).map((fieldId) => state.field(fieldId)?.name).filter(Boolean).join("・") || "圃場外" : kind === "other" ? (row.relatedFieldIds || row.fieldIds || []).map((fieldId) => state.field(fieldId)?.name).filter(Boolean).join("・") || "圃場外" : field?.name || "品種集計（圃場指定なし）";
     const info = [];
+    if (typeof row.photo === "string" && row.photo.trim() && !row.photo.startsWith("data:image/")) info.push(annualRecordInfoRow("写真のメモ", row.photo));
     if (isWater) {
       info.push(annualRecordInfoRow("開始日", annualRecordDate(row.startDate || row.date)));
       info.push(annualRecordInfoRow("終了日", annualRecordDate(row.actualEndDate)));
@@ -2803,12 +2846,10 @@
   function openWaterEditor(kind, id) {
     const record = waterRecord(kind, id);
     if (!record) return false;
-    selectedFieldId = record.fieldId;
-    selectedTab = "water";
-    waterEditDraft = { kind, id };
-    render();
-    setTimeout(() => U.$("annualTimeline").querySelector("[data-annual-water-editor]")?.scrollIntoView({ behavior: "smooth", block: "start" }), 30);
-    return true;
+    const water = RiceOS.screens.irrigation;
+    if (!water?.editPeriod) return false;
+    RiceOS.app.openInput("irrigation", "annual");
+    return water.editPeriod(kind, id) !== false;
   }
 
   function deleteWaterPeriod(kind, id) {
@@ -2994,9 +3035,11 @@
   }
 
   function openField(fieldId, tab) {
+    if (fieldId !== selectedFieldId) historyCategory = "all";
     compareFromHub = false;
     selectedFieldId = fieldId || "";
-    selectedTab = tab || "karte";
+    selectedTab = "karte";
+    if (["growth", "work", "water", "photos"].includes(tab)) { historyCategory = tab; recordFocus = "all"; }
     waterEditDraft = null;
     reviewView = "overview";
     compareFilter = "work";
@@ -3028,6 +3071,7 @@
     // The selector is a review filter, not a new navigation destination.
     // Editing still receives the selected field as its explicit return target.
     selectedFieldId = fieldId;
+    historyCategory = "all";
     selectedTab = "karte";
     seasonNoteDraft = null;
     waterEditDraft = null;
@@ -3051,6 +3095,7 @@
     }
     compareFromHub = false;
     selectedFieldId = "";
+    historyCategory = "all";
     selectedTab = "karte";
     seasonNoteDraft = null;
     waterEditDraft = null;
@@ -3064,25 +3109,10 @@
 
   function openHarvestResults() {
     const field = state.field(selectedFieldId);
-    if (!field || !RiceOS.screens.results) return;
-    const year = reviewYearValue();
-    const results = (state.data().varietyResults || []).filter((row) => String(row.season) === year && row.varietyId === field.varietyId);
-    const existing = results.find((row) => row.fieldId === field.fieldId) || results.find((row) => !row.fieldId);
-    const origin = { fieldId: selectedFieldId, tab: selectedTab, review: reviewView,
-      year: yearValue(), fromHub: compareFromHub, filter: compareFilter, top: topView };
-    if (RiceOS.navigation && RiceOS.navigation.clear) RiceOS.navigation.clear();
-    selectedFieldId = origin.fieldId;
-    selectedTab = origin.tab;
-    reviewView = origin.review;
-    compareFromHub = origin.fromHub;
-    compareFilter = origin.filter;
-    topView = origin.top;
-    if (U.$("annualYear")) U.$("annualYear").value = origin.year;
-    RiceOS.app.openInput("results", "annual");
-    if (existing && RiceOS.screens.results.editResult && RiceOS.screens.results.editResult(existing.resultId)) return;
-    RiceOS.screens.results.resetForm();
-    U.$("rSeason").value = year;
-    U.$("rVariety").value = field.varietyId;
+    const ledger = RiceOS.screens.harvestLedger;
+    if (!ledger) return;
+    RiceOS.app.openInput("harvest-ledger", "annual");
+    ledger.setScope({ season: reviewYearValue(), varietyId: field?.varietyId || "", fieldIds: field ? [field.fieldId] : [], date: U.today() });
   }
 
   function openHarvestWork(workId) {
@@ -3219,8 +3249,7 @@
         U.$("annualTimeline").querySelector(".annual-hub-compare")?.scrollIntoView({ block: "start", behavior: "smooth" }); return;
       }
       if (event.target.closest("[data-close-open-shipments]")) {
-        if (RiceOS.navigation) RiceOS.navigation.clear();
-        RiceOS.app.openInput("shipments", "annual"); return;
+        openHarvestResults(); return;
       }
       if (closureDraft && event.target.closest("[data-close-next], [data-close-prev]")) {
         closureDraft.step += event.target.closest("[data-close-next]") ? 1 : -1;
@@ -3260,9 +3289,8 @@
         if (!saved) return;
         renderOptions(); render(); return;
       }
-      if (event.target.closest("[data-annual-shipments], [data-crop-year-shipment]")) {
-        if (RiceOS.navigation) RiceOS.navigation.clear();
-        RiceOS.app.openInput("shipments", "annual");
+      if (event.target.closest("[data-annual-harvest-ledger], [data-annual-shipments], [data-crop-year-shipment]")) {
+        openHarvestResults();
         return;
       }
       const hubView = event.target.closest("[data-annual-hub-view]");
@@ -3301,6 +3329,16 @@
         return;
       }
       const scopeButton = event.target.closest("[data-annual-work-scope]");
+      const categoryButton = event.target.closest("[data-annual-history-category]");
+      if (categoryButton && HISTORY_CATEGORIES.some(([id]) => id === categoryButton.dataset.annualHistoryCategory)) {
+        historyCategory = categoryButton.dataset.annualHistoryCategory;
+        recordFocus = "all"; expandedFlowRecord = ""; render(); return;
+      }
+      if (event.target.closest("[data-annual-history-reset]")) { historyCategory = "all"; recordFocus = "all"; render(); return; }
+      if (event.target.closest("[data-annual-return-flow]")) { selectedTab = "karte"; historyCategory = "water"; recordFocus = "all"; waterEditDraft = null; render(); return; }
+      if (event.target.closest("[data-annual-field-settings]") && selectedFieldId) {
+        RiceOS.app.openInput("fields", "annual"); RiceOS.screens.fields.openField(selectedFieldId, "settings"); return;
+      }
       const focusButton = event.target.closest("[data-annual-record-focus]");
       if (focusButton && ["important", "routine", "all"].includes(focusButton.dataset.annualRecordFocus)) {recordFocus = focusButton.dataset.annualRecordFocus; workArchiveOpen = true; expandedFlowRecord = "";render();return;}
       if (scopeButton) {
@@ -3757,7 +3795,7 @@
 
   // A small pure surface for the record-preservation verifier. It is only
   // exposed when the Node test harness opts in, never in the running app.
-  if (window.__RICEOS_TEST__) RiceOS.annualTest = { waterRoleRank, fieldYearTimeline, harvestTotalsForFieldYear, renderHarvestTotals, annualRecordTarget, allRows, rowsForField, renderWorkArchive };
+  if (window.__RICEOS_TEST__) RiceOS.annualTest = { waterRoleRank, fieldYearTimeline, harvestTotalsForFieldYear, renderHarvestTotals, annualRecordTarget, allRows, rowsForField, renderWorkArchive, historyMatches, isRoutineRecord };
 
   RiceOS.screens = RiceOS.screens || {};
   RiceOS.screens.annual = {

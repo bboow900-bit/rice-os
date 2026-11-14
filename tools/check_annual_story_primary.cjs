@@ -12,7 +12,7 @@ const { chromium } = require("C:/Users/Keisuke/.cache/codex-runtimes/codex-prima
       await page.route("https://**/*",r=>r.abort());
       await page.goto("http://127.0.0.1:4182/index.html",{waitUntil:"networkidle"});
       const field = await page.evaluate(()=>{
-        const S=RiceOS.state, id=S.addField("亀石 右下（表示確認用）");
+        const S=RiceOS.state, id=S.addField("開パ下（画面確認用）");
         const v=S.addVariety("天のつぶ"); S.updateField(id,{varietyId:v,areaA:33.75});
         const d=RiceOS.utils.clone(S.data());
         d.fieldWorks.push(...[
@@ -28,7 +28,7 @@ const { chromium } = require("C:/Users/Keisuke/.cache/codex-runtimes/codex-prima
         function assertFixture(ok){if(!ok)throw Error("Fixture rejected");}
         return id;
       });
-      const baseline=await page.evaluate(()=>localStorage.getItem(RiceOS.schema.STORE_KEY));
+      let baseline=await page.evaluate(()=>localStorage.getItem(RiceOS.schema.STORE_KEY));
       await page.locator('.nav-item[data-screen="annual"]:visible').click();
       await page.locator('#annualYear').selectOption('2026');
       await page.locator(`[data-annual-hub-open-field="${field}"]:visible`).click();
@@ -36,8 +36,34 @@ const { chromium } = require("C:/Users/Keisuke/.cache/codex-runtimes/codex-prima
       await flow.waitFor();
       assert.equal(await flow.locator('[data-annual-record-open-id="primary-mow"]').count(),0);
       assert.equal(await flow.locator('.annual-flow-milestone-art').count(),3);
+      const artworkChecks=await flow.locator('.annual-flow-art').evaluateAll(nodes=>nodes.map(frame=>{
+        const image=frame.querySelector('img'), open=frame.closest('.annual-year-flow-open');
+        const bounds=frame.getBoundingClientRect(), copy=open.querySelector('.annual-flow-copy').getBoundingClientRect();
+        const thermal=open.querySelector('.annual-flow-thermal')?.getBoundingClientRect();
+        return {width:bounds.width,height:bounds.height,loaded:image.complete&&image.naturalWidth>0,
+          copyClear:copy.right<=bounds.left+1,thermalClear:!thermal||thermal.top>=bounds.bottom-1};
+      }));
+      for(const art of artworkChecks){
+        assert(art.loaded,'Botanical artwork loads');
+        assert(art.width>=(width<=380?88:96)&&art.height>=(width<=380?104:112),'Botanical artwork remains enlarged');
+        assert(art.copyClear&&art.thermalClear,'Artwork does not overlap text or thermal total');
+      }
       const text=await flow.innerText(); assert.doesNotMatch(text,/undefined|NaN|Invalid Date|1030/);
       assert.match(text,/16日間/);
+      assert.match(await flow.locator('.annual-flow-thermal').innerText(),/未取得/);
+      assert.equal(await page.evaluate(()=>localStorage.getItem(RiceOS.schema.STORE_KEY)),baseline);
+      await page.evaluate(fieldId=>{
+        const S=RiceOS.state,d=RiceOS.utils.clone(S.data());
+        d.fieldWorks.find(row=>row.workId==='primary-harvest').harvestSnapshots=[{
+          fieldId,harvestDate:'2026-09-12',thermal:{total:1030,status:'一部欠測',count:40,expectedDays:47}
+        }];
+        if(!S.replace(d,'Isolated partial thermal fixture'))throw Error('Partial fixture rejected');
+        RiceOS.screens.annual.render();
+      },field);
+      assert.match(await flow.locator('.annual-flow-thermal').innerText(),/保存済積算温度 1,030℃（一部取得）/);
+      const thermalClear=await flow.locator('.annual-flow-thermal').evaluate(el=>el.getBoundingClientRect().top>=el.parentElement.querySelector('.annual-flow-art').getBoundingClientRect().bottom-1);
+      assert(thermalClear,'Saved thermal value stays below enlarged artwork');
+      baseline=await page.evaluate(()=>localStorage.getItem(RiceOS.schema.STORE_KEY));
       const panicle=flow.locator('.annual-year-flow-entry:has([data-annual-record-open-id="primary-panicle"])');
       await panicle.locator('[data-annual-flow-summary]').click();
       assert.match(await panicle.innerText(),/来年も同時期/);
@@ -45,10 +71,19 @@ const { chromium } = require("C:/Users/Keisuke/.cache/codex-runtimes/codex-prima
       await page.locator('.annual-record-detail').waitFor();
       await page.locator('[data-annual-record-detail-back]:visible').click();
       await flow.waitFor();
-      await flow.scrollIntoViewIfNeeded();
+      await flow.evaluate(el => window.scrollTo(0, window.scrollY + el.getBoundingClientRect().top - 78));
       await page.locator('#toast').waitFor({state:'hidden',timeout:10000});
       const file=path.join(os.tmpdir(),`rice-annual-story-primary-${width}.png`);
       await flow.screenshot({path:file}); console.log(file);
+      await flow.evaluate(el => window.scrollTo(0, window.scrollY + el.getBoundingClientRect().top - 78));
+      await page.screenshot({path:path.join(os.tmpdir(),`rice-annual-story-screen-${width}.png`)});
+      if (width === 390) {
+        await page.setViewportSize({width:390,height:1320});
+        const harvest=flow.locator('.annual-year-flow-entry:has([data-annual-record-open-id="primary-harvest"])');
+        await harvest.locator('[data-annual-flow-summary]').click();
+        await flow.evaluate(el=>{for(let n=el;n;n=n.parentElement)n.scrollTop=0;window.scrollTo(0,0);});
+        await page.screenshot({path:path.join(process.env.ANNUAL_STORY_REVIEW_DIR || os.tmpdir(),'annual-story-317-390.png')});
+      }
       assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
       assert.equal(await page.evaluate(()=>localStorage.getItem(RiceOS.schema.STORE_KEY)),baseline);
       console.log(`PASS primary annual story ${width}: actual milestone art, one water period, detail/back, memo and no writes`);

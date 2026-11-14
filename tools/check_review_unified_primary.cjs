@@ -1,0 +1,80 @@
+"use strict";
+const assert=require("node:assert/strict"),path=require("node:path"),os=require("node:os");
+const {chromium}=require("C:/Users/Keisuke/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright");
+(async()=>{
+ const browser=await chromium.launch({headless:true,executablePath:"C:/Program Files/Google/Chrome/Application/chrome.exe"});
+ try{for(const width of [360,390,1280]){
+  const context=await browser.newContext({viewport:{width,height:900},serviceWorkers:"block"});
+  try{
+   const page=await context.newPage(),errors=[]; page.on("pageerror",e=>errors.push(e.message));page.on("dialog",d=>d.dismiss());
+   await page.clock.setFixedTime(new Date("2026-11-14T03:00:00Z"));await page.route("https://**/*",r=>r.abort());
+   await page.goto("http://127.0.0.1:4182/index.html",{waitUntil:"networkidle"});
+   const fixture=await page.evaluate(()=>{
+    const S=RiceOS.state,f=S.addField("統合確認の田んぼ"),v=S.addVariety("確認用の品種");S.updateField(f,{varietyId:v,areaA:20});
+    const d=RiceOS.utils.clone(S.data());
+    d.fieldWorks.push({workId:"unified-plant",date:"2025-05-14",cropYear:2025,workName:"田植え",fieldIds:[f]});
+    d.growthLogs.push({logId:"unified-leaf",fieldId:f,date:"2025-06-01",leafColor:4,memo:"通常の観察記録"},
+      {logId:"unified-panicle",fieldId:f,date:"2025-07-20",panicleLengthMm:1});
+    if(!S.replace(d,"Isolated unified route fixture"))throw Error("Fixture failed");
+    if(!S.saveDryPeriod({dryPeriodId:"unified-dry",fieldId:f,date:"2025-06-20",startDate:"2025-06-20",actualEndDate:"2025-06-30",cropYear:2025,memo:"水管理の元メモ"}))throw Error("Water fixture failed");
+    if(!S.saveMillingRecord({season:2025,varietyId:v,date:"2025-09-20",fieldIds:[f],packages:[{kg:30,bags:20}],looseKg:0}))throw Error("Milling fixture failed");
+    if(!S.saveShipment({kind:"sale",recipient:"確認用販売先",season:2025,varietyId:v,date:"2025-10-10",riceType:"brown",packages:[{kg:30,bags:4}],pricePer60Kg:18000}))throw Error("Sale fixture failed");
+    return{f,v};
+   });
+   const baseline=await page.evaluate(()=>localStorage.getItem(RiceOS.schema.STORE_KEY));
+   await page.locator('.nav-item[data-screen="annual"]:visible').click();await page.locator('#annualYear').selectOption('2025');
+   await page.locator(`[data-annual-hub-open-field="${fixture.f}"]`).click();
+   const flow=page.locator('.annual-story');await flow.waitFor();
+   assert.equal(await page.locator('.annual-field-tabs').count(),0);
+   const category=async value=>{await flow.locator('.annual-history-filter > summary').click();await flow.locator(`[data-annual-history-category="${value}"]`).click();};
+   await category('growth');assert.equal(await flow.locator('[data-annual-record-open-id="unified-leaf"]').count(),1);
+   assert.equal(await flow.locator('[data-annual-record-open-id="unified-plant"]').count(),0);
+   await category('water');assert.equal(await flow.locator('[data-annual-record-open-id="unified-dry"]').count(),1);
+   await flow.locator('[data-annual-flow-menu-id="unified-dry"]').click();await page.locator('[data-annual-record-action="edit"]').click();
+   await page.locator('#screen-irrigation.active').waitFor();assert.equal(await page.locator('#waterEditStart').inputValue(),'2025-06-20');
+   assert.equal(await page.locator('#waterEditMemo').inputValue(),'水管理の元メモ');
+   assert.equal(await page.locator('.nav-item.active').getAttribute('data-screen'),'annual');
+   await page.locator('#appBackButton').click();await flow.waitFor();
+   assert.equal(await page.locator('[data-annual-field-switch]').inputValue(),fixture.f);
+   assert.equal(await flow.locator('[data-annual-record-open-id="unified-dry"]').count(),1);
+   await flow.locator('[data-annual-field-settings]').click();await page.locator('#screen-fields.active').waitFor();
+   await page.locator('#appBackButton').click();await flow.waitFor();
+   await page.locator('[data-annual-results]:visible').click();await page.locator('#screen-harvest-ledger.active').waitFor();
+   assert.equal(await page.locator('#harvestLedgerSeason').inputValue(),'2025');assert.equal(await page.locator('#harvestLedgerVariety').inputValue(),fixture.v);
+   assert.equal(await page.locator('.nav-item.active').getAttribute('data-screen'),'annual');
+   assert.match(await page.locator('[data-harvest-ledger-sales]').innerText(),/36,000/);
+   await page.locator('#toast').waitFor({state:'hidden',timeout:10000});await page.evaluate(()=>scrollTo(0,0));
+   await page.screenshot({path:path.join(os.tmpdir(),`rice-unified-primary-harvest-${width}.png`)});
+   await page.locator('[data-harvest-ledger-new-milling]').click();await page.locator('#screen-results.active').waitFor();
+   assert.equal(await page.locator('[data-milling-field]:checked').count(),1);
+   await page.locator('#appBackButton').click();await page.locator('#screen-harvest-ledger.active').waitFor();
+   await page.locator('[data-harvest-ledger-new-shipment]').click();await page.locator('#screen-shipments.active').waitFor();
+   await page.locator('#appBackButton').click();if(await page.locator('#screen-shipments.active').count())await page.locator('#appBackButton').click();
+   await page.locator('#screen-harvest-ledger.active').waitFor();await page.locator('#appBackButton').click();await flow.waitFor();
+   assert.equal(await page.locator('[data-annual-field-switch]').inputValue(),fixture.f);
+   assert.equal(await flow.locator('[data-annual-record-open-id="unified-dry"]').count(),1);
+   await category('all');await page.locator('#toast').waitFor({state:'hidden',timeout:10000});
+   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+   assert.equal(await page.evaluate(()=>localStorage.getItem(RiceOS.schema.STORE_KEY)),baseline);
+   const originalRecords=await page.evaluate(()=>JSON.stringify({works:RiceOS.state.data().fieldWorks,growth:RiceOS.state.data().growthLogs,water:RiceOS.state.data().dryPeriods}));
+   await page.locator('[data-annual-results]').click();await page.locator('[data-harvest-ledger-new-shipment]').click();
+   await page.locator('#shipmentRecipient').fill('追加出荷の保存確認');
+   await page.locator('[data-shipment-bags]').first().fill('1');
+   await page.locator('#shipmentForm button[type="submit"]').click();await page.locator('#screen-harvest-ledger.active').waitFor();
+   assert.equal(await page.evaluate(v=>RiceOS.harvestLedger.read(2025,v).stock.remainingKg,fixture.v),450);
+   await page.locator('[data-harvest-ledger-new-milling]').click();
+   await page.locator('[data-milling-add-package="30"]').click();
+   await page.locator('[data-milling-bags]').first().fill('1');
+   await page.locator('#millingForm button[type="submit"]').click();await page.locator('#screen-harvest-ledger.active').waitFor();
+   assert.equal(await page.evaluate(v=>RiceOS.harvestLedger.read(2025,v).stock.receivedKg,fixture.v),630);
+   await page.locator('[data-harvest-ledger-new-milling]').click();
+   await page.locator('#millingForm:visible').waitFor();
+   assert.equal(await page.locator('[data-milling-bags]').count(),0,'Saved draft is not reused for the next quantity');
+   await page.locator('#appBackButton').click();await page.locator('#screen-harvest-ledger.active').waitFor();
+   assert.equal(await page.evaluate(()=>JSON.stringify({works:RiceOS.state.data().fieldWorks,growth:RiceOS.state.data().growthLogs,water:RiceOS.state.data().dryPeriods})),originalRecords);
+   await page.locator('#appBackButton').click();await flow.waitFor();
+   assert.equal(await page.locator('[data-annual-field-switch]').inputValue(),fixture.f);
+   assert.deepEqual(errors,[]);console.log(`PASS primary unified ${width}: filters, shared water editor unchanged, settings/back, scope, nested cancel no-writes, intended shipment/milling saves and totals`);
+  }finally{await context.close();}
+ }}finally{await browser.close();}
+})().catch(e=>{console.error(e);process.exitCode=1;});

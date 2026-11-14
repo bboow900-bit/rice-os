@@ -1,0 +1,41 @@
+/* Shared record destinations, with the yearly story as the only review timeline. */
+#screen-annual .annual-harvest-entry { display: grid; grid-template-columns: 68px minmax(0,1fr) 20px; gap: 14px; align-items: center; padding: 14px 12px; border: 1px solid #ddcf97; border-left: 4px solid #d1ac3c; background: #fffbed; border-radius: 8px; text-align: left; box-shadow: none; }
+#screen-annual .annual-harvest-entry > img { width: 68px; height: 76px; object-fit: contain; }
+#screen-annual .annual-harvest-entry b { display: block; font-size: 21px; line-height: 1.4; color: #3f4c27; }
+#screen-annual .annual-harvest-entry small { display: block; font-size: 13px; line-height: 1.6; font-weight: 400; color: #5b6449; }
+#screen-annual .annual-story .annual-year-flow-head { display: flex; justify-content: space-between; gap: 8px; overflow: visible; }
+#screen-annual .annual-story .annual-year-flow-head h3 { min-width: 0; font-size: 22px; }
+#screen-annual .annual-history-filter { position: relative; flex: 0 0 auto; margin: 0; border: 0; border-radius: 0; padding: 0; background: transparent; box-shadow: none; }
+#screen-annual .annual-history-filter > summary { display: flex; align-items: center; justify-content: center; gap: 5px; min-height: 44px; padding: 7px 8px; border: 1px solid #c6d3bd; border-radius: 6px; background: #fff; color: #315337; font-size: 12px; font-weight: 600; list-style: none; cursor: pointer; }
+#screen-annual .annual-history-filter > summary::-webkit-details-marker { display: none; }
+#screen-annual .annual-history-filter > summary svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.7; }
+#screen-annual .annual-history-filter-menu { position: absolute; top: calc(100% + 5px); right: 0; width: 176px; z-index: 7; padding: 5px; border: 1px solid #c6d3bd; border-radius: 6px; background: #fff; box-shadow: 0 6px 18px #203c3026; }
+#screen-annual .annual-history-filter-menu button { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; min-height: 44px; padding: 9px 10px; margin: 0; border: 0; border-radius: 4px; background: #fff; color: #2e4a32; font-size: 14px; font-weight: 500; box-shadow: none; text-align: left; }
+#screen-annual .annual-history-filter-menu button[aria-pressed="true"] { background: #edf5e6; color: #315f30; font-weight: 700; }
+#screen-annual .annual-story .annual-field-settings-link { display: inline-flex; align-items: center; min-height: 44px; padding: 3px 0; margin: -6px 0 4px; border: 0; border-radius: 0; background: none; color: #466741; font-size: 12px; box-shadow: none; }
+#screen-annual .annual-history-empty { padding: 18px 0; color: #53624d; }
+#screen-annual .annual-history-empty p { font-size: 14px; }
+#screen-annual .annual-history-empty button { min-height: 44px; border-radius: 6px; }
+#screen-annual .annual-legacy-water-route > header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+#screen-harvest-ledger .hl-header { border-bottom: 1px solid #d8dfcd; padding-bottom: 10px; }
+#screen-harvest-ledger .hl-header img { width: 104px; height: 110px; }
+#screen-harvest-ledger .hl-balance { display: block; padding: 18px 0; border: 0; border-radius: 0; background: #fff9e8; border-top: 3px solid #d2b34a; border-bottom: 1px solid #e4d9ae; }
+#screen-harvest-ledger .hl-balance > :is(h3,p,div) { padding-right: 14px; padding-left: 14px; text-align: left; }
+#screen-harvest-ledger .hl-balance-value { margin: 8px 0; color: #695321; }
+#screen-harvest-ledger .hl-balance-value strong { font-size: 40px; }
+#screen-harvest-ledger .hl-balance-value small { margin-left: 6px; font-size: 16px; }
+#screen-harvest-ledger :is(.hl-sales,.hl-performance) { margin-top: 22px; }
+#screen-harvest-ledger .hl-sales dd { color: #6c521d; }
+#screen-harvest-ledger .hl-scope-note { margin: -7px 0 12px; color: #5d674e; font-size: 12px; line-height: 1.6; }
+#screen-harvest-ledger dl.hl-sales { padding: 14px 0 14px 12px; margin: 12px 0 18px; border-left: 4px solid #c9a33b; background: #fffdf5; }
+#screen-harvest-ledger .hl-sales > div { display: block; }
+#screen-harvest-ledger .hl-sales dd { text-align: left; margin-top: 6px; font-size: 32px; }
+#screen-harvest-ledger .hl-actions button[data-harvest-ledger-performance] { background: #fff; border: 1px solid #c5d2be; color: #41663b; font-size: 15px; }
+#screen-harvest-ledger .hl-actions { grid-template-columns: minmax(0,1fr); }
+#screen-harvest-ledger .hl-actions button:first-child { background: #3b7144; }
+#screen-harvest-ledger .hl-actions button:nth-child(2) { background: #8b6926; }
+#screen-harvest-ledger .hl-more button { width: 100%; text-align: left; border-radius: 6px; }
+@media (min-width: 700px) {
+  #screen-harvest-ledger .harvest-ledger { max-width: 760px; margin: auto; }
+  #screen-harvest-ledger .hl-actions { grid-template-columns: repeat(2,minmax(0,1fr)); }
+}

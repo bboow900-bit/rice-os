@@ -172,7 +172,8 @@ assert(/function isOpen\(\)/.test(bottomSheetSource) && /RiceOS\.bottomSheet = \
 assert(/const sheetOpen = Boolean\(RiceOS\.bottomSheet/.test(appSource) && /RiceOS\.bottomSheet\.close\(\);[\s\S]*return;/.test(appSource), "Shared back must close the record sheet before any old route");
 assert(/function openInput\(screenId, originScreen, options\)/.test(appSource) && /inputOriginScreen = originScreen \|\| activeScreen \|\| "home"/.test(appSource), "A new record input must remember its source tab");
 assert(/inputOriginParents\.pop\(\)/.test(appSource) && /inputOriginParents = \[\]/.test(appSource), "Nested inputs must restore their parent and clear on tab changes");
-assert(/if \(inputOriginScreen\) \{[\s\S]*show\(origin, \{ skipHistory: true \}\);/.test(appSource), "Shared back must return a cancelled input to its source tab");
+assert(/function returnFromInput\(\)[\s\S]*show\(origin, \{ inputTransition: true, scrollTop:/.test(appSource)
+  && /if \(inputOriginScreen && !hasInputChildRoute\(\)\) \{ returnFromInput\(\); return; \}/.test(appSource), "Shared back must return a cancelled input to its source tab and scroll position");
 assert(/RiceOS\.app\.openInput\(screen, originScreen\)/.test(bottomSheetSource), "Date-sheet record entry must use the source-aware input route");
 assert(/button\.dataset\.screen === "field-work"[\s\S]*RiceOS\.navigation\.clear\(\);[\s\S]*RiceOS\.bottomSheet\.open\(U\.today\(\)\)/.test(navSource), "Opening record input from bottom navigation must clear stale detail routes before the sheet opens");
 

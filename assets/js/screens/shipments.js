@@ -10,6 +10,8 @@
   let view = "list";
   let selectedId = "";
   let editorOrigin = "list";
+  let originOnly = false;
+  let editorBaseline = "";
   let draft = null;
   let errorMessage = "";
   let saving = false;
@@ -286,6 +288,7 @@
     syncBack();
   }
   function openNew(date, scope = {}) {
+    originOnly = scope.originOnly === true;
     selectedId = "";
     editorOrigin = "list";
     errorMessage = "";
@@ -296,9 +299,11 @@
     if (Object.hasOwn(KINDS, scope.kind)) draft.kind = scope.kind;
     view = "editor";
     render();
+    if (originOnly) { captureDraft(); editorBaseline = JSON.stringify(draft); }
   }
-  function openDetail(id) {
+  function openDetail(id, options = {}) {
     if (!record(id)) return false;
+    originOnly = options.originOnly === true;
     selectedId = id;
     view = "detail";
     draft = null;
@@ -316,6 +321,7 @@
     errorMessage = "";
     view = "editor";
     render();
+    if (originOnly) { captureDraft(); editorBaseline = JSON.stringify(draft); }
   }
   function captureDraft() {
     const form = U.$("shipmentForm");
@@ -382,19 +388,29 @@
     errorMessage = "";
     selectedId = id || "";
     view = selectedId && record(selectedId) ? "detail" : "list";
+    const returnToOrigin = originOnly;
+    if (returnToOrigin) { originOnly = false; view = "list"; selectedId = ""; }
     render();
+    if (returnToOrigin) RiceOS.app.back();
   }
   function canHandleBack() { return view !== "list"; }
   function handleBack() {
     if (!canHandleBack() || saving) return false;
+    if (originOnly && view === "editor") {
+      captureDraft();
+      if (JSON.stringify(draft) !== editorBaseline && !confirm("入力中の変更を取り消して戻りますか？")) return true;
+    }
     view = view === "editor" && editorOrigin === "detail" && record(selectedId) ? "detail" : "list";
     if (view === "list") selectedId = "";
     draft = null;
     errorMessage = "";
     render();
+    if (originOnly && view === "list") { originOnly = false; RiceOS.app.back(); }
     return true;
   }
   function resetNavigation() {
+    originOnly = false;
+    editorBaseline = "";
     view = "list";
     selectedId = "";
     draft = null;
@@ -454,7 +470,7 @@
         const row = record(selectedId);
         if (!row || !confirm(`${U.fd(row.date)} ${row.recipient || "相手先未設定"}の記録を削除しますか？`)) return;
         try {
-          if (state.deleteShipment && state.deleteShipment(selectedId)) resetNavigation();
+          if (state.deleteShipment && state.deleteShipment(selectedId)) { const returnToOrigin = originOnly; resetNavigation(); if (returnToOrigin) RiceOS.app.back(); }
           else showError("削除できませんでした。記録を確認してください。");
         } catch (error) { showError(error.message || "削除できませんでした。"); }
         return;

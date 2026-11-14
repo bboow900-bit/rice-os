@@ -7,6 +7,8 @@
   let activeScreen = "home";
   let inputOriginScreen = "";
   let inputOriginParents = [];
+  let inputReturnContext = null;
+  let originPrimary = "";
   let bound = false;
   const initialScreens = new Set([
     "home",
@@ -69,14 +71,20 @@
 
   function show(screenId, options) {
     const opts = options || {};
+    // Saved forms also return through show(), rather than the back button.
+    if (!opts.inputTransition && inputOriginScreen === screenId && inputReturnContext) {
+      return returnFromInput();
+    }
     if (!initialScreens.has(screenId)) screenId = "home";
     activeScreen = screenId;
     U.$$(".screen").forEach((section) => {
       section.classList.toggle("active", section.id === `screen-${screenId}`);
     });
     const harvestChild = ["results", "shipments"].includes(screenId)
-      && (inputOriginScreen === "harvest-ledger" || inputOriginParents.includes("harvest-ledger"));
-    const navScreen = harvestChild || ["machines", "tractor-settings", "transplanter-settings", "seeder-settings", "herbicide", "harvest-ledger"].includes(screenId) ? "data" : ["shipments", "harvest-performance"].includes(screenId) ? "annual" : screenId;
+      && (inputOriginScreen === "harvest-ledger" || inputOriginParents.some(parent => parent.screen === "harvest-ledger"));
+    const routePrimary = ["home", "fields", "calendar", "annual", "outlook", "data"].includes(opts.navOrigin) ? opts.navOrigin : "";
+    const navScreen = routePrimary || (["harvest-ledger", "results", "shipments", "harvest-performance", "irrigation", "growth", "field-work", "other-work"].includes(screenId) && originPrimary)
+      || (harvestChild || ["machines", "tractor-settings", "transplanter-settings", "seeder-settings", "herbicide", "harvest-ledger"].includes(screenId) ? "data" : ["shipments", "harvest-performance"].includes(screenId) ? "annual" : screenId);
     U.$$(".nav-item").forEach((button) => {
       button.classList.toggle("active", button.dataset.screen === navScreen);
     });
@@ -85,7 +93,22 @@
     const mod = screenModule(screenId);
     if (mod && typeof mod.render === "function") mod.render();
     updateBackButton();
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    window.scrollTo({ top: opts.scrollTop || 0, behavior: opts.scrollTop !== undefined ? "instant" : "smooth" });
+  }
+
+  function returnFromInput() {
+    const origin = inputOriginScreen;
+    const context = inputReturnContext;
+    const parent = inputOriginParents.pop();
+    inputOriginScreen = parent ? parent.screen : "";
+    inputReturnContext = parent ? parent.context : null;
+    originPrimary = context ? context.primary : "";
+    show(origin, { inputTransition: true, scrollTop: context ? context.scrollTop : 0 });
+  }
+
+  function hasInputChildRoute() {
+    return Boolean(inputReturnContext && RiceOS.navigation?.snapshot
+      && RiceOS.navigation.snapshot().length > inputReturnContext.routeDepth);
   }
 
   function back() {
@@ -98,7 +121,7 @@
     }
     const ledger = ["materials", "seeder-settings", "recipes", "tractor-settings", "transplanter-settings", "results", "irrigation"].includes(activeScreen) ? screenModule(activeScreen) : null;
     if (ledger && ledger.canHandleBack && ledger.canHandleBack() && ledger.handleBack()) { updateBackButton(); return; }
-    if (ledger && inputOriginScreen) {const origin = inputOriginScreen; inputOriginScreen = inputOriginParents.pop() || "";show(origin,{skipHistory:true});return;}
+    if (ledger && inputOriginScreen && !hasInputChildRoute()) { returnFromInput(); return; }
     if (activeScreen === "shipments" && RiceOS.screens.shipments && RiceOS.screens.shipments.canHandleBack() && RiceOS.screens.shipments.handleBack()) {
       updateBackButton();
       return;
@@ -107,10 +130,8 @@
       updateBackButton();
       return;
     }
-    if (activeScreen === "herbicide" && inputOriginScreen) {
-      const origin = inputOriginScreen;
-      inputOriginScreen = inputOriginParents.pop() || "";
-      show(origin, { skipHistory: true });
+    if (activeScreen === "herbicide" && inputOriginScreen && !hasInputChildRoute()) {
+      returnFromInput();
       return;
     }
     // Close temporary review layers before walking back through selected fields.
@@ -119,16 +140,10 @@
       updateBackButton();
       return;
     }
+    // An input layer must return before consuming its underlying field route.
+    if (inputOriginScreen && !hasInputChildRoute()) { returnFromInput(); return; }
     if (RiceOS.navigation && RiceOS.navigation.back && RiceOS.navigation.back()) {
       updateBackButton();
-      return;
-    }
-    // New records opened from the date sheet are not routes yet. Keep their
-    // source tab so cancelling an input never strands the user on a form.
-    if (inputOriginScreen) {
-      const origin = inputOriginScreen;
-      inputOriginScreen = inputOriginParents.pop() || "";
-      show(origin, { skipHistory: true });
       return;
     }
     const mod = screenModule(activeScreen);
@@ -153,16 +168,23 @@
   }
 
   function openInput(screenId, originScreen, options) {
-    if (options && options.nested) inputOriginParents.push(inputOriginScreen);
+    const primary = ["home", "fields", "calendar", "annual", "outlook", "data"].includes(originScreen) ? originScreen
+      : originPrimary || (U.$$(".nav-item").find(button => button.classList.contains("active")) || {}).dataset?.screen || originScreen || activeScreen;
+    if (options && options.nested) inputOriginParents.push({ screen: inputOriginScreen, context: inputReturnContext });
     else inputOriginParents = [];
     inputOriginScreen = originScreen || activeScreen || "home";
-    show(screenId, { skipHistory: true });
+    inputReturnContext = { scrollTop: window.scrollY || 0, primary, routeDepth: RiceOS.navigation?.snapshot ? RiceOS.navigation.snapshot().length : 0 };
+    originPrimary = primary;
+    show(screenId, { skipHistory: true, inputTransition: true });
+    if (screenId === "harvest-ledger" && RiceOS.screens.harvestLedger?.setScope) RiceOS.screens.harvestLedger.setScope(options?.scope || { fieldIds: [], date: U.today() });
     updateBackButton();
   }
 
   function clearInputOrigin() {
     inputOriginScreen = "";
     inputOriginParents = [];
+    inputReturnContext = null;
+    originPrimary = "";
     updateBackButton();
   }
 
@@ -376,9 +398,10 @@
       RiceOS.screens.growth.editLog(id);
       return true;
     }
-    if ((kind === "dry" || kind === "irrigation") && RiceOS.screens.annual) {
-      show("annual", { skipHistory: true });
-      return RiceOS.screens.annual.openWaterEditor(kind, id);
+    if ((kind === "dry" || kind === "irrigation") && RiceOS.screens.irrigation?.editPeriod) {
+      show("irrigation", { skipHistory: true, navOrigin: route.options?.originScreen });
+      RiceOS.screens.irrigation.editPeriod(kind, id);
+      return true;
     }
     if (kind === "other" && RiceOS.screens.otherWork) {
       show("other-work", { skipHistory: true });

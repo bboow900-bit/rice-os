@@ -41,7 +41,7 @@ assert.equal(S.shipments().filter(row => row.shipmentId === sale.shipmentId).len
 assert(S.saveShipmentIssue({ season: 2026, varietyId: "v", date: "2026-10-03", millingId: m.millingId, reason: "Check", costYen: 1000 }));
 assert.equal(L.read(2026, "v").stock.remainingKg, 1080);
 const routes = [];
-R.app = { openInput(...args) { routes.push(args); }, syncBackButton() {} };
+R.app = { openInput(...args) { routes.push(args); }, back() { routes.push(["back"]); }, syncBackButton() {} };
 load("screens/shipments.js");
 hosts.shipmentContent = host(); hosts.harvestLedgerContent = host();
 load("screens/harvest-ledger.js");
@@ -64,7 +64,7 @@ assert(shipments.openDetail("legacy")); assert.match(hosts.shipmentContent.inner
 assert.equal(raw(), before);
 let scopeCall;
 R.screens.results = { openMillingForYear(...args) { scopeCall = args; }, openMillingDetail(id) { scopeCall = id; }, openMillingLedger() { scopeCall = "ledger"; }, openShipmentIssues() { scopeCall = "issues"; } };
-click("data-harvest-ledger-new-milling"); assert.deepEqual(JSON.parse(JSON.stringify(scopeCall)), ["2026", "v", { originOnly: true }]);
+click("data-harvest-ledger-new-milling"); assert.deepEqual(JSON.parse(JSON.stringify(scopeCall)), ["2026", "v", { originOnly: true, fieldIds: [], date: R.utils.today() }]);
 click("data-harvest-ledger-record", { harvestLedgerType: "milling", harvestLedgerRecord: m.millingId }); assert.equal(scopeCall, m.millingId);
 click("data-harvest-ledger-record", { harvestLedgerType: "shipment", harvestLedgerRecord: sale.shipmentId }); assert.match(hosts.shipmentContent.innerHTML, /1等/);
 click("data-harvest-ledger-issues"); assert.equal(scopeCall, "issues");
@@ -115,9 +115,12 @@ const workflow = vm.runInContext(`(function () {
   function resetIssue() {} function resetForm() {}
   ${["startEditor", "finishEditor", "cancelEditor", "editorValue", "canHandleBack", "handleBack", "requestBack", "openMillingForYear"].map(name => sourceFunction(resultsSource, name)).join("\n")}
   let activeScreen = "results", inputOriginScreen = "harvest-ledger";
+  let inputReturnContext = null, originPrimary = "";
   const inputOriginParents = [];
   function screenModule() { return {canHandleBack,handleBack}; }
   function updateBackButton() {} function show(screen) { activeScreen = screen; }
+  ${sourceFunction(appSource, "hasInputChildRoute")}
+  ${sourceFunction(appSource, "returnFromInput")}
   ${sourceFunction(appSource, "back")}
   return { open: openMillingForYear, back, cancel: requestBack, finish: () => finishEditor("milling", "saved"),
     dirty() { millingDraft.memo = "changed"; }, status: () => ({activeScreen, ledgerView, origin: millingOriginOnly, history: ledgerHistory.length}),
@@ -136,6 +139,10 @@ workflow.reenter(); assert(workflow.open(2026, "v")); workflow.back();
 assert.equal(workflow.status().activeScreen, "results", "Ordinary entry still cancels to its internal list");
 workflow.reenter(); assert(workflow.open(2026, "v", { originOnly: true })); workflow.finish();
 assert.equal(workflow.status().origin, false, "Save clears the one-shot cancellation origin");
+assert.equal(workflow.status().activeScreen, "harvest-ledger", "Ledger-origin saves return to the common ledger");
+workflow.reenter(); c.confirm = () => { throw Error("Completed milling must not be treated as an unsaved draft"); };
+assert(workflow.open(2026, "v", { originOnly: true })); workflow.back();
+c.confirm = () => true;
 assert.equal(raw(), noWrite); R.app.back = previousBack;
 assert(S.saveHarvestYearReview({ season: 2026, varietyId: "v", areaA: 50, completed: true }));
 const yieldBefore = raw(); screen.render();

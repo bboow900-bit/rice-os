@@ -35,7 +35,7 @@ assert(/headingSaveApproved/.test(growth) && /requestHeadingConfirmation/.test(g
 assert(/出穂日は保存しませんでした/.test(growth), "The not-yet action must be a no-op for the heading anchor");
 assert(/同じ年の出穂確認が登録済み/.test(state), "State must reject same-year duplicate heading observations even when UI is bypassed");
 assert(/function isObservedHeading\(row\) \{\s*return Boolean\(row && row\.headingObserved\);/.test(annual), "Annual history must not call a manual stage selection an observed heading");
-assert(/label: "現場ステージ"/.test(annual) && /category: fact\.kind === "manual-stage" \? "現場判定" : "生育実測"/.test(annual), "Annual history must visibly distinguish field judgement from measurement");
+assert(/label: "現場ステージ"/.test(annual) && /category: fact\.kind === "manual-stage" \? "現場判定" : fact\.kind === "growth-observation" \? "生育記録" : "生育実測"/.test(annual), "Annual history must visibly distinguish field judgement, ordinary observation and measurement");
 assert(!/headingObserved \|\| log\.stageConfirmed && log\.observedStage === "heading"/.test(state), "Deleting a heading record must not promote a manual heading stage into a factual observation");
 
 assert(/evidenceKind: usePrediction \? "prediction" : displayedEvidence && displayedEvidence\.kind \|\| ""/.test(agro), "Stage service must expose display evidence kind without changing records");

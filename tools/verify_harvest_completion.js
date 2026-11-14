@@ -124,7 +124,7 @@ const savedBefore = JSON.stringify(state.data());
 const renderSummary = context.RiceOS.harvestSummaryTest.renderEndSeasonReflection;
 const summary = renderSummary(state.field("a"), { year: 2026, harvest: date, harvestStatus: status("a") });
 assert(summary.includes("980")); assert(summary.includes("40")); assert(summary.includes(date));
-assert(summary.includes("data-annual-results"));
+assert(annualCode.includes('data-annual-results><img'), "Shared harvest entry remains in the field overview, outside the duplicate result summary");
 const partialSummary = renderSummary(state.field("b"), { year: 2026, harvest: "", harvestStatus: status("b") });
 assert(!partialSummary.includes('class="annual-compare-check complete"'));
 assert.equal(JSON.stringify(state.data()), savedBefore);
@@ -161,12 +161,14 @@ context.RiceOS.navigation = { clear() {
   resultNodes.annualYear.value = "all";
 } };
 context.RiceOS.app = { openInput(screen, origin) {
-  assert(cleared); assert.equal(screen, "results"); assert.equal(origin, "annual");
+  assert(!cleared); assert.equal(screen, "harvest-ledger"); assert.equal(origin, "annual");
   assert.equal(context.resultOrigin().field, "a"); assert.equal(context.resultOrigin().review, "compare");
   assert.equal(resultNodes.annualYear.value, "2026");
 } };
 context.RiceOS.screens.results = { resetForm() { resultNodes.rSeason.value = ""; resultNodes.rVariety.value = ""; } };
+let ledgerScope;
+context.RiceOS.screens.harvestLedger = { setScope(scope) { ledgerScope = scope; } };
 vm.runInContext("openHarvestResults()", context);
 assert.equal(context.resultOrigin().fromHub, true); assert.equal(context.resultOrigin().filter, "harvest");
-assert.equal(resultNodes.rSeason.value, "2026"); assert.equal(resultNodes.rVariety.value, state.field("a").varietyId);
+assert.equal(ledgerScope.season, "2026"); assert.equal(ledgerScope.varietyId, state.field("a").varietyId);
 console.log("PASS harvest completion: field/year/asOf, mixed group, schedule isolation, legacy, CRUD, roundtrip, failures and snapshot retention");
