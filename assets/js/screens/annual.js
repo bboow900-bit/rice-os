@@ -2255,10 +2255,11 @@
       : "比較できる事前記録なし";
     return `<section class="harvest-recap" aria-label="収穫の振り返り">
       <header><span>${esc(year)}年産 / ${esc(field.name)}</span><h3>収穫の振り返り</h3><p>${esc(U.fd(work.date))}の稲刈り${works.length > 1 ? "（この年の最新記録）" : ""}</p><p data-harvest-recap-status>${esc(statusLabel)}</p></header>
-      <div class="harvest-recap-assessment"><small>現場での最終判断</small><strong>${esc(model.assessment.recorded ? model.assessment.label : "評価未登録")}</strong>${model.timing.memo ? `<p>${esc(model.timing.memo)}</p>` : ""}</div>
+      <div class="harvest-recap-assessment"><small>現場での最終判断</small><strong>${esc(model.assessment.recorded ? model.assessment.label : "評価未登録")}</strong>${model.timing.delayReasonLabel ? `<p>時期がずれた理由：${esc(model.timing.delayReasonLabel)}</p>` : ""}${model.timing.memo ? `<p>${esc(model.timing.memo)}</p>` : ""}</div>
       <dl class="harvest-recap-numbers"><div><dt>作業に記録した収量</dt><dd>${model.metrics.kg === null ? "未登録" : `${esc(model.metrics.kg)} kg`}</dd><small>${esc(model.metrics.scopeLabel)} / ${esc(model.metrics.basis || "測定条件未登録")}</small></div><div><dt>収穫時の出穂後積算温度</dt><dd>${thermal.available ? `${esc(Math.round(thermal.total))} ℃` : "未確認"}</dd><small>${esc(thermal.label)}${thermal.legacy && thermal.partial ? " / 一部欠測・取得済み分のみ" : ""}</small></div></dl>
       <div class="harvest-recap-reference"><b>データ上の参考比較</b><p>保存した見通し：${esc(reference(model.comparison.day))}</p><p>積算温度の目安：${esc(reference(model.comparison.thermal))}</p><small>現場の適期判断とは別の参考情報です。</small></div>
       ${model.summaryLines.length ? `<details><summary>来年に引き継ぐ材料</summary><ul class="harvest-handoff-facts">${model.summaryLines.map(line => `<li>${esc(line)}</li>`).join("")}</ul></details>` : '<p class="muted">現場の評価や気づきは、稲刈り詳細から記録できます。</p>'}
+      <button type="button" class="secondary" data-annual-harvest-edit="${U.attr(work.workId)}" data-harvest-edit-section="reason">${model.timing.delayReason || model.timing.memo ? "刈り取りの理由・事情を編集" : "刈り取りが遅れた理由を記入"}</button>
       <button type="button" class="secondary" data-annual-harvest-detail="${U.attr(work.workId)}">稲刈りの詳細・評価を確認 <span aria-hidden="true">›</span></button>
     </section>`;
   }
@@ -2658,7 +2659,7 @@
         ${model.timing.idealStartDate || model.timing.idealEndDate ? `<p>見立てた適期 ${esc([model.timing.idealStartDate, model.timing.idealEndDate].filter(Boolean).map(U.fd).join(" ～ "))}</p>` : ""}
         ${model.timing.delayReasonLabel ? `<p>日程の事情：${esc(model.timing.delayReasonLabel)}</p>` : ""}
         ${model.timing.memo ? `<p class="harvest-note">${esc(model.timing.memo)}</p>` : ""}
-        <button type="button" class="secondary" data-annual-harvest-edit="${U.attr(row.workId)}" data-harvest-edit-section="timing">収穫実績・評価を編集</button>
+        <button type="button" class="secondary" data-annual-harvest-edit="${U.attr(row.workId)}" data-harvest-edit-section="timing">評価・遅れた理由を編集</button>
         ${!status ? `<button type="button" class="secondary" data-annual-harvest-confirm="${U.attr(row.workId)}" data-harvest-field="${U.attr(field.fieldId)}">この圃場の刈り取り完了を確認</button>` : ""}
       </section>
       <section class="annual-record-detail-section"><h3>収穫時の数字</h3><p class="muted">${esc(model.metrics.scopeLabel)}</p><dl class="harvest-result-metrics">
@@ -3165,9 +3166,14 @@
     RiceOS.app.openInput("field-work", "annual");
     RiceOS.screens.fieldWork.editWork(workId);
     U.$("fwHarvestReview").open = true;
-    if (section === "timing") {
+    if (section === "timing" || section === "reason") {
       U.$("fwHarvestTiming").open = true;
-      U.$("fwHarvestTiming").scrollIntoView({ block: "start" });
+      const fieldForm = Array.from(U.$("fwHarvestTimingFields").querySelectorAll("[data-field-id]")).find(node => node.dataset.fieldId === fieldId);
+      const target = section === "reason" && fieldForm?.querySelector('[data-timing-key="delayReason"]');
+      if (target) {
+        target.focus({ preventScroll: true });
+        target.scrollIntoView({ block: "center" });
+      } else (fieldForm || U.$("fwHarvestTiming")).scrollIntoView({ block: "start" });
     } else U.$("fwHarvestYieldKg").focus();
   }
 

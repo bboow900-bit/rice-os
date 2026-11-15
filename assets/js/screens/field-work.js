@@ -394,14 +394,14 @@
           <label>見立てた適期・開始${input("idealStartDate", "date", value.idealStartDate)}</label>
           <label>見立てた適期・終了${input("idealEndDate", "date", value.idealEndDate)}</label>
         </div>
-        <details><summary>判断材料・メモ</summary>
+        <label>刈り取り時期がずれた理由（任意）${timingSelect("delayReason", value.delayReason || "")}</label>
+        <label>刈り取りが遅れた事情・時期を選んだ理由（任意）<textarea data-timing-key="memo" placeholder="例：雨が続いた、田面が軟らかかった、乾燥機待ち">${U.escapeHTML(value.memo || "")}</textarea></label>
+        <details><summary>籾水分・色の記録</summary>
           <div class="form-grid dense">
             <label>乾燥前の籾水分（％）${input("moisturePct", "number", value.moisturePct, 'min="0" max="100" step="0.1" inputmode="decimal"')}</label>
             <label>水分測定日${input("moistureDate", "date", value.moistureDate)}</label>
             <label>籾の色${timingSelect("yellowing", value.yellowing || "")}</label>
-            <label>日程がずれた理由${timingSelect("delayReason", value.delayReason || "")}</label>
           </div>
-          <label>判断の根拠・後から分かったこと<textarea data-timing-key="memo">${U.escapeHTML(value.memo || "")}</textarea></label>
         </details>
         <button type="button" class="secondary" data-timing-clear="${U.attr(id)}">この圃場の評価を解除</button>
       </div>`;

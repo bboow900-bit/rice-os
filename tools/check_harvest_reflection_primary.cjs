@@ -62,6 +62,17 @@ const appUrl = process.env.RICE_TEST_URL || "http://127.0.0.1:4182/index.html";
       await detail.locator('[data-annual-record-detail-back]:visible').click();
       await page.locator('.annual-story').waitFor();
       assert.equal(await page.evaluate(() => localStorage.getItem(RiceOS.schema.STORE_KEY)), before);
+      await recap.locator('[data-harvest-edit-section="reason"]').click();
+      const timing = page.locator(`#fwHarvestTimingFields [data-field-id="${fieldId}"]`);
+      await timing.locator('[data-timing-key="delayReason"]').waitFor({ state: 'visible' });
+      await timing.locator('[data-timing-key="memo"]').waitFor({ state: 'visible' });
+      assert.equal(await page.evaluate(() => document.activeElement.dataset.timingKey), 'delayReason');
+      await timing.locator('[data-timing-key="delayReason"]').selectOption('machine');
+      await timing.locator('[data-timing-key="memo"]').fill('乾燥機の順番待ち。取消テストのため保存しない。');
+      await page.screenshot({ path: path.join(os.tmpdir(), `harvest-reason-primary-${width}.png`) });
+      await page.locator('#appBackButton').click();
+      await recap.waitFor();
+      assert.equal(await page.evaluate(() => localStorage.getItem(RiceOS.schema.STORE_KEY)), before);
       console.log(`PASS primary harvest reflection ${width}: actual timeline/detail/back, operator judgment, yield, legacy thermal, no writes`);
     } finally { await context.close(); }
   }} finally { await browser.close(); }
