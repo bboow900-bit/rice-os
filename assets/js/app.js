@@ -83,7 +83,7 @@
     const harvestChild = ["results", "shipments"].includes(screenId)
       && (inputOriginScreen === "harvest-ledger" || inputOriginParents.some(parent => parent.screen === "harvest-ledger"));
     const routePrimary = ["home", "fields", "calendar", "annual", "outlook", "data"].includes(opts.navOrigin) ? opts.navOrigin : "";
-    const navScreen = routePrimary || (["harvest-ledger", "results", "shipments", "harvest-performance", "irrigation", "growth", "field-work", "other-work"].includes(screenId) && originPrimary)
+    const navScreen = routePrimary || (["harvest-ledger", "results", "shipments", "harvest-performance", "irrigation", "growth", "field-work", "other-work", "materials", "herbicide"].includes(screenId) && originPrimary)
       || (harvestChild || ["machines", "tractor-settings", "transplanter-settings", "seeder-settings", "herbicide", "harvest-ledger"].includes(screenId) ? "data" : ["shipments", "harvest-performance"].includes(screenId) ? "annual" : screenId);
     U.$$(".nav-item").forEach((button) => {
       button.classList.toggle("active", button.dataset.screen === navScreen);
@@ -213,6 +213,8 @@
     });
     U.$$(".nav-item").forEach((button) => {
       button.addEventListener("click", () => {
+        const current = screenModule(activeScreen);
+        if (current && typeof current.canLeave === "function" && !current.canLeave()) return;
         clearInputOrigin();
         if (activeScreen === "annual" && RiceOS.screens.annual && RiceOS.screens.annual.resetNavigation) {
           RiceOS.screens.annual.resetNavigation();

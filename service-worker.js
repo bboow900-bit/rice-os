@@ -1,9 +1,14 @@
-const CACHE_NAME = "rice-karte-20261115-321";
-const APP_VERSION = "20261115_ver321";
+const CACHE_NAME = "rice-karte-20261117-323";
+const APP_VERSION = "20261117_ver323";
 const CACHE_PREFIX = "rice-karte-";
 const RETAINED_APP_CACHES = 2;
 
 const APP_SHELL = [
+  `./assets/css/annual-reflection.css?v=${APP_VERSION}`,
+  `./assets/css/material-review.css?v=${APP_VERSION}`,
+  `./assets/js/ui/material-review.js?v=${APP_VERSION}`,
+  "./assets/images/material-review/materials-rice.png",
+  "./assets/images/material-review/rice-weeds.png",
   `./assets/css/harvest-reflection.css?v=${APP_VERSION}`,
   `./assets/js/core/harvest-review.js?v=${APP_VERSION}`,
   "./",

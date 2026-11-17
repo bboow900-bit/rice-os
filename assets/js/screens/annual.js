@@ -68,6 +68,7 @@
   const thermalRetries = new Map();
   let waterEditDraft = null;
   let reviewView = "overview";
+  let materialReviewView = null;
   let compareFilter = "work";
   let timelineActionRecord = null;
   let recordDetail = null;
@@ -2228,8 +2229,7 @@
       <button type="button" class="annual-shipment-entry annual-harvest-entry" data-annual-results><img src="assets/images/light-icons/rice-sack.png" alt=""><span><b>収穫・出荷</b><small>${U.escapeHTML(year)}年産 / ${U.escapeHTML(varietyName(field))}</small></span><span aria-hidden="true">›</span></button>
       ${renderHarvestRecap(field, year)}
       <section class="annual-compare-launch annual-flow-compare-link"><div><span>振り返り</span><h3>今年と前年を比べる</h3><p>${U.escapeHTML(year)}年と${U.escapeHTML(previousYear)}年の節目・作業・水管理を、見やすく読み比べます。</p></div><button type="button" class="primary" data-annual-open-compare>比較を開く</button></section>
-      ${renderUsedMaterials(field)}
-      ${RiceOS.herbicideUI ? RiceOS.herbicideUI.renderReview(field, yearValue()) : ""}
+      ${RiceOS.materialReview ? RiceOS.materialReview.renderEntry(field, year) : renderUsedMaterials(field)}
       ${renderSeasonNotes(field)}
       ${renderCarryoverNotes(field)}
     `;
@@ -2812,14 +2812,112 @@
     ], annualSortValue);
   }
 
+  function materialEditorValues(editor) {
+    return Object.fromEntries(["date", "status", "weeds", "memo"].map(key => [key, String(editor[key] ?? "")]));
+  }
+
+  function captureMaterialReviewEditor(form) {
+    const editor = materialReviewView && materialReviewView.editor;
+    const host = U.$("annualTimeline");
+    const source = form || (host && typeof host.querySelector === "function" ? host.querySelector("[data-mr-observation-form]") : null);
+    if (!editor || !source) return editor;
+    ["date", "status", "weeds", "memo"].forEach(key => {
+      const input = source.elements.namedItem(key);
+      if (input) editor[key] = input.value;
+    });
+    return editor;
+  }
+
+  function discardMaterialReviewEditor() {
+    const editor = captureMaterialReviewEditor();
+    if (!editor) return true;
+    if (JSON.stringify(materialEditorValues(editor)) !== editor.original && !confirm("入力中の評価・メモを保存せずに戻りますか？")) return false;
+    materialReviewView.editor = null;
+    return true;
+  }
+
+  function materialReviewAssignment(id) {
+    if (!selectedFieldId || !RiceOS.herbicide || !materialReviewView) return null;
+    return RiceOS.herbicide.assignments(selectedFieldId, materialReviewView.year).find(row => row.assignmentId === id && row.fieldId === selectedFieldId && String(row.year) === materialReviewView.year) || null;
+  }
+
+  function handleMaterialReviewCommand(button) {
+    if (button.disabled || !selectedFieldId || !RiceOS.materialReview) return;
+    const field = state.field(selectedFieldId);
+    if (!field) return;
+    if (button.hasAttribute("data-mr-open")) {
+      materialReviewView = { fieldId: selectedFieldId, year: String(reviewYearValue()), selectorYear: yearValue(), tab: "result", editor: null };
+      recordDetail = null;
+      expandedFlowRecord = "";
+    } else if (button.hasAttribute("data-mr-back") || button.hasAttribute("data-mr-cancel-editor")) {
+      handleBack(); return;
+    } else if (button.hasAttribute("data-mr-tab")) {
+      if (!materialReviewView || !["result", "program", "materials"].includes(button.dataset.mrTab) || !discardMaterialReviewEditor()) return;
+      materialReviewView.tab = button.dataset.mrTab;
+    } else if (button.hasAttribute("data-mr-edit-observation") || button.hasAttribute("data-mr-new-observation")) {
+      if (!materialReviewView || !discardMaterialReviewEditor()) return;
+      const assignment = materialReviewAssignment(button.dataset.mrEditObservation || button.dataset.mrNewObservation);
+      if (!assignment) { U.toast("対象の年度・圃場・体系を確認してください。"); return; }
+      const id = button.dataset.observationId || "";
+      const saved = id && RiceOS.herbicide.observations(assignment.assignmentId).find(row => row.observationId === id && row.fieldId === selectedFieldId);
+      if (id && !saved) { U.toast("編集する観察記録が見つかりません。"); return; }
+      const weeds = saved ? saved.weeds ?? "" : "";
+      const editor = { assignmentId: assignment.assignmentId, assignmentName: assignment.name, observationId: id,
+        date: saved ? saved.date : materialReviewView.year === String(U.season(U.today())) ? U.today() : `${materialReviewView.year}-09-01`,
+        status: saved ? saved.status : "経過観察中", weeds: Array.isArray(weeds) ? weeds.join("・") : String(weeds || ""), memo: saved ? saved.memo : "", error: "",
+        originalWeeds: U.clone(weeds), originalWeedsText: Array.isArray(weeds) ? weeds.join("・") : String(weeds || ""), recordToken: saved ? JSON.stringify(saved) : "" };
+      editor.original = JSON.stringify(materialEditorValues(editor));
+      materialReviewView.editor = editor;
+    } else if (button.hasAttribute("data-mr-delete-observation")) {
+      if (!materialReviewView || !discardMaterialReviewEditor()) return;
+      const assignments = RiceOS.herbicide.assignments(selectedFieldId, materialReviewView.year);
+      const saved = assignments.flatMap(row => RiceOS.herbicide.observations(row.assignmentId)).find(row => row.observationId === button.dataset.mrDeleteObservation && row.fieldId === selectedFieldId);
+      if (!saved || !confirm(`${U.fd(saved.date)}の効果確認を削除しますか？体系・使用資材・作業履歴は残ります。`)) return;
+      RiceOS.herbicide.deleteObservation(saved.observationId);
+    } else if (button.hasAttribute("data-mr-management") || button.hasAttribute("data-mr-material-master")) {
+      if (!discardMaterialReviewEditor()) return;
+      if (button.hasAttribute("data-mr-material-master")) {
+        const id = button.dataset.mrMaterialMaster;
+        if (!state.data().materials.some(row => row.materialId === id) || !RiceOS.screens.materials?.openDetail) return;
+        RiceOS.app.openInput("materials", "annual");
+        RiceOS.screens.materials.openDetail(id);
+      } else RiceOS.app.openInput("herbicide", "annual");
+      return;
+    } else return;
+    render();
+    window.scrollTo({ top: 0, behavior: "instant" });
+  }
+
+  function saveMaterialReviewObservation(form) {
+    const editor = captureMaterialReviewEditor(form);
+    const assignment = editor && materialReviewAssignment(editor.assignmentId);
+    if (!editor || !assignment) return;
+    const current = editor.observationId && RiceOS.herbicide.observations(assignment.assignmentId).find(row => row.observationId === editor.observationId && row.fieldId === selectedFieldId);
+    if (editor.observationId && (!current || JSON.stringify(current) !== editor.recordToken)) {
+      editor.error = "記録が変更または削除されています。入力内容は保持しています。開き直して確認してください。";
+      render(); return;
+    }
+    const saved = RiceOS.herbicide.saveObservation({ ...(current || {}), observationId: editor.observationId || undefined,
+      assignmentId: assignment.assignmentId, fieldId: selectedFieldId, date: editor.date, status: editor.status,
+      weeds: editor.weeds === editor.originalWeedsText ? editor.originalWeeds : editor.weeds, memo: editor.memo });
+    if (!saved) { editor.error = "保存できませんでした。観察日・評価を確認してください。入力内容は保持しています。"; render(); return; }
+    materialReviewView.editor = null;
+    materialReviewView.tab = "result";
+    render();
+    window.scrollTo({ top: 0, behavior: "instant" });
+  }
+
   function render() {
+    captureMaterialReviewEditor();
     renderOptions();
     const field = selectedFieldId && state.field(selectedFieldId);
     const rows = rowsForYear(allRows());
     const fieldlessMilling = Boolean(recordDetail && !selectedFieldId);
     const screen = U.$("screen-annual");
+    if (materialReviewView && (!field || materialReviewView.fieldId !== field.fieldId || materialReviewView.year !== String(reviewYearValue()))) materialReviewView = null;
     if (screen) screen.classList.toggle("annual-detail-mode", Boolean(field || fieldlessMilling));
-    U.$("annualTimeline").innerHTML = fieldlessMilling ? renderAnnualRecordDetail(null,recordDetail) : field ? `${renderAnnualFieldSwitcher(field)}${recordDetail ? renderAnnualRecordDetail(field, recordDetail) : renderFieldDetail(field)}${renderTimelineActionSheet()}` : renderTop(rows);
+    if (screen) screen.classList.toggle("annual-material-review-mode", Boolean(materialReviewView && !recordDetail));
+    U.$("annualTimeline").innerHTML = fieldlessMilling ? renderAnnualRecordDetail(null,recordDetail) : field ? `${renderAnnualFieldSwitcher(field)}${recordDetail ? renderAnnualRecordDetail(field, recordDetail) : materialReviewView && RiceOS.materialReview ? RiceOS.materialReview.renderDetail(field, reviewYearValue(), materialReviewView) : renderFieldDetail(field)}${renderTimelineActionSheet()}` : renderTop(rows);
     renderSortOptions();
     if (RiceOS.app && RiceOS.app.syncBackButton) RiceOS.app.syncBackButton();
   }
@@ -2918,6 +3016,7 @@
   function closeFieldDetail() {
     if (!selectedFieldId) return false;
     selectedFieldId = "";
+    materialReviewView = null;
     compareFromHub = false;
     selectedTab = "karte";
     seasonNoteDraft = null;
@@ -2962,6 +3061,14 @@
       recordDetail = null;
       render();
       window.scrollTo({ top: 0, behavior: "smooth" });
+      return true;
+    }
+    if (materialReviewView) {
+      if (materialReviewView.editor) {
+        if (!discardMaterialReviewEditor()) return true;
+      } else materialReviewView = null;
+      render();
+      window.scrollTo({ top: 0, behavior: "instant" });
       return true;
     }
     if (expandedFlowRecord) {
@@ -3074,6 +3181,7 @@
   }
 
   function openField(fieldId, tab) {
+    materialReviewView = null;
     if (fieldId !== selectedFieldId) historyCategory = "all";
     compareFromHub = false;
     selectedFieldId = fieldId || "";
@@ -3106,6 +3214,8 @@
 
   function switchFieldWithinAnnual(fieldId) {
     if (!fieldId || fieldId === selectedFieldId || !state.field(fieldId)) return false;
+    if (!discardMaterialReviewEditor()) return false;
+    if (materialReviewView) materialReviewView = { fieldId, year: String(reviewYearValue()), selectorYear: yearValue(), tab: materialReviewView.tab, editor: null };
     compareFromHub = false;
     // The selector is a review filter, not a new navigation destination.
     // Editing still receives the selected field as its explicit return target.
@@ -3126,6 +3236,7 @@
   }
 
   function resetNavigation(options) {
+    materialReviewView = null;
     if (!options || !options.preserveHub) {
       closureDraft = null;
       topView = "fields";
@@ -3216,13 +3327,19 @@
       }
     });
     const year = U.$("annualYear");
-    if (year) year.addEventListener("change", render);
+    if (year) year.addEventListener("change", () => {
+      if (materialReviewView && !discardMaterialReviewEditor()) { year.value = materialReviewView.selectorYear; return; }
+      if (materialReviewView) materialReviewView = { ...materialReviewView, year: String(reviewYearValue()), selectorYear: yearValue(), editor: null };
+      render();
+    });
     U.$("annualTimeline").addEventListener("toggle", (event) => {
       if (event.target.matches("[data-crop-year-closure]")) closureOpen = event.target.open;
       if (event.target.matches("[data-annual-carryover]")) carryoverOpen = event.target.open;
       if (event.target.matches("[data-annual-work-list]")) workArchiveOpen = event.target.open;
     }, true);
     U.$("annualTimeline").addEventListener("click", (event) => {
+      const materialCommand = event.target.closest("[data-mr-open], [data-mr-back], [data-mr-tab], [data-mr-edit-observation], [data-mr-new-observation], [data-mr-cancel-editor], [data-mr-delete-observation], [data-mr-management], [data-mr-material-master]");
+      if (materialCommand) { handleMaterialReviewCommand(materialCommand); return; }
       const reviewWork = event.target.closest("[data-year-review-work], [data-year-review-milling]");
       if (reviewWork) {
         const kind = reviewWork.hasAttribute("data-year-review-milling") ? "milling" : "fieldWork";
@@ -3785,7 +3902,7 @@
         return;
       }
       if (event.target && event.target.matches("[data-annual-field-switch]")) {
-        switchFieldWithinAnnual(event.target.value);
+        if (!switchFieldWithinAnnual(event.target.value)) event.target.value = selectedFieldId;
         return;
       }
       if (event.target && event.target.id === "annualSort") {
@@ -3801,6 +3918,8 @@
       state.updateField(selectedFieldId, { [key]: value });
     });
     U.$("annualTimeline").addEventListener("submit", (event) => {
+      const materialForm = event.target.closest("[data-mr-observation-form]");
+      if (materialForm) { event.preventDefault(); saveMaterialReviewObservation(materialForm); return; }
       const activeForm = event.target.closest("[data-crop-year-active-form]");
       if (activeForm) {
         event.preventDefault();
@@ -3860,6 +3979,7 @@
     canHandleBack,
     resetNavigation,
     isRecordDetailOpen: () => Boolean(recordDetail),
-    hasTransientBackState: () => Boolean(closureDraft || recordDetail || expandedFlowRecord || reviewView === "compare")
+    canLeave: discardMaterialReviewEditor,
+    hasTransientBackState: () => Boolean(closureDraft || recordDetail || expandedFlowRecord || materialReviewView || reviewView === "compare")
   };
 })();

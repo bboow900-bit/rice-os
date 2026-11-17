@@ -3,6 +3,7 @@
   const R = window.RiceOS = window.RiceOS || {}, U = R.utils, S = R.schema, state = R.state;
   let view = "list", mode = "materials", year = "all", category = "all";
   let materialId = "", purchaseId = "", purchaseScope = "", bound = false;
+  let externalDetail = false;
   let purchaseDraft = null, materialOriginal = "", purchaseOriginal = "";
   let materialError = "", purchaseError = "", listError = "";
   let stockDraft = null, stockOriginal = "", stockError = "";
@@ -72,6 +73,7 @@
     materialError = "";
   }
   function resetForm() {
+    externalDetail = false;
     clearFields(); view = "list"; history.length = 0; materialId = ""; purchaseId = ""; purchaseScope = "";
     purchaseDraft = null; purchaseError = ""; listError = ""; stockDraft = null; stockError = ""; receiptDraft = null; cancellationDraft = null; planDraft = null; planError = ""; render(); notify();
   }
@@ -441,6 +443,10 @@
   function canHandleBack() { return view !== "list"; }
   function handleBack() {
     if (!canHandleBack()) return false;
+    if (externalDetail && view === "material-detail" && history.length === 1) {
+      resetForm();
+      return false;
+    }
     if (view === "purchase-edit") capturePurchase();
     if (view === "stock-edit") captureStock();
     if (view === "plan-edit") {
@@ -648,5 +654,12 @@
     });
   }
   R.screens = R.screens || {};
-  R.screens.materials = {render,bind,resetForm,openPurchases,canHandleBack,handleBack};
+  function openDetail(id) {
+    if (!material(id)) return false;
+    resetForm();
+    move("material-detail", {materialId:id});
+    externalDetail = true;
+    return true;
+  }
+  R.screens.materials = {render,bind,resetForm,openPurchases,openDetail,canHandleBack,handleBack};
 })();

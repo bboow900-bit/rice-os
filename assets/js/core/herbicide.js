@@ -175,7 +175,8 @@
     if (!assignment) return null;
     const matches = (work, stepId) => array(work.herbicideLinks).some((link) => link && link.fieldId === assignment.fieldId
       && link.assignmentId === assignmentId && link.stepId === stepId);
-    const works = array(state.data().fieldWorks).filter((work) => work && work.workName === "除草剤" && array(work.fieldIds).includes(assignment.fieldId) && U.isInYear(work.date, assignment.year)
+    const works = array(state.data().fieldWorks).filter((work) => work && work.workName === "除草剤" && array(work.fieldIds).includes(assignment.fieldId)
+      && (String(state.cropYearForRecord(work)) === String(assignment.year) || U.isInYear(work.date, assignment.year))
       && assignment.steps.some((step) => matches(work, step.id)))
       .slice().sort((a, b) => String(a.date).localeCompare(String(b.date)));
     return copy({ assignment, works, steps: assignment.steps.map((step) => ({ ...step, works: works.filter((work) => matches(work, step.id)) })) });

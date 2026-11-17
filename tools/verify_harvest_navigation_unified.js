@@ -28,6 +28,7 @@ const R = { utils: { $: get, $$: s => s === ".nav-item" ? nav : s === "[data-mil
   state: { field: id => fields.find(f => f.fieldId === id), activeFields: () => fields,
     variety: id => id === "v" ? { varietyId: "v" } : null, defaultShipmentCropYear: () => 2026 },
   harvestLedger: { scopes: () => ({ seasons: [2025, 2026], varieties: [{ varietyId: "v", name: "Rice" }] }),
+    annualSales: () => ({ salesYen: 0, pricedCount: 0, unpricedCount: 0, recordCount: 0 }),
     read(year, variety) { scopeRead = [year, variety]; return { stock: {}, performance: null, history: [] }; } },
   screens: {
     annual: { render() {}, resetNavigation() { resetCount++; }, openField(...args) { annualReturn = args; } },

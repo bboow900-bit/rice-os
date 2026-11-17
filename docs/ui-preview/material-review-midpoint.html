@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <base href="../../">
+  <title>資材・除草の振り返り / 途中確認</title>
+  <link rel="stylesheet" href="assets/css/app.css">
+  <link rel="stylesheet" href="assets/css/material-review.css">
+  <style>
+    body { margin: 0; padding: 0; background: #fff !important; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #173e29; letter-spacing: 0; }
+    #screen-annual { display: block; width: min(100%,430px) !important; max-width: 430px !important; min-height: 100vh; margin: auto; padding: 0 0 88px; background: #fff !important; }
+    .preview-intro { padding: 22px 18px; background: #11623b; color: #fff; }
+    .preview-intro p { margin: 0 0 8px; font-size: 14px; }
+    .preview-intro h2 { margin: 0; color: #fff; font-size: 24px; }
+    .preview-entry { padding: 10px 14px 0; }
+    .preview-note { padding: 18px; border-top: 1px solid #d6dfd5; }
+    .preview-note h3 { margin: 0 0 10px; font-size: 20px; }
+    .preview-nav { position: fixed; left: 50%; bottom: 0; transform: translateX(-50%); display: grid; grid-template-columns: repeat(6,minmax(0,1fr)); width: min(100%,430px); background: #fff; border-top: 1px solid #d6dfd5; padding: 7px 5px max(7px,env(safe-area-inset-bottom)); z-index: 2; }
+    .preview-nav button { display: grid; justify-items: center; gap: 3px; margin: 0; padding: 2px 0; border: 0; border-radius: 5px; box-shadow: none; background: transparent; color: #24482b; font-family: inherit; font-size: 10px; line-height: 1.5; font-weight: 600; min-width: 0; white-space: nowrap; }
+    .preview-nav img { width: 33px; height: 33px; object-fit: contain; }
+    .preview-nav .active { background: #e5f2df; }
+    .preview-nav button:disabled, #screen-annual button:disabled { opacity: 1; cursor: default; }
+    .preview-comparison { display: grid; grid-template-columns: repeat(2, minmax(0,430px)); justify-content: center; gap: 28px; padding: 18px 22px 28px; }
+    .preview-comparison figure { margin: 0; min-width: 0; }
+    .preview-comparison figcaption { padding: 8px 0 12px; font-size: 15px; font-weight: 700; }
+    .preview-comparison iframe { width: 100%; height: 1100px; border: 1px solid #d4e1d2; border-radius: 8px; background: #fff; }
+    .preview-caption { margin: 18px 22px 0; text-align: center; font-size: 20px; }
+    @media (max-width:700px) { .preview-comparison { grid-template-columns: minmax(0,430px); padding: 12px; } }
+  </style>
+  <script>
+    // Preview fixtures use memory only, never this origin's real saved records.
+    const previewMemory = new Map();
+    Object.defineProperty(window, "localStorage", { configurable: true, value: {
+      getItem: key => previewMemory.get(String(key)) ?? null,
+      setItem: (key, value) => previewMemory.set(String(key), String(value)),
+      removeItem: key => previewMemory.delete(String(key)), clear: () => previewMemory.clear()
+    } });
+  </script>
+</head>
+<body>
+  <main id="screen-annual"></main>
+  <script src="assets/js/core/utils.js"></script>
+  <script src="assets/js/core/schema.js"></script>
+  <script src="assets/js/core/storage.js"></script>
+  <script src="assets/js/core/state.js"></script>
+  <script src="assets/js/core/herbicide.js"></script>
+  <script src="assets/js/ui/material-review.js"></script>
+  <script>
+    const params = new URLSearchParams(location.search), mode = params.get("view") || "compare";
+    if (mode === "compare") {
+      document.querySelector("#screen-annual").remove();
+      const caption = document.createElement("h1"); caption.className = "preview-caption"; caption.textContent = "途中確認：入口と結果画面（仮データ）"; document.body.append(caption);
+      const compare = document.createElement("div"); compare.className = "preview-comparison";
+      for (const [view,label] of [["entry","入口部分 / 既存の一年の流れは変更しません"],["result","開いた先 / 除草の結果"]]) {
+        const figure = document.createElement("figure"), figcaption = document.createElement("figcaption"), iframe = document.createElement("iframe");
+        figcaption.textContent = label; iframe.src = `docs/ui-preview/material-review-midpoint.html?view=${view}`; iframe.title = label;
+        figure.append(figcaption,iframe); compare.append(figure);
+      }
+      document.body.append(compare);
+    } else {
+      const S = RiceOS.state, H = RiceOS.herbicide;
+      RiceOS.utils.today = () => "2026-11-15";
+      RiceOS.utils.now = () => "2026-11-15T03:00:00Z";
+      const fieldId = S.addField("開パ 下");
+      const materialIds = [];
+      for (const [name,category] of [["初期剤A","除草剤"],["初中期剤B","除草剤"],["追肥資材C","肥料"],["防除資材D","殺虫殺菌剤"]]) {
+        if (!S.saveMaterial({name,category})) throw Error("Preview material rejected");
+        materialIds.push(S.data().materials.at(-1).materialId);
+      }
+      const program = H.saveProgram({name:"残草対策A",steps:[
+        {id:"preview-initial",category:"初期剤",materialId:materialIds[0],plannedTiming:"田植え後",purpose:"初期の発生を記録"},
+        {id:"preview-middle",category:"初中期剤",materialId:materialIds[1],plannedTiming:"6月上旬",purpose:"経過を見て記録"},
+        {id:"preview-extra",category:"追加処理",materialName:"追加処理用資材",plannedTiming:"必要時"}
+      ]});
+      if (!program) throw Error("Preview program rejected");
+      const assignment = H.assignProgram({year:2026,programId:program.programId,fieldIds:[fieldId]})?.[0];
+      if (!assignment) throw Error("Preview assignment rejected");
+      const data = RiceOS.utils.clone(S.data());
+      materialIds.forEach((id,index) => data.fieldWorks.push({workId:`preview-material-${index}`,date:["2026-05-17","2026-06-06","2026-07-20","2026-08-01"][index],cropYear:2026,
+        workName:index<2?"除草剤":index===2?"追肥":"防除",fieldIds:[fieldId],materialId:id,material:["初期剤A","初中期剤B","追肥資材C","防除資材D"][index],
+        herbicideLinks:index<2?[{assignmentId:assignment.assignmentId,fieldId,stepId:assignment.steps[index].id}]:[]}));
+      if (!S.replace(data,"Preview memory fixture")) throw Error("Preview usage rejected");
+      if (!H.saveObservation({assignmentId:assignment.assignmentId,fieldId,date:"2026-09-12",status:"残草少なめ",weeds:["ヒエ","ホタルイ"],memo:"畦際は残草が見られた。\n来年は同じ場所の経過を残したい。"})) throw Error("Preview observation rejected");
+      const field = S.field(fieldId), host = document.querySelector("#screen-annual");
+      const nav = () => `<nav class="preview-nav" aria-label="既存の下部ナビの表示確認">${[["paddy-field","ホーム"],["rice-clump","圃場"],["farm-calendar","カレンダー"],["karte-notebook","振り返り"],["rice-panicle","見通し"],["farm-masters","管理"]].map(([icon,label])=>`<button type="button" disabled class="${label==="振り返り"?"active":""}"><img src="assets/images/light-icons/${icon}.png" alt=""><span>${label}</span></button>`).join("")}</nav>`;
+      function render(view) {
+        host.innerHTML = (view === "entry" ? `<header class="preview-intro"><p>2026年産　開パ 下</p><h2>一年の流れ</h2></header><div class="preview-entry">${RiceOS.materialReview.renderEntry(field,2026)}</div><section class="preview-note"><h3>今年の気づき</h3><p>畦際の残草を来年も見比べたい。</p></section>` : RiceOS.materialReview.renderDetail(field,2026,{tab:"result"})) + nav();
+        host.querySelectorAll("[data-mr-tab]:not([data-mr-tab='result']),[data-mr-edit-observation],[data-mr-delete-observation]").forEach(button => {button.disabled=true;button.title="途中確認の対象外です";});
+        window.scrollTo(0,0);
+      }
+      host.addEventListener("click", event => {
+        if (event.target.closest("[data-mr-open]")) render("result");
+        if (event.target.closest("[data-mr-back]")) render("entry");
+      });
+      render(mode);
+      window.materialReviewPreview = {fieldId,year:2026,memoryOnly:true};
+    }
+  </script>
+</body>
+</html>

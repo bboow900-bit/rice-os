@@ -27,11 +27,18 @@
     if (!varietyId && scopes.varieties.length) varietyId = scopes.varieties[0].varietyId;
     const years = [...new Set([Number(season), ...scopes.seasons])].sort((a, b) => b - a);
     const ledger = R.harvestLedger.read(season, varietyId), stock = ledger.stock, performance = ledger.performance;
+    const annualSales = R.harvestLedger.annualSales(season);
     host.innerHTML = `<div class="harvest-ledger">
       <header class="hl-header"><h2>収穫・出荷</h2><img src="assets/images/light-icons/rice-sack.png" alt="" width="80" height="80"></header>
       <div class="hl-filters"><label>年産<select id="harvestLedgerSeason" data-harvest-ledger-season>${years.map(year => option(year, `${year}年産`, season)).join("")}</select></label><label>品種<select id="harvestLedgerVariety" data-harvest-ledger-variety>${scopes.varieties.length ? "" : option("", "品種未設定", varietyId)}${scopes.varieties.map(row => option(row.varietyId, row.name, varietyId)).join("")}</select></label></div>
+      <section class="hl-annual-sales" aria-label="年産全体の販売額合計" data-harvest-ledger-annual-sales>
+        <h3>${U.escapeHTML(season)}年産の販売額合計</h3><p>全品種・全販売先</p>
+        <div class="hl-annual-sales-value" data-harvest-ledger-annual-sales-amount>${annualSales.salesYen === null ? "集計範囲外" : annualSales.pricedCount || !annualSales.recordCount ? `<strong>${number(annualSales.salesYen)}</strong><small>円</small>` : "未計算"}</div>
+        ${annualSales.unpricedCount ? `<p class="hl-warning">金額未計算 ${annualSales.unpricedCount}件（単価・袋内訳未登録など）${annualSales.pricedCount ? "・計算できる記録分の合計です" : ""}</p>` : ""}
+        ${!annualSales.recordCount ? '<p>出荷・販売記録なし</p>' : ""}
+      </section>
       <p class="hl-scope-note">${U.escapeHTML(season)}年産 / ${U.escapeHTML(R.state.variety(varietyId)?.name || "品種未設定")} / 品種全体の集計</p>
-      <dl class="hl-sales"><div><dt>販売額合計</dt><dd data-harvest-ledger-sales>${ledger.pricedCount ? `<strong>${number(ledger.salesYen)}</strong><small>円</small>` : "未計算"}</dd></div></dl>${ledger.unpricedCount ? `<p>単価・袋内訳未登録 ${ledger.unpricedCount}件（未計算）</p>` : ""}
+      <dl class="hl-sales"><div><dt>選択品種の販売額</dt><dd data-harvest-ledger-sales>${ledger.pricedCount ? `<strong>${number(ledger.salesYen)}</strong><small>円</small>` : "未計算"}</dd></div></dl>${ledger.unpricedCount ? `<p>単価・袋内訳未登録 ${ledger.unpricedCount}件（未計算）</p>` : ""}
       <section class="hl-balance" aria-label="残っているお米"><h3>残っているお米</h3><div class="hl-balance-value" data-harvest-ledger-remaining>${stock.hasHarvest ? quantity(stock.remainingKg) : "収量未登録"}</div><p>${stock.hasHarvest && stock.remainingKg !== null ? `${number(stock.remainingKg)}kg・30kg袋で${number(stock.remainingKg / 30)}袋相当` : ""}</p><p class="hl-balance-note">自家用を除いた、玄米の出荷用参考残量</p></section>
       ${stock.whiteShipmentCount || stock.unquantifiedCount || stock.unclassifiedCount ? `<p class="hl-warning" role="status">白米 ${stock.whiteShipmentCount}件・数量不足 ${stock.unquantifiedCount}件・品種未設定 ${stock.unclassifiedCount}件は残量に未反映です。</p>` : ""}
       ${stock.remainingKg < 0 ? '<p class="hl-warning" role="alert">出荷数量が収量を超えています。年産・品種・収量・出荷記録を確認してください。</p>' : ""}

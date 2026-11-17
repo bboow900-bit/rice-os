@@ -19,7 +19,9 @@ const {chromium}=require("C:/Users/Keisuke/.cache/codex-runtimes/codex-primary-r
     if(!S.saveDryPeriod({dryPeriodId:"unified-dry",fieldId:f,date:"2025-06-20",startDate:"2025-06-20",actualEndDate:"2025-06-30",cropYear:2025,memo:"水管理の元メモ"}))throw Error("Water fixture failed");
     if(!S.saveMillingRecord({season:2025,varietyId:v,date:"2025-09-20",fieldIds:[f],packages:[{kg:30,bags:20}],looseKg:0}))throw Error("Milling fixture failed");
     if(!S.saveShipment({kind:"sale",recipient:"確認用販売先",season:2025,varietyId:v,date:"2025-10-10",riceType:"brown",packages:[{kg:30,bags:4}],pricePer60Kg:18000}))throw Error("Sale fixture failed");
-    return{f,v};
+    const otherVariety=S.addVariety("販売合計確認用の別品種");
+    if(!S.saveShipment({kind:"sale",recipient:"別の販売先",season:2025,varietyId:otherVariety,date:"2025-10-11",riceType:"brown",packages:[{kg:30,bags:2}],pricePer60Kg:24000}))throw Error("Second variety sale fixture failed");
+    return{f,v,otherVariety};
    });
    const baseline=await page.evaluate(()=>localStorage.getItem(RiceOS.schema.STORE_KEY));
    await page.locator('.nav-item[data-screen="annual"]:visible').click();await page.locator('#annualYear').selectOption('2025');
@@ -43,6 +45,14 @@ const {chromium}=require("C:/Users/Keisuke/.cache/codex-runtimes/codex-primary-r
    assert.equal(await page.locator('#harvestLedgerSeason').inputValue(),'2025');assert.equal(await page.locator('#harvestLedgerVariety').inputValue(),fixture.v);
    assert.equal(await page.locator('.nav-item.active').getAttribute('data-screen'),'annual');
    assert.match(await page.locator('[data-harvest-ledger-sales]').innerText(),/36,000/);
+   const annualSales=page.locator('[data-harvest-ledger-annual-sales-amount]');
+   assert.match(await annualSales.innerText(),/60,000/);
+   const annualBounds=await annualSales.boundingBox();assert(annualBounds&&annualBounds.y>=0&&annualBounds.y+annualBounds.height<=900,'Annual total is visible on the first screen');
+   await page.locator('#harvestLedgerVariety').selectOption(fixture.otherVariety);
+   assert.match(await annualSales.innerText(),/60,000/);assert.match(await page.locator('[data-harvest-ledger-sales]').innerText(),/24,000/);
+   await page.locator('#harvestLedgerSeason').selectOption('2026');assert.match(await annualSales.innerText(),/^0\s*円$/);
+   await page.locator('#harvestLedgerSeason').selectOption('2025');await page.locator('#harvestLedgerVariety').selectOption(fixture.v);
+   await page.evaluate(({f,v})=>RiceOS.screens.harvestLedger.setScope({season:2025,varietyId:v,fieldIds:[f]}),fixture);
    await page.locator('#toast').waitFor({state:'hidden',timeout:10000});await page.evaluate(()=>scrollTo(0,0));
    await page.screenshot({path:path.join(os.tmpdir(),`rice-unified-primary-harvest-${width}.png`)});
    await page.locator('[data-harvest-ledger-new-milling]').click();await page.locator('#screen-results.active').waitFor();
