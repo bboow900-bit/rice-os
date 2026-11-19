@@ -785,44 +785,25 @@
     return state.harvestStatusForField(field.fieldId, year, U.today(), { cropYear: true });
   }
 
-  function renderFieldPickerCard(item) {
-    const { field, stats, status } = item;
+  function renderFieldPickerCard({ field }) {
     const harvest = pickerHarvestStatus(field);
-    const harvestLabel = harvest.status === "complete" ? `収穫済み・${Number(harvest.date.slice(5, 7))}/${Number(harvest.date.slice(8, 10))}`
-      : harvest.status === "partial" ? "稲刈り一部実施" : harvest.status === "legacy" ? "完了区分未確認" : "";
-    const harvestBadge = harvestLabel ? `<span class="harvest-list-badge ${U.attr(harvest.status)}" data-harvest-status="${U.attr(harvest.status)}">${U.escapeHTML(harvestLabel)}</span>` : "";
-    const last = stats.lastDate ? annualListDate(stats.lastDate) : "記録なし";
     const stage = annualStageForField(field);
     const riceStage = riceStageNumberForField(field);
-    const district = field.district ? ` / ${U.escapeHTML(field.district)}` : "";
-    const statusBadge = status.action
-      ? `<button type="button" class="annual-status-badge ${U.attr(status.tone)} action" data-annual-status-action="${U.attr(status.action)}" data-annual-status-field="${U.attr(field.fieldId)}"><b>${U.escapeHTML(status.label)}</b><small>入力へ</small></button>`
-      : `<span class="annual-status-badge ${U.attr(status.tone)}">${U.escapeHTML(status.label)}</span>`;
-    return `
-      <article class="annual-field-pick-card status-${U.attr(status.tone)}">
-        <button type="button" class="annual-field-pick-open" data-annual-hub-open-field="${U.attr(field.fieldId)}" data-annual-open-field="${U.attr(field.fieldId)}" aria-label="${U.attr(field.name)}の圃場履歴を開く">
-          <span class="annual-field-plant stage-${U.attr(String(riceStage).padStart(2, "0"))}" aria-hidden="true">${annualPickerRiceImage(riceStage)}</span>
-          <div class="annual-field-pick-main">
-          <div class="annual-field-pick-head">
-            <div>
-              <b>${U.escapeHTML(field.name)}</b>
-              <em>${U.escapeHTML(varietyName(field))}</em>
-            </div>
-            <strong>${U.escapeHTML(field.areaA ? `${field.areaA}a` : "面積未設定")}</strong>
-          </div>
-          <small>最終更新：${U.escapeHTML(last)}${district}</small>
-          ${harvestBadge}
-          <small class="annual-field-stage">現在：${U.escapeHTML(stage && stage.current ? stage.current.label : "記録待ち")} / ${U.escapeHTML(stage && stage.certainty || "記録待ち")}</small>
-          <div class="annual-field-pick-metrics">
-            <span class="growth"><i aria-hidden="true"></i>生育 ${U.escapeHTML(String(stats.growth))}件</span>
-            <span class="water"><i aria-hidden="true"></i>水管理 ${U.escapeHTML(String(stats.water))}件</span>
-            <span class="work"><i aria-hidden="true"></i>作業 ${U.escapeHTML(String(stats.work))}件</span>
-          </div>
-          </div>
-        </button>
-        ${statusBadge}
-      </article>
-    `;
+    const harvestLabel = { complete: "収穫済み", partial: "一部刈り取り", legacy: "完了区分未確認" }[harvest.status] || "刈り取り未記録";
+    const tone = harvest.status === "complete" || riceStage >= 7 ? "gold"
+      : !stage?.current ? "neutral" : riceStage >= 5 ? "jade" : "green";
+    return `<article class="annual-field-card" data-tone="${tone}">
+      <button type="button" class="annual-field-card-open" data-annual-hub-open-field="${U.attr(field.fieldId)}" data-annual-open-field="${U.attr(field.fieldId)}">
+        <span class="annual-field-card-copy">
+          <strong>${U.escapeHTML(field.name)}</strong>
+          <span>${U.escapeHTML(field.areaA ? `${field.areaA}a` : "面積未設定")}</span>
+          <span>${U.escapeHTML(stage?.current ? [stage.current.label, stage.certainty].filter(Boolean).join(" / ") : "ステージ記録待ち")}</span>
+        </span>
+        <span class="annual-field-card-art" aria-hidden="true">${annualPickerRiceImage(riceStage)}</span>
+        <span aria-hidden="true">›</span>
+        <em class="annual-field-card-harvest" data-harvest-status="${U.attr(harvest.status)}">${harvestLabel}</em>
+      </button>
+    </article>`;
   }
 
   const WORK_REASON_LABELS = { rain: "雨・天候", surface: "圃場の乾き・状態", machine: "機械", labor: "人手", schedule: "作業都合", intentional: "意図的な変更", material: "資材", other: "その他" };
@@ -979,7 +960,7 @@
         <div class="annual-hub-tools"><button type="button" data-annual-hub-notes aria-expanded="${hubNotesOpen}" aria-controls="annualHubNotes">来年メモ</button></div>
         ${renderCropYearClosure()}
         <div class="annual-hub-nav" role="group" aria-label="振り返りの表示">
-          ${[["fields", "圃場の一年"], ["work", "作業・資材"], ["compare", "年の比較"]].map(([value, label]) => `<button type="button" data-annual-hub-view="${value}" class="${topView === value ? "active" : ""}" aria-pressed="${topView === value}">${label}</button>`).join("")}
+          ${[["fields", "圃場の一年"], ["work", "使用資材"], ["compare", "年の比較"]].map(([value, label]) => `<button type="button" data-annual-hub-view="${value}" class="${topView === value ? "active" : ""}" aria-pressed="${topView === value}">${label}</button>`).join("")}
         </div>
         <div class="annual-hub-panel" data-annual-hub-panel="${topView}">
         ${topView === "fields" ? `
@@ -1003,13 +984,11 @@
             ${fields.length ? fields.map(renderFieldPickerCard).join("") : '<div class="empty">条件に合う圃場がありません。</div>'}
           </div>
         </section>
+        ${renderOffFieldArchive(rows)}
         ` : ""}
         ${topView === "work" ? `
-        <button type="button" class="annual-shipment-entry" data-annual-harvest-ledger><b>収穫・出荷</b><span>収量・販売・配布の記録を見る ›</span></button>
-        <details class="annual-hub-summary"><summary>サマリー</summary>${renderSummary(rows)}</details>
-        ${renderWorkArchive(rows)}
+        <header class="annual-work-heading"><h3>使用資材</h3><img src="assets/images/material-review/materials-rice.png" alt="" decoding="async"></header>
         ${renderUsedMaterials()}
-        ${RiceOS.herbicideUI ? RiceOS.herbicideUI.renderReview(null, yearValue()) : ""}
         ` : ""}
         ${topView === "compare" ? renderHubCompare() : ""}
         </div>
@@ -1030,16 +1009,17 @@
       <div class="annual-field-pick-grid">${fields.length ? fields.map((field) => `<button type="button" class="annual-hub-compare-card" data-annual-hub-compare-field="${U.attr(field.fieldId)}" aria-label="${U.attr(field.name)}の年度比較を開く"><span class="annual-hub-compare-thumb" aria-hidden="true">${annualPickerRiceImage(riceStageNumberForField(field))}</span><span class="annual-hub-compare-main"><b>${U.escapeHTML(field.name)}</b><small>${U.escapeHTML(varietyName(field))}${field.areaA ? ` / ${U.escapeHTML(field.areaA)}a` : ""}</small></span><span class="annual-hub-compare-arrow" aria-hidden="true">›</span></button>`).join("") : '<div class="empty">比較する圃場がありません。</div>'}</div></section>`;
   }
 
-  function renderWorkArchive(rows) {
-    const works = rows.filter((row) => row.kind === "fieldWork" || row.kind === "other");
-    const visible = focusRecords(works).filter((row) => {
-      const offField = row.raw.targetScope === "offField" || (row.kind === "other" && !row.fieldIds.length);
-      return workScopeFilter === "all" || (workScopeFilter === "offField" ? offField : !offField);
-    });
-    return `<section class="annual-work-archive"><div class="section-title compact"><h3>作業を振り返る</h3><span>${visible.length}件</span></div>
-      ${renderRecordFocus()}
-      <div class="annual-compare-filter-row" role="group" aria-label="作業の対象">${[["all", "すべての作業"], ["field", "圃場作業"], ["offField", "圃場外作業"]].map(([value, label]) => `<button type="button" class="${workScopeFilter === value ? "active" : ""}" aria-pressed="${workScopeFilter === value}" data-annual-work-scope="${value}">${label}</button>`).join("")}</div>
-      <details data-annual-work-list${workArchiveOpen ? " open" : ""}><summary>作業履歴を見る（${visible.length}件）</summary><div class="card-list">${visible.length ? visible.map(renderArchiveEntry).join("") : '<div class="empty">この表示範囲の作業記録はありません。全履歴からも確認できます。</div>'}</div></details></section>`;
+  function isArchivedActualWork(work) {
+    return work.targetScope === "offField" ? Boolean(work.date) && !/(?:予定|確認候補)/.test(String(work.workName || "")) : state.isActualFieldWork(work);
+  }
+
+  function renderOffFieldArchive(rows) {
+    const visible = rows.filter(row => (row.kind === "fieldWork" && row.raw.targetScope === "offField" && isArchivedActualWork(row.raw))
+      || (row.kind === "other" && (row.raw.targetScope === "offField" || !row.fieldIds.length)));
+    if (!visible.length) return "";
+    return `<details class="annual-used-materials" data-annual-work-list${workArchiveOpen ? " open" : ""}>
+      <summary>圃場外の作業 <small>${visible.length}件</small></summary>
+      <div class="card-list">${visible.map(renderArchiveEntry).join("")}</div></details>`;
   }
 
   function renderNextSeasonIdeas() {
@@ -2213,13 +2193,13 @@
   function renderUsedMaterials(field, targetYear) {
     const year = targetYear || yearValue();
     if (year === "all") {
-      const years = unique(state.data().fieldWorks.filter((work) => (work.materialId || String(work.material || "").trim())
+      const years = unique(state.data().fieldWorks.filter((work) => isArchivedActualWork(work) && (work.materialId || String(work.material || "").trim())
         && (!field || (work.fieldIds || []).includes(field.fieldId))).map((work) => state.cropYearForRecord ? state.cropYearForRecord(work) : U.dateYear(work.date)))
         .filter((value) => /^\d{4}$/.test(String(value))).sort().reverse();
       return `<details class="annual-used-materials"><summary>使用した資材 <small>全年度</small></summary>${years.length ? years.map((value) => renderUsedMaterials(field, String(value))).join("") : '<p class="muted">資材使用記録はありません。</p>'}</details>`;
     }
     const groups = state.materialUsageForYear(year, { cropYear: true }).map((group) => ({
-      ...group, works: group.works.filter((work) => !field || (work.fieldIds || []).includes(field.fieldId))
+      ...group, works: group.works.filter((work) => isArchivedActualWork(work) && (!field || (work.fieldIds || []).includes(field.fieldId)))
     })).filter((group) => group.works.length);
     return `<details class="annual-used-materials"><summary>使用した資材 <small>${U.escapeHTML(year)}年 / ${groups.length}種類</small></summary>${groups.length ? groups.map((group) => `<section class="annual-material-group"><h4>${U.escapeHTML(group.name)}${!group.materialId ? '<small>未紐付け</small>' : ""}</h4><p class="annual-material-brief">${group.works.length}回使用 / ${U.escapeHTML(annualListDate([...group.works].map(work => work.date).sort()[0] || "", group.works.map(work => work.date)))}〜${U.escapeHTML(annualListDate([...group.works].map(work => work.date).sort().at(-1) || "", group.works.map(work => work.date)))}</p><details><summary>使用記録を確認</summary>${group.works.map((work) => {
       const fieldId = field ? field.fieldId : (work.fieldIds || []).find((id) => state.field(id));
@@ -2265,7 +2245,7 @@
       <header><span>${esc(year)}年産 / ${esc(field.name)}</span><h3>収穫の振り返り</h3><p>${esc(U.fd(work.date))}の稲刈り${works.length > 1 ? "（この年の最新記録）" : ""}</p><p data-harvest-recap-status>${esc(statusLabel)}</p></header>
       <div class="harvest-recap-assessment"><small>現場での最終判断</small><strong>${esc(model.assessment.recorded ? model.assessment.label : "評価未登録")}</strong>${model.timing.delayReasonLabel ? `<p>時期がずれた理由：${esc(model.timing.delayReasonLabel)}</p>` : ""}${model.timing.memo ? `<p>${esc(model.timing.memo)}</p>` : ""}</div>
       <dl class="harvest-recap-numbers"><div><dt>作業に記録した収量</dt><dd>${model.metrics.kg === null ? "未登録" : `${esc(model.metrics.kg)} kg`}</dd><small>${esc(model.metrics.scopeLabel)} / ${esc(model.metrics.basis || "測定条件未登録")}</small></div><div><dt>収穫時の出穂後積算温度</dt><dd>${thermal.available ? `${esc(Math.round(thermal.total))} ℃` : "未確認"}</dd><small>${esc(thermal.label)}${thermal.legacy && thermal.partial ? " / 一部欠測・取得済み分のみ" : ""}</small></div></dl>
-      <div class="harvest-recap-reference"><b>データ上の参考比較</b><p>保存した見通し：${esc(reference(model.comparison.day))}</p><p>積算温度の目安：${esc(reference(model.comparison.thermal))}</p><small>現場の適期判断とは別の参考情報です。</small></div>
+      <details class="harvest-recap-reference"><summary>データ上の参考比較</summary><p>保存した見通し：${esc(reference(model.comparison.day))}</p><p>積算温度の目安：${esc(reference(model.comparison.thermal))}</p><small>現場の適期判断とは別の参考情報です。</small></details>
       ${model.summaryLines.length ? `<details><summary>来年に引き継ぐ材料</summary><ul class="harvest-handoff-facts">${model.summaryLines.map(line => `<li>${esc(line)}</li>`).join("")}</ul></details>` : '<p class="muted">現場の評価や気づきは、稲刈り詳細から記録できます。</p>'}
       <button type="button" class="secondary" data-annual-harvest-edit="${U.attr(work.workId)}" data-harvest-edit-section="reason">${model.timing.delayReason || model.timing.memo ? "刈り取りの理由・事情を編集" : "刈り取りが遅れた理由を記入"}</button>
       <button type="button" class="secondary" data-annual-harvest-detail="${U.attr(work.workId)}">稲刈りの詳細・評価を確認 <span aria-hidden="true">›</span></button>
@@ -3974,7 +3954,7 @@
 
   // A small pure surface for the record-preservation verifier. It is only
   // exposed when the Node test harness opts in, never in the running app.
-  if (window.__RICEOS_TEST__) RiceOS.annualTest = { waterRoleRank, fieldYearTimeline, harvestTotalsForFieldYear, renderHarvestTotals, annualRecordTarget, allRows, rowsForField, renderWorkArchive, historyMatches, isRoutineRecord };
+  if (window.__RICEOS_TEST__) RiceOS.annualTest = { waterRoleRank, fieldYearTimeline, harvestTotalsForFieldYear, renderHarvestTotals, annualRecordTarget, allRows, rowsForField, renderOffFieldArchive, historyMatches, isRoutineRecord };
 
   RiceOS.screens = RiceOS.screens || {};
   RiceOS.screens.annual = {

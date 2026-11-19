@@ -118,7 +118,26 @@
 #screen-annual .annual-story-surface > .harvest-recap > details { margin-top: 12px; margin-bottom: 16px; padding: 12px; border: 0; border-radius: 6px; background: var(--reflection-gold); }
 #screen-annual .annual-story-surface > .harvest-recap > details > summary { min-height: 32px; color: #354323; font-size: 15px; font-weight: 700; line-height: 1.7; cursor: pointer; }
 #screen-annual .annual-story-surface > .harvest-recap > button { width: calc(100% - 28px); min-height: 44px; margin: 12px 14px 0; padding: 10px 12px; border: 1px solid #b8d3ba; border-radius: 6px; background: #fff; color: #245333; font-size: 14px; line-height: 1.6; box-shadow: none; }
-#screen-annual .annual-story-surface > .harvest-recap > button:last-child { background: #edf6e8; font-weight: 700; }
+#screen-annual .annual-story-surface > .harvest-recap > button:last-child { background: #fff; border-color: transparent; font-weight: 700; text-decoration: underline; text-underline-offset: 4px; }
+#screen-annual .annual-story-surface > .harvest-recap > header { position: relative; isolation: isolate; padding: 16px 40% 16px 14px; border-bottom: 1px solid #829f71; background: #fbf8e9; color: #283f27; }
+#screen-annual .annual-story-surface > .harvest-recap > header::after { content: ""; position: absolute; z-index: -1; inset: 0 0 0 auto; width: 48%; background: url("../images/annual-story/schedule-harvest.png") right bottom / cover no-repeat; mix-blend-mode: multiply; mask-image: linear-gradient(to right,transparent,#000 35%); pointer-events: none; }
+#screen-annual .annual-story-surface > .harvest-recap > header :is(span,h3,p) { color: #283f27; }
+#screen-annual .annual-story-surface .harvest-recap-numbers { grid-template-columns: minmax(0,1fr); }
+#screen-annual .annual-story-surface .harvest-recap-numbers > div { display: grid; grid-template-columns: minmax(0,1fr) auto; align-items: baseline; gap: 3px 10px; padding: 10px 0; }
+#screen-annual .annual-story-surface .harvest-recap-numbers dd { margin: 0; padding-left: 10px; border-left: 1px solid var(--reflection-rule); font-size: 22px; }
+#screen-annual .annual-story-surface .harvest-recap-numbers small { grid-column: 1 / -1; }
+#screen-annual .annual-story-surface > .harvest-recap > details.harvest-recap-reference { background: #fff; border: 1px solid #a6c3a0; padding: 8px 12px; }
+#screen-annual .annual-field-card { --field-fill: #f7f8f4; --field-edge: #cbd5c7; min-width: 0; }
+#screen-annual .annual-field-card[data-tone="green"] { --field-fill: #eef6e8; --field-edge: #acc899; }
+#screen-annual .annual-field-card[data-tone="jade"] { --field-fill: #edf6ef; --field-edge: #9bbdab; }
+#screen-annual .annual-field-card[data-tone="gold"] { --field-fill: #fbf6e5; --field-edge: #cbb879; }
+#screen-annual .annual-field-card-open { display: grid; grid-template-columns: minmax(0,1fr) 94px 12px; gap: 8px; align-items: center; text-align: left; width: 100%; min-height: 114px; margin: 0; padding: 10px 12px; border: 1px solid var(--field-edge); border-left-width: 3px; border-radius: 8px; background: var(--field-fill); color: #244632; box-shadow: none; }
+#screen-annual .annual-field-card-copy { display: grid; gap: 3px; min-width: 0; overflow-wrap: anywhere; font-size: 13px; line-height: 1.5; }
+#screen-annual .annual-field-card-copy strong { font-size: 18px; }
+#screen-annual .annual-field-card-harvest { grid-column: 1 / -1; padding-top: 5px; border-top: 1px solid var(--field-edge); font-size: 12px; font-style: normal; }
+#screen-annual .annual-field-card-harvest[data-harvest-status="complete"] { padding: 5px 8px; border: 0; border-radius: 4px; background: #f2e5b4; color: #534014; font-size: 14px; font-weight: 750; text-align: center; }
+#screen-annual .annual-field-card-art { width: 94px; height: 90px; }
+#screen-annual .annual-field-card-art img { width: 100%; height: 100%; object-fit: contain; object-position: center bottom; mix-blend-mode: multiply; opacity: .94; mask-image: radial-gradient(ellipse farthest-side at 50% 43%, #000 52%, rgba(0,0,0,.88) 77%, transparent 100%); }
 #screen-annual .annual-story-surface > .annual-flow-compare-link { display: grid; grid-template-columns: minmax(0,1fr); gap: 12px; margin: 16px 0; padding: 16px 0; border: 0; border-top: 1px solid var(--reflection-rule); border-bottom: 1px solid var(--reflection-rule); border-radius: 0; background: #fff; box-shadow: none; }
 #screen-annual .annual-story-surface > .annual-flow-compare-link > div { min-width: 0; }
 #screen-annual .annual-story-surface > .annual-flow-compare-link > div > span { font-size: 12px; line-height: 1.6; }
@@ -126,3 +145,121 @@
 #screen-annual .annual-story-surface > .annual-flow-compare-link h3 { padding-left: 12px; border-left: 5px solid #64a42d; margin: 8px 0 12px; color: #173e29; font-size: 22px; line-height: 1.5; }
 #screen-annual .annual-story-surface > .annual-flow-compare-link p { margin: 0; color: #586c53; font-size: 14px; font-weight: 400; line-height: 1.8; }
 #screen-annual .annual-story-surface > .annual-flow-compare-link .primary { width: 100%; min-height: 44px; padding: 10px 16px; border: 1px solid #126b40; border-radius: 6px; background: #126b40; color: #fff; font-size: 15px; line-height: 1.6; white-space: normal; box-shadow: none; }
+
+/* Work and materials: warm paper, soft green controls, and thin section rules. */
+#screen-annual [data-annual-hub-panel="work"] {
+  --work-ink: #274534;
+  --work-rule: #d5dfcf;
+  --work-leaf: #edf4e9;
+  --work-paper: #fbf7e9;
+  --work-gold: #c5a45d;
+}
+#screen-annual [data-annual-hub-panel="work"] > .annual-work-heading {
+  display: grid;
+  grid-template-columns: minmax(0,1fr) min(38%,136px);
+  align-items: center;
+  gap: 10px;
+  min-height: 84px;
+  margin: 0 0 10px;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--work-gold);
+  background: var(--work-paper);
+}
+#screen-annual [data-annual-hub-panel="work"] .annual-work-heading h3 {
+  margin: 0;
+  color: var(--work-ink);
+  font-size: 21px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+#screen-annual [data-annual-hub-panel="work"] .annual-work-heading img {
+  display: block;
+  width: 100%;
+  height: 72px;
+  object-fit: contain;
+  object-position: right center;
+  mix-blend-mode: multiply;
+}
+#screen-annual [data-annual-hub-panel="work"] > .annual-shipment-entry {
+  min-height: 52px;
+  margin: 0 0 12px;
+  padding: 9px 12px;
+  gap: 3px 12px;
+  border: 1px solid var(--work-rule);
+  border-radius: 6px;
+  background: var(--work-leaf);
+  color: var(--work-ink);
+  line-height: 1.5;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+#screen-annual [data-annual-hub-panel="work"] > :is(.annual-hub-summary,.annual-used-materials),
+#screen-annual [data-annual-hub-panel="work"] .annual-work-archive > details {
+  margin: 10px 0;
+  padding: 0;
+  border: 0;
+  border-block: 1px solid var(--work-rule);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+#screen-annual [data-annual-hub-panel="work"] :is(.annual-hub-summary,.annual-used-materials,.annual-work-archive details) > summary {
+  box-sizing: border-box;
+  min-height: 44px;
+  padding: 10px 8px;
+  color: var(--work-ink);
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+#screen-annual [data-annual-hub-panel="work"] :is(.annual-hub-summary,.annual-used-materials,.annual-work-archive details)[open] > summary {
+  background: var(--work-leaf);
+}
+#screen-annual [data-annual-hub-panel="work"] .annual-work-archive > .section-title {
+  gap: 6px 12px;
+  flex-wrap: wrap;
+  margin: 16px 0 8px;
+  padding-left: 9px;
+  border-left: 3px solid var(--work-gold);
+}
+#screen-annual [data-annual-hub-panel="work"] .annual-work-archive > .section-title h3 {
+  color: var(--work-ink);
+  font-size: 17px;
+}
+#screen-annual [data-annual-hub-panel="work"] .annual-work-archive .annual-compare-filter-row {
+  margin: 8px 0;
+}
+#screen-annual [data-annual-hub-panel="work"] .annual-work-archive .annual-compare-filter-row button {
+  min-width: 0;
+  margin: 0;
+  border: 1px solid var(--work-rule);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--work-ink);
+  box-shadow: none;
+  white-space: normal;
+}
+#screen-annual [data-annual-hub-panel="work"] .annual-work-archive .annual-compare-filter-row button[aria-pressed="true"] {
+  border-color: #789476;
+  background: var(--work-leaf);
+  font-weight: 750;
+}
+#screen-annual [data-annual-hub-panel="work"] .annual-archive-preview {
+  min-width: 0;
+  min-height: 44px;
+  padding: 9px 8px;
+  border-bottom-color: var(--work-rule);
+  color: var(--work-ink);
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+#screen-annual [data-annual-hub-panel="work"] .annual-archive-preview b { font-size: 15px; }
+#screen-annual [data-annual-hub-panel="work"] .annual-material-group + .annual-material-group {
+  border-top: 1px solid var(--work-rule);
+}
+#screen-annual [data-annual-hub-panel="work"] :is(button,summary):focus-visible {
+  outline: 2px solid #38674b;
+  outline-offset: 2px;
+}

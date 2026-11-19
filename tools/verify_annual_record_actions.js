@@ -118,8 +118,8 @@ assert(
   "Review status must derive recency from actual records rather than schedules"
 );
 assert(
-  /data-annual-status-action=[\s\S]*data-annual-status-field/.test(annual) && /function openStatusInput\(action, fieldId\)/.test(annual),
-  "Review status badges must route to the relevant prefilled input"
+  /class="annual-field-card-open"[^>]+data-annual-hub-open-field/.test(annual) && /data-harvest-status/.test(annual),
+  "The field picker card must open field history and show harvest status"
 );
 
 console.log("PASS annual record action contract");
