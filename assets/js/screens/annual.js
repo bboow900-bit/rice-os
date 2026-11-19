@@ -799,7 +799,7 @@
           <span>${U.escapeHTML(field.areaA ? `${field.areaA}a` : "面積未設定")}</span>
           <span>${U.escapeHTML(stage?.current ? [stage.current.label, stage.certainty].filter(Boolean).join(" / ") : "ステージ記録待ち")}</span>
         </span>
-        <span class="annual-field-card-art" aria-hidden="true">${annualPickerRiceImage(riceStage)}</span>
+        <span class="annual-field-card-art" aria-hidden="true">${stage?.current || harvest.status === "complete" ? annualPickerRiceImage(riceStage) : ""}</span>
         <span aria-hidden="true">›</span>
         <em class="annual-field-card-harvest" data-harvest-status="${U.attr(harvest.status)}">${harvestLabel}</em>
       </button>
@@ -1011,7 +1011,7 @@
         const current = compareEntriesForFilter(field, year, "all").length;
         const previous = compareEntriesForFilter(field, prior, "all").length;
         const status = !previous ? "前年記録なし" : current ? "両年の記録あり" : "対象年の記録なし";
-        return `<button type="button" class="annual-hub-compare-card" data-annual-hub-compare-field="${U.attr(field.fieldId)}"><span class="annual-hub-compare-main"><b>${U.escapeHTML(field.name)}</b><small>${U.escapeHTML(field.areaA ? `${field.areaA}a` : "面積未設定")}</small><em data-paired="${Boolean(current && previous)}">${status}</em></span><span class="annual-hub-compare-thumb" aria-hidden="true">${annualPickerRiceImage(8)}</span><span class="annual-hub-compare-arrow" aria-hidden="true">›</span></button>`;
+        return `<button type="button" class="annual-hub-compare-card" data-annual-hub-compare-field="${U.attr(field.fieldId)}"><span class="annual-hub-compare-main"><b>${U.escapeHTML(field.name)}</b><small>${U.escapeHTML(field.areaA ? `${field.areaA}a` : "面積未設定")}</small><em data-paired="${Boolean(current && previous)}">${status}</em></span><span class="annual-hub-compare-thumb" aria-hidden="true">${current && annualStageForField(field)?.current ? annualPickerRiceImage(riceStageNumberForField(field)) : ""}</span><span class="annual-hub-compare-arrow" aria-hidden="true">›</span></button>`;
       }).join("") : '<div class="empty">比較する圃場がありません。</div>'}</div></section>`;
   }
 
@@ -1851,9 +1851,9 @@
     const heading = entry.editKind === "growth" && isObservedHeading(row) && !crossYear;
     const panicle = entry.editKind === "growth" && !heading && U.number(row.panicleLengthMm, 0) > 0 && !crossYear;
     const manual = entry.editKind === "growth" && !heading && !panicle && row.stageConfirmed && row.observedStage;
-    const harvest = entry.editKind === "fieldWork" && /収穫|稲刈り/.test(String(row.workName || "")) && !/落水/.test(String(row.workName || "")) && !crossYear;
+    const workName = entry.editKind === "fieldWork" && state.isActualFieldWork(row) ? String(row.workName || "") : "";
+    const harvest = /収穫|稲刈り/.test(workName) && !/落水/.test(workName) && !crossYear;
     const badge = heading ? "現地観察" : panicle ? "実測" : manual ? "現地判断" : harvest ? "作業記録" : entry.category || "記録";
-    const workName = entry.editKind === "fieldWork" ? String(row.workName || "") : "";
     const observedStage = manual && RiceOS.agro?.SEASON_STAGES?.find(stage => stage.key === manual);
     const art = heading ? "annual-story/watercolor-heading-paddy.png" : panicle ? "annual-story/watercolor-panicle-check.png"
       : harvest ? "annual-story/schedule-harvest.png"
