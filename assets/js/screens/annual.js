@@ -1003,10 +1003,16 @@
 
   function renderHubCompare() {
     const year = reviewYearValue();
+    const prior = String(Number(year) - 1);
     const fields = state.activeFields();
-    return `<section class="annual-hub-compare"><div class="section-title compact"><h3>圃場の年度比較</h3><span>${U.escapeHTML(year)}年 / ${Number(year) - 1}年</span></div>
+    return `<section class="annual-hub-compare"><div class="section-title compact"><h3>年の比較</h3></div><p class="annual-compare-year-pair">${U.escapeHTML(year)}年 ⇄ ${prior}年</p>
       ${yearValue() === "all" ? `<p class="muted">全年度を選択中のため、比較は${U.escapeHTML(year)}年と前年を表示します。</p>` : ""}
-      <div class="annual-field-pick-grid">${fields.length ? fields.map((field) => `<button type="button" class="annual-hub-compare-card" data-annual-hub-compare-field="${U.attr(field.fieldId)}" aria-label="${U.attr(field.name)}の年度比較を開く"><span class="annual-hub-compare-thumb" aria-hidden="true">${annualPickerRiceImage(riceStageNumberForField(field))}</span><span class="annual-hub-compare-main"><b>${U.escapeHTML(field.name)}</b><small>${U.escapeHTML(varietyName(field))}${field.areaA ? ` / ${U.escapeHTML(field.areaA)}a` : ""}</small></span><span class="annual-hub-compare-arrow" aria-hidden="true">›</span></button>`).join("") : '<div class="empty">比較する圃場がありません。</div>'}</div></section>`;
+      <div class="annual-field-pick-grid">${fields.length ? fields.map((field) => {
+        const current = compareEntriesForFilter(field, year, "all").length;
+        const previous = compareEntriesForFilter(field, prior, "all").length;
+        const status = !previous ? "前年記録なし" : current ? "両年の記録あり" : "対象年の記録なし";
+        return `<button type="button" class="annual-hub-compare-card" data-annual-hub-compare-field="${U.attr(field.fieldId)}"><span class="annual-hub-compare-main"><b>${U.escapeHTML(field.name)}</b><small>${U.escapeHTML(field.areaA ? `${field.areaA}a` : "面積未設定")}</small><em data-paired="${Boolean(current && previous)}">${status}</em></span><span class="annual-hub-compare-thumb" aria-hidden="true">${annualPickerRiceImage(8)}</span><span class="annual-hub-compare-arrow" aria-hidden="true">›</span></button>`;
+      }).join("") : '<div class="empty">比較する圃場がありません。</div>'}</div></section>`;
   }
 
   function isArchivedActualWork(work) {
@@ -2334,17 +2340,33 @@
     const previous = fieldYearSnapshot(field, previousYear);
     const currentEntries = compareEntriesForFilter(field, currentYear, "all");
     const previousEntries = compareEntriesForFilter(field, previousYear, "all");
-    const currentPlanting = milestoneEntry(currentEntries, /田植/);
-    const previousPlanting = milestoneEntry(previousEntries, /田植/);
-    const currentHeading = milestoneEntry(currentEntries, /出穂/);
-    const previousHeading = milestoneEntry(previousEntries, /出穂/);
+    const heading = entries => entries.find(entry => entry.label === "出穂確認" && entry.editKind === "growth")?.date;
+    const dryDays = entries => {
+      const entry = entries.find(item => item.tone === "water" && /中干し/.test(item.label));
+      return entry && isTimelineDate(entry.periodEndDate) && entry.periodEndDate <= U.today()
+        && Number.isFinite(entry.periodDays) ? entry.periodDays : null;
+    };
+    const harvest = year => {
+      const result = state.harvestStatusForField(field.fieldId, year, U.today(), { cropYear: true });
+      return result.status === "complete" ? result.date : "";
+    };
+    const dateText = date => isTimelineDate(date) ? `${Number(date.slice(5,7))}/${Number(date.slice(8,10))}` : "";
+    const highlight = (label, tone, a, b, delta, before, after) => `<article class="annual-compare-highlight" data-tone="${tone}"><div><b>${label}</b><small>${delta === null ? "比較できる実績なし" : delta === 0 ? "前年と同じ" : `前年より${Math.abs(delta)}日${delta < 0 ? before : after}`}</small></div>${[[currentYear,a],[previousYear,b]].map(([year,value]) => `<div><span>${U.escapeHTML(year)}年</span><strong>${U.escapeHTML(value || "未記録")}</strong></div>`).join("")}</article>`;
+    const dateHighlight = (label,tone,a,b) => highlight(label,tone,dateText(a),dateText(b),
+      dateText(a) && dateText(b) && a.slice(0,4) === currentYear && b.slice(0,4) === previousYear
+        ? U.daysBetween(`2000-${b.slice(5)}`, `2000-${a.slice(5)}`) : null,"早い","遅い");
+    const aDry = dryDays(currentEntries), bDry = dryDays(previousEntries);
     const milestones = [["田植え", /田植/], ["中干し", /中干し/], ["幼穂確認", /幼穂/], ["出穂", /出穂/], ["収穫", /収穫|稲刈/]];
     const filters = [["milestones", "季節の節目"], ["all", "すべて"], ["work", "その他の作業"], ["water", "水管理"], ["growth", "生育"], ["harvest", "収穫"]];
     const history = (entries, year) => entries.length ? entries.map((entry) => compareRecordCard(entry, year, field)).join("") : `<div class="annual-compare-record empty"><span>${U.escapeHTML(year)}年</span><b>該当する記録なし</b><small>条件を変えるか、次の作業で残しましょう</small></div>`;
     return `
       <section class="annual-compare-experience" aria-label="${U.escapeHTML(field.name)}の今年と前年の比較">
-        <div class="annual-compare-experience-head"><button type="button" class="annual-compare-back" data-annual-close-compare aria-label="比較を閉じる">‹</button><div><span>今年と前年を比べる</span><h3>${U.escapeHTML(field.name)}</h3><p>${U.escapeHTML(currentYear)}年と${U.escapeHTML(previousYear)}年 / ${U.escapeHTML(varietyName(field))}</p></div></div>
-        <div class="annual-compare-season-status"><article class="current"><span>${U.escapeHTML(currentYear)}年</span><b>${U.escapeHTML(currentPlanting ? `田植え ${U.fd(currentPlanting.date)}` : "田植え未記録")}</b><small>${U.escapeHTML(currentHeading ? `出穂 ${U.fd(currentHeading.date)}` : "出穂記録待ち")}</small></article><i aria-hidden="true">⇄</i><article><span>${U.escapeHTML(previousYear)}年</span><b>${U.escapeHTML(previousPlanting ? `田植え ${U.fd(previousPlanting.date)}` : "田植え未記録")}</b><small>${U.escapeHTML(previousHeading ? `出穂 ${U.fd(previousHeading.date)}` : "出穂記録なし")}</small></article></div>
+        <div class="annual-compare-experience-head"><button type="button" class="annual-compare-back" data-annual-close-compare aria-label="比較を閉じる">‹</button><div><span>圃場名</span><h3>${U.escapeHTML(field.name)}</h3></div><img src="assets/images/annual-story/schedule-harvest.png" alt=""></div>
+        <p class="annual-compare-year-pair">${U.escapeHTML(currentYear)}年 ⇄ ${U.escapeHTML(previousYear)}年</p>
+        ${dateHighlight("出穂","green",heading(currentEntries),heading(previousEntries))}
+        ${highlight("中干し","blue",aDry === null ? "" : `${aDry}日間`,bDry === null ? "" : `${bDry}日間`,aDry === null || bDry === null ? null : aDry-bDry,"短い","長い")}
+        ${dateHighlight("稲刈り","gold",harvest(currentYear),harvest(previousYear))}
+        <details class="annual-compare-more"><summary>記録を読み比べる</summary>
         ${renderWorkTimingComparison(field, currentYear)}
         ${renderWorkTimingReviews(field, currentYear)}
         ${renderSettingExperiments(field, currentYear)}
@@ -2354,6 +2376,8 @@
         <section class="annual-compare-milestones"><div class="annual-compare-section-head"><div><span>季節の節目</span><h4>今年と前年の歩み</h4></div><small>実績のみ</small></div>${milestones.map(([label, pattern]) => `<article><span>${U.escapeHTML(label)}</span><div>${compareRecordCard(milestoneEntry(currentEntries, pattern), currentYear, field)}${compareRecordCard(milestoneEntry(previousEntries, pattern), previousYear, field)}</div></article>`).join("")}</section>
         <section class="annual-compare-history"><div class="annual-compare-section-head"><div><span>比べたい履歴</span><h4>記録を読み比べる</h4></div><small>${U.escapeHTML(currentYear)}年 ⇄ ${U.escapeHTML(previousYear)}年</small></div><div class="annual-compare-filter-row">${filters.map(([id, label]) => `<button type="button" class="${compareFilter === id ? "active" : ""}" data-annual-compare-filter="${U.attr(id)}">${U.escapeHTML(label)}</button>`).join("")}</div><div class="annual-compare-history-grid"><div><b>${U.escapeHTML(currentYear)}年</b>${history(compareEntriesForFilter(field, currentYear, compareFilter), currentYear)}</div><div><b>${U.escapeHTML(previousYear)}年</b>${history(compareEntriesForFilter(field, previousYear, compareFilter), previousYear)}</div></div></section>
         ${renderAnnualPhotoComparison(field)}
+        </details>
+        <h4 class="annual-compare-handoff-title">来年への引き継ぎ</h4>
         <section class="annual-compare-memos"><div><span>今年のひとこと</span><b>${U.escapeHTML(current.memo || "まだ記録がありません")}</b></div><div><span>前年の記憶</span><b>${U.escapeHTML(previous.memo || "前年のメモはありません")}</b></div></section>
       </section>
     `;

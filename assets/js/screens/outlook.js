@@ -84,25 +84,40 @@
     candidates.forEach((row) => persistedKeys.add(keyFor(row)));
   }
 
+  function nextMilestone(outlook) {
+    const harvestActual = outlook.harvest?.kind === "actual";
+    const afterHeading = outlook.heading?.kind === "actual";
+    const entry = harvestActual || afterHeading ? outlook.harvest : outlook.heading;
+    const label = harvestActual ? outlook.harvest.label : afterHeading ? "収穫の目安" : "出穂の目安";
+    const short = date => date ? date.slice(5).split("-").map(Number).join("/") : "";
+    const range = entry?.range;
+    const date = !entry?.date ? "記録不足" : entry.kind !== "actual" && range?.start && range?.end && range.start !== range.end
+      ? `${short(range.start)}〜${short(range.end)}` : short(entry.date);
+    return { label, date, harvestActual, afterHeading };
+  }
+
+  function outlookArt(outlook) {
+    const current = outlook.cultivation && outlook.stage?.fieldStage ? outlook.stage.fieldStage.current : outlook.stage?.current;
+    const stage = outlook.heading?.kind === "actual" ? 6 : Number(current?.image || 0);
+    const completed = outlook.harvest?.kind === "actual" && outlook.harvest.label === "収穫完了";
+    if (!stage && !completed) return "";
+    const asset = completed || stage >= 8 ? "mature" : stage === 7 ? "ripening"
+      : stage === 6 ? "heading" : stage >= 5 ? "booting" : stage >= 3 ? "tillering" : "seedling";
+    return `<img class="outlook-preview-art" src="assets/images/rice-stages/review-${asset}.png" alt="" decoding="async">`;
+  }
+
+  function milestoneContent(outlook, next) {
+    return `<span class="outlook-preview-stage">${next.afterHeading ? "出穂確認済み" : U.escapeHTML(stageLabel(outlook))}</span>
+      <span>${U.escapeHTML(next.label)}</span><strong class="outlook-preview-date">${U.escapeHTML(next.date)}</strong>
+      ${next.harvestActual ? "" : `<span class="outlook-confidence ${U.attr(outlook.confidence.key)}">信頼度：${U.escapeHTML(outlook.confidence.label)}</span>`}`;
+  }
+
   function fieldCard(outlook) {
     const field = outlook.field;
-    return `
-      <button class="outlook-field-card" type="button" data-outlook-field="${U.attr(field.fieldId)}">
-        <div class="outlook-card-head">
-          <div><small>${U.escapeHTML(varietyName(field))} / ${U.escapeHTML(field.areaA ? `${field.areaA}a` : "面積未登録")}</small><h3>${U.escapeHTML(field.name)}</h3></div>
-          <span class="outlook-confidence ${U.attr(outlook.confidence.key)}">信頼度 ${U.escapeHTML(outlook.confidence.label)}</span>
-        </div>
-        <div class="outlook-now"><span>${outlook.cultivation ? "現場記録" : "現在"}</span><b>${U.escapeHTML(stageLabel(outlook))}</b></div>
-        ${outlook.cultivation ? `<small>${U.escapeHTML(predictedStageText(outlook))}</small>` : ""}
-        <dl class="outlook-estimates">
-          ${outlook.cultivation ? `<div><dt>幼穂形成目安</dt><dd class="${outlook.panicle?.date ? "" : "is-missing"}">${U.escapeHTML(dateText(outlook.panicle))}</dd></div>` : ""}
-          <div><dt>出穂目安</dt><dd class="${outlook.heading?.date ? "" : "is-missing"}">${U.escapeHTML(dateText(outlook.heading))}</dd></div>
-          ${outlook.cultivation ? `<div><dt>追肥参考時期</dt><dd class="${outlook.topDressing?.date ? "" : "is-missing"}">${U.escapeHTML(dateText(outlook.topDressing))}</dd></div>` : ""}
-          <div><dt>収穫目安</dt><dd class="${outlook.harvest?.date ? "" : "is-missing"}">${U.escapeHTML(dateText(outlook.harvest))}</dd></div>
-        </dl>
-        ${outlook.calibration && outlook.calibration.status === "applied" ? '<small class="outlook-calibration-badge">この圃場の履歴を参考に暫定補正</small>' : ""}
-        <div class="outlook-card-foot"><span>${U.escapeHTML(outlook.water && outlook.water.label || "水管理は未記録")}</span><b>詳細　›</b></div>
-      </button>`;
+    const next = nextMilestone(outlook);
+    return `<button class="outlook-field-card outlook-preview" type="button" data-outlook-field="${U.attr(field.fieldId)}">
+      <div><h3>${U.escapeHTML(field.name)}</h3>${milestoneContent(outlook, next)}</div>${outlookArt(outlook)}<span aria-hidden="true">›</span>
+    </button>`;
   }
 
   function differenceText(outlook) {
@@ -191,9 +206,16 @@
     const regional = outlook.regional;
     return `
       <section class="outlook-detail">
-        <div class="screen-head outlook-detail-head">
+        <div class="screen-head outlook-detail-head outlook-watercolor-head">
           <div><p class="eyebrow">${U.escapeHTML(varietyName(outlook.field))}</p><h2>${U.escapeHTML(outlook.field.name)}の見通し</h2></div>
+          <img src="assets/images/annual-story/schedule-harvest.png" alt="" decoding="async">
         </div>
+        <div class="outlook-next-hero"><div>${milestoneContent(outlook, nextMilestone(outlook))}</div>${outlookArt(outlook)}</div>
+        <section class="outlook-detail-section"><h3>見通しの根拠</h3>
+          <div class="outlook-source-list">${outlook.sources.map((item) => `<div class="outlook-source ${item.available ? "available" : ""}"><span>${U.escapeHTML(item.label)}</span><b>${stars(item.strength)}</b><small>${U.escapeHTML(item.detail)}</small></div>`).join("")}</div>
+        </section>
+        <details class="outlook-reference-fold"><summary>積算温度の参考値</summary>${thermalDetail(outlook) || '<p class="muted">積算温度の参考値は未取得です。</p>'}</details>
+        <details class="outlook-reference-fold"><summary>計算条件・前年との比較</summary>
         <div class="outlook-detail-hero">
           <small>${outlook.cultivation ? "現場記録" : "現在ステージ"}</small><b>${U.escapeHTML(stageLabel(outlook))}</b><span>${U.escapeHTML(outlook.water && outlook.water.label || "水管理は未記録")}</span>
           ${outlook.cultivation ? `<span>${U.escapeHTML(predictedStageText(outlook))}</span>` : ""}
@@ -211,14 +233,11 @@
           ${cultivationEvidence(outlook)}
         </section>
         ${calibrationDetail(outlook)}
-        ${thermalDetail(outlook)}
-        <section class="outlook-detail-section"><details><summary>見通しの根拠</summary>
-          <div class="outlook-source-list">${outlook.sources.map((item) => `<div class="outlook-source ${item.available ? "available" : ""}"><span>${U.escapeHTML(item.label)}</span><b>${stars(item.strength)}</b><small>${U.escapeHTML(item.detail)}</small></div>`).join("")}</div>
-        </details></section>
         <section class="outlook-detail-section regional-reference"><h3>福島県の一般目安</h3>
           <p><b>${U.escapeHTML(regional.variety)}</b>　収穫期の参考: ${U.escapeHTML(regional.harvestTarget.label)}（出穂後の積算気温）</p>
           <div>${regional.sources.map((item) => `<a href="${U.attr(item.url)}" target="_blank" rel="noopener">${U.escapeHTML(item.label)}　›</a>`).join("")}</div>
         </section>
+        </details>
       </section>`;
   }
 
@@ -239,7 +258,7 @@
       return;
     }
     root.innerHTML = `
-      <div class="screen-head outlook-head"><div><p class="eyebrow">記録と地域情報を読む</p><h2>見通し</h2><small>実測を最優先に、予測の根拠を表示します。</small></div></div>
+      <div class="screen-head outlook-head outlook-watercolor-head"><h2>見通し</h2><img src="assets/images/annual-story/schedule-harvest.png" alt=""></div>
       <div class="outlook-toolbar"><label>対象圃場<select data-outlook-group><option value="all">全圃場</option>${groups.map((group) => `<option value="${U.attr(group.fieldGroupId)}" ${group.fieldGroupId === selectedGroupId ? "selected" : ""}>${U.escapeHTML(group.name)}</option>`).join("")}</select></label><button class="secondary" type="button" data-outlook-weather>${hasWeatherLocation ? "気象を再取得" : "現在地から気象を取得"}</button></div>
       <div class="outlook-actions"><p class="outlook-update-note">見通しを保存すると、予測と実績との差を翌年の補正に残せます。</p><button class="secondary" type="button" data-outlook-save>見通しを保存</button></div>
       <div class="outlook-list">${rows.length ? rows.map(fieldCard).join("") : '<div class="empty-state">このグループに表示できる圃場がありません。</div>'}</div>`;

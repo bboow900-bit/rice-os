@@ -15,6 +15,7 @@ const {chromium}=require("C:/Users/Keisuke/.cache/codex-runtimes/codex-primary-r
      d.fieldWorks.push({workId:`reflection-plant-${year}`,date:`${year}-05-14`,cropYear:year,workName:"田植え",fieldIds:[id]},
       {workId:`reflection-harvest-${year}`,date:`${year}-09-20`,cropYear:year,workName:"稲刈り",fieldIds:[id],harvestStatusByField:{[id]:"complete"}});
      d.growthLogs.push({logId:`reflection-panicle-${year}`,fieldId:id,date:`${year}-07-20`,cropYear:year,panicleLengthMm:1});
+     d.growthLogs.push({logId:`reflection-heading-${year}`,fieldId:id,date:`${year}-07-${year===2026?27:30}`,cropYear:year,headingObserved:true});
     }
     d.fieldWorks.push({workId:"reflection-herbicide",date:"2026-06-16",cropYear:2026,workName:"除草剤",fieldIds:[id],material:"確認用粒剤"});
     d.fieldWorks.push({workId:"reflection-sowing",date:"2026-04-16",cropYear:2026,workName:"播種",targetScope:"offField",fieldIds:[]});
@@ -57,7 +58,14 @@ const {chromium}=require("C:/Users/Keisuke/.cache/codex-runtimes/codex-primary-r
    await page.locator('[data-annual-record-detail-back]:visible').click();
    await workPanel.waitFor();
    await page.locator('[data-annual-hub-view="compare"]').click();await shot('compare-picker');
-   await page.locator(`[data-annual-hub-compare-field="${id}"]`).click();await page.locator('[data-annual-compare-filter]').first().waitFor();await shot('compare');
+   await page.locator(`[data-annual-hub-compare-field="${id}"]`).click();
+   const compare=page.locator('.annual-compare-experience');
+   assert.equal(await compare.locator('.annual-compare-highlight').count(),3);
+   assert.match(await compare.locator('[data-tone="gold"]').innerText(),/前年と同じ/);
+   assert.match(await compare.locator('[data-tone="green"]').innerText(),/前年より3日早い/);
+   await compare.locator('.annual-compare-experience-head').scrollIntoViewIfNeeded();await shot('compare');
+   await compare.locator('.annual-compare-more > summary').click();
+   await page.locator('[data-annual-compare-filter]').first().waitFor();
    await page.locator('#appBackButton').click();await page.locator('[data-annual-hub-view="fields"]').click();await page.locator(`[data-annual-hub-open-field="${id}"]`).click();
    await page.locator('.annual-story').waitFor();await shot('field-overview');
    await page.locator('.harvest-recap').scrollIntoViewIfNeeded();await shot('harvest-recap');

@@ -197,3 +197,152 @@ body:has(#screen-annual.annual-detail-mode.active) { overflow-x: clip !important
   #screen-home .home-decision-section-head select { flex: 1 1 170px; font-size: 12px; }
   .screen :is(.form-actions, .ts-actions, .recipe-ledger-actions) { flex-wrap: wrap; }
 }
+
+/* Outlook: keep the forecast readable beside its watercolor. */
+#screen-outlook {
+  --outlook-paper: #faf8f0;
+  --outlook-leaf: #f0f4eb;
+  --outlook-rule: #cbd9c8;
+  --outlook-ink: #284536;
+  --outlook-muted: #4d6657;
+}
+#screen-outlook :is(.outlook-watercolor-head,.outlook-preview,.outlook-next-hero) {
+  box-sizing: border-box;
+  position: relative;
+  isolation: isolate;
+  min-width: 0;
+  padding: 12px;
+  color: var(--outlook-ink);
+  background: var(--outlook-paper);
+  overflow-wrap: anywhere;
+}
+#screen-outlook .outlook-watercolor-head {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  min-height: 82px;
+  border-bottom: 1px solid #c5b279;
+  text-align: left;
+}
+#screen-outlook :is(.outlook-watercolor-head,.outlook-next-hero):has(> img),
+#screen-outlook :is(.outlook-preview,.outlook-next-hero):has(.outlook-preview-art) {
+  padding-inline-end: min(33%,144px);
+}
+#screen-outlook :is(.outlook-watercolor-head,.outlook-next-hero) > img,
+#screen-outlook .outlook-preview-art {
+  position: absolute;
+  z-index: -1;
+  inset: 6px 0 6px auto;
+  width: min(32%,144px);
+  height: calc(100% - 12px);
+  object-fit: contain;
+  object-position: right center;
+  mix-blend-mode: multiply;
+  mask-image: radial-gradient(ellipse closest-side, #000 56%, transparent 112%),
+    linear-gradient(to bottom, #000 66%, transparent);
+  mask-composite: intersect;
+  pointer-events: none;
+}
+#screen-outlook .outlook-preview-art img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: right center;
+}
+#screen-outlook :is(.outlook-watercolor-head,.outlook-next-hero) :is(h2,h3,p) { margin: 0; }
+#screen-outlook .outlook-detail-head > div {
+  flex: 1 1 auto;
+  min-width: 0;
+  text-align: left;
+}
+#screen-outlook .outlook-detail-head > :is(button,a) {
+  flex: 0 0 auto;
+  min-width: 44px;
+  min-height: 44px;
+}
+#screen-outlook .outlook-detail-head h2 { font-size: 20px; }
+#screen-outlook .outlook-preview {
+  display: grid;
+  grid-template-columns: minmax(0,1fr);
+  align-content: center;
+  justify-items: start;
+  gap: 4px;
+  width: 100%;
+  min-height: 104px;
+  border: 1px solid var(--outlook-rule);
+  border-radius: 8px;
+  box-shadow: none;
+  text-align: left;
+  white-space: normal;
+}
+#screen-outlook .outlook-preview h3 {
+  min-width: 0;
+  margin: 0;
+  color: var(--outlook-ink);
+  font-size: 17px;
+  line-height: 1.4;
+}
+#screen-outlook :is(.outlook-preview-stage,.outlook-preview-date) {
+  display: block;
+  min-width: 0;
+  line-height: 1.5;
+  white-space: normal;
+}
+#screen-outlook .outlook-preview-stage { color: var(--outlook-muted); font-size: 13px; }
+#screen-outlook .outlook-preview-date { color: var(--outlook-ink); font-size: 23px; font-weight: 750; }
+#screen-outlook .outlook-next-hero .outlook-preview-date { font-size: 29px; }
+#screen-outlook .outlook-preview > span:last-child { position: absolute; inset: 50% 8px auto auto; transform: translateY(-50%); font-size: 22px; }
+#screen-outlook .outlook-preview > .outlook-preview-art { right: 22px; width: min(26%,122px); }
+#screen-outlook :is(.outlook-preview,.outlook-next-hero) .outlook-confidence {
+  display: inline-block;
+  justify-self: start;
+  box-sizing: border-box;
+  max-width: 100%;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: #dfeddf;
+  color: #31583c;
+  font-size: 11px;
+  line-height: 1.5;
+  white-space: normal;
+}
+#screen-outlook :is(.outlook-preview,.outlook-next-hero) .outlook-confidence.medium { background: #f5ebcd; color: #6b511c; }
+#screen-outlook :is(.outlook-preview,.outlook-next-hero) .outlook-confidence:is(.low,.missing) { background: #eeefeb; color: #515c55; }
+#screen-outlook .outlook-next-hero {
+  min-height: 78px;
+  border-block: 1px solid var(--outlook-rule);
+  background: var(--outlook-leaf);
+}
+#screen-outlook .outlook-reference-fold {
+  min-width: 0;
+  margin-block: 10px;
+  padding: 0;
+  border: 0;
+  border-block: 1px solid var(--outlook-rule);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+#screen-outlook .outlook-reference-fold > summary {
+  box-sizing: border-box;
+  min-height: 44px;
+  padding: 10px 8px;
+  color: var(--outlook-ink);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+#screen-outlook .outlook-reference-fold[open] > summary { background: var(--outlook-leaf); }
+#screen-outlook :is(.outlook-preview,.outlook-reference-fold > summary):focus-visible {
+  outline: 2px solid #38674b;
+  outline-offset: 2px;
+}
+@media (max-width: 380px) {
+  #screen-outlook :is(.outlook-watercolor-head,.outlook-preview,.outlook-next-hero) {
+    padding-block: 9px;
+    padding-inline-start: 10px;
+  }
+}
