@@ -35,7 +35,9 @@ const { chromium } = require("C:/Users/Keisuke/.cache/codex-runtimes/codex-prima
       const flow=page.locator('.annual-story');
       await flow.waitFor();
       assert.equal(await flow.locator('[data-annual-record-open-id="primary-mow"]').count(),0);
-      assert.equal(await flow.locator('.annual-flow-milestone-art').count(),3);
+      const images=flow.locator('.annual-flow-milestone-art');
+      assert.equal(await images.count(),6);
+      await images.evaluateAll(nodes=>Promise.all(nodes.map(image=>{image.loading='eager';return image.decode();})));
       const artworkChecks=await flow.locator('.annual-flow-art').evaluateAll(nodes=>nodes.map(frame=>{
         const image=frame.querySelector('img'), open=frame.closest('.annual-year-flow-open');
         const bounds=frame.getBoundingClientRect(), copy=open.querySelector('.annual-flow-copy').getBoundingClientRect();
@@ -45,7 +47,7 @@ const { chromium } = require("C:/Users/Keisuke/.cache/codex-runtimes/codex-prima
       }));
       for(const art of artworkChecks){
         assert(art.loaded,'Botanical artwork loads');
-        assert(art.width>=(width<=380?88:96)&&art.height>=(width<=380?104:112),'Botanical artwork remains enlarged');
+        assert(art.width>=(width<=380?88:96)&&art.height===66,'Artwork is wide without making the card tall');
         assert(art.copyClear&&art.thermalClear,'Artwork does not overlap text or thermal total');
       }
       const text=await flow.innerText(); assert.doesNotMatch(text,/undefined|NaN|Invalid Date|1030/);
@@ -65,10 +67,11 @@ const { chromium } = require("C:/Users/Keisuke/.cache/codex-runtimes/codex-prima
       assert(thermalClear,'Saved thermal value stays below enlarged artwork');
       baseline=await page.evaluate(()=>localStorage.getItem(RiceOS.schema.STORE_KEY));
       const panicle=flow.locator('.annual-year-flow-entry:has([data-annual-record-open-id="primary-panicle"])');
-      await panicle.locator('[data-annual-flow-summary]').click();
-      assert.match(await panicle.innerText(),/来年も同時期/);
+      assert.equal(await panicle.locator('.annual-flow-note-mark').count(),1);
+      assert.equal(await flow.locator('[data-annual-flow-summary]').count(),0);
       await panicle.locator('[data-annual-record-open-id="primary-panicle"]').click();
       await page.locator('.annual-record-detail').waitFor();
+      assert.match(await page.locator('.annual-record-detail').innerText(),/来年も同時期/);
       await page.locator('[data-annual-record-detail-back]:visible').click();
       await flow.waitFor();
       await flow.evaluate(el => window.scrollTo(0, window.scrollY + el.getBoundingClientRect().top - 78));
@@ -80,7 +83,7 @@ const { chromium } = require("C:/Users/Keisuke/.cache/codex-runtimes/codex-prima
       if (width === 390) {
         await page.setViewportSize({width:390,height:1320});
         const harvest=flow.locator('.annual-year-flow-entry:has([data-annual-record-open-id="primary-harvest"])');
-        await harvest.locator('[data-annual-flow-summary]').click();
+        assert.equal(await harvest.locator('.annual-flow-note-mark').count(),1);
         await flow.evaluate(el=>{for(let n=el;n;n=n.parentElement)n.scrollTop=0;window.scrollTo(0,0);});
         await page.screenshot({path:path.join(process.env.ANNUAL_STORY_REVIEW_DIR || os.tmpdir(),'annual-story-317-390.png')});
       }

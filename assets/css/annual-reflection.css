@@ -91,3 +91,38 @@
   #screen-annual .annual-pop-heading .annual-pop-rice { width: 96px; height: 102px; flex-basis: 96px; }
   #screen-annual .annual-field-plant { width: 60px; height: 82px; }
 }
+
+/* Field overview midpoint: only the sections after the unchanged annual story. */
+#screen-annual .annual-story-surface > .annual-shipment-entry { display: grid; grid-template-columns: 56px minmax(0,1fr) 16px; gap: 12px; align-items: center; padding: 14px; margin: 20px 0; border: 1px solid #b8d3ba; border-left: 4px solid #39764b; border-radius: 8px; background: #fff; box-shadow: none; }
+#screen-annual .annual-story-surface > .annual-shipment-entry > img { width: 56px; height: 68px; object-fit: contain; }
+#screen-annual .annual-story-surface > .annual-shipment-entry > span { min-width: 0; font-size: 15px; line-height: 1.6; }
+#screen-annual .annual-story-surface > .annual-shipment-entry > span[aria-hidden="true"] { font-size: 28px; line-height: 1; }
+#screen-annual .annual-story-surface > .annual-shipment-entry b { color: #173e29; font-size: 21px; line-height: 1.5; }
+#screen-annual .annual-story-surface > .annual-shipment-entry small { color: #586c53; font-size: 13px; line-height: 1.7; text-wrap: balance; overflow-wrap: anywhere; }
+#screen-annual .annual-story-surface > .harvest-recap { margin: 24px 0; padding: 0 0 16px; border: 0; border-bottom: 1px solid var(--reflection-rule); border-radius: 0; background: #fff; box-shadow: none; }
+#screen-annual .annual-story-surface > .harvest-recap > header { display: block; padding: 16px; background: #11623b; color: #fff; overflow-wrap: anywhere; }
+#screen-annual .annual-story-surface > .harvest-recap > header > span { color: #e2efda; font-size: 12px; line-height: 1.7; }
+#screen-annual .annual-story-surface > .harvest-recap > header h3 { margin: 6px 0 10px; color: #fff; font-size: 22px; line-height: 1.5; }
+#screen-annual .annual-story-surface > .harvest-recap > header > p { margin: 5px 0 0; color: #edf5e9; font-size: 13px; line-height: 1.7; }
+#screen-annual .annual-story-surface > .harvest-recap > :is(.harvest-recap-assessment,.harvest-recap-numbers,.harvest-recap-reference,details,p) { margin-right: 14px; margin-left: 14px; }
+#screen-annual .annual-story-surface .harvest-recap-assessment { padding: 18px 0; border-bottom: 1px solid var(--reflection-rule); }
+#screen-annual .annual-story-surface .harvest-recap-assessment > small { color: #586c53; font-size: 13px; line-height: 1.6; }
+#screen-annual .annual-story-surface .harvest-recap-assessment > strong { color: #173e29; font-size: 26px; line-height: 1.5; }
+#screen-annual .annual-story-surface .harvest-recap-assessment > p { margin: 12px 0 0; padding: 12px; border-left: 3px solid #c4a343; background: var(--reflection-gold); color: #4d482e; font-size: 14px; line-height: 1.8; white-space: pre-wrap; overflow-wrap: anywhere; }
+#screen-annual .annual-story-surface .harvest-recap-numbers { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,180px),1fr)); gap: 0 20px; }
+#screen-annual .annual-story-surface .harvest-recap-numbers > div { min-width: 0; border-bottom: 1px solid var(--reflection-rule); }
+#screen-annual .annual-story-surface .harvest-recap-numbers dt { color: #586c53; font-size: 13px; line-height: 1.7; }
+#screen-annual .annual-story-surface .harvest-recap-numbers dd { color: #173e29; font-size: 26px; line-height: 1.5; overflow-wrap: anywhere; }
+#screen-annual .annual-story-surface .harvest-recap-reference { color: #34503a; }
+#screen-annual .annual-story-surface .harvest-recap-reference > b { font-size: 15px; line-height: 1.7; }
+#screen-annual .annual-story-surface > .harvest-recap > details { margin-top: 12px; margin-bottom: 16px; padding: 12px; border: 0; border-radius: 6px; background: var(--reflection-gold); }
+#screen-annual .annual-story-surface > .harvest-recap > details > summary { min-height: 32px; color: #354323; font-size: 15px; font-weight: 700; line-height: 1.7; cursor: pointer; }
+#screen-annual .annual-story-surface > .harvest-recap > button { width: calc(100% - 28px); min-height: 44px; margin: 12px 14px 0; padding: 10px 12px; border: 1px solid #b8d3ba; border-radius: 6px; background: #fff; color: #245333; font-size: 14px; line-height: 1.6; box-shadow: none; }
+#screen-annual .annual-story-surface > .harvest-recap > button:last-child { background: #edf6e8; font-weight: 700; }
+#screen-annual .annual-story-surface > .annual-flow-compare-link { display: grid; grid-template-columns: minmax(0,1fr); gap: 12px; margin: 16px 0; padding: 16px 0; border: 0; border-top: 1px solid var(--reflection-rule); border-bottom: 1px solid var(--reflection-rule); border-radius: 0; background: #fff; box-shadow: none; }
+#screen-annual .annual-story-surface > .annual-flow-compare-link > div { min-width: 0; }
+#screen-annual .annual-story-surface > .annual-flow-compare-link > div > span { font-size: 12px; line-height: 1.6; }
+#screen-annual .annual-story-surface > .annual-flow-compare-link + .mr-entry { margin-top: 0; }
+#screen-annual .annual-story-surface > .annual-flow-compare-link h3 { padding-left: 12px; border-left: 5px solid #64a42d; margin: 8px 0 12px; color: #173e29; font-size: 22px; line-height: 1.5; }
+#screen-annual .annual-story-surface > .annual-flow-compare-link p { margin: 0; color: #586c53; font-size: 14px; font-weight: 400; line-height: 1.8; }
+#screen-annual .annual-story-surface > .annual-flow-compare-link .primary { width: 100%; min-height: 44px; padding: 10px 16px; border: 1px solid #126b40; border-radius: 6px; background: #126b40; color: #fff; font-size: 15px; line-height: 1.6; white-space: normal; box-shadow: none; }

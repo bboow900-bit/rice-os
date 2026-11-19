@@ -745,7 +745,8 @@
 
   function annualPickerRiceAsset(stageNumber) {
     const num = Math.max(1, Math.min(8, Number(stageNumber) || 1));
-    return `assets/images/rice-stages/rice-card-clump-${String(num).padStart(2, "0")}.png`;
+    const art = ["seedling", "seedling", "tillering", "tillering", "booting", "heading", "ripening", "mature"][num - 1];
+    return `assets/images/rice-stages/review-${art}.png`;
   }
 
   function annualPickerRiceImage(stageNumber) {
@@ -1852,8 +1853,6 @@
 
   function renderExpandableFlowCard(field, entry, timeline = []) {
     const id = String(entry.editId || entry.id || "");
-    const key = `${entry.editKind}:${id}`;
-    const expanded = expandedFlowRecord === key;
     const target = annualRecordTarget(field, entry.editKind, id);
     const row = target && target.row || {};
     if (entry.editKind === "milling" && row.date && String(row.season) !== row.date.slice(0, 4)) {
@@ -1868,7 +1867,17 @@
     const manual = entry.editKind === "growth" && !heading && !panicle && row.stageConfirmed && row.observedStage;
     const harvest = entry.editKind === "fieldWork" && /収穫|稲刈り/.test(String(row.workName || "")) && !/落水/.test(String(row.workName || "")) && !crossYear;
     const badge = heading ? "現地観察" : panicle ? "実測" : manual ? "現地判断" : harvest ? "作業記録" : entry.category || "記録";
-    const art = heading ? "heading" : panicle ? "panicle" : harvest ? "harvest" : "";
+    const workName = entry.editKind === "fieldWork" ? String(row.workName || "") : "";
+    const observedStage = manual && RiceOS.agro?.SEASON_STAGES?.find(stage => stage.key === manual);
+    const art = heading ? "annual-story/watercolor-heading-paddy.png" : panicle ? "annual-story/watercolor-panicle-check.png"
+      : harvest ? "annual-story/schedule-harvest.png"
+      : /^(田植え|田植)$/.test(workName) ? "annual-story/schedule-planting.png"
+      : /^(除草剤|除草剤散布)$/.test(workName) ? "annual-story/schedule-herbicide.png"
+      : /草刈/.test(workName) ? "annual-story/watercolor-mowing.png"
+      : /追肥/.test(workName) || entry.editKind === "fertilizer" ? "annual-story/watercolor-fertilizer.png"
+      : /防除/.test(workName) ? "annual-story/watercolor-spraying.png"
+      : entry.tone === "water" && /中干/.test(entry.label) ? "annual-story/watercolor-drying.png"
+      : observedStage ? annualPickerRiceAsset(observedStage.image).replace(/^assets\/images\//, "") : "";
     const milestoneBadge = Boolean(heading || panicle || harvest || manual);
     const primary = [];
     if (panicle) primary.push(`幼穂長 ${Number(row.panicleLengthMm).toFixed(1)}mm`);
@@ -1932,18 +1941,17 @@
     if (entry.stageFact) facts.push(entry.stageFact);
     const memo = String(row.memo || row.observationSummary || "").trim();
     const extra = facts.some(fact => fact !== entry.stageFact) || Boolean(memo);
-    const supplement = extra ? `<div class="annual-flow-supplement"><button type="button" class="annual-year-flow-summary-toggle" data-annual-flow-summary="${U.attr(key)}" aria-expanded="${expanded ? "true" : "false"}">${expanded ? "補足を閉じる" : memo ? "メモあり・補足を見る" : "補足を見る"}<span aria-hidden="true">${expanded ? "⌃" : "›"}</span></button></div>` : "";
-    return `<article class="annual-year-flow-entry ${U.attr(entry.tone)}${entry.milestone || harvest ? " milestone" : ""}${expanded && extra ? " expanded" : ""}"><div class="annual-year-flow-main">
+    const supplementLabel = memo ? "メモあり" : "補足あり";
+    return `<article class="annual-year-flow-entry ${U.attr(entry.tone)}${entry.milestone || harvest ? " milestone" : ""}"><div class="annual-year-flow-main">
       <button type="button" class="annual-year-flow-open" data-annual-record-open-kind="${U.attr(entry.editKind)}" data-annual-record-open-id="${U.attr(id)}" data-annual-record-open-label="${U.attr(entry.label)}">
         <span class="annual-flow-category"><em class="annual-flow-category-label${milestoneBadge ? " annual-flow-milestone-badge" : ""}">${U.escapeHTML(badge)}</em></span>
         <span class="annual-flow-copy"><span class="annual-year-flow-title"><b>${U.escapeHTML(entry.label)}</b></span>${waterSummary || primary.length ? `<span class="annual-year-flow-detail">${waterSummary || primary.map(value => U.escapeHTML(value).replace(/(\d+日)/g, '<span class="annual-flow-day-count">$1</span>')).join("<br>")}</span>` : ""}</span>
-        ${art ? `<span class="annual-flow-art" aria-hidden="true"><img class="annual-flow-milestone-art" src="assets/images/annual-story/annual-story-${art}.png" alt="" loading="lazy"></span>` : ""}
+        ${art ? `<span class="annual-flow-art scene" aria-hidden="true"><img class="annual-flow-milestone-art" src="assets/images/${art}" alt="" loading="lazy"></span>` : ""}
         ${thermalText ? `<span class="annual-flow-thermal">${U.escapeHTML(thermalText)}</span>` : ""}
-        <strong class="annual-flow-chevron" aria-hidden="true">›</strong>
+        ${extra ? `<span class="annual-flow-chevron annual-flow-note-mark" title="${supplementLabel}"><svg role="img" aria-label="${supplementLabel}" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="false"><path d="M6 3h12a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z M8 8h8 M8 12h8 M8 16h5"/></svg></span>` : '<strong class="annual-flow-chevron" aria-hidden="true">›</strong>'}
       </button>
       <button type="button" class="annual-year-flow-menu" aria-label="${U.escapeHTML(entry.label)}の編集・削除" title="編集・削除" data-annual-flow-menu-kind="${U.attr(entry.editKind)}" data-annual-flow-menu-id="${U.attr(id)}" data-annual-flow-menu-label="${U.attr(entry.label)}">⋮</button>
-      ${supplement}
-    </div>${expanded && extra ? `<div class="annual-year-flow-summary">${facts.length ? `<div class="annual-year-flow-summary-metrics">${facts.map(fact => `<span>${U.escapeHTML(fact)}</span>`).join("")}</div>` : ""}${memo ? `<p><b>メモ</b> / ${U.escapeHTML(memo)}</p>` : ""}</div>` : ""}</article>`;
+    </div></article>`;
   }
 
   function fieldYearTimeline(field, year) {

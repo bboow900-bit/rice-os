@@ -295,9 +295,11 @@
     const title = String(U.$("sheetScheduleTitle").value || "");
     const presets = U.$("sheetScheduleTargetMode").value === "offField"
       ? RiceOS.schema.OTHER_WORK_NAMES.map((name) => ({ title: `${name}予定`, label: name })) : SCHEDULE_PRESETS;
-    root.innerHTML = presets.map((preset) => `
-      <button type="button" class="${title === preset.title ? "active" : ""}" data-schedule-preset="${U.attr(preset.title)}">${U.escapeHTML(preset.label)}</button>
-    `).join("");
+    root.innerHTML = presets.map((preset) => {
+      const selected = title === preset.title;
+      return `<button type="button" class="${selected ? "active" : ""}" aria-pressed="${selected}" data-schedule-preset="${U.attr(preset.title)}"><span>${U.escapeHTML(preset.label)}</span></button>`;
+      return `<button type="button" class="${selected ? "active" : ""}${art ? " schedule-illustrated-preset" : ""}" aria-pressed="${selected}" data-schedule-preset="${U.attr(preset.title)}">${art ? '<small>予定</small>' : ""}<span>${U.escapeHTML(art && preset.title === "除草剤散布予定" ? "除草剤散布" : preset.label)}</span>${art ? `<img src="assets/images/${art}" alt="" loading="lazy">` : ""}</button>`;
+    }).join("");
   }
 
   function hideScheduleForm() {

@@ -36,7 +36,9 @@ const {chromium}=require("C:/Users/Keisuke/.cache/codex-runtimes/codex-primary-r
    await page.locator('[data-annual-hub-view="compare"]').click();await shot('compare-picker');
    await page.locator(`[data-annual-hub-compare-field="${id}"]`).click();await page.locator('[data-annual-compare-filter]').first().waitFor();await shot('compare');
    await page.locator('#appBackButton').click();await page.locator('[data-annual-hub-view="fields"]').click();await page.locator(`[data-annual-hub-open-field="${id}"]`).click();
-   await page.locator('.annual-story').waitFor();await page.locator('.annual-season-notes').scrollIntoViewIfNeeded();await shot('notes');
+   await page.locator('.annual-story').waitFor();await shot('field-overview');
+   await page.locator('.harvest-recap').scrollIntoViewIfNeeded();await shot('harvest-recap');
+   await page.locator('.annual-season-notes').scrollIntoViewIfNeeded();await shot('notes');
    assert.match(await page.locator('.annual-season-notes').innerText(),/畦際/);assert.match(await page.locator('.annual-carryover-notes').innerText(),/今年の記録/);
    const noteBounds=await page.locator('.annual-season-notes').boundingBox(),carryBounds=await page.locator('.annual-carryover-notes').boundingBox();assert(noteBounds&&carryBounds&&noteBounds.y+noteBounds.height<=carryBounds.y+1);
    assert.equal(await page.evaluate(()=>localStorage.getItem(RiceOS.schema.STORE_KEY)),baseline);assert.deepEqual(errors,[]);

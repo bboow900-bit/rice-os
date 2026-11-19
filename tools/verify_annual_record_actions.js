@@ -96,17 +96,14 @@ assert(
   /\.annual-field-switcher \{[\s\S]*position: sticky/.test(css),
   "Annual field switcher must stay reachable while reviewing a long record"
 );
+const flowCard = annual.slice(annual.indexOf("function renderExpandableFlowCard("), annual.indexOf("function fieldYearTimeline("));
 assert(
-  /data-annual-flow-summary=[\s\S]*補足を見る/.test(annual) && /const flowSummary = event\.target\.closest\("\[data-annual-flow-summary\]"\)/.test(annual),
-  "Annual flow must offer an explicit inline-summary control separate from the normal card tap"
+  /\$\{extra \? `<span class="annual-flow-chevron annual-flow-note-mark"/.test(flowCard) && !flowCard.includes("data-annual-flow-summary"),
+  "Annual flow must mark supplemental content without adding a separate button"
 );
 assert(
-  /expandedFlowRecord = expandedFlowRecord === key \? "" : key;/.test(annual) && /if \(expandedFlowRecord\) \{[\s\S]*expandedFlowRecord = ""/.test(annual),
-  "Inline summaries must toggle independently and close through the shared back path"
-);
-assert(
-  /class="annual-year-flow-open"[\s\S]*data-annual-flow-summary/.test(annual),
-  "Opening the read-only record detail must remain distinct from opening its inline summary"
+  /<button[^>]+class="annual-year-flow-open"[^>]+data-annual-record-open-kind/.test(flowCard),
+  "Annual flow cards must still open the record detail"
 );
 assert(
   /label: "記録更新", tone: "warn", action: "growth"/.test(annual),

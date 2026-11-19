@@ -1,9 +1,24 @@
-const CACHE_NAME = "rice-karte-20261117-323";
-const APP_VERSION = "20261117_ver323";
+const CACHE_NAME = "rice-karte-20261119-324";
+const APP_VERSION = "20261119_ver324";
 const CACHE_PREFIX = "rice-karte-";
 const RETAINED_APP_CACHES = 2;
 
 const APP_SHELL = [
+  "./assets/images/annual-story/watercolor-panicle-check.png",
+  "./assets/images/annual-story/watercolor-heading-paddy.png",
+  "./assets/images/annual-story/watercolor-mowing.png",
+  "./assets/images/annual-story/watercolor-fertilizer.png",
+  "./assets/images/annual-story/watercolor-spraying.png",
+  "./assets/images/annual-story/watercolor-drying.png",
+  "./assets/images/annual-story/schedule-planting.png",
+  "./assets/images/annual-story/schedule-herbicide.png",
+  "./assets/images/annual-story/schedule-harvest.png",
+  "./assets/images/rice-stages/review-seedling.png",
+  "./assets/images/rice-stages/review-tillering.png",
+  "./assets/images/rice-stages/review-booting.png",
+  "./assets/images/rice-stages/review-heading.png",
+  "./assets/images/rice-stages/review-ripening.png",
+  "./assets/images/rice-stages/review-mature.png",
   `./assets/css/annual-reflection.css?v=${APP_VERSION}`,
   `./assets/css/material-review.css?v=${APP_VERSION}`,
   `./assets/js/ui/material-review.js?v=${APP_VERSION}`,
