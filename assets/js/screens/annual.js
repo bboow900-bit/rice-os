@@ -2354,7 +2354,7 @@
       return result.status === "complete" ? result.date : "";
     };
     const dateText = date => isTimelineDate(date) ? `${Number(date.slice(5,7))}/${Number(date.slice(8,10))}` : "";
-    const highlight = (label, tone, a, b, delta, before, after) => `<article class="annual-compare-highlight" data-tone="${tone}"><div><b>${label}</b><small>${delta === null ? "比較できる実績なし" : delta === 0 ? "前年と同じ" : `前年より${Math.abs(delta)}日${delta < 0 ? before : after}`}</small></div>${[[currentYear,a],[previousYear,b]].map(([year,value]) => `<div><span>${U.escapeHTML(year)}年</span><strong>${U.escapeHTML(value || "未記録")}</strong></div>`).join("")}</article>`;
+    const highlight = (label, tone, a, b, delta, before, after) => `<article class="annual-compare-highlight" data-tone="${tone}"><div><b>${label}</b><small>${delta === null ? "比較できる実績なし" : delta === 0 ? "前年と同じ" : `前年より${Math.abs(delta)}日${delta < 0 ? before : after}`}</small></div>${[[currentYear,a],[previousYear,b]].map(([year,value]) => `<div><span>${U.escapeHTML(year)}年</span><strong${value ? "" : " data-compare-missing"}>${U.escapeHTML(value || "未記録")}</strong></div>`).join("")}</article>`;
     const dateHighlight = (label,tone,a,b) => highlight(label,tone,dateText(a),dateText(b),
       dateText(a) && dateText(b) && a.slice(0,4) === currentYear && b.slice(0,4) === previousYear
         ? U.daysBetween(`2000-${b.slice(5)}`, `2000-${a.slice(5)}`) : null,"早い","遅い");

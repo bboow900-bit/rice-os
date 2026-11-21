@@ -34,6 +34,15 @@ const { chromium } = require("C:/Users/Keisuke/.cache/codex-runtimes/codex-prima
       await page.locator(`[data-annual-hub-open-field="${field}"]:visible`).click();
       const flow=page.locator('.annual-story');
       await flow.waitFor();
+      const typeScale = await flow.locator('.annual-year-flow-title b').evaluateAll(nodes => nodes.map(node => ({
+        size: parseFloat(getComputedStyle(node).fontSize),
+        milestone: !!node.closest('.milestone')
+      })));
+      const ordinary = typeScale.filter(row => !row.milestone);
+      const milestones = typeScale.filter(row => row.milestone);
+      if (ordinary.length && milestones.length) {
+        assert(Math.min(...milestones.map(row => row.size)) >= Math.max(...ordinary.map(row => row.size)), 'Milestone titles must not be smaller than ordinary work');
+      }
       await flow.locator('.annual-story-watercolor-head img').evaluate(img=>img.decode());
       assert.match(await flow.locator('.annual-story-watercolor-head').innerText(),/一年の流れ/);
       assert.equal(await flow.locator('[data-annual-record-open-id="primary-mow"]').count(),0);

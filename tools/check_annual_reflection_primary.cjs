@@ -78,6 +78,11 @@ const {chromium}=require("C:/Users/Keisuke/.cache/codex-runtimes/codex-primary-r
    await compare.locator('.annual-compare-experience-head').scrollIntoViewIfNeeded();await shot('compare');
    await compare.locator('.annual-compare-more > summary').click();
    await page.locator('[data-annual-compare-filter]').first().waitFor();
+   const filterType = await page.locator('[data-annual-compare-filter]').evaluateAll(nodes => nodes.map(node => parseFloat(getComputedStyle(node).fontSize)));
+   assert(filterType.every(size => size >= 12), 'Comparison filters must remain readable on phones');
+   const recordDates = await compare.locator('.annual-compare-record:not(.empty) > span:first-child').evaluateAll(nodes => nodes.map(node => parseFloat(getComputedStyle(node).fontSize)));
+   assert(recordDates.length > 0, 'Comparison date check must cover real records');
+   assert(recordDates.every(size => size >= 12), 'Comparison record dates must not regress to tiny text');
    await compare.locator('[data-annual-compare-filter="harvest"]').click();
    assert.equal(await compare.locator('.annual-compare-more').getAttribute('open'),'');
    await page.locator('#appBackButton').click();await page.locator('[data-annual-hub-view="fields"]').click();await page.locator(`[data-annual-hub-open-field="${id}"]`).click();

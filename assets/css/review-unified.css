@@ -10,7 +10,6 @@
 #screen-annual .annual-harvest-entry b { display: block; font-size: 21px; line-height: 1.4; color: #3f4c27; }
 #screen-annual .annual-harvest-entry small { display: block; font-size: 13px; line-height: 1.6; font-weight: 400; color: #5b6449; }
 #screen-annual .annual-story .annual-year-flow-head { display: flex; justify-content: space-between; gap: 8px; overflow: visible; }
-#screen-annual .annual-story .annual-year-flow-head h3 { min-width: 0; font-size: 22px; }
 #screen-annual .annual-history-filter { position: relative; flex: 0 0 auto; margin: 0; border: 0; border-radius: 0; padding: 0; background: transparent; box-shadow: none; }
 #screen-annual .annual-history-filter > summary { display: flex; align-items: center; justify-content: center; gap: 5px; min-height: 44px; padding: 7px 8px; border: 1px solid #c6d3bd; border-radius: 6px; background: #fff; color: #315337; font-size: 12px; font-weight: 600; list-style: none; cursor: pointer; }
 #screen-annual .annual-history-filter > summary::-webkit-details-marker { display: none; }
