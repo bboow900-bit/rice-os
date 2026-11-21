@@ -101,3 +101,79 @@
   #screen-annual .annual-story .milestone .annual-year-flow-title b { font-size: 17px; }
   #screen-annual .annual-story .annual-record-focus button { font-size: 12px; }
 }
+
+#screen-annual .annual-story {
+  --story-heading-font: "Yu Mincho", "Hiragino Mincho ProN", "Noto Serif CJK JP", serif;
+  --story-control-font: "Yu Gothic", "Hiragino Kaku Gothic ProN", "Noto Sans CJK JP", sans-serif;
+  --story-date-font: Georgia, var(--story-heading-font);
+}
+#screen-annual .annual-story .annual-story-watercolor-head {
+  position: relative;
+  isolation: isolate;
+  background: #fbf8ef;
+}
+#screen-annual .annual-story .annual-story-watercolor-head > img {
+  position: absolute;
+  inset: 5px 0 auto auto;
+  z-index: -1;
+  width: min(36%, 156px);
+  height: 42px;
+  object-fit: contain;
+  object-position: right top;
+  pointer-events: none;
+  mix-blend-mode: multiply;
+  mask-image: radial-gradient(ellipse farthest-side at 60% 48%, #000 52%, #000b 76%, transparent 100%),
+    linear-gradient(to right, transparent, #000 32%);
+  mask-composite: intersect;
+  opacity: .65;
+}
+#screen-annual .annual-story .annual-year-flow-head h3 {
+  color: #274534;
+  font-family: var(--story-heading-font);
+  font-weight: 600;
+}
+#screen-annual .annual-story .annual-story-watercolor-head .annual-flow-field-context {
+  position: relative;
+  background: linear-gradient(to right, #fbf8ef 68%, #fbf8efd9);
+  overflow-wrap: anywhere;
+}
+#screen-annual .annual-story :is(button, summary) {
+  font-family: var(--story-control-font);
+}
+#screen-annual .annual-story :is(.annual-year-flow-season > span:first-child,
+  .annual-year-flow-single-row > time) {
+  font-family: var(--story-date-font);
+  font-variant-numeric: lining-nums tabular-nums;
+}
+#screen-annual .annual-story .annual-year-flow-single-row .annual-year-flow-entry { background: #fdfbf5; }
+#screen-annual .annual-story .annual-year-flow-single-row.growth :is(.annual-year-flow-entry, .annual-year-flow-entry.milestone) { background: #f2f7ed; }
+#screen-annual .annual-story .annual-year-flow-single-row.water .annual-year-flow-entry { background: #eef6fa; }
+#screen-annual .annual-story .annual-year-flow-single-row.harvest .annual-year-flow-entry { background: #fbf5e4; }
+#screen-annual .annual-story .annual-flow-art.scene img {
+  mask-image: radial-gradient(ellipse closest-side, #000 68%, #000e 84%, transparent 118%),
+    linear-gradient(to right, transparent, #000 20%, #000 88%, transparent);
+  mask-composite: intersect;
+}
+#screen-annual .annual-story { --story-art: 112px; --story-art-height: 82px; }
+#screen-annual .annual-story .annual-story-watercolor-head { position: relative; isolation: isolate; padding: 12px 8px; min-height: 108px; background: #fbf8ed; }
+#screen-annual .annual-story .annual-story-watercolor-head > img { position: absolute; z-index: -1; inset: 0 0 0 auto; width: 56%; height: 100%; object-fit: cover; object-position: right center; mask-image: linear-gradient(to right,transparent,#000 32%),linear-gradient(to bottom,#000 70%,transparent); mask-composite: intersect; }
+#screen-annual .annual-story .annual-story-watercolor-head h3 { font-size: 29px; }
+#screen-annual .annual-story .annual-story-watercolor-head .annual-flow-field-context { max-width: 64%; font-size: 14px; }
+#screen-annual .annual-story .annual-year-flow-single-row .annual-year-flow-open:has(.annual-flow-art.scene) { position: relative; isolation: isolate; display: grid; grid-template-columns: minmax(0,1fr) 14px; padding: 10px 48% 10px 10px; min-height: 88px; align-content: center; gap: 4px; }
+#screen-annual .annual-story .annual-year-flow-open:has(.annual-flow-art.scene) .annual-flow-copy { grid-area: auto / 1; }
+#screen-annual .annual-story .annual-year-flow-open:has(.annual-flow-art.scene) .annual-flow-category { grid-area: auto / 1; }
+#screen-annual .annual-story .annual-year-flow-open:has(.annual-flow-art.scene) .annual-flow-art { position: absolute; z-index: -1; inset: 0 0 0 auto; width: 54%; height: 100%; }
+#screen-annual .annual-story .annual-flow-art.scene img { width: 100%; height: 100%; object-fit: cover; mask-image: linear-gradient(to right,transparent,#000 28%),linear-gradient(to bottom,#000 85%,transparent); mask-composite: intersect; }
+#screen-annual .annual-story .annual-flow-art.scene img:is([src*="/watercolor-"],[src*="/rice-stages/"]) { object-fit: contain; }
+#screen-annual .annual-story .annual-year-flow-open:has(.annual-flow-art.scene) .annual-flow-thermal { grid-area: auto / 1; font-size: 12px; }
+#screen-annual .annual-story .annual-year-flow-title b { font-size: 20px; }
+#screen-annual .annual-story .annual-year-flow-main .annual-year-flow-open:has(.annual-flow-art.scene) { min-height: 92px !important; padding: 10px 46% 10px 10px !important; }
+#screen-annual .annual-story .annual-year-flow-open:has(.annual-flow-art.scene) .annual-flow-art { width: 54% !important; height: 100% !important; }
+#screen-annual .annual-story .annual-flow-art.scene img[src$="schedule-herbicide.png"] {
+  box-sizing: border-box;
+  object-fit: contain;
+  object-position: right center;
+  padding: 4px 5px 4px 0;
+  mask-image: linear-gradient(to right, transparent, #000 15%), linear-gradient(to bottom, #000 86%, transparent);
+  mask-composite: intersect;
+}

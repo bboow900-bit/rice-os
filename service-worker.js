@@ -1,9 +1,12 @@
-const CACHE_NAME = "rice-karte-20261119-327";
-const APP_VERSION = "20261119_ver327";
+const CACHE_NAME = "rice-karte-20261121-328";
+const APP_VERSION = "20261121_ver328";
 const CACHE_PREFIX = "rice-karte-";
 const RETAINED_APP_CACHES = 2;
 
 const APP_SHELL = [
+  "./assets/images/annual-story/field-year-watercolor.png",
+  "./assets/images/annual-story/year-comparison-watercolor.png",
+  "./assets/images/material-review/materials-paddy-watercolor.png",
   "./assets/images/annual-story/watercolor-panicle-check.png",
   "./assets/images/annual-story/watercolor-heading-paddy.png",
   "./assets/images/annual-story/watercolor-mowing.png",
@@ -66,6 +69,7 @@ const APP_SHELL = [
   `./assets/js/ui/season-art.js?v=${APP_VERSION}`,
   "./assets/images/ui-pop/rice-sowing.png",
   "./assets/images/ui-pop/rice-growing.png",
+  "./assets/images/ui-pop/rice-growing-watercolor.png",
   "./assets/images/ui-pop/rice-processing.png",
   "./assets/images/ui-pop/rice-winter.png",
   "./assets/images/ui-pop/harvest-rice.png",

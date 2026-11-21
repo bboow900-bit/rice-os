@@ -965,29 +965,24 @@
         <div class="annual-hub-panel" data-annual-hub-panel="${topView}">
         ${topView === "fields" ? `
         <section class="annual-field-picker">
-          <div class="section-title compact">
-            <h3>圃場から振り返る</h3>
-          </div>
+          <header class="annual-fields-art-head"><div><h3>圃場の一年</h3><span>${yearValue() === "all" ? "全年度" : `${U.escapeHTML(yearValue())}年産`}</span></div><img src="assets/images/annual-story/field-year-watercolor.png" alt="" decoding="async"></header>
           <div class="annual-filter-row annual-picker-controls">
             <label class="annual-search-label" aria-label="圃場検索">
               <input id="annualSearch" placeholder="圃場名・品種で検索" value="${U.attr(annualSearchValue)}">
             </label>
-            <button type="button" class="annual-filter-button" aria-label="絞り込み" title="絞り込み">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16l-6.5 7.2v4.6l-3 1.6v-6.2L4 6z"></path></svg>
-            </button>
             <label class="annual-sort-button" aria-label="並び替え">
               <select id="annualSort"></select>
               <span>並び替え ›</span>
             </label>
           </div>
-          <div class="annual-field-pick-grid">
+          <div class="annual-field-pick-grid" data-annual-field-results>
             ${fields.length ? fields.map(renderFieldPickerCard).join("") : '<div class="empty">条件に合う圃場がありません。</div>'}
           </div>
         </section>
         ${renderOffFieldArchive(rows)}
         ` : ""}
         ${topView === "work" ? `
-        <header class="annual-work-heading"><h3>使用資材</h3><img src="assets/images/material-review/materials-rice.png" alt="" decoding="async"></header>
+        <header class="annual-work-heading"><div><h3>使用資材</h3><span>${yearValue() === "all" ? "全年度" : `${U.escapeHTML(yearValue())}年産`}</span></div><img src="assets/images/material-review/materials-paddy-watercolor.png" alt="" decoding="async"></header>
         ${renderUsedMaterials()}
         ` : ""}
         ${topView === "compare" ? renderHubCompare() : ""}
@@ -1005,7 +1000,7 @@
     const year = reviewYearValue();
     const prior = String(Number(year) - 1);
     const fields = state.activeFields();
-    return `<section class="annual-hub-compare"><div class="section-title compact"><h3>年の比較</h3></div><p class="annual-compare-year-pair">${U.escapeHTML(year)}年 ⇄ ${prior}年</p>
+    return `<section class="annual-hub-compare"><div class="section-title compact annual-compare-art-head"><h3>年の比較</h3><img class="annual-compare-banner" src="assets/images/annual-story/year-comparison-watercolor.png" alt=""></div><p class="annual-compare-year-pair">${U.escapeHTML(year)}年 ⇄ ${prior}年</p>
       ${yearValue() === "all" ? `<p class="muted">全年度を選択中のため、比較は${U.escapeHTML(year)}年と前年を表示します。</p>` : ""}
       <div class="annual-field-pick-grid">${fields.length ? fields.map((field) => {
         const current = compareEntriesForFilter(field, year, "all").length;
@@ -2046,9 +2041,13 @@
     }).join("");
     return `
       <section class="annual-year-flow annual-story" aria-label="${U.escapeHTML(year)}年の一年の流れ">
-        <div class="annual-year-flow-head"><h3>一年の流れ</h3>${renderHistoryFilter()}</div>
+        <div class="annual-story-watercolor-head">
+        <div class="annual-year-flow-head"><h3>一年の流れ</h3></div>
         <p class="annual-flow-field-context">${U.escapeHTML(field.name)} / ${U.escapeHTML(varietyName(field))}${field.areaA ? ` / ${U.escapeHTML(field.areaA)}a` : ""}</p><button type="button" class="annual-field-settings-link" data-annual-field-settings>圃場の設定 ›</button>
         <p class="annual-year-flow-season"><span>${U.escapeHTML(seasonText)}</span><span class="annual-flow-actual-only">実績のみ</span></p>
+        <img src="assets/images/annual-story/field-year-watercolor.png" alt="" decoding="async">
+        </div>
+        <div class="annual-year-flow-head annual-story-filter-head">${renderHistoryFilter()}</div>
         ${renderRecordFocus(["重要な記録", "繰り返し作業", "すべて"])}
         ${items ? `<ol class="annual-year-flow-single">${items}</ol>` : `<div class="annual-history-empty"><p>${historyCategory === "all" ? "この表示範囲の実績はまだありません。" : "この種類の記録はまだありません。"}</p><button type="button" data-annual-history-reset>すべての記録を見る</button></div>`}
       </section>
@@ -2198,21 +2197,23 @@
 
   function renderUsedMaterials(field, targetYear) {
     const year = targetYear || yearValue();
+    const esc = U.escapeHTML;
     if (year === "all") {
-      const years = unique(state.data().fieldWorks.filter((work) => isArchivedActualWork(work) && (work.materialId || String(work.material || "").trim())
-        && (!field || (work.fieldIds || []).includes(field.fieldId))).map((work) => state.cropYearForRecord ? state.cropYearForRecord(work) : U.dateYear(work.date)))
-        .filter((value) => /^\d{4}$/.test(String(value))).sort().reverse();
-      return `<details class="annual-used-materials"><summary>使用した資材 <small>全年度</small></summary>${years.length ? years.map((value) => renderUsedMaterials(field, String(value))).join("") : '<p class="muted">資材使用記録はありません。</p>'}</details>`;
+      const years = unique(state.data().fieldWorks.filter(work => isArchivedActualWork(work) && (work.materialId || String(work.material || "").trim())
+        && (!field || (work.fieldIds || []).includes(field.fieldId))).map(work => state.cropYearForRecord ? state.cropYearForRecord(work) : U.dateYear(work.date)))
+        .filter(value => /^\d{4}$/.test(String(value))).sort().reverse();
+      return years.map(value => `<section class="annual-usage-year"><h4>${esc(value)}年産</h4>${renderUsedMaterials(field, String(value))}</section>`).join("")
+        || '<p class="muted">資材使用記録はありません。</p>';
     }
-    const groups = state.materialUsageForYear(year, { cropYear: true }).map((group) => ({
-      ...group, works: group.works.filter((work) => isArchivedActualWork(work) && (!field || (work.fieldIds || []).includes(field.fieldId)))
-    })).filter((group) => group.works.length);
-    return `<details class="annual-used-materials"><summary>使用した資材 <small>${U.escapeHTML(year)}年 / ${groups.length}種類</small></summary>${groups.length ? groups.map((group) => `<section class="annual-material-group"><h4>${U.escapeHTML(group.name)}${!group.materialId ? '<small>未紐付け</small>' : ""}</h4><p class="annual-material-brief">${group.works.length}回使用 / ${U.escapeHTML(annualListDate([...group.works].map(work => work.date).sort()[0] || "", group.works.map(work => work.date)))}〜${U.escapeHTML(annualListDate([...group.works].map(work => work.date).sort().at(-1) || "", group.works.map(work => work.date)))}</p><details><summary>使用記録を確認</summary>${group.works.map((work) => {
-      const fieldId = field ? field.fieldId : (work.fieldIds || []).find((id) => state.field(id));
-      const fields = (work.fieldIds || []).map((id) => state.field(id)?.name || id).join("・");
-      if (work.targetScope === "offField") return `<button type="button" class="annual-material-work" data-annual-record-open-kind="fieldWork" data-annual-record-open-id="${U.attr(work.workId)}" data-annual-record-open-label="${U.attr(work.workName)}"><span>${U.escapeHTML(annualListDate(work.date))} / 圃場外</span><b>${U.escapeHTML(work.workName || "作業")}</b><span>${U.escapeHTML([work.material, work.amount].filter(Boolean).join(" / "))}</span></button>`;
-      return `<button type="button" class="annual-material-work" data-annual-record-open-kind="fieldWork" data-annual-record-open-id="${U.attr(work.workId)}" data-annual-record-open-label="${U.attr(work.workName)}" ${!field && fieldId ? `data-annual-material-field="${U.attr(fieldId)}"` : ""} ${!fieldId ? "disabled" : ""}><span>${U.escapeHTML(annualListDate(work.date))} / ${U.escapeHTML(fields || "圃場未設定")}</span><b>${U.escapeHTML(work.workName || "作業")}</b><span>${U.escapeHTML([work.material, work.amount].filter(Boolean).join(" / "))}</span></button>`;
-    }).join("")}</details></section>`).join("") : '<p class="muted">この年の資材使用記録はありません。</p>'}</details>`;
+    const groups = state.materialUsageForYear(year, { cropYear: true }).map(group => ({
+      ...group, works: group.works.filter(work => isArchivedActualWork(work) && (!field || (work.fieldIds || []).includes(field.fieldId)))
+    })).filter(group => group.works.length);
+    return groups.map(group => `<details class="annual-usage-group" data-annual-usage-group="${U.attr(`${year}:${group.key}`)}"><summary><b>${esc(group.name)}</b><small>使用${group.works.length}回</small></summary>${group.works.map(work => {
+      const fieldId = field ? field.fieldId : (work.fieldIds || []).find(id => state.field(id));
+      const offField = work.targetScope === "offField";
+      const names = offField ? "圃場外" : (work.fieldIds || []).map(id => state.field(id)?.name || id).join("・") || "圃場未設定";
+      return `<button type="button" class="annual-material-work" data-annual-record-open-kind="fieldWork" data-annual-record-open-id="${U.attr(work.workId)}" data-annual-record-open-label="${U.attr(work.workName)}" ${!field && fieldId && !offField ? `data-annual-material-field="${U.attr(fieldId)}"` : ""} ${!fieldId && !offField ? "disabled" : ""}><time datetime="${U.attr(work.date)}">${esc(annualListDate(work.date, [], year))}</time><span><b>${esc(work.workName || "作業")}</b><small>${esc(names)}</small></span><span aria-hidden="true">›</span></button>`;
+    }).join("")}</details>`).join("") || '<p class="muted">この年の資材使用記録はありません。</p>';
   }
 
   function renderReviewOverview(field) {
@@ -2222,7 +2223,7 @@
       ${renderYearFlow(field)}
       <button type="button" class="annual-shipment-entry annual-harvest-entry" data-annual-results><img src="assets/images/light-icons/rice-sack.png" alt=""><span><b>収穫・出荷</b><small>${U.escapeHTML(year)}年産 / ${U.escapeHTML(varietyName(field))}</small></span><span aria-hidden="true">›</span></button>
       ${renderHarvestRecap(field, year)}
-      <section class="annual-compare-launch annual-flow-compare-link"><div><span>振り返り</span><h3>今年と前年を比べる</h3><p>${U.escapeHTML(year)}年と${U.escapeHTML(previousYear)}年の節目・作業・水管理を、見やすく読み比べます。</p></div><button type="button" class="primary" data-annual-open-compare>比較を開く</button></section>
+      <button type="button" class="annual-compare-compact-link" data-annual-open-compare>この圃場を「年の比較」で見る <span aria-hidden="true">›</span></button>
       ${RiceOS.materialReview ? RiceOS.materialReview.renderEntry(field, year) : renderUsedMaterials(field)}
       ${renderSeasonNotes(field)}
       ${renderCarryoverNotes(field)}
@@ -2338,6 +2339,8 @@
     const previousYear = String(Number(currentYear) - 1);
     const current = fieldYearSnapshot(field, currentYear);
     const previous = fieldYearSnapshot(field, previousYear);
+    const currentCarryover = state.carryoverNoteForField(field.fieldId, currentYear);
+    const previousCarryover = state.carryoverNoteForField(field.fieldId, previousYear);
     const currentEntries = compareEntriesForFilter(field, currentYear, "all");
     const previousEntries = compareEntriesForFilter(field, previousYear, "all");
     const heading = entries => entries.find(entry => entry.label === "出穂確認" && entry.editKind === "growth")?.date;
@@ -2361,7 +2364,7 @@
     const history = (entries, year) => entries.length ? entries.map((entry) => compareRecordCard(entry, year, field)).join("") : `<div class="annual-compare-record empty"><span>${U.escapeHTML(year)}年</span><b>該当する記録なし</b><small>条件を変えるか、次の作業で残しましょう</small></div>`;
     return `
       <section class="annual-compare-experience" aria-label="${U.escapeHTML(field.name)}の今年と前年の比較">
-        <div class="annual-compare-experience-head"><button type="button" class="annual-compare-back" data-annual-close-compare aria-label="比較を閉じる">‹</button><div><span>圃場名</span><h3>${U.escapeHTML(field.name)}</h3></div><img src="assets/images/annual-story/schedule-harvest.png" alt=""></div>
+        <div class="annual-compare-experience-head annual-compare-art-head"><button type="button" class="annual-compare-back" data-annual-close-compare aria-label="比較を閉じる">‹</button><div><span>圃場名</span><h3>${U.escapeHTML(field.name)}</h3></div><img class="annual-compare-banner" src="assets/images/annual-story/year-comparison-watercolor.png" alt=""></div>
         <p class="annual-compare-year-pair">${U.escapeHTML(currentYear)}年 ⇄ ${U.escapeHTML(previousYear)}年</p>
         ${dateHighlight("出穂","green",heading(currentEntries),heading(previousEntries))}
         ${highlight("中干し","blue",aDry === null ? "" : `${aDry}日間`,bDry === null ? "" : `${bDry}日間`,aDry === null || bDry === null ? null : aDry-bDry,"短い","長い")}
@@ -2378,7 +2381,7 @@
         ${renderAnnualPhotoComparison(field)}
         </details>
         <h4 class="annual-compare-handoff-title">来年への引き継ぎ</h4>
-        <section class="annual-compare-memos"><div><span>今年のひとこと</span><b>${U.escapeHTML(current.memo || "まだ記録がありません")}</b></div><div><span>前年の記憶</span><b>${U.escapeHTML(previous.memo || "前年のメモはありません")}</b></div></section>
+        <section class="annual-compare-memos"><div><span>${U.escapeHTML(currentYear)}年の引き継ぎ</span><b>${U.escapeHTML(currentCarryover?.text || "まだ記録がありません")}</b></div><div><span>${U.escapeHTML(previousYear)}年の引き継ぎ</span><b>${U.escapeHTML(previousCarryover?.text || "前年のメモはありません")}</b></div></section>
       </section>
     `;
   }
@@ -3070,9 +3073,19 @@
       }
       if (recordDetail.fromMaterialsTop) selectedFieldId = "";
       if (recordDetail.returnComparisonField && state.field(recordDetail.returnComparisonField)) selectedFieldId = recordDetail.returnComparisonField;
+      const usageReturn = recordDetail.usageReturn;
       recordDetail = null;
       render();
-      window.scrollTo({ top: 0, behavior: "smooth" });
+      if (usageReturn) {
+        const groups = [...document.querySelectorAll("[data-annual-usage-group]")];
+        groups.forEach(group => { group.open = usageReturn.open.includes(group.dataset.annualUsageGroup); });
+        const item = groups.flatMap(group => [...group.querySelectorAll("[data-annual-record-open-id]")])
+          .find(button => button.dataset.annualRecordOpenId === usageReturn.id);
+        if (item) {
+          item.focus({ preventScroll: true });
+          window.scrollBy({ top: item.getBoundingClientRect().top - usageReturn.top, behavior: "instant" });
+        }
+      } else window.scrollTo({ top: 0, behavior: "smooth" });
       return true;
     }
     if (materialReviewView) {
@@ -3583,6 +3596,8 @@
       }
       if (event.target.closest("[data-annual-open-compare]")) {
         reviewView = "compare";
+        topView = "compare";
+        compareFromHub = true;
         compareFilter = "work";
         render();
         window.scrollTo({ top: 0, behavior: "smooth" });
@@ -3603,7 +3618,10 @@
       const compareFilterButton = event.target.closest("[data-annual-compare-filter]");
       if (compareFilterButton) {
         compareFilter = compareFilterButton.dataset.annualCompareFilter || "work";
+        const wasOpen = Boolean(compareFilterButton.closest(".annual-compare-more[open]"));
         render();
+        const disclosure = wasOpen && document.querySelector(".annual-compare-more");
+        if (disclosure) disclosure.open = true;
         return;
       }
       const recordAction = event.target.closest("[data-annual-record-action]");
@@ -3676,9 +3694,14 @@
         const comparisonField = recordOpen.dataset.annualRecordField;
         if (comparisonField && state.field(comparisonField)) selectedFieldId = comparisonField;
         const fromMaterialsTop = Boolean(recordOpen.dataset.annualMaterialField);
+        const usageReturn = recordOpen.closest('[data-annual-hub-panel="work"]') ? {
+          id: recordOpen.dataset.annualRecordOpenId, top: recordOpen.getBoundingClientRect().top,
+          open: [...document.querySelectorAll("[data-annual-usage-group][open]")].map(group => group.dataset.annualUsageGroup)
+        } : null;
         if (fromMaterialsTop) selectedFieldId = recordOpen.dataset.annualMaterialField;
         const opened = openAnnualRecordDetail(recordOpen.dataset.annualRecordOpenKind, recordOpen.dataset.annualRecordOpenId, recordOpen.dataset.annualRecordOpenLabel);
         if (opened && fromMaterialsTop) recordDetail.fromMaterialsTop = true;
+        if (opened && usageReturn) recordDetail.usageReturn = usageReturn;
         if (opened && comparisonField) recordDetail.returnComparisonField = returnComparisonField;
         if (!opened && fromMaterialsTop) selectedFieldId = "";
         if (!opened && comparisonField) selectedFieldId = returnComparisonField;
@@ -3898,7 +3921,10 @@
     U.$("annualTimeline").addEventListener("input", (event) => {
       if (event.target && event.target.id === "annualSearch") {
         annualSearchValue = event.target.value;
-        render();
+        const grid = document.querySelector("[data-annual-field-results]");
+        if (!grid) return;
+        const fields = filteredFields();
+        grid.innerHTML = fields.length ? fields.map(renderFieldPickerCard).join("") : '<div class="empty">条件に合う圃場がありません。</div>';
       }
     });
     U.$("annualTimeline").addEventListener("change", (event) => {

@@ -17,7 +17,9 @@ const {chromium}=require("C:/Users/Keisuke/.cache/codex-runtimes/codex-primary-r
      d.growthLogs.push({logId:`reflection-panicle-${year}`,fieldId:id,date:`${year}-07-20`,cropYear:year,panicleLengthMm:1});
      d.growthLogs.push({logId:`reflection-heading-${year}`,fieldId:id,date:`${year}-07-${year===2026?27:30}`,cropYear:year,headingObserved:true});
     }
-    d.fieldWorks.push({workId:"reflection-herbicide",date:"2026-06-16",cropYear:2026,workName:"除草剤",fieldIds:[id],material:"確認用粒剤"});
+    d.fieldWorks.push({workId:"reflection-herbicide",date:"2026-06-16",cropYear:2026,workName:"除草剤",fieldIds:[id],material:"確認用粒剤"},
+      {workId:"reflection-herbicide-2",date:"2026-06-18",cropYear:2026,workName:"除草剤",fieldIds:[id],material:"確認用粒剤"},
+      {workId:"reflection-fertilizer",date:"2026-07-15",cropYear:2026,workName:"追肥",fieldIds:[id],material:"確認用肥料"});
     d.fieldWorks.push({workId:"reflection-sowing",date:"2026-04-16",cropYear:2026,workName:"播種",targetScope:"offField",fieldIds:[]});
     if(!S.replace(d,"Isolated annual reflection fixture"))throw Error("Fixture rejected");
     if(!S.saveSeasonNote({fieldId:id,season:2026,date:"2026-09-20",text:"畦際の残草を来年も見比べたい。"}))throw Error("Note rejected");
@@ -37,6 +39,13 @@ const {chromium}=require("C:/Users/Keisuke/.cache/codex-runtimes/codex-primary-r
    assert.doesNotMatch(await card.innerText(),/最終更新|作業.*件|天のつぶ/);
    assert((await card.locator('.annual-field-card-art').boundingBox()).width>=88);
    await shot('fields');
+   const fieldsPanel=page.locator('.annual-field-picker');
+   await fieldsPanel.locator('.annual-fields-art-head img').evaluate(img=>img.decode());
+   await fieldsPanel.screenshot({path:path.join(os.tmpdir(),`rice-annual-fields-panel-${width}.png`)});
+   await page.locator('#annualSearch').fill('振り返りUI確認');
+   assert.equal(await fieldsPanel.locator('.annual-field-card').count(),1);
+   assert.equal(await page.evaluate(()=>document.activeElement.id),'annualSearch');
+   await page.locator('#annualSearch').fill('');
    const offField=page.locator('[data-annual-hub-panel="fields"] [data-annual-work-list]');
    await offField.locator('summary').click();
    assert.match(await offField.innerText(),/播種/);
@@ -49,26 +58,39 @@ const {chromium}=require("C:/Users/Keisuke/.cache/codex-runtimes/codex-primary-r
    assert.equal(await workPanel.locator('[data-annual-harvest-ledger]').count(),0);
    await workPanel.screenshot({path:path.join(os.tmpdir(),`rice-annual-work-panel-${width}.png`)});
    assert.equal(await workPanel.locator('[data-annual-work-list], .annual-hub-summary, .herbicide-review').count(),0);
-   const materials=workPanel.locator('details.annual-used-materials:not(.herbicide-review)').first();
+   const materials=workPanel.locator('.annual-usage-group').filter({hasText:'確認用粒剤'});
    await materials.locator(':scope > summary').click();
-   assert.match(await materials.innerText(),/確認用粒剤/);
-   await materials.locator('details > summary').first().click();
+   assert.match(await materials.innerText(),/使用2回/);
+   await workPanel.screenshot({path:path.join(os.tmpdir(),`rice-annual-materials-expanded-${width}.png`)});
    await materials.locator('[data-annual-record-open-id="reflection-herbicide"]').click();
    await page.locator('.annual-record-detail').waitFor();
    await page.locator('[data-annual-record-detail-back]:visible').click();
    await workPanel.waitFor();
+   assert.equal(await materials.getAttribute('open'),'');
+   assert.equal(await page.evaluate(()=>document.activeElement?.dataset.annualRecordOpenId),'reflection-herbicide');
    await page.locator('[data-annual-hub-view="compare"]').click();await shot('compare-picker');
    await page.locator(`[data-annual-hub-compare-field="${id}"]`).click();
    const compare=page.locator('.annual-compare-experience');
    assert.equal(await compare.locator('.annual-compare-highlight').count(),3);
    assert.match(await compare.locator('[data-tone="gold"]').innerText(),/前年と同じ/);
    assert.match(await compare.locator('[data-tone="green"]').innerText(),/前年より3日早い/);
+   await compare.screenshot({path:path.join(os.tmpdir(),`rice-annual-compare-panel-${width}.png`)});
    await compare.locator('.annual-compare-experience-head').scrollIntoViewIfNeeded();await shot('compare');
    await compare.locator('.annual-compare-more > summary').click();
    await page.locator('[data-annual-compare-filter]').first().waitFor();
+   await compare.locator('[data-annual-compare-filter="harvest"]').click();
+   assert.equal(await compare.locator('.annual-compare-more').getAttribute('open'),'');
    await page.locator('#appBackButton').click();await page.locator('[data-annual-hub-view="fields"]').click();await page.locator(`[data-annual-hub-open-field="${id}"]`).click();
    await page.locator('.annual-story').waitFor();await shot('field-overview');
    await page.locator('.harvest-recap').scrollIntoViewIfNeeded();await shot('harvest-recap');
+   assert.equal(await page.locator('.annual-compare-launch').count(),0);
+   await page.locator('[data-annual-open-compare]').click();
+   await page.locator('.annual-compare-experience').waitFor();
+   assert.match(await page.locator('.annual-compare-memos').innerText(),/来年は畦際/);
+   await page.locator('[data-annual-close-compare]').click();
+   await page.locator('[data-annual-hub-panel="compare"]').waitFor();
+   await page.locator('[data-annual-hub-view="fields"]').click();
+   await page.locator(`[data-annual-hub-open-field="${id}"]`).click();
    await page.locator('.annual-season-notes').scrollIntoViewIfNeeded();await shot('notes');
    assert.match(await page.locator('.annual-season-notes').innerText(),/畦際/);assert.match(await page.locator('.annual-carryover-notes').innerText(),/今年の記録/);
    const noteBounds=await page.locator('.annual-season-notes').boundingBox(),carryBounds=await page.locator('.annual-carryover-notes').boundingBox();assert(noteBounds&&carryBounds&&noteBounds.y+noteBounds.height<=carryBounds.y+1);

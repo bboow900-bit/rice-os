@@ -3,7 +3,7 @@ const assert = require("node:assert/strict"), fs = require("node:fs"), path = re
 const {chromium} = require(process.env.PLAYWRIGHT_MODULE || "C:/Users/Keisuke/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright");
 const phases = [
   ["2026-04-15","rice-sowing"], ["2026-05-15","rice-transplanter"],
-  ["2026-07-15","rice-growing"], ["2026-09-15","rice-combine"],
+  ["2026-07-15","rice-growing-watercolor"], ["2026-09-15","rice-combine"],
   ["2026-11-15","rice-processing"], ["2026-01-15","rice-winter"]
 ];
 (async () => {

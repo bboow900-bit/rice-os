@@ -48,7 +48,7 @@ click("[data-annual-hub-view]", { annualHubView: "work" });
 assert(!html().includes('id="annualSearch"'));
 assert(!html().includes('class="annual-work-archive"'));
 assert(!html().includes('<details class="annual-hub-summary">'));
-assert(html().includes('class="annual-used-materials"'));
+assert(html().includes('class="annual-work-heading"'));
 assert(!html().includes("herbicide-review"));
 assert.equal((html().match(/class="next-season-ideas"/g) || []).length, 1);
 const field = R.state.activeFields()[0];
