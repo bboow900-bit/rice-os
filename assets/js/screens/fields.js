@@ -904,12 +904,25 @@
     const year = herbicideYear || currentSeasonYear();
     const assignment = RiceOS.herbicide && RiceOS.herbicide.assignmentFor(field.fieldId, year);
     const herbicideLabel = assignment ? assignment.name : "未設定";
+    const facts = RiceOS.fieldProgress.facts(field, U.today());
+    const row = (label, value, extra, tone = "") => `<span class="field-wc-row ${tone}"><span class="field-wc-label">${U.escapeHTML(label)}</span><span class="field-wc-value">${value}${extra || ""}</span></span>`;
+    const esc = U.escapeHTML;
+    const artName = ["review-seedling", "review-seedling", "review-tillering", "review-tillering", "review-booting", "review-heading", "review-ripening", "review-mature"][Math.max(0, Math.min(7, Number(stage.number) - 1))];
+    const art = Number(stage.number) === 6 ? "annual-story/watercolor-heading-paddy.png" : `rice-stages/${artName}.png`;
+    const heatNumber = /^(\d+)℃$/.exec(facts.heat.title);
+    const quality = /一部|欠測|未確定|旧記録|当日速報/.test(facts.heat.note) ? "一部取得・要確認" : facts.heatBasis;
     return `
-      <button type="button" class="field-hub-card stage-${U.attr(String(stage.number).padStart(2, "0"))}" data-field-open="${U.attr(field.fieldId)}" data-field-search-text="${U.attr(`${field.name} ${variety && variety.name || ""} ${field.district || ""}`.toLowerCase())}">
-        <span class="field-hub-card-rice">${groupRiceImage(stage.number)}</span>
-        <span class="field-hub-card-main"><b class="field-hub-card-name">${U.escapeHTML(field.name)}</b><small class="field-hub-card-meta">${U.escapeHTML(variety && variety.name || "品種未設定")} / ${U.escapeHTML(String(field.areaA || 0))}a</small><em class="field-hub-card-use-status">${U.escapeHTML(fieldStatusText(field))}</em>${harvestBadge}</span>
-        <span class="field-hub-stage field-hub-card-current"><small>現在 / ${U.escapeHTML(stage.certainty || "記録待ち")}</small><b>${U.escapeHTML(stage.label)}</b></span>
-        <span class="field-herbicide-summary field-hub-card-secondary" data-field-herbicide="${U.attr(field.fieldId)}"><small class="field-herbicide-caption">${U.escapeHTML(String(year))}年度の除草体系（計画）</small><strong class="field-herbicide-name">${U.escapeHTML(herbicideLabel)}</strong>${assignment ? `<small class="field-herbicide-steps">${U.escapeHTML(assignment.steps.map(step => step.category).filter(Boolean).join(" → "))}</small>` : ""}</span>
+      <button type="button" class="field-hub-card field-wc stage-${U.attr(String(stage.number).padStart(2, "0"))}" data-field-open="${U.attr(field.fieldId)}" data-field-search-text="${U.attr(`${field.name} ${variety && variety.name || ""} ${field.district || ""}`.toLowerCase())}">
+        <span class="field-hub-card-rice"><img src="assets/images/${U.attr(art)}" alt="" loading="lazy"></span>
+        <span class="field-hub-card-main"><b class="field-hub-card-name">${esc(field.name)}</b><small class="field-hub-card-meta">${esc(variety && variety.name || "品種未設定")} / ${esc(String(field.areaA || 0))}a</small>${field.status && field.status !== "使用中" ? `<em class="field-hub-card-use-status">${esc(field.status)}</em>` : ""}</span>
+        <span class="field-wc-facts">
+          ${row("現場ステージ", `<b>${esc(facts.observed)}</b><em>${esc(facts.badge)}</em>`, `<small>${esc(facts.eventAge)}</small>`, "field-wc-observed")}
+          ${row(facts.completed ? "実績" : "見通し", `<b>${esc(facts.outlook.title)}</b>`, facts.outlook.estimated ? '<small class="field-wc-estimate">推定</small>' : "", "field-wc-outlook")}
+          ${row(facts.completed ? "収穫時積算" : "積算温度", heatNumber ? `<b class="field-wc-number">${esc(heatNumber[1])}<span>℃</span></b>` : `<b>${esc(facts.heat.title)}</b>`, `<small title="${U.attr(facts.heat.note)}">${esc(quality)}</small>`)}
+          ${row("水管理", `<b>${esc(facts.waterText)}</b>`, `<small>${esc(facts.waterDay)}</small>`, "field-wc-water")}
+        </span>
+        ${assignment ? `<span class="field-herbicide-summary field-hub-card-secondary" data-field-herbicide="${U.attr(field.fieldId)}"><small class="field-herbicide-caption">${esc(String(year))}年度の除草体系（計画）</small><strong class="field-herbicide-name">${esc(herbicideLabel)}</strong></span>` : ""}
+        ${harvestBadge}<span class="field-wc-open" aria-hidden="true">›</span>
       </button>
     `;
   }
@@ -1070,6 +1083,20 @@
       ${fieldView === "list" ? renderFieldListView() : ""}
     `;
     if (RiceOS.app && RiceOS.app.syncBackButton) RiceOS.app.syncBackButton();
+    if (fieldView === "list" && screen && screen.classList.contains("active") && RiceOS.fieldProgress) {
+      const visible = [...screen.querySelectorAll("[data-field-open]")].map(el => state.field(el.dataset.fieldOpen)).filter(Boolean);
+      RiceOS.fieldProgress.load(visible, field => {
+        if (fieldView !== "list" || !screen.classList.contains("active")) return;
+        const target = screen.querySelector(`[data-field-open="${CSS.escape(field.fieldId)}"]`);
+        if (target) {
+          const focused = document.activeElement === target;
+          const current = state.field(field.fieldId);
+          if (!current) return;
+          target.outerHTML = renderFieldListCard(current);
+          if (focused) screen.querySelector(`[data-field-open="${CSS.escape(field.fieldId)}"]`)?.focus({ preventScroll: true });
+        }
+      });
+    }
   }
 
   function bind() {

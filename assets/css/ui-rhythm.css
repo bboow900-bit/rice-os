@@ -88,7 +88,6 @@ body {
 #screen-fields .field-hub-filters :is(input, select) { min-height: 44px; border-radius: 8px; font-size: 14px; }
 #screen-fields .field-hub-groups { gap: 8px; margin-block: 0; }
 #screen-fields .field-hub-groups > div { border-radius: 8px; }
-#screen-fields .field-hub-cards { gap: 12px; }
 #screen-fields .field-hub-settings :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea) { border-radius: 8px; font-size: 16px; line-height: 1.5; min-height: 44px; }
 
 /* Review: preserve all factual content and the single-column yearly flow. */

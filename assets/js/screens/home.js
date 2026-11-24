@@ -809,7 +809,7 @@
   }
 
   // A home card is read-only: four short facts from existing records, not a new data source.
-  function renderDecisionProgressGrid(field, stage, management, focus, dateText) {
+  function fieldProgressFacts(field, dateText = U.today(), stage = seasonStageForField(field, dateText), management = waterManagementForField(field, dateText), focus = criticalWaterWindowFor(field, dateText)) {
     const fieldStage = stage.fieldStage || { current: stage.current, evidence: homeStageEvidenceLabel(stage), evidenceDate: "" };
     const harvest = harvestHeatContext(field, dateText);
     const observed = harvest.completed ? "収穫済み" : fieldStage.current ? fieldStage.current.label : "現場記録なし";
@@ -825,20 +825,30 @@
     const eventAge = harvest.completed ? "収穫済み" : headingDate
       ? `出穂から${U.daysBetween(headingDate, dateText)}日`
       : panicle && panicle.date ? `幼穂確認から${U.daysBetween(panicle.date, dateText)}日` : "";
+    const activePeriod = harvest.completed || management.key === "overlap" ? null : activeHomeWaterPeriod(field, dateText);
+    const movement = activePeriod ? homeWaterMovementPresentation(activePeriod, activeHomeWaterMovement(activePeriod), dateText) : null;
+    return { observed, badge, outlook, heat, completed: harvest.completed, reviewStatus, eventAge,
+      waterText: harvest.completed ? "管理終了" : movement ? movement.currentLabel.startsWith(movement.kindLabel) ? movement.currentLabel : `${movement.kindLabel}・${movement.currentLabel}` : waterText,
+      waterDay: harvest.completed ? "収穫済み" : management.key === "overlap" ? "要確認" : movement ? movement.dayText : waterDay,
+      heatBasis: harvest.completed ? "稲刈り日まで" : headingDate ? "出穂翌日から" : "田植日から" };
+  }
+
+  function renderDecisionProgressGrid(field, stage, management, focus, dateText) {
+    const { observed, badge, outlook, heat, completed, reviewStatus, eventAge, waterText, waterDay } = fieldProgressFacts(field, dateText, stage, management, focus);
     return `
       <div class="home-stage-summary">
         ${eventAge ? `<strong class="home-event-age">${U.escapeHTML(eventAge)}</strong>` : ""}
         <div class="home-stage-observed">
-          <span class="home-stage-observed-label">${harvest.completed ? "現在の状態" : "現場ステージ"}</span>
+          <span class="home-stage-observed-label">${completed ? "現在の状態" : "現場ステージ"}</span>
           <b>${U.escapeHTML(observed)}</b>
           <em>${U.escapeHTML(badge === "記録待ち" ? "今年の生育記録なし" : badge)}</em>
         </div>
-        <p class="home-stage-outlook"><span>${harvest.completed ? "実績" : "見通し"}</span><b>${U.escapeHTML(outlook.title)}</b><small>${U.escapeHTML(outlook.detail)}</small></p>
+        <p class="home-stage-outlook"><span>${completed ? "実績" : "見通し"}</span><b>${U.escapeHTML(outlook.title)}</b><small>${U.escapeHTML(outlook.detail)}</small></p>
         <div class="home-stage-heat">
-          <div><span>${harvest.completed ? "収穫時積算" : "積算気温"}</span><b>${U.escapeHTML(heat.title)}</b><small>${U.escapeHTML(heat.note)}</small></div>
+          <div><span>${completed ? "収穫時積算" : "積算気温"}</span><b>${U.escapeHTML(heat.title)}</b><small>${U.escapeHTML(heat.note)}</small></div>
           <i aria-hidden="true"><em style="width:${U.attr(String(heat.percent))}%"></em></i>
         </div>
-        ${harvest.completed ? `<p class="home-harvest-review-state">${U.escapeHTML(reviewStatus)}</p>` : `<div class="home-stage-water"><span aria-hidden="true">💧</span><b>${U.escapeHTML(waterText)}</b><small>${U.escapeHTML(waterDay)}</small></div>`}
+        ${completed ? `<p class="home-harvest-review-state">${U.escapeHTML(reviewStatus)}</p>` : `<div class="home-stage-water"><span aria-hidden="true">💧</span><b>${U.escapeHTML(waterText)}</b><small>${U.escapeHTML(waterDay)}</small></div>`}
       </div>
     `;
   }
@@ -929,14 +939,14 @@
 
   function homeStageOutlook(field, stage, focus, dateText) {
     if (focus && focus.active && focus.mode === "postHeading") {
-      return { title: focus.phase || "登熟の見通し", detail: `${focus.anchorLabel} / ${focus.certainty || "推定"}` };
+      return { title: focus.phase || "登熟の見通し", detail: `${focus.anchorLabel} / ${focus.certainty || "推定"}`, estimated: true };
     }
     if (focus && focus.active && focus.mode === "panicle") {
-      return { title: focus.observation || "出穂の目安", detail: `${focus.anchorLabel} / 実測を起点にした推定` };
+      return { title: focus.observation || "出穂の目安", detail: `${focus.anchorLabel} / 実測を起点にした推定`, estimated: true };
     }
     const outlook = stage.outlookStage || {};
-    if (outlook.current) return { title: `${outlook.current.label}の目安`, detail: `${outlook.basis || "田植日"} / 推定` };
-    return { title: "見通しを準備中", detail: "田植え・生育記録から表示します" };
+    if (outlook.current) return { title: `${outlook.current.label}の目安`, detail: `${outlook.basis || "田植日"} / 推定`, estimated: true };
+    return { title: "見通しを準備中", detail: "田植え・生育記録から表示します", estimated: false };
   }
 
   function homeStageHeat(field, dateText) {
@@ -953,7 +963,8 @@
     if (context.completed && !heading) return { title: "出穂日未登録", note: "出穂後の収穫時積算は計算できません", percent: 0 };
     if (!planting) return { title: "田植日未登録", note: "田植えの実績日が必要です", percent: 0 };
     const start = heading ? postHeadingThermalStart(heading) : planting;
-    const accumulated = cached && !cached.error ? accumulatedFromRows(cached.rows, start, context.endDate) : { total: "", count: 0 };
+    const confirmedEnd = context.completed ? context.endDate : addDays(dateText, -1);
+    const accumulated = cached && !cached.error ? accumulatedFromRows(cached.rows, start, confirmedEnd) : { total: "", count: 0 };
     if (!cached) return { title: "取得中", note: heading ? "出穂後の登熟を計算中" : "田植えからの生育を計算中", percent: 0 };
     if (cached.error) return { title: "気温取得失敗", note: "通信・地点設定をご確認ください。記録は残っています", percent: 0 };
     if (accumulated.total === "") return { title: "気温データなし", note: "対象期間の確定した日平均気温がありません", percent: 0 };
@@ -2150,9 +2161,9 @@
     }
   }
 
-  async function hydrateHeatMeters() {
-    if (!["progress", "dashboard"].includes(viewMode) || !RiceOS.weather || !RiceOS.weather.fetchDailyRange) return;
-    const visibleFields = fields().slice(0, 8);
+  async function hydrateHeatMeters(options = {}) {
+    if ((!options.fields && !["progress", "dashboard"].includes(viewMode)) || !RiceOS.weather || !RiceOS.weather.fetchDailyRange) return;
+    const visibleFields = options.fields || fields().slice(0, 8);
     let location = null;
     let projectionRows = [];
     for (const field of visibleFields) {
@@ -2188,7 +2199,8 @@
           }
         }
       }
-      if (viewMode === "progress") {
+      if (options.onUpdate) options.onUpdate(field);
+      else if (viewMode === "progress") {
         const target = document.querySelector(`[data-heat-field="${CSS.escape(field.fieldId)}"]`);
         if (target) target.outerHTML = renderHeatMeter(field);
       } else {
@@ -2196,7 +2208,7 @@
         if (target) target.outerHTML = renderDecisionFieldCard(field);
       }
     }
-    hydrateWaterStageForecasts(location);
+    if (!options.fields) hydrateWaterStageForecasts(location);
   }
 
   function openDate(date, fieldId) {
@@ -2362,5 +2374,6 @@
   if (window.__RICEOS_TEST__) RiceOS.homeTest = { homeWaterMovementPresentation, homeWaterMovementLabel, renderHomeWaterMovementTimeline, actualEntriesForDate, eventTone, renderRipeningHeatMeter };
 
   RiceOS.screens = RiceOS.screens || {};
+  RiceOS.fieldProgress = { facts: fieldProgressFacts, load: (fields, onUpdate) => hydrateHeatMeters({ fields, onUpdate }) };
   RiceOS.screens.home = { render, bind };
 })();

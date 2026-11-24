@@ -1,9 +1,12 @@
-const CACHE_NAME = "rice-karte-20261124-330";
-const APP_VERSION = "20261124_ver330";
+const CACHE_NAME = "rice-karte-20261124-331";
+const APP_VERSION = "20261124_ver331";
 const CACHE_PREFIX = "rice-karte-";
 const RETAINED_APP_CACHES = 2;
 
 const APP_SHELL = [
+  `./assets/css/field-watercolor.css?v=${APP_VERSION}`,
+  "./assets/images/ui-pop/reflection-notebook-watercolor.png",
+  "./assets/images/ui-pop/nav-watercolor-approved-20261124.png",
   "./assets/images/annual-story/field-year-watercolor.png",
   "./assets/images/annual-story/year-comparison-watercolor.png",
   "./assets/images/material-review/materials-paddy-watercolor.png",

@@ -55,6 +55,13 @@ body:has(#screen-harvest-performance.active) .content { min-width: 0; }
 .side-nav .nav-item { transition: background-color .15s ease-out, color .15s ease-out; }
 .side-nav .nav-item:active .nav-icon { transform: scale(.94); }
 .side-nav .nav-icon { transition: transform .12s ease-out; }
+.side-nav .nav-icon img { display: block; width: 32px; height: 32px; max-width: 100%; object-fit: contain; }
+.side-nav .nav-watercolor { display: block; width: 32px; height: 32px; background-image: url("../images/ui-pop/nav-watercolor-approved-20261124.png"); background-size: 300% 200%; background-repeat: no-repeat; }
+.side-nav [data-screen="home"] .nav-watercolor { background-position: 0 0; }
+.side-nav [data-screen="fields"] .nav-watercolor { background-position: 50% 0; }
+.side-nav [data-screen="calendar"] .nav-watercolor { background-position: 100% 0; }
+.side-nav [data-screen="outlook"] .nav-watercolor { background-position: 50% 100%; }
+.side-nav [data-screen="data"] .nav-watercolor { background-position: 100% 100%; }
 body .app-shell .side-nav .nav-item { border-radius: 8px !important; }
 body .app-shell .side-nav .nav-icon { border-radius: 8px !important; }
 @media (prefers-reduced-motion: reduce) {

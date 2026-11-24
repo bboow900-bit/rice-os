@@ -1,0 +1,201 @@
+/* All-fields list only. Artwork sources and field facts are supplied by the renderer. */
+#screen-fields .field-hub-cards { display: grid; gap: 12px; }
+#screen-fields .field-hub-card.field-wc {
+  --field-wc-ink: #173f27;
+  --field-wc-muted: #5b6e59;
+  --field-wc-line: #d5dfcf;
+  --field-wc-mincho: "Yu Mincho", "Hiragino Mincho ProN", "Noto Serif CJK JP", serif;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 112px;
+  align-items: center;
+  gap: 8px 12px;
+  min-width: 0;
+  width: 100%;
+  min-height: 80px;
+  padding: 12px;
+  border: 1px solid #bbcdb3;
+  border-left: 3px solid var(--season-accent, #75945e);
+  border-radius: 8px;
+  background: #fffef9;
+  box-shadow: none;
+  color: var(--field-wc-ink);
+  text-align: left;
+  letter-spacing: 0;
+}
+#screen-fields .field-wc .field-hub-card-main {
+  grid-column: 1;
+  grid-row: 1;
+  min-width: 0;
+  border-left: 3px solid #d3ad43;
+  padding-left: 9px;
+}
+#screen-fields .field-wc .field-hub-card-main > :is(b,small,em) { display: block; }
+#screen-fields .field-hub-card.field-wc .field-hub-card-name {
+  color: var(--field-wc-ink);
+  font-family: var(--field-wc-mincho);
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1.3;
+  white-space: normal;
+  overflow: visible;
+  overflow-wrap: anywhere;
+}
+#screen-fields .field-hub-card.field-wc .field-hub-card-meta {
+  color: #647569;
+  margin-top: 4px;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+#screen-fields .field-wc .field-hub-card-use-status {
+  margin-top: 5px;
+  color: #4e7651;
+  font-style: normal;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.5;
+  white-space: normal;
+}
+#screen-fields .field-wc .field-hub-card-rice {
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  grid-column: 2;
+  grid-row: 1;
+  width: 112px;
+  height: 68px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+#screen-fields .field-wc .field-hub-card-rice img {
+  display: block;
+  width: 112px;
+  height: 68px;
+  object-fit: cover;
+  filter: none;
+  mask-image: radial-gradient(ellipse, #000 48%, transparent 76%);
+}
+#screen-fields .field-wc .field-wc-facts {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 0;
+  width: 100%;
+  min-width: 0;
+}
+#screen-fields .field-wc .field-wc-row {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: 104px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 6px 0;
+  border-top: 1px solid var(--field-wc-line);
+}
+#screen-fields .field-wc .field-wc-label {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  min-height: 30px;
+  margin: 0;
+  padding: 4px 10px;
+  border: 0;
+  border-radius: 4px;
+  background: #f0f4e9;
+  color: #40553b;
+  font: 600 13px/22px "Yu Gothic", "Hiragino Kaku Gothic ProN", sans-serif;
+  white-space: nowrap;
+}
+#screen-fields .field-wc .field-wc-value {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 3px 5px;
+  min-width: 0;
+  font-family: var(--field-wc-mincho);
+}
+#screen-fields .field-wc .field-wc-value b {
+  color: var(--field-wc-ink);
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+#screen-fields .field-wc .field-wc-value em {
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: #efe0a3;
+  color: #5f4a1c;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 600;
+  line-height: 1.5;
+}
+#screen-fields .field-wc .field-wc-value small {
+  margin-left: auto;
+  color: var(--field-wc-muted);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+#screen-fields .field-wc .field-wc-outlook .field-wc-value small { margin-left: 0; }
+#screen-fields .field-wc .field-wc-observed .field-wc-value b { font-size: 20px; }
+#screen-fields .field-wc .field-wc-outlook .field-wc-value b { color: #52634c; font-weight: 500; }
+#screen-fields .field-wc .field-wc-value .field-wc-number {
+  font-family: Georgia, serif;
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+#screen-fields .field-wc .field-wc-number span { font-size: 14px; }
+#screen-fields .field-wc .field-wc-water { border-top-color: #cfe0e6; background: #f1f8fa; }
+#screen-fields .field-wc .field-wc-water .field-wc-label { background: #e8f2f5; color: #396478; }
+#screen-fields .field-wc .field-wc-water .field-wc-value b { color: #28637b; }
+#screen-fields .field-hub-card.field-wc > .field-hub-card-secondary {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+#screen-fields .field-wc .field-herbicide-caption,
+#screen-fields .field-wc .field-herbicide-steps {
+  color: var(--field-wc-muted);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.5;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+#screen-fields .field-wc .field-hub-card-secondary .field-herbicide-name {
+  color: #526d59;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.6;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+#screen-fields .field-wc .field-wc-open {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-height: 20px;
+  padding: 0 2px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: #315337;
+  font: 500 24px/1 "Yu Gothic", sans-serif;
+}
+#screen-fields .field-hub-card.field-wc:focus-visible { outline: 3px solid var(--season-accent, #286848); outline-offset: 3px; }
+#screen-fields .field-wc > .harvest-list-badge { grid-column: 1 / -1; justify-self: stretch; justify-content: center; min-height: 28px; padding: 5px 8px; white-space: normal; line-height: 1.5; }
+#screen-fields .field-wc > .harvest-list-badge.complete { background: #f2e5b4; color: #534014; }
