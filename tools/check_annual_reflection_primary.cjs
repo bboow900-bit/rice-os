@@ -29,6 +29,18 @@ const {chromium}=require("C:/Users/Keisuke/.cache/codex-runtimes/codex-primary-r
    await page.locator('.nav-item[data-screen="annual"]:visible').click();await page.locator('#annualYear').selectOption('2026');
    await page.locator('#toast').waitFor({state:'hidden',timeout:10000});
    const shot=async name=>{assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);await page.screenshot({path:path.join(os.tmpdir(),`rice-annual-reflection-${name}-${width}.png`)});};
+   const headerMetrics=[];
+   const checkHeader=async (panel,name)=>{
+    const header=panel.locator('.annual-tab-art-head');
+    await header.locator('img').evaluate(img=>img.decode());
+    headerMetrics.push(await header.evaluate(el=>{
+     const r=el.getBoundingClientRect(),title=el.querySelector('h3'),badge=el.querySelector('.annual-tab-year');
+     const metric=node=>{const b=node.getBoundingClientRect(),s=getComputedStyle(node);return{x:b.x-r.x,y:b.y-r.y,h:b.height,size:s.fontSize,weight:s.fontWeight,family:s.fontFamily,line:s.lineHeight,color:s.color,border:s.border,background:s.backgroundColor};};
+     const nav=document.querySelector('.annual-hub-nav').getBoundingClientRect();
+     return{height:r.height,width:r.width,left:r.left,navGap:r.top-nav.bottom,title:metric(title),badge:metric(badge)};
+    }));
+    await header.screenshot({path:path.join(os.tmpdir(),`rice-unified-header-${name}-${width}.png`)});
+   };
    await shot('hub');
    await page.locator('.annual-field-picker').scrollIntoViewIfNeeded();
    const card=page.locator('.annual-field-card').filter({has:page.locator(`[data-annual-hub-open-field="${id}"]`)});
@@ -40,6 +52,7 @@ const {chromium}=require("C:/Users/Keisuke/.cache/codex-runtimes/codex-primary-r
    assert((await card.locator('.annual-field-card-art').boundingBox()).width>=88);
    await shot('fields');
    const fieldsPanel=page.locator('.annual-field-picker');
+   await checkHeader(fieldsPanel,'fields');
    await fieldsPanel.locator('.annual-fields-art-head img').evaluate(img=>img.decode());
    await fieldsPanel.screenshot({path:path.join(os.tmpdir(),`rice-annual-fields-panel-${width}.png`)});
    await page.locator('#annualSearch').fill('振り返りUI確認');
@@ -53,6 +66,7 @@ const {chromium}=require("C:/Users/Keisuke/.cache/codex-runtimes/codex-primary-r
    await card.screenshot({path:path.join(os.tmpdir(),`rice-annual-reflection-card-${width}.png`)});
    await page.locator('[data-annual-hub-view="work"]').click();await shot('summary');
    const workPanel=page.locator('[data-annual-hub-panel="work"]');
+   await checkHeader(workPanel,'work');
    await workPanel.locator('.annual-work-heading img').evaluate(img=>img.decode());
    await workPanel.locator('.annual-work-heading').scrollIntoViewIfNeeded();await shot('work');
    assert.equal(await workPanel.locator('[data-annual-harvest-ledger]').count(),0);
@@ -69,11 +83,22 @@ const {chromium}=require("C:/Users/Keisuke/.cache/codex-runtimes/codex-primary-r
    assert.equal(await materials.getAttribute('open'),'');
    assert.equal(await page.evaluate(()=>document.activeElement?.dataset.annualRecordOpenId),'reflection-herbicide');
    await page.locator('[data-annual-hub-view="compare"]').click();await shot('compare-picker');
+   await checkHeader(page.locator('.annual-hub-compare'),'compare');
+   assert.deepEqual(headerMetrics[1],headerMetrics[0],'Fields and materials headers must share geometry and typography');
+   assert.deepEqual(headerMetrics[2],headerMetrics[0],'Compare header must use the same geometry and typography');
    await page.locator(`[data-annual-hub-compare-field="${id}"]`).click();
    const compare=page.locator('.annual-compare-experience');
    assert.equal(await compare.locator('.annual-compare-highlight').count(),3);
    assert.match(await compare.locator('[data-tone="gold"]').innerText(),/前年と同じ/);
    assert.match(await compare.locator('[data-tone="green"]').innerText(),/前年より3日早い/);
+   const compareAlignment=await compare.locator('.annual-compare-highlight').evaluateAll(rows=>rows.map(row=>{
+    const cells=[...row.children].slice(1);
+    return cells.map(cell=>{const year=cell.querySelector('span').getBoundingClientRect(),value=cell.querySelector('strong').getBoundingClientRect();return{yearTop:year.top,valueTop:value.top,valueHeight:value.height};});
+   }));
+   for(const cells of compareAlignment){
+    assert(Math.abs(cells[0].yearTop-cells[1].yearTop)<1,'Comparison year labels must align');
+    assert(Math.abs(cells[0].valueTop-cells[1].valueTop)<1,'Comparison values must align');
+   }
    await compare.screenshot({path:path.join(os.tmpdir(),`rice-annual-compare-panel-${width}.png`)});
    await compare.locator('.annual-compare-experience-head').scrollIntoViewIfNeeded();await shot('compare');
    await compare.locator('.annual-compare-more > summary').click();

@@ -951,6 +951,11 @@
     </details></section>`;
   }
 
+  function renderAnnualTabHeader(title, image, legacyClass = "") {
+    const year = yearValue();
+    return `<header class="annual-tab-art-head${legacyClass ? ` ${legacyClass}` : ""}"><div><h3>${U.escapeHTML(title)}</h3><span class="annual-tab-year">${year === "all" ? "全年度" : `${U.escapeHTML(year)}年産`}</span></div><img src="${U.attr(image)}" alt="" decoding="async"></header>`;
+  }
+
   function renderTop(rows) {
     const fields = topView === "fields" ? filteredFields() : [];
     return `
@@ -965,7 +970,7 @@
         <div class="annual-hub-panel" data-annual-hub-panel="${topView}">
         ${topView === "fields" ? `
         <section class="annual-field-picker">
-          <header class="annual-fields-art-head"><div><h3>圃場の一年</h3><span>${yearValue() === "all" ? "全年度" : `${U.escapeHTML(yearValue())}年産`}</span></div><img src="assets/images/annual-story/field-year-watercolor.png" alt="" decoding="async"></header>
+          ${renderAnnualTabHeader("圃場の一年", "assets/images/annual-story/field-year-watercolor.png", "annual-fields-art-head")}
           <div class="annual-filter-row annual-picker-controls">
             <label class="annual-search-label" aria-label="圃場検索">
               <input id="annualSearch" placeholder="圃場名・品種で検索" value="${U.attr(annualSearchValue)}">
@@ -982,7 +987,7 @@
         ${renderOffFieldArchive(rows)}
         ` : ""}
         ${topView === "work" ? `
-        <header class="annual-work-heading"><div><h3>使用資材</h3><span>${yearValue() === "all" ? "全年度" : `${U.escapeHTML(yearValue())}年産`}</span></div><img src="assets/images/material-review/materials-paddy-watercolor.png" alt="" decoding="async"></header>
+        ${renderAnnualTabHeader("使用資材", "assets/images/material-review/materials-paddy-watercolor.png", "annual-work-heading")}
         ${renderUsedMaterials()}
         ` : ""}
         ${topView === "compare" ? renderHubCompare() : ""}
@@ -1000,7 +1005,7 @@
     const year = reviewYearValue();
     const prior = String(Number(year) - 1);
     const fields = state.activeFields();
-    return `<section class="annual-hub-compare"><div class="section-title compact annual-compare-art-head"><h3>年の比較</h3><img class="annual-compare-banner" src="assets/images/annual-story/year-comparison-watercolor.png" alt=""></div><p class="annual-compare-year-pair">${U.escapeHTML(year)}年 ⇄ ${prior}年</p>
+    return `<section class="annual-hub-compare">${renderAnnualTabHeader("年の比較", "assets/images/annual-story/year-comparison-watercolor.png")}<p class="annual-compare-year-pair">${U.escapeHTML(year)}年 ⇄ ${prior}年</p>
       ${yearValue() === "all" ? `<p class="muted">全年度を選択中のため、比較は${U.escapeHTML(year)}年と前年を表示します。</p>` : ""}
       <div class="annual-field-pick-grid">${fields.length ? fields.map((field) => {
         const current = compareEntriesForFilter(field, year, "all").length;
