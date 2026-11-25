@@ -39,10 +39,10 @@ const { chromium } = require("C:/Users/Keisuke/.cache/codex-runtimes/codex-prima
         assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth), false, `${screen} overflow`);
         assert.equal(await page.evaluate(() => getComputedStyle(document.body).backgroundColor), "rgb(251, 247, 249)", `${screen} background`);
         if (screen === "fields") {
-          const card = page.locator(`[data-field-open="${field}"]`);
+          const card = page.locator('.field-master-card').filter({has:page.locator(`[data-field-open="${field}"]`)});
           assert.match(await card.innerText(), /収穫済み/);
           assert.doesNotMatch(await card.innerText(), /成熟期/);
-          await card.click();
+          await card.locator('[data-field-open]').click();
           assert.match(await page.locator(".field-hub-now").innerText(), /収穫済み/);
           await page.locator("#appBackButton").click();
           await page.locator(`[data-field-open="${field}"]`).waitFor();

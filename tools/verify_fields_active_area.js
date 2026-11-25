@@ -27,11 +27,11 @@ const missing = "0a\u30fb\u672a\u8a2d\u5b9a";
 const field = (fieldId, areaA, status = active, extra = {}) => ({ fieldId, name: fieldId, areaA, status, ...extra });
 function summary() {
   screen.render();
-  const matches = [...list.innerHTML.matchAll(/<p class="muted" data-field-active-area>(.*?)<\/p>/g)];
+  const matches = [...list.innerHTML.matchAll(/<section class="field-master-area" data-field-active-area data-area-a="([^"]*)" data-area-ha="([^"]*)" data-field-count="([^"]*)"[^>]*>(.*?)<\/section>/g)];
   assert.equal(matches.length, 1);
-  assert.ok(matches[0][1].includes("<b>\u4f5c\u4ed8\u3051\u4e2d\u306e\u5408\u8a08\u9762\u7a4d\uff08\u5168\u5703\u5834\uff09</b>"));
-  assert.ok(matches[0][1].includes("<br>\u4f7f\u7528\u4e2d\u306e\u5703\u5834\uff1a"));
-  return matches[0][1];
+  assert.ok(matches[0][4].includes("作付け中"));
+  assert.ok(matches[0][4].includes("全圃場"));
+  return `${matches[0][1]} a / ${matches[0][2]} ha ・ ${matches[0][3]}圃場 ${matches[0][4]}`;
 }
 let passed = 0;
 function test(name, fn) { fn(); passed++; console.log(`PASS ${name}`); }

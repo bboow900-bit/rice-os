@@ -1,201 +1,284 @@
-/* All-fields list only. Artwork sources and field facts are supplied by the renderer. */
-#screen-fields .field-hub-cards { display: grid; gap: 12px; }
-#screen-fields .field-hub-card.field-wc {
+/* Fields-tab management list only. Keep renderer-supplied stage colors. */
+#screen-fields .field-hub-list { padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
+#screen-fields .field-hub-card.field-wc.field-master-card[hidden] { display: none; }
+#screen-fields .field-master-heading,
+#screen-fields .field-master-area,
+#screen-fields .field-master-card {
   --field-wc-ink: #173f27;
-  --field-wc-muted: #5b6e59;
-  --field-wc-line: #d5dfcf;
+  --field-wc-line: #cbd9c5;
   --field-wc-mincho: "Yu Mincho", "Hiragino Mincho ProN", "Noto Serif CJK JP", serif;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 112px;
-  align-items: center;
-  gap: 8px 12px;
-  min-width: 0;
-  width: 100%;
-  min-height: 80px;
-  padding: 12px;
-  border: 1px solid #bbcdb3;
-  border-left: 3px solid var(--season-accent, #75945e);
-  border-radius: 8px;
-  background: #fffef9;
-  box-shadow: none;
+  --field-wc-gothic: "Yu Gothic", "Hiragino Kaku Gothic ProN", "Meiryo", sans-serif;
+  box-sizing: border-box;
   color: var(--field-wc-ink);
-  text-align: left;
   letter-spacing: 0;
 }
-#screen-fields .field-wc .field-hub-card-main {
-  grid-column: 1;
-  grid-row: 1;
+#screen-fields .field-master-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+#screen-fields .field-master-heading h3 {
   min-width: 0;
+  margin: 0;
+  padding-left: 10px;
   border-left: 3px solid #d3ad43;
-  padding-left: 9px;
+  font: 700 25px/1.4 var(--field-wc-mincho);
+  overflow-wrap: anywhere;
 }
-#screen-fields .field-wc .field-hub-card-main > :is(b,small,em) { display: block; }
-#screen-fields .field-hub-card.field-wc .field-hub-card-name {
+#screen-fields .field-master-heading button {
+  flex: 0 0 auto;
+  min-height: 44px;
+  padding: 6px 12px;
+  border: 1px solid #8aa477;
+  border-radius: 6px;
+  background: #f7faef;
   color: var(--field-wc-ink);
-  font-family: var(--field-wc-mincho);
-  font-size: 26px;
-  font-weight: 700;
-  line-height: 1.3;
-  white-space: normal;
-  overflow: visible;
-  overflow-wrap: anywhere;
+  font: 600 14px/1.5 var(--field-wc-gothic);
 }
-#screen-fields .field-hub-card.field-wc .field-hub-card-meta {
-  color: #647569;
-  margin-top: 4px;
-  font-size: 13px;
-  font-weight: 500;
-  line-height: 1.6;
-  overflow-wrap: anywhere;
-}
-#screen-fields .field-wc .field-hub-card-use-status {
-  margin-top: 5px;
-  color: #4e7651;
-  font-style: normal;
-  font-size: 11px;
-  font-weight: 500;
-  line-height: 1.5;
-  white-space: normal;
-}
-#screen-fields .field-wc .field-hub-card-rice {
-  display: grid;
-  place-items: center;
-  overflow: hidden;
-  grid-column: 2;
-  grid-row: 1;
-  width: 112px;
-  height: 68px;
+#screen-fields .field-master-banner {
+  margin: 0;
   padding: 0;
   border: 0;
   border-radius: 0;
   background: transparent;
 }
-#screen-fields .field-wc .field-hub-card-rice img {
+#screen-fields .field-master-banner img {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 112px;
+  object-fit: contain;
+}
+#screen-fields .field-master-area {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  margin: 4px 0 10px;
+  padding: 8px 0 10px;
+  border-bottom: 1px solid var(--field-wc-line);
+  background: transparent;
+  font: 600 13px/1.5 var(--field-wc-gothic);
+}
+#screen-fields .field-master-area > span { min-width: 0; overflow-wrap: anywhere; }
+#screen-fields .field-master-area > span b {
+  margin-left: 8px;
+  font: 700 28px/1.2 var(--field-wc-mincho);
+}
+#screen-fields .field-master-area > .field-master-area-value {
+  min-width: 0;
+  margin-left: auto;
+  font: 700 28px/1.2 var(--field-wc-mincho);
+  overflow-wrap: anywhere;
+}
+#screen-fields .field-master-area-value > span { font-size: 18px; }
+#screen-fields .field-master-area-value > small {
+  display: inline-block;
+  margin-left: 6px;
+  font: 400 13px/1.5 Georgia, "Yu Mincho", serif;
+}
+#screen-fields .field-master-area > small {
+  flex-basis: 100%;
+  color: #62725e;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+#screen-fields .field-hub-cards { display: grid; gap: 10px; }
+#screen-fields .field-hub-card.field-wc.field-master-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 0;
+  min-width: 0;
+  width: 100%;
+  min-height: 0;
+  padding: 10px;
+  border: 1px solid #a6bea0;
+  border-left: 3px solid var(--season-accent, #75945e);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: none;
+  text-align: left;
+  font-family: var(--field-wc-gothic);
+}
+#screen-fields .field-master-card > button.field-master-open {
+  box-sizing: border-box;
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 112px;
+  align-items: center;
+  gap: 6px 8px;
+  min-width: 0;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  letter-spacing: 0;
+  cursor: pointer;
+}
+#screen-fields .field-master-card .field-hub-card-main {
+  grid-column: 1;
+  grid-row: 1;
+  min-width: 0;
+  padding-left: 8px;
+  border-left: 3px solid #d3ad43;
+}
+#screen-fields .field-master-card .field-hub-card-main > :is(b, small, em) { display: block; }
+#screen-fields .field-master-card .field-hub-card-name {
+  color: var(--field-wc-ink);
+  font: 700 23px/1.35 var(--field-wc-mincho);
+  white-space: normal;
+  overflow: visible;
+  overflow-wrap: anywhere;
+}
+#screen-fields .field-master-card .field-hub-card-meta {
+  margin-top: 3px;
+  color: #40553b;
+  font: 500 13px/1.5 var(--field-wc-gothic);
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+#screen-fields .field-master-card .field-hub-card-use-status {
+  margin-top: 2px;
+  color: #62725e;
+  font: 500 11px/1.4 var(--field-wc-gothic);
+  white-space: normal;
+}
+#screen-fields .field-master-card .field-hub-card-rice {
+  grid-column: 2;
+  grid-row: 1;
+  display: block;
+  width: 112px;
+  height: 68px;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+#screen-fields .field-master-card .field-hub-card-rice img {
   display: block;
   width: 112px;
   height: 68px;
   object-fit: cover;
   filter: none;
+  -webkit-mask-image: radial-gradient(ellipse, #000 48%, transparent 76%);
   mask-image: radial-gradient(ellipse, #000 48%, transparent 76%);
 }
-#screen-fields .field-wc .field-wc-facts {
+#screen-fields .field-master-card-long-name > button.field-master-open { grid-template-columns: minmax(0, 1fr) 88px; }
+#screen-fields .field-master-card-long-name .field-hub-card-name { box-sizing: border-box; padding-right: 12px; font-size: 20px; line-height: 1.5; }
+#screen-fields .field-master-card-long-name .field-hub-card-rice,
+#screen-fields .field-master-card-long-name .field-hub-card-rice img { width: 88px; height: 60px; }
+#screen-fields .field-master-card .field-master-facts {
   grid-column: 1 / -1;
   display: grid;
   gap: 0;
-  width: 100%;
   min-width: 0;
+  width: 100%;
 }
-#screen-fields .field-wc .field-wc-row {
-  grid-column: 1 / -1;
+#screen-fields .field-master-card .field-master-row {
   display: grid;
-  grid-template-columns: 104px minmax(0, 1fr);
+  grid-template-columns: 78px minmax(0, 1fr);
   align-items: center;
   gap: 10px;
   min-width: 0;
-  padding: 6px 0;
+  padding: 3px 0;
   border-top: 1px solid var(--field-wc-line);
 }
-#screen-fields .field-wc .field-wc-label {
+#screen-fields .field-master-card .field-master-row > small {
   box-sizing: border-box;
-  display: flex;
-  align-items: center;
-  min-height: 30px;
+  display: block;
   margin: 0;
-  padding: 4px 10px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: #eef3e5;
+  color: #40553b;
+  font: 500 12px/1.5 var(--field-wc-gothic);
+  overflow-wrap: anywhere;
+}
+#screen-fields .field-master-card .field-master-row > b {
+  min-width: 0;
+  color: var(--field-wc-ink);
+  font: 500 13px/1.5 var(--field-wc-gothic);
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+#screen-fields .field-master-card .field-master-conditions {
+  grid-column: 1;
+  grid-row: auto;
+  align-self: center;
+  min-width: 0;
+  color: #53644d;
+  font: 400 12px/1.5 var(--field-wc-gothic);
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+#screen-fields .field-master-card .field-master-conditions small { font: inherit; }
+#screen-fields .field-master-card > .harvest-list-badge {
+  grid-column: 1 / -1;
+  align-self: center;
+  justify-self: start;
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 100%;
+  min-height: 0;
+  margin: 4px 8px 0 0;
+  padding: 3px 6px;
+  border-radius: 4px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.4;
+}
+#screen-fields .field-master-card > button.field-master-edit {
+  box-sizing: border-box;
+  grid-column: 2;
+  grid-row: auto;
+  justify-self: end;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  width: 60px;
+  min-width: 60px;
+  min-height: 44px;
+  margin: 4px 0 0;
+  padding: 6px;
   border: 0;
   border-radius: 4px;
-  background: #f0f4e9;
-  color: #40553b;
-  font: 600 13px/22px "Yu Gothic", "Hiragino Kaku Gothic ProN", sans-serif;
+  background: transparent;
+  box-shadow: none;
+  color: var(--field-wc-ink);
+  font: 600 13px/1.5 var(--field-wc-gothic);
+  white-space: normal;
+  cursor: pointer;
+}
+#screen-fields .field-master-card > button.field-master-edit > span {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 28px;
+  padding: 3px 10px;
+  border: 1px solid #8aa477;
+  border-radius: 4px;
+  background: #f7faef;
+  font: 500 12px/1.5 var(--field-wc-gothic);
   white-space: nowrap;
 }
-#screen-fields .field-wc .field-wc-value {
-  display: flex;
-  align-items: baseline;
-  flex-wrap: wrap;
-  gap: 3px 5px;
-  min-width: 0;
-  font-family: var(--field-wc-mincho);
+#screen-fields .field-master-card > button:focus-visible,
+#screen-fields .field-master-heading button:focus-visible {
+  outline: 3px solid var(--season-accent, #286848);
+  outline-offset: 3px;
 }
-#screen-fields .field-wc .field-wc-value b {
-  color: var(--field-wc-ink);
-  font-size: 16px;
-  font-weight: 700;
-  line-height: 1.5;
-  overflow-wrap: anywhere;
+@media (hover: hover) {
+  #screen-fields .field-master-card > .field-master-edit:hover > span,
+  #screen-fields .field-master-heading button:hover { background: #edf3e3; }
 }
-#screen-fields .field-wc .field-wc-value em {
-  padding: 1px 5px;
-  border-radius: 4px;
-  background: #efe0a3;
-  color: #5f4a1c;
-  font-size: 10px;
-  font-style: normal;
-  font-weight: 600;
-  line-height: 1.5;
-}
-#screen-fields .field-wc .field-wc-value small {
-  margin-left: auto;
-  color: var(--field-wc-muted);
-  font-size: 12px;
-  font-weight: 500;
-  line-height: 1.5;
-  overflow-wrap: anywhere;
-}
-#screen-fields .field-wc .field-wc-outlook .field-wc-value small { margin-left: 0; }
-#screen-fields .field-wc .field-wc-observed .field-wc-value b { font-size: 20px; }
-#screen-fields .field-wc .field-wc-outlook .field-wc-value b { color: #52634c; font-weight: 500; }
-#screen-fields .field-wc .field-wc-value .field-wc-number {
-  font-family: Georgia, serif;
-  font-size: 30px;
-  font-weight: 700;
-  line-height: 1.2;
-}
-#screen-fields .field-wc .field-wc-number span { font-size: 14px; }
-#screen-fields .field-wc .field-wc-water { border-top-color: #cfe0e6; background: #f1f8fa; }
-#screen-fields .field-wc .field-wc-water .field-wc-label { background: #e8f2f5; color: #396478; }
-#screen-fields .field-wc .field-wc-water .field-wc-value b { color: #28637b; }
-#screen-fields .field-hub-card.field-wc > .field-hub-card-secondary {
-  display: grid;
-  gap: 3px;
-  min-width: 0;
-  grid-column: 1 / -1;
-  margin: 0;
-  padding: 0;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-}
-#screen-fields .field-wc .field-herbicide-caption,
-#screen-fields .field-wc .field-herbicide-steps {
-  color: var(--field-wc-muted);
-  font-size: 11px;
-  font-weight: 500;
-  line-height: 1.5;
-  white-space: normal;
-  overflow-wrap: anywhere;
-}
-#screen-fields .field-wc .field-hub-card-secondary .field-herbicide-name {
-  color: #526d59;
-  font-size: 13px;
-  font-weight: 600;
-  line-height: 1.6;
-  white-space: normal;
-  overflow-wrap: anywhere;
-}
-#screen-fields .field-wc .field-wc-open {
-  grid-column: 1 / -1;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  min-height: 20px;
-  padding: 0 2px;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  color: #315337;
-  font: 500 24px/1 "Yu Gothic", sans-serif;
-}
-#screen-fields .field-hub-card.field-wc:focus-visible { outline: 3px solid var(--season-accent, #286848); outline-offset: 3px; }
-#screen-fields .field-wc > .harvest-list-badge { grid-column: 1 / -1; justify-self: stretch; justify-content: center; min-height: 28px; padding: 5px 8px; white-space: normal; line-height: 1.5; }
-#screen-fields .field-wc > .harvest-list-badge.complete { background: #f2e5b4; color: #534014; }

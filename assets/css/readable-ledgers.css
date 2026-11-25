@@ -51,46 +51,6 @@
 #screen-data .common-master-card small { font-size: 13px; }
 #screen-data .common-master-card b { font-weight: 700; }
 
-/* Home follows the same vertical ledger as harvest and supplies. */
-#screen-home .home-pop-header h1 { font-size: 26px; font-weight: 700; }
-#screen-home .home-pop-header p { font-size: 14px; color: var(--reading-muted); }
-#screen-home [data-home-quick-record] { justify-content: flex-start; font-size: 18px; font-weight: 600; }
-#screen-home .home-decision-summary { display: grid; grid-template-columns: minmax(0,1fr); gap: 0; margin: 0 0 22px; }
-#screen-home .home-summary-heading { margin: 20px 0 8px; padding-left: 12px; border-left: 4px solid #387f45; font-size: 19px; }
-#screen-home .home-decision-summary > button { display: grid; grid-template-columns: minmax(0,1fr) auto 16px; grid-template-rows: auto; align-items: center; gap: 8px; min-height: 52px; padding: 10px 2px; border: 0; border-bottom: 1px solid var(--reading-rule); border-radius: 0; background: transparent; }
-#screen-home .home-decision-summary > button > span { grid-column: 1; grid-row: 1; font-size: 16px; font-weight: 400; }
-#screen-home .home-decision-summary > button > b { grid-column: 2; grid-row: 1; color: var(--reading-ink); font-size: 26px; font-weight: 700; text-align: right; }
-#screen-home .home-decision-summary > button > b small { display: inline; font-size: 14px; margin-left: 4px; color: inherit; font-weight: 400; }
-#screen-home .home-decision-summary > button > i { grid-column: 3; grid-row: 1; font-size: 24px; font-style: normal; text-align: right; }
-#screen-home .home-decision-summary > button:disabled { background: transparent; border-color: var(--reading-rule); }
-#screen-home .home-decision-summary > button:disabled b { color: #768178; font-weight: 500; }
-#screen-home .home-decision-summary > button:disabled i { visibility: hidden; }
-#screen-home .home-decision-list { gap: 0; }
-#screen-home .home-decision-card { border-width: 0 0 1px; border-radius: 0; background: transparent; box-shadow: none; }
-#screen-home .home-decision-card-toggle { padding: 18px 0 12px; }
-#screen-home .home-decision-card-head b { font-size: 19px; font-weight: 700; }
-#screen-home .home-decision-card-head small { font-size: 13px; font-weight: 400; }
-#screen-home .home-decision-card-head img.stage { width: 32px; height: 40px; }
-#screen-home .home-decision-card .home-decision-card-head { grid-template-columns: 32px minmax(0,1fr) 18px; }
-#screen-home .home-stage-summary { margin: 8px 0 0 41px; gap: 6px; }
-#screen-home .home-stage-observed { display: flex; flex-wrap: wrap; gap: 4px 8px; padding: 0; }
-#screen-home .home-stage-observed-label { font-size: 13px; }
-#screen-home .home-stage-observed b { font-size: 14px; font-weight: 500; }
-#screen-home .home-stage-observed em { font-size: 12px; background: transparent; padding: 0; font-weight: 400; }
-#screen-home .home-event-age { display: block; font-size: 22px; line-height: 1.4; font-weight: 700; color: var(--reading-ink); }
-#screen-home .home-stage-outlook { display: block; margin: 0; font-size: 14px; line-height: 1.6; }
-#screen-home .home-stage-outlook > span { padding: 0; margin-right: 5px; background: transparent; font-size: 13px; color: var(--reading-muted); }
-#screen-home .home-stage-outlook > b { font-size: 14px; font-weight: 500; }
-#screen-home .home-stage-outlook small { display: block; font-size: 13px; }
-#screen-home .home-stage-water { padding: 7px 9px; font-size: 14px; line-height: 1.6; }
-#screen-home .home-stage-water b { font-weight: 600; }
-#screen-home .home-stage-water small { font-size: 13px; }
-#screen-home .home-stage-heat { padding: 5px 0; }
-#screen-home .home-stage-heat b { font-size: 17px; font-weight: 700; }
-#screen-home .home-stage-heat :is(span,small) { font-size: 13px; line-height: 1.6; }
-#screen-home .home-decision-card:not(.expanded) :is(.home-stage-outlook small,.home-stage-heat small,.home-stage-observed-label,.home-stage-observed em) { display: none; }
-#screen-home .home-decision-section-head { flex-wrap: wrap; gap: 10px; }
-#screen-home .home-decision-section-head select { font-size: 13px; min-width: 0; }
 
 /* Harvest is an overview, not a second copy of any editable source record. */
 #screen-shipments .shipment-annual-sales { margin: 14px 0 22px; padding: 16px 0; border-block: 1px solid var(--reading-rule); }

@@ -10,6 +10,7 @@
   let filterFieldId = "all";
   let homeGroupFilter = "all";
   let expandedManagementFieldId = "";
+  const expandedWaterMovementFields = new Set();
   let homeCandidatesExpanded = false;
   let homeHarvestCompletedExpanded = false;
   const heatCache = new Map();
@@ -784,7 +785,9 @@
     const waterManagement = waterManagementForField(field, date);
     const criticalWater = criticalWaterWindowFor(field, date);
     const fieldStage = stage.fieldStage && stage.fieldStage.current || stage.current;
-    const stageImage = fieldStage ? `assets/images/rice-stages/rice-stage-${String(fieldStage.image).padStart(2, "0")}.png` : "assets/images/rice-stages/rice-stage-01.png";
+    const imageNumber = Math.max(1, Math.min(8, Number(fieldStage && fieldStage.image) || 1));
+    const artName = ["seedling", "seedling", "tillering", "tillering", "booting", "heading", "ripening", "mature"][imageNumber - 1];
+    const stageImage = imageNumber === 6 ? "assets/images/annual-story/watercolor-heading-paddy.png" : `assets/images/rice-stages/review-${artName}.png`;
     const candidateCount = candidatesForDate(date).filter((entry) => entryFieldIds(entry).includes(field.fieldId)).length;
     const isExpanded = expandedManagementFieldId === field.fieldId;
     const harvestStatus = state.harvestStatusForField(field.fieldId, cropYear(date), date);
@@ -844,7 +847,7 @@
           <em>${U.escapeHTML(badge === "記録待ち" ? "今年の生育記録なし" : badge)}</em>
         </div>
         <p class="home-stage-outlook"><span>${completed ? "実績" : "見通し"}</span><b>${U.escapeHTML(outlook.title)}</b><small>${U.escapeHTML(outlook.detail)}</small></p>
-        <div class="home-stage-heat">
+        <div class="home-stage-heat${/^-?\d+(?:\.\d+)?℃$/.test(heat.title) ? "" : " home-stage-heat-text"}">
           <div><span>${completed ? "収穫時積算" : "積算気温"}</span><b>${U.escapeHTML(heat.title)}</b><small>${U.escapeHTML(heat.note)}</small></div>
           <i aria-hidden="true"><em style="width:${U.attr(String(heat.percent))}%"></em></i>
         </div>
@@ -926,13 +929,14 @@
     if (!period) return "";
     const movement = activeHomeWaterMovement(period);
     const presentation = homeWaterMovementPresentation(period, movement, dateText);
+    const timeline = renderHomeWaterMovementTimeline(period, dateText);
     return `
       <section class="home-water-quick" aria-label="${U.attr(`${field.name}の${presentation.kindLabel}`)}">
         <span class="home-water-quick-icon" aria-hidden="true">💧</span>
         <div class="home-water-quick-copy"><span>${U.escapeHTML(presentation.kindLabel)}</span><b>${U.escapeHTML(presentation.currentLabel)}</b><small>${U.escapeHTML(presentation.dayText)}</small></div>
         <button type="button" class="home-water-quick-action" data-home-water-input data-home-water-field="${U.attr(field.fieldId)}" data-home-water-type="${U.attr(period.kind)}">${U.escapeHTML(presentation.nextLabel)}</button>
         <button type="button" class="home-water-quick-open" data-home-water-open data-home-water-field="${U.attr(field.fieldId)}" data-home-water-type="${U.attr(period.kind)}" aria-label="${U.attr(`${presentation.kindLabel}を開く`)}">›</button>
-        ${renderHomeWaterMovementTimeline(period, dateText)}
+        ${timeline ? `<details class="home-water-movement-details" data-home-water-movement="${U.attr(field.fieldId)}" ${expandedWaterMovementFields.has(field.fieldId) ? "open" : ""}><summary>水の動きを見る</summary>${timeline}</details>` : ""}
       </section>
     `;
   }
@@ -2221,6 +2225,11 @@
     root.dataset.boundHomeCalendar = "1";
     root.addEventListener("toggle", (event) => {
       if (event.target.matches("[data-home-harvest-completed]")) homeHarvestCompletedExpanded = event.target.open;
+      if (event.target.matches("[data-home-water-movement]")) {
+        const fieldId = event.target.dataset.homeWaterMovement;
+        if (event.target.open) expandedWaterMovementFields.add(fieldId);
+        else expandedWaterMovementFields.delete(fieldId);
+      }
     }, true);
     root.addEventListener("click", (event) => {
       const overview = event.target.closest("[data-home-overview]");

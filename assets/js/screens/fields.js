@@ -904,26 +904,27 @@
     const year = herbicideYear || currentSeasonYear();
     const assignment = RiceOS.herbicide && RiceOS.herbicide.assignmentFor(field.fieldId, year);
     const herbicideLabel = assignment ? assignment.name : "未設定";
-    const facts = RiceOS.fieldProgress.facts(field, U.today());
-    const row = (label, value, extra, tone = "") => `<span class="field-wc-row ${tone}"><span class="field-wc-label">${U.escapeHTML(label)}</span><span class="field-wc-value">${value}${extra || ""}</span></span>`;
     const esc = U.escapeHTML;
+    const areaLabel = U.number(field.areaA, 0) > 0 ? `${field.areaA}a` : "面積未設定";
+    const longName = Array.from(String(field.name || "")).length > 14;
+    const row = (label, value) => `<span class="field-master-row"><small>${esc(label)}</small><b>${esc(value)}</b></span>`;
     const artName = ["review-seedling", "review-seedling", "review-tillering", "review-tillering", "review-booting", "review-heading", "review-ripening", "review-mature"][Math.max(0, Math.min(7, Number(stage.number) - 1))];
     const art = Number(stage.number) === 6 ? "annual-story/watercolor-heading-paddy.png" : `rice-stages/${artName}.png`;
-    const heatNumber = /^(\d+)℃$/.exec(facts.heat.title);
-    const quality = /一部|欠測|未確定|旧記録|当日速報/.test(facts.heat.note) ? "一部取得・要確認" : facts.heatBasis;
     return `
-      <button type="button" class="field-hub-card field-wc stage-${U.attr(String(stage.number).padStart(2, "0"))}" data-field-open="${U.attr(field.fieldId)}" data-field-search-text="${U.attr(`${field.name} ${variety && variety.name || ""} ${field.district || ""}`.toLowerCase())}">
-        <span class="field-hub-card-rice"><img src="assets/images/${U.attr(art)}" alt="" loading="lazy"></span>
-        <span class="field-hub-card-main"><b class="field-hub-card-name">${esc(field.name)}</b><small class="field-hub-card-meta">${esc(variety && variety.name || "品種未設定")} / ${esc(String(field.areaA || 0))}a</small>${field.status && field.status !== "使用中" ? `<em class="field-hub-card-use-status">${esc(field.status)}</em>` : ""}</span>
-        <span class="field-wc-facts">
-          ${row("現場ステージ", `<b>${esc(facts.observed)}</b><em>${esc(facts.badge)}</em>`, `<small>${esc(facts.eventAge)}</small>`, "field-wc-observed")}
-          ${row(facts.completed ? "実績" : "見通し", `<b>${esc(facts.outlook.title)}</b>`, facts.outlook.estimated ? '<small class="field-wc-estimate">推定</small>' : "", "field-wc-outlook")}
-          ${row(facts.completed ? "収穫時積算" : "積算温度", heatNumber ? `<b class="field-wc-number">${esc(heatNumber[1])}<span>℃</span></b>` : `<b>${esc(facts.heat.title)}</b>`, `<small title="${U.attr(facts.heat.note)}">${esc(quality)}</small>`)}
-          ${row("水管理", `<b>${esc(facts.waterText)}</b>`, `<small>${esc(facts.waterDay)}</small>`, "field-wc-water")}
-        </span>
-        ${assignment ? `<span class="field-herbicide-summary field-hub-card-secondary" data-field-herbicide="${U.attr(field.fieldId)}"><small class="field-herbicide-caption">${esc(String(year))}年度の除草体系（計画）</small><strong class="field-herbicide-name">${esc(herbicideLabel)}</strong></span>` : ""}
-        ${harvestBadge}<span class="field-wc-open" aria-hidden="true">›</span>
-      </button>
+      <article class="field-hub-card field-wc field-master-card${longName ? " field-master-card-long-name" : ""} stage-${U.attr(String(stage.number).padStart(2, "0"))}" data-field-search-text="${U.attr(`${field.name} ${variety && variety.name || ""} ${field.district || ""}`.toLowerCase())}">
+        <button type="button" class="field-master-open" data-field-open="${U.attr(field.fieldId)}" aria-label="${U.attr(`${field.name}の圃場詳細を開く`)}">
+          <span class="field-hub-card-rice"><img src="assets/images/${U.attr(art)}" alt="" loading="lazy"></span>
+          <span class="field-hub-card-main"><b class="field-hub-card-name">${esc(field.name)}</b><small class="field-hub-card-meta">${esc(variety && variety.name || "品種未設定")} / ${esc(areaLabel)}</small>${field.status && field.status !== "使用中" ? `<em class="field-hub-card-use-status">${esc(field.status)}</em>` : ""}</span>
+          <span class="field-master-facts">
+            ${field.district ? row("地区", field.district) : ""}
+            ${row("グループ", groupName(field))}
+            <span data-field-herbicide="${U.attr(field.fieldId)}">${row("除草体系", `${year}年度・${herbicideLabel}`)}</span>
+          </span>
+        </button>
+        ${harvestBadge}
+        ${field.soilType || field.waterHolding ? `<small class="field-master-conditions">${esc([field.soilType ? `土質 ${field.soilType}` : "", field.waterHolding ? `水持ち ${field.waterHolding}` : ""].filter(Boolean).join(" ・ "))}</small>` : ""}
+        <button type="button" class="field-master-edit" data-field-edit="${U.attr(field.fieldId)}" aria-label="${U.attr(`${field.name}の圃場設定を編集`)}"><span>編集</span></button>
+      </article>
     `;
   }
 
@@ -944,8 +945,7 @@
       known++;
       area += value;
     });
-    const total = `${formatNumber(area, 2)} a / ${formatNumber(area / 100, 4)} ha`;
-    return `<p class="muted" data-field-active-area><b>作付け中の合計面積（全圃場）</b><br>使用中の圃場：${total} ・ ${count}圃場${known < count ? ` ・ 0a・未設定 ${count - known}圃場（正の面積のみ集計）` : ""}</p>`;
+    return `<section class="field-master-area" data-field-active-area data-area-a="${formatNumber(area, 2)}" data-area-ha="${formatNumber(area / 100, 4)}" data-field-count="${count}" aria-label="作付け中の合計面積（全圃場）"><span>作付け中 <small>全圃場</small> <b>${count}圃場</b></span><b class="field-master-area-value">${formatNumber(area, 2)}<span>a</span><small>${formatNumber(area / 100, 4)}ha</small></b>${known < count ? `<small class="field-master-area-missing">0a・未設定 ${count - known}圃場</small>` : ""}</section>`;
   }
 
   function renderFieldListView() {
@@ -960,11 +960,12 @@
       .sort((a, b) => U.number(a.sortOrder, 0) - U.number(b.sortOrder, 0) || String(a.name).localeCompare(String(b.name)));
     return `
         <section class="field-hub-list">
-        <div class="field-hub-intro"><div><span>圃場一覧</span><h3>田んぼを管理する</h3><small>圃場名・品種・面積・グループなど固定情報を整えます。</small></div><button class="primary" type="button" data-action="add-field">＋ 圃場追加</button></div>
+        <header class="field-master-heading"><h3>圃場の管理</h3><button class="primary" type="button" data-action="add-field">＋ 圃場追加</button></header>
+        <div class="field-master-banner"><img src="assets/images/annual-story/field-year-watercolor.png" alt="" decoding="async"></div>
         ${renderActiveAreaSummary()}
-        <label class="field-herbicide-year">除草体系の表示年度<select data-field-herbicide-year>${[...new Set([currentSeasonYear(), herbicideYear || currentSeasonYear(), ...(RiceOS.herbicide ? RiceOS.herbicide.assignments().map(row => Number(row.year)) : [])])].sort((a,b) => b-a).map(year => `<option value="${U.attr(String(year))}" ${year === (herbicideYear || currentSeasonYear()) ? "selected" : ""}>${U.escapeHTML(String(year))}年度</option>`).join("")}</select></label>
         <div class="field-hub-filters"><input type="search" data-field-search placeholder="圃場名・品種・地区で検索" value="${U.attr(fieldSearch)}"><select data-field-group-filter>${groupOptions}</select></div>
         <div class="field-hub-groups">${groups.map((group) => `<div><button type="button" data-field-group-open="${U.attr(group.fieldGroupId)}"><span>${U.escapeHTML(group.unassigned ? "グループ未設定" : group.name)}</span><small>${group.fields.length}圃場 / ${Math.round(group.area * 10) / 10}a</small></button>${group.unassigned ? "" : `<button type="button" data-field-group-bulk="${U.attr(group.fieldGroupId)}">一括作業入力</button>`}</div>`).join("")}</div>
+        <label class="field-herbicide-year">除草体系<select data-field-herbicide-year aria-label="除草体系の表示年度">${[...new Set([currentSeasonYear(), herbicideYear || currentSeasonYear(), ...(RiceOS.herbicide ? RiceOS.herbicide.assignments().map(row => Number(row.year)) : [])])].sort((a,b) => b-a).map(year => `<option value="${U.attr(String(year))}" ${year === (herbicideYear || currentSeasonYear()) ? "selected" : ""}>${U.escapeHTML(String(year))}年度</option>`).join("")}</select></label>
         <div class="field-hub-cards">${visible.length ? visible.map(renderFieldListCard).join("") : '<div class="empty">条件に合う圃場はありません。</div>'}</div>
       </section>
     `;
@@ -1083,20 +1084,6 @@
       ${fieldView === "list" ? renderFieldListView() : ""}
     `;
     if (RiceOS.app && RiceOS.app.syncBackButton) RiceOS.app.syncBackButton();
-    if (fieldView === "list" && screen && screen.classList.contains("active") && RiceOS.fieldProgress) {
-      const visible = [...screen.querySelectorAll("[data-field-open]")].map(el => state.field(el.dataset.fieldOpen)).filter(Boolean);
-      RiceOS.fieldProgress.load(visible, field => {
-        if (fieldView !== "list" || !screen.classList.contains("active")) return;
-        const target = screen.querySelector(`[data-field-open="${CSS.escape(field.fieldId)}"]`);
-        if (target) {
-          const focused = document.activeElement === target;
-          const current = state.field(field.fieldId);
-          if (!current) return;
-          target.outerHTML = renderFieldListCard(current);
-          if (focused) screen.querySelector(`[data-field-open="${CSS.escape(field.fieldId)}"]`)?.focus({ preventScroll: true });
-        }
-      });
-    }
   }
 
   function bind() {
@@ -1107,10 +1094,19 @@
       let value = el.value;
       if (el.dataset.arrayField === "1") value = parseArray(value);
       if (["areaA", "sortOrder"].includes(key)) value = U.number(el.value, 0);
+      const current = state.field(el.dataset.fieldId);
+      if (current && (Array.isArray(value) ? JSON.stringify(current[key] || []) === JSON.stringify(value) : current[key] === value)) return;
       state.updateField(el.dataset.fieldId, { [key]: value });
     });
 
     U.$("fieldList").addEventListener("click", (event) => {
+      const editButton = event.target.closest("[data-field-edit]");
+      if (editButton) {
+        const id = editButton.dataset.fieldEdit;
+        if (!state.field(id)) return;
+        openField(id, "settings");
+        return;
+      }
       if (event.target.closest("[data-field-herbicide-open]")) {
         RiceOS.app.openInput("herbicide", "fields");
         return;

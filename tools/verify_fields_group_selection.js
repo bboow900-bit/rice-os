@@ -30,7 +30,10 @@ Object.assign(context.RiceOS.state, {
 const screen = context.RiceOS.screens.fields;
 screen.bind();
 screen.render();
-const area = () => list.innerHTML.match(/<p class="muted" data-field-active-area>(.*?)<\/p>/)[1];
+const area = () => {
+  const match = list.innerHTML.match(/<section class="field-master-area" data-field-active-area data-area-a="([^"]*)" data-area-ha="([^"]*)" data-field-count="([^"]*)"[^>]*>(.*?)<\/section>/);
+  return `${match[1]} a / ${match[2]} ha ・ ${match[3]}圃場 ${match[4]}`;
+};
 const total = area();
 assert.match(total, /50 a \/ 0\.5 ha/);
 function check(value, ids, expectedData = before) {

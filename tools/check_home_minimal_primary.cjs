@@ -1,0 +1,117 @@
+"use strict";
+// Isolated UI fixtures; never connect this check to a browser profile with farm data.
+const path=require('node:path'),os=require('node:os'),assert=require('node:assert/strict');
+const {chromium}=require('C:/Users/Keisuke/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
+(async()=>{
+ const browser=await chromium.launch({headless:true,executablePath:'C:/Program Files/Google/Chrome/Application/chrome.exe'});
+ try{for(const width of [360,390,1280]){
+  const context=await browser.newContext({viewport:{width,height:1000},serviceWorkers:'block'});
+  try{
+   const page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));await page.clock.setFixedTime(new Date('2026-08-03T03:00:00Z'));
+   await page.route('https://**/*',r=>r.abort());await page.goto('http://127.0.0.1:4182/index.html',{waitUntil:'networkidle'});
+   const fixture=await page.evaluate(()=>{
+    const S=RiceOS.state,v=S.varieties()[0].varietyId,g=S.addFieldGroup('見本グループ');
+    const ids=['開パ 下','亀石 右下'].map(n=>S.addField(n));
+    const d=RiceOS.utils.clone(S.data());d.fields=d.fields.filter(f=>ids.includes(f.fieldId));
+    d.fields.forEach((f,i)=>Object.assign(f,{areaA:i?33.75:20,varietyId:v,fieldGroupId:g}));
+    d.fieldWorks=ids.map((id,i)=>({workId:'home-min-plant-'+i,fieldIds:[id],workName:'田植え',date:'2026-05-14',cropYear:2026}));
+    d.growthLogs=[{logId:'home-min-heading',fieldId:ids[0],date:'2026-07-27',headingObserved:true,cropYear:2026},{logId:'home-min-panicle',fieldId:ids[1],date:'2026-07-25',panicleLengthMm:1,cropYear:2026}];
+    d.irrigations=[{irrigationId:'home-min-water',fieldId:ids[0],date:'2026-07-28',startDate:'2026-07-28',method:'間断灌水',status:'実施中',cropYear:2026,waterMovements:[{movementId:'home-min-drain',phase:'drain',startDate:'2026-07-31'}]}];
+    d.schedules=[{scheduleId:'home-min-plan',date:'2026-08-03',title:'追肥',fieldIds:[ids[0]],status:'予定'}];
+    RiceOS.weather.ensureLocation=async()=>({latitude:37.5,longitude:140.5});
+    RiceOS.weather.fetchDailyRange=async(start,end)=>{const rows=[];for(let date=start;date<=end;date=new Date(Date.parse(date+'T00:00:00Z')+86400000).toISOString().slice(0,10))rows.push({date,tempMean:28,source:'archive'});return{rows};};
+    S.replace(d,'Isolated home design preview');return{ids,g};
+   });
+   await page.locator('.nav-item[data-screen="home"]:visible').click();
+   await page.locator('[data-home-group-filter]').selectOption(fixture.g);
+   await page.evaluate(async ids=>{await RiceOS.fieldProgress.load(ids.map(id=>RiceOS.state.field(id)),()=>{});RiceOS.screens.home.render();},fixture.ids);
+   await page.locator('#screen-home img').evaluateAll(nodes=>Promise.all(nodes.map(img=>{img.loading='eager';return img.decode();})));
+   await page.locator('#toast').waitFor({state:'hidden',timeout:10000});
+   const saved=await page.evaluate(()=>localStorage.getItem(RiceOS.schema.STORE_KEY));
+   if(width<900)assert.equal(await page.locator('.nav-item:visible').count(),6);
+   for(const screen of ['home','fields','calendar','annual','outlook','data'])assert.equal(await page.locator('.nav-item[data-screen="'+screen+'"]:visible').count(),1);
+   const cards=page.locator('.home-decision-card');assert.equal(await cards.count(),2);
+   const first=page.locator('[data-home-stage-card="'+fixture.ids[0]+'"]');
+   const typeStyle=selector=>first.locator(selector).evaluate(el=>{const css=getComputedStyle(el);return {size:parseFloat(css.fontSize),font:css.fontFamily};});
+   for(const selector of ['.home-water-quick-copy > span','.home-water-quick-copy > small'])assert((await typeStyle(selector)).size>=12,'Daily water labels and elapsed days must be readable');
+   assert.match((await typeStyle('.home-stage-observed b')).font,/Gothic|Kaku|sans-serif/);
+   assert.match((await typeStyle('.home-stage-outlook b')).font,/Gothic|Kaku|sans-serif/);
+   assert.equal((await typeStyle('.home-stage-heat b')).size,26,'Numeric heat remains emphasized');
+   const labelColumns=await first.locator('.home-stage-observed-label,.home-stage-outlook > span,.home-stage-heat > div > span').evaluateAll(nodes=>nodes.map(el=>{const r=el.getBoundingClientRect();return {x:r.x,width:r.width};}));
+   assert(labelColumns.every(r=>Math.abs(r.x-labelColumns[0].x)<1&&Math.abs(r.width-labelColumns[0].width)<1),'Fact labels share the same column');
+   assert.match(await first.locator('img.stage').getAttribute('src'),/watercolor-heading-paddy/);
+   assert.equal(await first.locator('.home-stage-water').isVisible(),false,'Water status must not repeat above its input shortcut');
+   const movement=first.locator('.home-water-movement-details');
+   assert.equal(await movement.getAttribute('open'),null);
+   await movement.locator('summary').click();
+   assert.equal(await movement.locator('.water-movement-timeline').isVisible(),true);
+   await page.waitForTimeout(50);
+   await page.evaluate(()=>RiceOS.screens.home.render());
+   assert.notEqual(await movement.getAttribute('open'),null,'Water movement expansion must survive redraw');
+   const smallFonts=await movement.locator('b,small,em,.water-movement-timeline-dates').evaluateAll(nodes=>nodes.filter(el=>parseFloat(getComputedStyle(el).fontSize)<11).map(el=>el.textContent));
+   assert.deepEqual(smallFonts,[],'Expanded timeline must remain readable');
+   await movement.locator('summary').click();
+   const summaryBoxes=await page.locator('.home-decision-summary > button').evaluateAll(nodes=>nodes.map(el=>{const r=el.getBoundingClientRect();return {y:r.y,h:r.height};}));
+   assert(Math.abs(summaryBoxes[0].y-summaryBoxes[1].y)<1);
+   assert(summaryBoxes[2].y>summaryBoxes[0].y);
+   assert(summaryBoxes.every(r=>r.h>=44));
+   await first.evaluate(el=>el.scrollIntoView({block:'start',behavior:'instant'}));
+   await first.screenshot({path:path.join(os.tmpdir(),'rice-home-minimal-card-'+width+'.png')});
+   await page.evaluate(()=>window.scrollTo({top:0,behavior:'instant'}));
+   await page.screenshot({path:path.join(os.tmpdir(),'rice-home-minimal-'+width+'.png')});
+   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+   await page.locator('[data-home-quick-record]').click();await page.evaluate(()=>RiceOS.bottomSheet.close());
+   await first.locator('[data-home-water-input]').click();
+   await page.locator('#screen-irrigation.active').waitFor();
+   await page.locator('#appBackButton').click();
+   await page.locator('#screen-home.active').waitFor();
+   await first.locator('[data-home-toggle-field]').click();assert.equal(await first.locator('[data-home-toggle-field]').getAttribute('aria-expanded'),'true');
+   const clippedDetails=await first.locator('.home-management-head b,.home-management-head small,.home-management-row > b,.home-management-row > span,.home-management-row > small,.critical-water-window p').evaluateAll(nodes=>nodes.filter(el=>el.getClientRects().length&&(el.scrollWidth>el.clientWidth+1||el.scrollHeight>el.clientHeight+2||getComputedStyle(el).textOverflow==='ellipsis'||!['none','0','auto'].includes(getComputedStyle(el).webkitLineClamp))).map(el=>el.textContent.trim()));
+   assert.deepEqual(clippedDetails,[],'Expanded details must wrap and remain fully readable');
+   await first.screenshot({path:path.join(os.tmpdir(),'rice-home-typography-expanded-'+width+'.png')});
+   assert.equal(await page.evaluate(()=>localStorage.getItem(RiceOS.schema.STORE_KEY)),saved);
+   await first.locator('[data-home-open-field]').click();
+   await page.locator('#screen-fields.active').waitFor();
+   await page.locator('#appBackButton').click();
+   await page.locator('#screen-home.active').waitFor();
+   assert.equal(await page.evaluate(()=>localStorage.getItem(RiceOS.schema.STORE_KEY)),saved,'Detail round trip must not mutate farm data');
+   await first.locator('[data-home-toggle-field]').click();
+   await page.evaluate(ids=>{
+    const S=RiceOS.state,d=RiceOS.utils.clone(S.data());
+    const field=d.fields.find(f=>f.fieldId===ids[1]);field.name='亀石右下・用水路沿いの長い名前の圃場';
+    d.irrigations[0].method='飽水管理';d.irrigations[0].waterMovements[0].phase='wait';
+    S.replace(d,'Isolated wait-state fixture');RiceOS.screens.home.render();
+   },fixture.ids);
+   assert.match(await first.locator('.home-water-quick-copy').innerText(),/給水待ち/);
+   await page.locator('#toast').waitFor({state:'hidden',timeout:10000});
+   const longCard=page.locator('[data-home-stage-card="'+fixture.ids[1]+'"]');
+   await longCard.screenshot({path:path.join(os.tmpdir(),'rice-home-minimal-long-'+width+'.png')});
+   await first.screenshot({path:path.join(os.tmpdir(),'rice-home-minimal-wait-'+width+'.png')});
+   await page.evaluate(ids=>{
+    const S=RiceOS.state,d=RiceOS.utils.clone(S.data());
+    d.fieldWorks.push({workId:'home-min-harvest',fieldIds:[ids[0]],workName:'稲刈り',date:'2026-08-02',cropYear:2026,harvestStatusByField:{[ids[0]]:'complete'}});
+    S.replace(d,'Isolated harvested fixture');RiceOS.screens.home.render();
+   },fixture.ids);
+   const harvestedToggle=page.locator('[data-home-harvest-completed] > summary');
+   await harvestedToggle.click();
+   assert.match(await first.locator('.home-stage-observed').innerText(),/収穫済み/);
+   assert.equal(await first.locator('.home-water-quick').count(),0);
+   assert.equal(await page.evaluate(()=>document.body.dataset.seasonTheme),'harvested');
+   await page.locator('#toast').waitFor({state:'hidden',timeout:10000});
+   await first.evaluate(el=>el.scrollIntoView({block:'start',behavior:'instant'}));
+   if(width<900){
+    const cardBox=await first.boundingBox(),navBox=await page.locator('.nav-item[data-screen="home"]:visible').boundingBox();
+    assert(cardBox.y+cardBox.height<=navBox.y,'Final harvested card must scroll fully above bottom navigation');
+   }
+   await first.screenshot({path:path.join(os.tmpdir(),'rice-home-minimal-harvested-'+width+'.png')});
+   await page.evaluate(()=>{const d=RiceOS.utils.clone(RiceOS.state.data());d.fieldWorks=[];d.growthLogs=[];d.irrigations=[];d.schedules=[];RiceOS.state.replace(d,'Isolated empty fixture');RiceOS.screens.home.render();});
+   assert.match(await first.locator('.home-stage-observed').innerText(),/現場記録なし/);
+   assert.equal((await typeStyle('.home-stage-heat-text b')).size,14,'Non-numeric heat status is not a large number');
+   await page.locator('#toast').waitFor({state:'hidden',timeout:10000});
+   await first.screenshot({path:path.join(os.tmpdir(),'rice-home-minimal-empty-'+width+'.png')});
+   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+   assert.deepEqual(errors,[]);
+   console.log('PASS minimal home preview '+width+': real derived facts, two cards, actions and no farm-store writes');
+  }finally{await context.close();}
+ }}finally{await browser.close();}
+})().catch(e=>{console.error(e);process.exitCode=1;});

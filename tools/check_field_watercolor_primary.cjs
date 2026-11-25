@@ -7,18 +7,19 @@ assert(!fs.readFileSync(path.join(__dirname,'../assets/css/field-herbicide.css')
 const {chromium}=require('C:/Users/Keisuke/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
 (async()=>{
  const browser=await chromium.launch({headless:true,executablePath:'C:/Program Files/Google/Chrome/Application/chrome.exe'});
- try{for(const width of [360,390,1280]){
+ try{for(const width of process.argv[2] ? [Number(process.argv[2])] : [360,390,1280]){
   const context=await browser.newContext({viewport:{width,height:900},serviceWorkers:'block'});
   try{
    const page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));
    await page.clock.setFixedTime(new Date('2026-08-03T03:00:00Z'));await page.route('https://**/*',r=>r.abort());
    await page.goto('http://127.0.0.1:4182/index.html',{waitUntil:'networkidle'});
    const ids=await page.evaluate(()=>{
-    const S=RiceOS.state,v=S.varieties()[0].varietyId;
+    const S=RiceOS.state,v=S.varieties()[0].varietyId,g=S.addFieldGroup('確認用グループ');
     const ids=['開パ 下','亀石 右下（長い圃場名でも文字を省略しない）','収穫を終えた田んぼ','今年の記録がない田んぼ'].map(name=>S.addField(name));
     const d=RiceOS.utils.clone(S.data());d.fields=d.fields.filter(f=>ids.includes(f.fieldId));
-    d.fields.forEach(f=>Object.assign(f,{areaA:20,varietyId:v}));
+    d.fields.forEach(f=>Object.assign(f,{areaA:20,varietyId:v,fieldGroupId:g,district:'開パ',soilType:'粘土質',waterHolding:'良い'}));
     d.fields.find(f=>f.fieldId===ids[3]).status='休耕';
+    d.fields.find(f=>f.fieldId===ids[3]).areaA=0;
     d.fieldWorks=ids.slice(0,3).map((id,i)=>({workId:'wc-plant-'+i,fieldIds:[id],date:'2026-05-14',workName:'田植え',cropYear:2026}));
     d.growthLogs=[{logId:'wc-heading',fieldId:ids[0],date:'2026-07-27',headingObserved:true,cropYear:2026},{logId:'wc-panicle',fieldId:ids[1],date:'2026-07-25',panicleLengthMm:1,cropYear:2026},{logId:'wc-harvest-heading',fieldId:ids[2],date:'2026-06-01',headingObserved:true,cropYear:2026}];
     d.fieldWorks.push({workId:'wc-harvest',fieldIds:[ids[2]],date:'2026-07-25',workName:'稲刈り',cropYear:2026,harvestStatusByField:{[ids[2]]:'complete'}});
@@ -29,48 +30,71 @@ const {chromium}=require('C:/Users/Keisuke/.cache/codex-runtimes/codex-primary-r
     RiceOS.weather.fetchDailyRange=async(start,end)=>{const rows=[];for(let date=start;date<=end;date=new Date(Date.parse(date+'T00:00:00Z')+86400000).toISOString().slice(0,10))rows.push({date,tempMean:28,source:'archive'});return{rows};};
     return ids;
    });
-   const saved=await page.evaluate(()=>localStorage.getItem(RiceOS.schema.STORE_KEY));
+   let saved=await page.evaluate(()=>localStorage.getItem(RiceOS.schema.STORE_KEY));
+   await page.evaluate(()=>{RiceOS.fieldProgress.load=()=>{throw Error('The fixed-information list must not fetch progress weather');};});
    await page.locator('.nav-item[data-screen="fields"]:visible').click();
    const card=id=>page.locator('[data-field-open="'+id+'"]');
    await card(ids[0]).waitFor();
-   await page.waitForFunction(id=>document.querySelector('[data-field-open="'+id+'"] .field-wc-number'),ids[0]);
    assert((await page.locator('.field-wc').count())>=4);
-   const first=card(ids[0]);assert.equal(await first.locator('.field-wc-row').count(),4);
-   assert((await first.boundingBox()).height<=350,'Normal field card must retain the approved compact height');
-   const labelBoxes=await first.locator('.field-wc-label').evaluateAll(nodes=>nodes.map(el=>{const r=el.getBoundingClientRect(),s=getComputedStyle(el);return{w:r.width,h:r.height,padding:s.padding,align:s.alignItems};}));
+   const first=card(ids[0]),article=first.locator('..');
+   assert.equal(await page.locator('.field-wc-row,.field-wc-facts,.field-wc-number').count(),0,'Live progress facts belong on home, not the fixed-information list');
+   assert((await article.boundingBox()).height<=300,'Management card must remain compact');
+   const labelBoxes=await first.locator('.field-master-row > small').evaluateAll(nodes=>nodes.map(el=>{const r=el.getBoundingClientRect(),s=getComputedStyle(el);return{w:r.width,h:r.height,padding:s.padding,align:s.alignItems};}));
    assert(labelBoxes.every(r=>JSON.stringify(r)===JSON.stringify(labelBoxes[0])),'Fact labels must have identical size and alignment');
-   assert.match(await first.locator('.field-wc-water').innerText(),/入水待ち/);
-   assert.match(await first.locator('.field-wc-water').innerText(),/3日目/);
-   assert.match(await first.locator('.field-wc-number').innerText(),/168/);
-   const facts=await page.evaluate(id=>RiceOS.fieldProgress.facts(RiceOS.state.field(id)),ids[0]);
-   assert.match(await first.locator('.field-wc-observed').innerText(),new RegExp(facts.observed));
-   assert.match(await card(ids[1]).locator('.field-wc-observed').innerText(),/幼穂/);
-   assert.match(await card(ids[1]).locator('.field-wc-water').innerText(),/要確認/,'Conflict warning must not be replaced by movement phase');
-   assert.match(await card(ids[3]).innerText(),/記録待ち|未登録|現場記録なし/);
+   assert.match(await first.innerText(),/開パ|粘土質|水持ち 良い|確認用グループ/);
    assert.match(await card(ids[3]).innerText(),/休耕/);
-   assert.equal(await card(ids[3]).locator('.field-wc-estimate').count(),0,'No estimate badge without an estimate');
-   assert.match(await card(ids[2]).innerText(),/収穫済み/);
-   assert.match(await card(ids[2]).locator('.field-wc-water').innerText(),/管理終了/);
-   const harvestedHeat=await card(ids[2]).locator('.field-wc-number').innerText();
-   console.log('Field facts verified '+width);
+   assert.match(await card(ids[3]).innerText(),/面積未設定/);
+   assert.match(await card(ids[2]).locator('..').innerText(),/収穫済み/);
+   const area=await page.locator('[data-field-active-area]').getAttribute('data-area-a');
+   await page.locator('[data-field-search]').fill('開パ 下');
+   const searchResults=await page.locator('.field-master-card:visible').evaluateAll(nodes=>nodes.map(el=>el.dataset.fieldSearchText));
+   assert(searchResults.length>0&&searchResults.every(text=>text.includes('開パ 下')));
+   assert(await first.isVisible());
+   assert.equal(await page.locator('[data-field-active-area]').getAttribute('data-area-a'),area);
+   await page.locator('[data-field-search]').fill('');
    for(const c of await page.locator('.field-wc').all()){
     await c.locator('img').evaluate(img=>{img.loading='eager';return img.decode();});
-    const clipping=await c.locator('.field-hub-card-name,.field-wc-label,.field-wc-value').evaluateAll(nodes=>nodes.filter(el=>el.scrollWidth>el.clientWidth+1||el.scrollHeight>el.clientHeight+2).map(el=>el.textContent));
-    assert.equal(clipping.length,0,clipping.join(' / '));
+    const clipping=await c.locator('.field-hub-card-name,.field-master-row,.field-master-edit').evaluateAll(nodes=>nodes.filter(el=>el.scrollWidth>el.clientWidth+1||el.scrollHeight>el.clientHeight+2).map(el=>{const s=getComputedStyle(el);return{text:el.textContent,w:el.clientWidth,sw:el.scrollWidth,h:el.clientHeight,sh:el.scrollHeight,font:s.font,whiteSpace:s.whiteSpace,wordBreak:s.wordBreak,overflowWrap:s.overflowWrap,lineBreak:s.lineBreak,letterSpacing:s.letterSpacing};}));
+    if(clipping.length)await c.screenshot({path:path.join(os.tmpdir(),'rice-field-management-clipping-'+width+'.png')});
+    assert.equal(clipping.length,0,JSON.stringify(clipping));
    }
    await first.scrollIntoViewIfNeeded();
-   await first.screenshot({path:path.join(os.tmpdir(),'rice-field-watercolor-actual-card-'+width+'.png')});
-   await page.screenshot({path:path.join(os.tmpdir(),'rice-field-watercolor-actual-'+width+'.png')});
+   await article.screenshot({path:path.join(os.tmpdir(),'rice-field-management-card-'+width+'.png')});
+   await page.evaluate(()=>window.scrollTo({top:0,behavior:'instant'}));
+   await page.screenshot({path:path.join(os.tmpdir(),'rice-field-management-'+width+'.png')});
    await first.click();await page.locator('.field-hub-detail').waitFor();
-   console.log('Field detail opened '+width);
    await page.locator('[data-field-view="settings"]').click();await page.locator('.field-hub-settings').waitFor();
    await page.locator('#appBackButton').click();
    await page.locator('.nav-item[data-screen="fields"]:visible').click();
    await card(ids[0]).waitFor();
-   await page.clock.setFixedTime(new Date('2026-08-04T03:00:00Z'));
-   await page.evaluate(()=>RiceOS.screens.fields.render());
-   await page.waitForFunction(id=>document.querySelector('[data-field-open="'+id+'"] .field-wc-number'),ids[2]);
-   assert.equal(await card(ids[2]).locator('.field-wc-number').innerText(),harvestedHeat,'Harvest thermal must stop at harvest');
+   await page.locator('[data-field-edit="'+ids[0]+'"]').click();
+   await page.locator('.field-hub-settings[data-field-master-id="'+ids[0]+'"]').waitFor();
+   assert.equal(await page.evaluate(()=>localStorage.getItem(RiceOS.schema.STORE_KEY)),saved,'Opening direct edit must not alter records');
+   const district=page.locator('input[data-field-field="district"]');
+   await district.fill('開パ・更新');await district.dispatchEvent('change');
+   const updated=await page.evaluate(id=>RiceOS.state.field(id).district,ids[0]);assert.equal(updated,'開パ・更新');
+   const nextSaved=await page.evaluate(()=>localStorage.getItem(RiceOS.schema.STORE_KEY));
+   const before=JSON.parse(saved),after=JSON.parse(nextSaved);
+   for(const key of ['fieldWorks','growthLogs','irrigations'])assert.deepEqual(after[key],before[key],'Editing master information must preserve '+key);
+   saved=nextSaved;
+   await page.locator('.nav-item[data-screen="fields"]:visible').click();
+   assert.match(await card(ids[0]).innerText(),/開パ・更新/);
+   for(const [index,name] of [[0,'normal'],[1,'long-name'],[2,'harvested'],[3,'fallow-missing']]){
+    const item=card(ids[index]).locator('..');
+    await item.evaluate(el=>el.scrollIntoView({block:'start',behavior:'instant'}));
+    await item.screenshot({path:path.join(os.tmpdir(),'rice-field-management-'+name+'-'+width+'.png')});
+    const edit=item.locator('[data-field-edit]');
+    const hit=await edit.boundingBox(),visible=await edit.locator('span').boundingBox();
+    assert(hit.height>=44&&visible.height<=30,'Compact edit surface must retain its touch target');
+   }
+   const groupId=await page.evaluate(id=>RiceOS.state.field(id).fieldGroupId,ids[0]);
+   await page.locator('[data-field-group-filter]').selectOption(groupId);
+   assert.equal(await page.locator('.field-master-card:visible').count(),ids.length);
+   assert.equal(await page.locator('[data-field-active-area]').getAttribute('data-area-a'),area);
+   await page.locator('[data-field-group-bulk="'+groupId+'"]').click();
+   await page.locator('#screen-field-work.active').waitFor();
+   const selected=await page.locator('#fwFields .select-card.selected').evaluateAll(nodes=>nodes.map(el=>el.dataset.id).sort());
+   assert.deepEqual(selected,ids.slice().sort(),'Group bulk input must use exactly the master members');
    for(const screen of ['home','fields','calendar','annual','outlook','data']){
     await page.locator('.nav-item[data-screen="'+screen+'"]:visible').click();
     assert.equal(await page.locator('.nav-item:visible').count(),width<900?6:13);
@@ -78,7 +102,7 @@ const {chromium}=require('C:/Users/Keisuke/.cache/codex-runtimes/codex-primary-r
    }
    await page.locator('.side-nav').screenshot({path:path.join(os.tmpdir(),'rice-watercolor-nav-'+width+'.png')});
    assert.equal(await page.evaluate(()=>localStorage.getItem(RiceOS.schema.STORE_KEY)),saved);
-   assert.deepEqual(errors,[]);console.log('PASS real field watercolor '+width+': shared facts, wait phase, frozen harvest, routes, nav and no writes');
+   assert.deepEqual(errors,[]);console.log('PASS field management '+width+': no duplicated progress/weather, fixed data, search/global area, detail/direct edit, histories preserved and six tabs');
   }finally{await context.close();}
  }}finally{await browser.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;});
