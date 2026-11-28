@@ -54,7 +54,7 @@ const server = http.createServer((req,res) => {
       await page.waitForFunction(async name=>(await caches.keys()).includes(name),cacheName);
     }
     const cachePaths=await page.evaluate(async name => (await (await caches.open(name)).keys()).map(r=>new URL(r.url).pathname),cacheName);
-    for(const asset of ["/assets/css/management-watercolor.css","/assets/css/calendar-watercolor.css","/assets/css/review-outlook-watercolor.css","/assets/images/management/management-watercolor-approved.png"]) assert(cachePaths.includes(asset),asset);
+    for(const asset of ["/assets/css/management-watercolor.css","/assets/css/calendar-watercolor.css","/assets/css/review-outlook-watercolor.css","/assets/images/management/management-watercolor-approved.png","/assets/css/recipes-watercolor.css","/assets/images/recipes/recipe-detail-watercolor-approved.png"]) assert(cachePaths.includes(asset),asset);
     await context.setOffline(true);
     await page.reload({waitUntil:"networkidle"});
     for(const screen of ["home","fields","calendar","annual","outlook","data"]) {

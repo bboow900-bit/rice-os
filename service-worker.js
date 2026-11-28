@@ -1,5 +1,5 @@
-const CACHE_NAME = "rice-karte-20261128-333";
-const APP_VERSION = "20261128_ver333";
+const CACHE_NAME = "rice-karte-20261128-334";
+const APP_VERSION = "20261128_ver334";
 const CACHE_PREFIX = "rice-karte-";
 const RETAINED_APP_CACHES = 2;
 
@@ -44,6 +44,8 @@ const APP_SHELL = [
   `./assets/css/calendar-watercolor.css?v=${APP_VERSION}`,
   `./assets/css/review-outlook-watercolor.css?v=${APP_VERSION}`,
   `./assets/css/management-watercolor.css?v=${APP_VERSION}`,
+  `./assets/css/recipes-watercolor.css?v=${APP_VERSION}`,
+  "./assets/images/recipes/recipe-detail-watercolor-approved.png",
   "./assets/images/management/management-watercolor-approved.png",
   `./assets/css/annual-pop.css?v=${APP_VERSION}`,
   `./assets/css/herbicide-master.css?v=${APP_VERSION}`,

@@ -136,6 +136,47 @@
     }).join("")}<p class="muted">実測記録と当時の品種を確認できる履歴が対象です。採用後も、保存するまではマスターは変わりません。</p></section>`;
   }
 
+  function referenceValue(value, unit = "", prefix = "") {
+    if (value === "" || value == null) return '<span class="recipe-unset">未登録</span>';
+    const text = String(value).trim();
+    if (!text) return '<span class="recipe-unset">未登録</span>';
+    if (!/^\d+(?:\.\d+)?$/.test(text)) return U.escapeHTML(text);
+    return `${prefix ? `<span>${U.escapeHTML(prefix)}</span>` : ""}<strong>${U.escapeHTML(Number(text).toLocaleString("ja-JP", { maximumFractionDigits: 6 }))}</strong>${unit ? `<span>${U.escapeHTML(unit)}</span>` : ""}`;
+  }
+
+  function recipeArt(name) {
+    return `<span class="recipe-watercolor recipe-art-${name}" aria-hidden="true"></span>`;
+  }
+
+  function groupValues(row, title) {
+    const group = GROUPS.find(item => item.title === title);
+    return `<dl class="recipe-reference-values">${group.fields.map(([key, label]) => `<div><dt>${U.escapeHTML(label)}</dt><dd>${row[key] === "" || row[key] == null ? '<span class="recipe-unset">未登録</span>' : U.escapeHTML(String(row[key]))}</dd></div>`).join("")}</dl>`;
+  }
+
+  function recipeSection(title, art, body, subtitle = "", open = false) {
+    return `<details class="recipe-section"${open ? " open" : ""}><summary>${recipeArt(art)}<span class="recipe-section-copy"><b>${U.escapeHTML(title)}</b>${subtitle ? `<small>${U.escapeHTML(subtitle)}</small>` : ""}</span><span class="recipe-chevron" aria-hidden="true">›</span></summary><div class="recipe-section-body">${body}</div></details>`;
+  }
+
+  function renderDetail(row) {
+    const topDays = String(row.topDressingDaysBeforeHeading ?? "").trim();
+    const topHint = /^\d+(?:\.\d+)?$/.test(topDays) ? `出穂の${topDays}日前を参考に` : "肥料・量・出穂前の日数";
+    const hotWater = `<div class="recipe-hot-water">${[["hotWaterTemperatureC", "水温", "℃"], ["hotWaterDurationMinutes", "処理時間", "分"], ["hotWaterBatchKg", "1回の処理量", "kg"]].map(([key, label, unit]) => `<div><small>${label}</small><b>${referenceValue(row[key], unit)}</b></div>`).join("")}</div>`;
+    const seedPreparation = `<h5>温湯殺菌の参考設定</h5>${hotWater}<details class="recipe-subsection"><summary>浸種・催芽の参考設定</summary>${groupValues(row, "浸種・催芽の参考設定")}</details>`;
+    return `<article class="recipe-detail">
+      <header class="recipe-detail-head"><div class="recipe-detail-context"><span>栽培レシピ</span><button type="button" class="secondary" data-recipe-edit>編集</button></div><h3>${U.escapeHTML(row.name)}</h3>${recipeArt("heading")}</header>
+      <section class="recipe-growth"><div class="recipe-section-title"><h4>生育の目安</h4><small>品種共通の参考値</small></div><div class="recipe-growth-art" aria-hidden="true"></div>
+        <dl class="recipe-growth-values"><div><dt>幼穂形成期</dt><dd>${referenceValue(row.panicleInitiationDaysAfterPlanting, "日", "田植え後 約")}</dd></div><div><dt>出穂期</dt><dd>${referenceValue(row.headingDaysAfterPlanting, "日", "田植え後 約")}</dd></div><div><dt>収穫の積算目安</dt><dd>${referenceValue(row.ripeningAccumulatedTempTarget, "℃", "出穂後")}</dd></div><div><dt><span class="recipe-label-part">中干し前の</span><span class="recipe-label-part">目標分げつ数</span></dt><dd>${referenceValue(row.targetTillers)}</dd></div></dl>
+      </section>
+      ${recipeSection("追肥の目安", "fertilizer", groupValues(row, "追肥の目安"), topHint)}
+      ${recipeSection("種もみの準備", "seed", seedPreparation, "温湯殺菌・浸種・催芽", true)}
+      ${recipeSection("田植機の設定", "transplanter", groupValues(row, "田植機設定"))}
+      ${recipeSection("基肥", "base", groupValues(row, "基肥"))}
+      ${recipeSection("栽培メモ", "notebook", `<p class="recipe-memo">${U.escapeHTML(row.memo || "メモはまだありません。")}</p>`)}
+      ${recipeSection("これまでの実績と比べる", "history", historySummary(row), "設定値とは分けて確認")}
+      <details class="recipe-section recipe-management"><summary>レシピの管理</summary><div class="recipe-ledger-actions"><button type="button" data-recipe-back class="secondary">一覧へ</button><button type="button" class="danger" data-variety-delete="${U.attr(row.varietyId)}">削除</button></div></details>
+    </article>`;
+  }
+
   function render() {
     const root = U.$("recipeList"), row = selectedId && state.variety(selectedId);
     if (selectedId && !row) {selectedId="";editing=false;draft=null;}
@@ -144,7 +185,7 @@
     } else if (editing) {
       root.innerHTML = `<div class="recipe-ledger-actions"><button type="button" data-recipe-cancel class="secondary">取消</button><button type="button" data-recipe-save class="primary">変更を保存</button></div><p id="recipeValidationError" role="alert"></p><p class="muted">品種共通の参考値です。温湯殺菌の5kgは使用設備に合わせた設定です。浸種の積算水温と催芽時間は別に扱い、実際の芽の状態で判断します。</p>${renderRecipe(draft)}`;
     } else {
-      root.innerHTML = `<div class="recipe-ledger-actions"><button type="button" data-recipe-back class="secondary">一覧へ</button><button type="button" data-recipe-edit class="primary">編集</button><button type="button" class="secondary" data-variety-delete="${U.attr(row.varietyId)}">削除</button></div><h3>${U.escapeHTML(row.name)}</h3>${historySummary(row)}${GROUPS.map(group => `<section class="recipe-readonly"><h4>${U.escapeHTML(group.title)}</h4><dl>${group.fields.map(([key,label]) => `<div><dt>${U.escapeHTML(label)}</dt><dd>${U.escapeHTML(row[key] === "" || row[key] == null ? "未登録" : String(row[key]))}</dd></div>`).join("")}</dl></section>`).join("")}<p>${U.escapeHTML(row.memo || "")}</p>`;
+      root.innerHTML = renderDetail(row);
     }
     syncBack();
   }
