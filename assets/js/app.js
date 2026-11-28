@@ -135,6 +135,17 @@
       return;
     }
     // Close temporary review layers before walking back through selected fields.
+    if (activeScreen === "fields" && RiceOS.screens.fields?.isSettingsView?.()) {
+      RiceOS.screens.fields.handleBack();
+      updateBackButton();
+      return;
+    }
+    const currentRoute = RiceOS.navigation && RiceOS.navigation.current();
+    if (activeScreen === "annual" && currentRoute?.options?.destination === "annual-compare"
+      && RiceOS.screens.annual?.isComparisonRoot?.() && RiceOS.navigation.back()) {
+      updateBackButton();
+      return;
+    }
     if (activeScreen === "annual" && RiceOS.screens.annual && RiceOS.screens.annual.hasTransientBackState && RiceOS.screens.annual.hasTransientBackState()) {
       RiceOS.screens.annual.handleBack();
       updateBackButton();
@@ -363,7 +374,8 @@
     const fieldId = route && route.fieldId;
     if (!fieldId) return false;
     const options = route.options || {};
-    if (options.destination === "annual-history" && RiceOS.screens.annual && RiceOS.screens.annual.openField) {
+    if (options.destination === "annual-compare" && (!RiceOS.state.field(fieldId) || !RiceOS.screens.annual?.openComparison)) return false;
+    if (["annual-history", "annual-compare"].includes(options.destination) && RiceOS.screens.annual && RiceOS.screens.annual.openField) {
       show("annual", { skipHistory: true });
       const yearSelect = U.$("annualYear");
       if (yearSelect && RiceOS.schema.validCropYear(options.season)) {
@@ -375,6 +387,7 @@
         }
         yearSelect.value = year;
       }
+      if (options.destination === "annual-compare") return RiceOS.screens.annual.openComparison(fieldId);
       RiceOS.screens.annual.openField(fieldId, options.tab || "karte");
       return true;
     }
@@ -419,7 +432,8 @@
     // even when the underlying navigation route originated from field A.
     if (leaving && leaving.type === "record" && options.originScreen === "annual" && options.returnToAnnualFieldId && RiceOS.screens.annual && RiceOS.screens.annual.openField) {
       show("annual", { skipHistory: true });
-      RiceOS.screens.annual.openField(options.returnToAnnualFieldId, options.returnToAnnualTab || options.tab || "karte");
+      if (destination?.options?.destination === "annual-compare") RiceOS.screens.annual.openComparison(options.returnToAnnualFieldId);
+      else RiceOS.screens.annual.openField(options.returnToAnnualFieldId, options.returnToAnnualTab || options.tab || "karte");
       return true;
     }
     if (destination && destination.type === "field") return routeToField(destination);
@@ -459,6 +473,9 @@
       RiceOS.screens.fields.resetNavigation();
     }
     show(origin, { skipHistory: true });
+    if (origin === "home" && options.destination === "annual-compare" && Number.isFinite(options.returnScrollY)) {
+      requestAnimationFrame(() => window.scrollTo({ top: Math.max(0, options.returnScrollY), behavior: "instant" }));
+    }
     return true;
   }
 

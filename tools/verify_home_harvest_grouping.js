@@ -46,7 +46,7 @@ assert(html.includes("data-home-harvest-completed open"));
 assert(!html.includes('data-test-field="e"'));
 screen.renderHarvestGroupedFields([fields[1]], "2026-10-03");
 assert(screen.renderHarvestGroupedFields(fields, "2026-10-03").includes("data-home-harvest-completed open"));
-listeners.toggle({ target: { matches: () => true, open: false } });
+listeners.toggle({ target: { matches: selector => selector === "[data-home-harvest-completed]", open: false, dataset: {} } });
 assert(!screen.renderHarvestGroupedFields(fields, "2026-10-03").includes("data-home-harvest-completed open"));
 assert(!screen.renderHarvestGroupedFields([], "2026-10-03").includes("<details"));
 assert(screen.renderHarvestGroupedFields([fields[0]], "2026-10-03").includes("1/1"));

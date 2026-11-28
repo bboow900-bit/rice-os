@@ -10,10 +10,10 @@ let year = "2025", status = "none";
 const calls = [];
 const data = { fieldId: "a", name: "A", status: "master-unchanged", areaA: 10 };
 const before = JSON.stringify(data);
-const c = vm.createContext({ herbicideYear: null, RiceOS: {}, U: { today: () => "2026-10-04", dateYear: d => d.slice(0,4), escapeHTML: String, attr: String, fd: String },
+const c = vm.createContext({ herbicideYear: null, RiceOS: {}, U: { number: (value,fallback=0) => Number.isFinite(Number(value)) ? Number(value) : fallback, today: () => "2026-10-04", dateYear: d => d.slice(0,4), escapeHTML: String, attr: String, fd: String },
   state: { variety: () => ({ name: "V" }), harvestStatusForField: (...args) => { calls.push(args); return { status, date: "2025-09-03" }; } },
   yearValue: () => year, stageAsOfDateForField: () => year === "all" ? "2026-10-04" : "2025-12-31",
-  fieldStage: () => ({ number: 1, label: "stage" }), groupRiceImage: () => "image", fieldStatusText: () => "master-unchanged",
+  groupName: () => "group", fieldStage: () => ({ number: 1, label: "stage" }), groupRiceImage: () => "image", fieldStatusText: () => "master-unchanged",
   annualStageForField: () => null, riceStageNumberForField: () => 1, annualPickerRiceImage: () => "image", varietyName: () => "V" });
 vm.runInContext(extract(fields,"currentSeasonYear","currentYearCache") + extract(fields,"renderFieldListCard","renderActiveAreaSummary")
   + extract(annual,"pickerHarvestStatus","renderFieldPickerCard") + extract(annual,"renderFieldPickerCard","renderTop")
@@ -22,12 +22,12 @@ for (const value of ["none","complete","partial","legacy"]) {
   status = value;
   const fieldHtml = c.renderFieldListCard(data);
   const annualHtml = c.renderFieldPickerCard({ field: data, stats: { growth: 0, work: 0, water: 0 }, status: { label: "status", tone: "muted" } });
-  for (const html of [fieldHtml,annualHtml]) {
-    assert.equal(html.includes('data-harvest-status='),value !== "none");
-    if (value === "complete") assert(html.includes("\u53ce\u7a6b\u6e08\u307f\u30fb9/3"));
-    if (value === "partial") assert(html.includes("\u7a32\u5208\u308a\u4e00\u90e8\u5b9f\u65bd"));
-    if (value === "legacy") assert(html.includes("\u5b8c\u4e86\u533a\u5206\u672a\u78ba\u8a8d"));
-  }
+  assert.equal(fieldHtml.includes('data-harvest-status='),value !== "none");
+  assert(annualHtml.includes(`data-harvest-status="${value}"`));
+  if (value === "complete") { assert(fieldHtml.includes("収穫済み・9/3")); assert(annualHtml.includes("収穫済み")); }
+  if (value === "partial") { assert(fieldHtml.includes("稲刈り一部実施")); assert(annualHtml.includes("一部刈り取り")); }
+  if (value === "legacy") { assert(fieldHtml.includes("完了区分未確認")); assert(annualHtml.includes("完了区分未確認")); }
+  if (value === "none") assert(annualHtml.includes("刈り取り未記録"));
   assert(fieldHtml.includes('data-field-open="a"'));
   assert(annualHtml.includes('data-annual-open-field="a"'));
 }
@@ -47,7 +47,8 @@ c.state.harvestStatusForField = real.RiceOS.state.harvestStatusForField;
 year = "2027";
 assert.equal(c.pickerHarvestStatus(data).status,"none");
 const futureHtml = c.renderFieldPickerCard({ field: data, stats: { growth: 0, work: 0, water: 0 }, status: { label: "status", tone: "muted" } });
-assert(!futureHtml.includes('data-harvest-status='));
+assert(futureHtml.includes('data-harvest-status="none"'));
+assert(!futureHtml.includes('data-harvest-status="complete"'));
 assert.equal(c.fieldStatus(data,{ total: 0 }).label,"\u8a18\u9332\u306a\u3057");
 assert.equal(JSON.stringify(data),before);
 console.log("Harvest list badges: both cards, complete/partial/legacy/none, year/asOf, priority, routes, no mutation PASS");

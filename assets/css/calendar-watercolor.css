@@ -1,0 +1,151 @@
+/* Calendar presentation only. Leave month-grid geometry and state markers intact. */
+#screen-calendar {
+  --calendar-wc-mincho: "Yu Mincho", "Hiragino Mincho ProN", "Noto Serif CJK JP", serif;
+  --calendar-wc-gothic: "Yu Gothic", "Hiragino Kaku Gothic ProN", "Meiryo", sans-serif;
+}
+#screen-calendar .calendar-head {
+  padding: 8px 0;
+  border: 0;
+  border-bottom: 1px solid #cbd9c5;
+  border-radius: 0;
+  background: #fffef9;
+  box-shadow: none;
+  color: #173f27;
+}
+#screen-calendar .calendar-head h2 {
+  margin: 0;
+  padding-right: 4px;
+  color: #173f27;
+  font: 600 22px/1.4 var(--calendar-wc-mincho);
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+#screen-calendar .calendar-head .eyebrow {
+  margin: 0 0 2px;
+  color: #52634f;
+  font: 400 12px/1.6 var(--calendar-wc-gothic);
+}
+#screen-calendar .calendar-head > button { min-height: 44px; border-radius: 6px; }
+#screen-calendar .calendar-view-tools {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) auto;
+  align-items: end;
+  gap: 8px;
+  margin-bottom: 10px;
+  font: 500 12px/1.6 var(--calendar-wc-gothic);
+}
+#screen-calendar .calendar-view-tools label { min-width: 0; width: auto; }
+#screen-calendar .calendar-view-tools select { min-width: 0; width: 100%; }
+#screen-calendar .calendar-view-tools button { min-width: 44px; white-space: nowrap; }
+#screen-calendar .calendar-view-tools :is(select, button) {
+  box-sizing: border-box;
+  min-height: 44px;
+  border-radius: 6px;
+  font: 400 16px/1.5 var(--calendar-wc-gothic);
+}
+#screen-calendar .calendar-view-tools select { border: 1px solid #cbd9c5; }
+#screen-calendar .calendar-selection-panel button.primary {
+  border: 1px solid var(--season-accent, #286848);
+  background: var(--season-accent, #286848);
+  color: #fff;
+  box-shadow: none;
+}
+#screen-calendar .calendar-selection-panel button.secondary:not(.danger),
+#screen-calendar .calendar-head > button.secondary:not(.danger),
+#screen-calendar .calendar-view-tools > button.secondary:not(.danger) {
+  border: 1px solid #cbd9c5;
+  background: #fffef9;
+  color: #173f27;
+  box-shadow: none;
+}
+#screen-calendar .calendar-selection-panel {
+  padding: 10px 0;
+  border: 0;
+  border-block: 1px solid #cbd9c5;
+  border-radius: 0;
+  background: #fffef9;
+  box-shadow: none;
+  color: #173f27;
+  font: 400 14px/1.6 var(--calendar-wc-gothic);
+}
+#screen-calendar .calendar-selection-panel .section-title { flex-wrap: wrap; gap: 4px 8px; }
+#screen-calendar .calendar-selection-panel .section-title h3 {
+  min-width: 0;
+  margin: 0;
+  font: 600 18px/1.5 var(--calendar-wc-mincho);
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+#screen-calendar #selectedDateMeta,
+#screen-calendar #calendarSelectionMode,
+#screen-calendar .calendar-empty-day { font: 400 12px/1.6 var(--calendar-wc-gothic); }
+#screen-calendar .calendar-selected-entries { gap: 8px; }
+#screen-calendar .calendar-entry-group { min-width: 0; gap: 6px; }
+#screen-calendar .calendar-entry-group h4 { font: 600 16px/1.5 var(--calendar-wc-mincho); }
+#screen-calendar .calendar-entry-group h4 span {
+  border-radius: 4px;
+  font: 400 12px/1.6 var(--calendar-wc-gothic);
+}
+#screen-calendar #selectedDateEntries .mini-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  min-width: 0;
+  gap: 4px;
+  padding: 8px 10px;
+  border-top-color: #d5dfcf;
+  border-right-color: #d5dfcf;
+  border-bottom-color: #d5dfcf;
+  border-radius: 8px;
+  background: #fffef9;
+  box-shadow: none;
+}
+#screen-calendar #selectedDateEntries .mini-card > b {
+  grid-column: 1;
+  grid-row: 1;
+  padding-right: 0;
+  font: 600 14px/1.6 var(--calendar-wc-gothic);
+}
+#screen-calendar #selectedDateEntries .mini-card > :is(span, small) {
+  display: block;
+  max-height: none;
+  overflow: visible;
+  font: 400 12px/1.6 var(--calendar-wc-gothic);
+  -webkit-line-clamp: unset;
+  line-clamp: unset;
+}
+#screen-calendar #selectedDateEntries .mini-card > .mini-status {
+  grid-column: 2;
+  grid-row: 1;
+  position: static;
+  justify-self: start;
+  max-width: 100%;
+  border-radius: 4px;
+  font: 500 12px/1.6 var(--calendar-wc-gothic);
+}
+#screen-calendar #selectedDateEntries .mini-card > :is(span, small, details, button) { grid-column: 1 / -1; }
+#screen-calendar #selectedDateEntries .mini-card > :is(b, em, span, small) {
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+#screen-calendar .calendar-selection-panel time {
+  font-family: Georgia, var(--calendar-wc-mincho);
+  font-variant-numeric: tabular-nums;
+}
+#screen-calendar .calendar-selection-panel button,
+#screen-calendar .calendar-entry-menu > summary {
+  box-sizing: border-box;
+  min-width: 0;
+  min-height: 44px;
+  padding: 10px;
+  border-radius: 6px;
+  font: 500 12px/1.6 var(--calendar-wc-gothic);
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+#screen-calendar .calendar-entry-menu:not([open]) > :not(summary) { display: none; }
+#screen-calendar .calendar-entry-menu > summary:focus-visible {
+  outline: 2px solid var(--season-accent, #75945e);
+  outline-offset: 2px;
+}

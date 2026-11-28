@@ -42,10 +42,11 @@ const {chromium} = require(process.env.PLAYWRIGHT_MODULE || "C:/Users/Keisuke/.c
         assert.deepEqual(await stateData(),initial,"Sharing does not mark export date or change in-memory farm data");
       };
       await page.locator('.nav-item[data-screen="data"]:visible').click();
+      await page.locator('.management-backup-fold > summary').click();
       await page.locator("#dataBackupCenter").waitFor();
       await page.evaluate(() => window.scrollTo(0,0));
       assert.ok((await page.locator("#dataBackupCenter").boundingBox()).y < 500,"Backup center appears at management top");
-      assert.match(await page.locator("#dataBackupCenter").innerText(),/クラウド自動保存：未接続/);
+      assert.match(await page.locator("#dataBackupCenter").innerText(),/JSONの手動バックアップ/);
       await shot("initial");
       await button.click();
       await page.waitForFunction(() => !document.getElementById("dataBackupShare").disabled && /キャンセル|取消|取り消/.test(document.getElementById("dataBackupMessage").textContent));

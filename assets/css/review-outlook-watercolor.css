@@ -1,0 +1,173 @@
+/* Preserve annual story, comparison geometry, artwork and semantic colors. */
+html:has(#appBackButton) body:has(#screen-annual.active) .app-header {
+  background: #fffef9 !important;
+  color: #173f27;
+  border-bottom: 1px solid #cbd9c5;
+  box-shadow: none;
+}
+body:has(#screen-annual.active) .app-header h1 {
+  color: #173f27;
+  font-family: "Yu Mincho", "Hiragino Mincho ProN", "Noto Serif CJK JP", serif;
+  font-weight: 600;
+}
+body:has(#screen-annual.active) .app-header #saveStatus:not([data-save-state="error"]) {
+  color: #40553b;
+  background: transparent;
+  border-color: #cbd9c5;
+  border-radius: 4px;
+}
+#screen-annual .annual-phone-head {
+  background: #fffef9;
+  border-bottom: 1px solid #cbd9c5;
+  border-radius: 0;
+  box-shadow: none;
+}
+#screen-annual .annual-phone-head > h2 {
+  color: #173f27;
+  font: 600 22px/1.4 var(--reflection-heading-font);
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+#screen-annual .annual-phone-head > .annual-menu-button { min-height: 44px; min-width: 44px; border-radius: 6px; box-shadow: none; }
+#screen-annual .annual-pop-heading {
+  background: #fffef9;
+  border-bottom: 1px solid #cbd9c5;
+  border-radius: 0;
+  box-shadow: none;
+}
+#screen-annual .annual-pop-heading h2 {
+  color: #173f27;
+  font: 600 22px/1.4 var(--reflection-heading-font);
+  overflow-wrap: anywhere;
+}
+#screen-annual .annual-pop-heading .annual-pop-kicker {
+  color: #52634f;
+  font: 400 12px/1.6 var(--reflection-control-font);
+}
+#screen-annual .annual-year-button {
+  border: 1px solid #cbd9c5;
+  border-radius: 6px;
+  background: #fffef9;
+  box-shadow: none;
+  color: #173f27;
+  font: 500 12px/1.6 var(--reflection-control-font);
+}
+#screen-annual .annual-year-button select {
+  box-sizing: border-box;
+  min-height: 44px;
+  max-width: 100%;
+  border-radius: 6px;
+  font: 400 16px/1.5 var(--reflection-control-font);
+}
+#screen-annual .annual-close-entry button.primary:not(.danger) {
+  border: 1px solid var(--season-accent, #286848);
+  border-radius: 6px;
+  background: var(--season-accent, #286848);
+  color: #fff;
+  box-shadow: none;
+  font-family: var(--reflection-control-font);
+}
+#screen-outlook {
+  --outlook-wc-mincho: "Yu Mincho", "Hiragino Mincho ProN", "Noto Serif CJK JP", serif;
+  --outlook-wc-gothic: "Yu Gothic", "Hiragino Kaku Gothic ProN", "Meiryo", sans-serif;
+  --outlook-paper: #fffef9;
+  font: 400 14px/1.6 var(--outlook-wc-gothic);
+}
+#screen-outlook .outlook-watercolor-head {
+  border-bottom: 1px solid #cbd9c5;
+  border-radius: 0;
+  background: #fffef9;
+  box-shadow: none;
+}
+#screen-outlook .outlook-watercolor-head h2 {
+  box-sizing: border-box;
+  min-width: 0;
+  padding-right: 12px;
+  color: #173f27;
+  font: 600 22px/1.4 var(--outlook-wc-mincho);
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+#screen-outlook .outlook-detail-head > div { min-width: 0; }
+#screen-outlook .outlook-detail-head h2 {
+  max-width: 100%;
+  padding-right: 8px;
+  overflow: visible;
+  word-break: normal;
+  text-overflow: clip;
+}
+#screen-outlook .outlook-preview h3 {
+  box-sizing: border-box;
+  min-width: 0;
+  padding-right: 12px;
+  font: 600 20px/1.5 var(--outlook-wc-mincho);
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+#screen-outlook .outlook-detail-section h3 { font: 600 18px/1.5 var(--outlook-wc-mincho); }
+#screen-outlook :is(.outlook-toolbar, .outlook-actions) { gap: 8px; flex-wrap: wrap; }
+#screen-outlook .outlook-toolbar label { min-width: 0; font: 500 12px/1.6 var(--outlook-wc-gothic); }
+#screen-outlook :is(button, select, summary) {
+  box-sizing: border-box;
+  min-height: 44px;
+  border-radius: 6px;
+  font-family: var(--outlook-wc-gothic);
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+#screen-outlook select { min-width: 0; max-width: 100%; font-size: 16px; }
+#screen-outlook button.secondary:not(.danger) {
+  border: 1px solid #cbd9c5;
+  background: #fffef9;
+  color: #173f27;
+  box-shadow: none;
+  font-size: 12px;
+}
+#screen-outlook .outlook-detail-head .icon-button { min-width: 44px; width: 44px; height: 44px; }
+#screen-outlook .outlook-detail-head .eyebrow { display: flex; flex-wrap: wrap; gap: 2px 8px; }
+#screen-outlook .outlook-detail-head .eyebrow > span { display: inline-block; max-width: 100%; word-break: keep-all; overflow-wrap: anywhere; }
+#screen-outlook :is(.outlook-preview, .outlook-next-hero, .outlook-detail-hero, .outlook-detail-section) {
+  border-radius: 8px;
+  box-shadow: none;
+}
+#screen-outlook .outlook-preview { background: #fffef9; }
+#screen-outlook .outlook-detail-section {
+  padding: 10px 0;
+  border: 0;
+  border-block: 1px solid #cbd9c5;
+  border-radius: 0;
+  background: #fffef9;
+}
+#screen-outlook .outlook-detail-grid > div { border-radius: 6px; }
+#screen-outlook :is(.outlook-preview-stage, .outlook-next-hero > div > span:not(.outlook-confidence)) {
+  font: 400 14px/1.6 var(--outlook-wc-gothic);
+}
+#screen-outlook .outlook-preview-date {
+  font-family: Georgia, var(--outlook-wc-mincho);
+  font-variant-numeric: tabular-nums;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+#screen-outlook .outlook-preview-date.is-missing,
+#screen-outlook .outlook-next-hero .outlook-preview-date.is-missing {
+  font: 500 14px/1.6 var(--outlook-wc-gothic);
+}
+#screen-outlook :is(.outlook-confidence, .outlook-source > span, .outlook-source > small,
+  .outlook-detail-grid small, .outlook-detail-grid span, .outlook-update-note,
+  .outlook-watercolor-head .eyebrow, .outlook-calibration-note, .outlook-calibration-summary dt) {
+  font: 400 12px/1.6 var(--outlook-wc-gothic);
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+#screen-outlook .outlook-source > b { font: 600 12px/1.6 var(--outlook-wc-gothic); letter-spacing: 0; }
+#screen-outlook :is(.outlook-detail-grid b, .outlook-calibration-summary dd, .outlook-detail-hero b) {
+  font: 500 14px/1.6 var(--outlook-wc-gothic);
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+#screen-outlook .outlook-reference-fold > summary {
+  padding: 10px 0;
+  font: 500 14px/1.6 var(--outlook-wc-gothic);
+}
+#screen-outlook .outlook-detail-section p { font-size: 14px; line-height: 1.6; }
+#screen-outlook .outlook-detail-section :is(.outlook-calibration-note, .outlook-calibration-status) { font-size: 12px; }

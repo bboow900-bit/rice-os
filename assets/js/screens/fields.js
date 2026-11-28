@@ -751,8 +751,8 @@
           <small>${U.escapeHTML(water.actualDetail || "実績の水管理期間は未登録")}</small>
         </div>
         <div class="critical-water-window-reference"><span>照合の目安</span><b>${U.escapeHTML(water.referenceLabel || "現場と記録を確認")}</b></div>
-        <p>${U.escapeHTML(focus.note)}</p>
-        ${water.referenceNote ? `<p class="critical-water-window-note">${U.escapeHTML(water.referenceNote)}</p>` : ""}
+        <p>${U.escapeHTML(headingMode ? water.referenceNote || focus.note : focus.note)}</p>
+        ${!headingMode && water.referenceNote && water.referenceNote !== focus.note ? `<p class="critical-water-window-note">${U.escapeHTML(water.referenceNote)}</p>` : ""}
       </section>
     `;
   }
@@ -1289,5 +1289,5 @@
   }
 
   RiceOS.screens = RiceOS.screens || {};
-  RiceOS.screens.fields = { render, bind, handleBack, canHandleBack, openField, openGroup, resetNavigation, preserveOnDataChange: true };
+  RiceOS.screens.fields = { render, bind, handleBack, canHandleBack, openField, openGroup, resetNavigation, isSettingsView: () => fieldView === "settings", preserveOnDataChange: true };
 })();

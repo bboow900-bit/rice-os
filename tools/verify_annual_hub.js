@@ -12,7 +12,8 @@ function node(id) {
     querySelector: () => null });
   return nodes.get(id);
 }
-const context = vm.createContext({ console, navigator: {}, alert() {}, CustomEvent: class {},
+let approveDelete = false;
+const context = vm.createContext({ console, navigator: {}, alert() {}, confirm: () => approveDelete, CustomEvent: class {},
   dispatchEvent() {}, scrollTo() {}, setTimeout() {}, clearTimeout() {},
   document: { getElementById: node, querySelectorAll: () => [] },
   localStorage: { getItem: key => memory.get(key) || null, setItem: (key, value) => memory.set(key, String(value)), removeItem: key => memory.delete(key) }
@@ -34,7 +35,7 @@ const before = JSON.stringify(R.state.data());
 const stored = JSON.stringify([...memory]);
 const html = () => node("annualTimeline").innerHTML;
 function click(selector, dataset = {}) {
-  node("annualTimeline").handlers.click({ target: { closest: query => query === selector ? { dataset } : null } });
+  node("annualTimeline").handlers.click({ target: { closest: query => query === selector ? { dataset, closest: () => null } : null } });
 }
 node("annualYear").value = "all";
 annual.resetNavigation();
@@ -48,12 +49,12 @@ click("[data-annual-hub-view]", { annualHubView: "work" });
 assert(!html().includes('id="annualSearch"'));
 assert(!html().includes('class="annual-work-archive"'));
 assert(!html().includes('<details class="annual-hub-summary">'));
-assert(html().includes('class="annual-work-heading"'));
+assert.match(html(), /class="[^"]*\bannual-work-heading\b[^"]*"/);
 assert(!html().includes("herbicide-review"));
 assert.equal((html().match(/class="next-season-ideas"/g) || []).length, 1);
 const field = R.state.activeFields()[0];
 let routedFields = 0;
-R.navigation = { openField() { routedFields++; return true; } };
+R.navigation = { current: () => null, openField() { routedFields++; return true; } };
 click("[data-annual-hub-open-field]", { annualHubOpenField: field.fieldId });
 assert.equal(routedFields, 0, "Hub cards must not enter the fixed-field return route");
 assert(!html().includes('class="annual-hub-nav"'));
@@ -82,3 +83,53 @@ assert.equal(node("annualYear").value, "2025");
 assert.equal(JSON.stringify(R.state.data()), before, "Hub navigation must not mutate farm records");
 assert.equal(JSON.stringify([...memory]), stored, "Hub state must remain in memory only");
 console.log("PASS annual hub: panels, shared notes, work filter expansion, direct comparison, year fallback, back/reset and data safety");
+
+assert(R.state.saveFieldWork({ workId: "qa-off-field-action", date: "2025-05-01", cropYear: 2025,
+  targetScope: "offField", fieldIds: [], workName: "播種", memo: "Protected off-field memo" }));
+const off = R.state.data().fieldWorks.find(row => row.workId === "qa-off-field-action");
+assert(off);
+annual.resetNavigation();
+const actionBefore = JSON.stringify(R.state.data());
+const actionStored = JSON.stringify([...memory]);
+const recordTarget = { annualRecordOpenKind: "fieldWork", annualRecordOpenId: off.workId, annualRecordOpenLabel: "播種" };
+let editRoute = null;
+R.navigation.openRecord = (kind, id, options) => { editRoute = { kind, id, options }; return true; };
+click("[data-annual-record-open-kind]", recordTarget);
+assert(html().includes('class="annual-record-detail"'));
+assert(html().includes("Protected off-field memo"));
+assert(html().includes("data-annual-record-detail-edit"));
+click("[data-annual-record-detail-edit]");
+assert.equal(editRoute.kind, "fieldWork");
+assert.equal(editRoute.id, off.workId);
+assert.equal(editRoute.options.originScreen, "annual");
+assert.equal(editRoute.options.returnToAnnualHub, true);
+annual.handleBack();
+function contextMenu() {
+  let prevented = false;
+  node("annualTimeline").handlers.contextmenu({ preventDefault() { prevented = true; },
+    target: { closest: selector => selector === "[data-annual-record-open-kind]" ? { dataset: recordTarget } : null } });
+  assert(prevented);
+  assert(html().includes('class="annual-record-action-sheet"'));
+}
+contextMenu();
+editRoute = null;
+click("[data-annual-record-action]", { annualRecordAction: "edit" });
+assert.equal(editRoute.id, off.workId);
+assert(!html().includes('class="annual-record-action-sheet"'));
+assert.equal(JSON.stringify(R.state.data()), actionBefore);
+assert.equal(JSON.stringify([...memory]), actionStored);
+contextMenu();
+click("[data-annual-record-action]", { annualRecordAction: "delete" });
+assert.equal(JSON.stringify(R.state.data()), actionBefore, "Cancelled deletion must preserve all records");
+assert.equal(JSON.stringify([...memory]), actionStored);
+contextMenu();
+approveDelete = true;
+click("[data-annual-record-action]", { annualRecordAction: "delete" });
+assert(!R.state.data().fieldWorks.some(row => row.workId === off.workId));
+const afterDelete = JSON.parse(actionBefore);
+afterDelete.fieldWorks = afterDelete.fieldWorks.filter(row => row.workId !== off.workId);
+const actual = JSON.parse(JSON.stringify(R.state.data()));
+delete afterDelete.meta;
+delete actual.meta;
+assert.deepEqual(actual, afterDelete, "Confirmed deletion may remove only the targeted record");
+console.log("PASS off-field actions: normal detail/edit, hub context menu/edit, cancellation and targeted deletion");

@@ -2154,7 +2154,7 @@
         quantity: record.quantity || "",
         hours: record.hours || "",
         memo: record.memo || "",
-        createdAt: record.createdAt || U.now(),
+        createdAt: record.createdAt || previous && previous.createdAt || U.now(),
         updatedAt: U.now()
       };
       const index = d.otherWorks.findIndex((o) => o.otherWorkId === normalized.otherWorkId);

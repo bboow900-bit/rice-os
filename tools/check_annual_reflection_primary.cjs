@@ -28,6 +28,8 @@ const {chromium}=require("C:/Users/Keisuke/.cache/codex-runtimes/codex-primary-r
    const baseline=await page.evaluate(()=>localStorage.getItem(RiceOS.schema.STORE_KEY));
    await page.locator('.nav-item[data-screen="annual"]:visible').click();await page.locator('#annualYear').selectOption('2026');
    await page.locator('#toast').waitFor({state:'hidden',timeout:10000});
+   const menuTarget=await page.locator('.annual-menu-button:visible').boundingBox();
+   assert(menuTarget && menuTarget.width>=44 && menuTarget.height>=44,'Legacy CSS must not shrink the annual menu target');
    const shot=async name=>{assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);await page.screenshot({path:path.join(os.tmpdir(),`rice-annual-reflection-${name}-${width}.png`)});};
    const headerMetrics=[];
    const checkHeader=async (panel,name)=>{
@@ -52,6 +54,17 @@ const {chromium}=require("C:/Users/Keisuke/.cache/codex-runtimes/codex-primary-r
    assert((await card.locator('.annual-field-card-art').boundingBox()).width>=88);
    await shot('fields');
    const fieldsPanel=page.locator('.annual-field-picker');
+   await page.evaluate(()=>window.scrollTo({top:0,behavior:'instant'}));
+   await shot('overview');
+   const harvestEntry=page.locator('.annual-v2-top > [data-annual-harvest-ledger]');
+   assert.equal(await harvestEntry.evaluate(el=>[...el.parentElement.children].filter(child=>!child.matches('.annual-fab')&&!child.hidden&&getComputedStyle(child).display!=='none').at(-1)===el),true,'Harvest and shipments must be the last normal-flow entry');
+   await harvestEntry.evaluate(el=>el.scrollIntoView({block:'center',behavior:'instant'}));
+   assert.equal(await page.locator('#screen-annual .annual-fab').count(),0,'Reflection does not show a floating add button');
+   await shot('harvest-entry-bottom');
+   await harvestEntry.click();
+   await page.locator('#screen-harvest-ledger.active').waitFor();
+   await page.locator('#appBackButton').click();
+   await page.locator('#screen-annual.active').waitFor();
    await checkHeader(fieldsPanel,'fields');
    await fieldsPanel.locator('.annual-fields-art-head img').evaluate(img=>img.decode());
    await fieldsPanel.screenshot({path:path.join(os.tmpdir(),`rice-annual-fields-panel-${width}.png`)});
@@ -121,6 +134,7 @@ const {chromium}=require("C:/Users/Keisuke/.cache/codex-runtimes/codex-primary-r
    await page.locator('[data-annual-hub-panel="compare"]').waitFor();
    await page.locator('[data-annual-hub-view="fields"]').click();
    await page.locator(`[data-annual-hub-open-field="${id}"]`).click();
+   assert.equal(await page.locator('#screen-annual .annual-fab').count(),0,'Field history does not show a floating add button');
    await page.locator('.annual-season-notes').scrollIntoViewIfNeeded();await shot('notes');
    assert.match(await page.locator('.annual-season-notes').innerText(),/畦際/);assert.match(await page.locator('.annual-carryover-notes').innerText(),/今年の記録/);
    const noteBounds=await page.locator('.annual-season-notes').boundingBox(),carryBounds=await page.locator('.annual-carryover-notes').boundingBox();assert(noteBounds&&carryBounds&&noteBounds.y+noteBounds.height<=carryBounds.y+1);

@@ -1,0 +1,438 @@
+/* Management only; raw source coordinates are supplied by each button. */
+#screen-data #systemSettingsPanel {
+  padding: 16px;
+  border: 1px solid #c5d2bb;
+  border-radius: 8px;
+  background: #fefefd;
+  box-shadow: none;
+}
+#screen-data .system-settings-head h3 {
+  font-family: "Yu Mincho", "Hiragino Mincho ProN", serif;
+  font-size: 18px;
+  line-height: 1.5;
+}
+#screen-data .data-primary-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 16px;
+}
+#screen-data .data-primary-actions button {
+  min-width: 0;
+  min-height: 64px;
+  padding: 10px 6px;
+  border: 1px solid #c5d2bb;
+  border-radius: 8px;
+  background: #f2f7ef;
+  box-shadow: none;
+  color: #294b36;
+  font-size: 14px;
+  line-height: 1.5;
+  white-space: normal;
+}
+#screen-data .data-settings-fold {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-bottom: 1px solid #c5d2bb;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+#screen-data .data-settings-fold > summary {
+  min-height: 48px;
+  padding: 12px 0;
+  color: #294b36;
+  font-size: 14px;
+  line-height: 1.7;
+  cursor: pointer;
+}
+#screen-data #systemSettingsPanel .data-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+  padding: 8px 0 16px;
+}
+#screen-data #systemSettingsPanel .data-actions > * {
+  min-width: 0;
+}
+#screen-data #systemSettingsPanel .data-actions button,
+#screen-data #systemSettingsPanel .file-button,
+#screen-data #systemSettingsPanel select {
+  min-height: 44px;
+  font-size: 14px;
+}
+#screen-data #systemSettingsPanel button,
+#screen-data #systemSettingsPanel .file-button,
+#screen-data #systemSettingsPanel select,
+#screen-data #systemSettingsPanel textarea,
+#screen-data #dataBackupCenter button {
+  border-radius: 6px;
+  box-shadow: none;
+}
+#screen-data #systemSettingsPanel button {
+  min-height: 44px;
+  font-size: 14px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+#screen-data #systemSettingsPanel .data-primary-actions button {
+  min-height: 64px;
+  border-radius: 8px;
+}
+#screen-data #systemSettingsPanel .system-settings-head span,
+#screen-data #systemSettingsPanel .data-storage-status small,
+#screen-data #systemSettingsPanel .data-import-report small {
+  font-size: 12px;
+  line-height: 1.6;
+}
+/* Diagnostics are a ledger, not nested floating cards. Keep warning colors. */
+#screen-data #systemSettingsPanel .data-status {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+  min-width: 0;
+}
+#screen-data #systemSettingsPanel .data-status .kpi {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+  min-height: 0;
+  margin: 0;
+  padding: 10px 0;
+  border: 0;
+  border-bottom: 1px solid var(--management-rule);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  text-align: left;
+}
+#screen-data #systemSettingsPanel .data-status .kpi .label {
+  min-width: 0;
+  font-size: 12px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+#screen-data #systemSettingsPanel .data-status .kpi .value {
+  min-width: 0;
+  margin: 0;
+  line-height: 1.6;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+#screen-data #systemSettingsPanel .data-storage-status,
+#screen-data #systemSettingsPanel .data-snapshot-details {
+  min-width: 0;
+  padding: 10px 0;
+  border: 0;
+  border-bottom: 1px solid var(--management-rule);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  overflow-wrap: anywhere;
+}
+#screen-data #systemSettingsPanel .data-snapshot-details > summary {
+  min-height: 44px;
+  padding: 10px 0;
+  font-size: 14px;
+  line-height: 1.6;
+}
+#screen-data #systemSettingsPanel .data-snapshot-details > small {
+  padding: 8px 0;
+  font-size: 12px;
+  line-height: 1.6;
+}
+#screen-data #systemSettingsPanel .data-snapshot-details #dataSnapshot {
+  width: 100%;
+  min-width: 0;
+  margin: 8px 0 0;
+}
+#screen-data #systemSettingsPanel .system-settings-note {
+  margin: 10px 0;
+  font-size: 12px;
+  line-height: 1.7;
+  color: #607263;
+}
+#screen-data {
+  --master-art-scale: .5;
+  --management-ink: #294b36;
+  --management-muted: #607263;
+  --management-rule: #c5d2bb;
+  --management-gothic: "Yu Gothic", "Hiragino Kaku Gothic ProN", Meiryo, sans-serif;
+  --management-mincho: "Yu Mincho", "Hiragino Mincho ProN", "Noto Serif JP", serif;
+  color: var(--management-ink);
+  background-color: #fff;
+  font-family: var(--management-gothic);
+  letter-spacing: 0;
+}
+
+#screen-data .screen-head h2 {
+  font-family: var(--management-mincho);
+  font-size: 24px;
+  line-height: 1.5;
+  letter-spacing: 0;
+}
+
+#screen-data .settings-menu {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+#screen-data .common-master-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  min-width: 0;
+}
+
+#screen-data .common-master-group {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  margin: 12px 0 0;
+  padding: 4px 0;
+  border: 0;
+  color: var(--management-ink);
+  font-family: var(--management-mincho);
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.5;
+  letter-spacing: 0;
+  overflow-wrap: anywhere;
+}
+
+#screen-data .common-master-group::after {
+  content: "";
+  flex: 1 1 20px;
+  min-width: 12px;
+  border-top: 1px solid var(--management-rule);
+}
+
+#screen-data .common-master-card {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 8px;
+  align-items: center;
+  justify-items: stretch;
+  gap: 4px;
+  min-width: 0;
+  min-height: 108px;
+  height: auto;
+  padding: 8px 5px 23px;
+  border: 1px solid var(--management-rule);
+  border-radius: 8px;
+  background: #fefefd;
+  box-shadow: none;
+  color: var(--management-ink);
+  font-family: var(--management-gothic);
+  text-align: left;
+  letter-spacing: 0;
+  cursor: pointer;
+}
+
+#screen-data .common-master-card .master-watercolor-art {
+  display: block;
+  grid-column: 1 / -1;
+  grid-row: 1;
+  justify-self: center;
+  width: calc(180px * var(--master-art-scale));
+  height: calc(140px * var(--master-art-scale));
+  align-self: center;
+  background-image: url("../images/management/management-watercolor-approved.png");
+  background-size: calc(887px * var(--master-art-scale)) calc(1774px * var(--master-art-scale));
+  background-position: calc(-1px * var(--art-x) * var(--master-art-scale)) calc(-1px * var(--art-y) * var(--master-art-scale));
+  background-repeat: no-repeat;
+  -webkit-mask-image: radial-gradient(ellipse at center, #000 58%, transparent 100%);
+  mask-image: radial-gradient(ellipse at center, #000 58%, transparent 100%);
+  pointer-events: none;
+}
+
+#screen-data .master-card-copy {
+  display: contents;
+  min-width: 0;
+  white-space: normal;
+}
+
+#screen-data .master-card-wide {
+  grid-column: 1 / -1;
+}
+
+#screen-data .common-master-card b {
+  grid-column: 1;
+  grid-row: 2;
+  text-align: center;
+  display: block;
+  min-width: 0;
+  color: var(--management-ink);
+  font-family: var(--management-gothic);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.5;
+  letter-spacing: 0;
+  white-space: normal;
+  word-break: normal;
+  overflow-wrap: anywhere;
+  overflow: visible;
+  text-overflow: clip;
+}
+
+#screen-data .common-master-card small {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  display: none;
+  min-width: 0;
+  color: var(--management-muted);
+  font-family: var(--management-gothic);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.5;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+#screen-data .common-master-card em {
+  position: absolute;
+  top: auto;
+  right: 7px;
+  bottom: 5px;
+  max-width: calc(100% - 14px);
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--management-muted);
+  font-family: var(--management-gothic);
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+#screen-data .master-card-chevron {
+  grid-column: 2;
+  grid-row: 2;
+  align-self: center;
+  justify-self: center;
+  color: #73834b;
+  font-size: 18px;
+  line-height: 1;
+  pointer-events: none;
+}
+
+#screen-data .common-master-card:focus-visible,
+#screen-data #managementBackupShare:focus-visible,
+#screen-data .management-backup-fold > summary:focus-visible {
+  outline: 2px solid #47744f;
+  outline-offset: 2px;
+}
+
+#screen-data .common-master-card:active {
+  background-color: #f2f7f1;
+}
+
+#screen-data .management-backup-strip {
+  position: relative;
+  min-width: 0;
+  margin: 10px 0 16px;
+  padding: 0;
+  border: 0;
+  border-block: 1px solid var(--management-rule);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+#screen-data .management-backup-fold {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+/* Keep the native marker and disclosure behavior, including closed contents. */
+#screen-data .management-backup-fold > summary {
+  min-height: 44px;
+  padding: 10px 108px 10px 0;
+  color: var(--management-ink);
+  font-family: var(--management-gothic);
+  line-height: 1.6;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+
+#screen-data .management-backup-fold > summary b {
+  margin-right: 10px;
+  font-family: var(--management-mincho);
+  font-size: 18px;
+  font-weight: 700;
+}
+
+#screen-data #managementBackupSummary {
+  display: block;
+  font-size: 12px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+#screen-data #managementBackupSummary.is-warning {
+  color: #8a5a12;
+}
+
+#screen-data #managementBackupSummary.is-warning::before {
+  content: "\26A0\FE0E";
+  margin-right: 4px;
+}
+
+#screen-data #managementBackupShare {
+  position: absolute;
+  top: 8px;
+  right: 0;
+  min-height: 44px;
+  max-width: 100px;
+  padding: 8px 10px;
+  border: 1px solid var(--management-rule);
+  border-radius: 8px;
+  background: #f5f8f1;
+  box-shadow: none;
+  color: var(--management-ink);
+  font-family: var(--management-gothic);
+  font-size: 14px;
+  line-height: 1.5;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+#screen-data .common-master-card .management-settings-art {
+  display: block;
+  grid-column: 1 / -1;
+  grid-row: 1;
+  justify-self: center;
+  width: 70px;
+  height: 70px;
+  background-image: url("../images/ui-pop/nav-watercolor-approved-20261124.png");
+  background-position: 100% 100%;
+  background-size: 300% 200%;
+  background-repeat: no-repeat;
+  pointer-events: none;
+}
+
+#screen-data .management-backup-fold[open] > summary {
+  border-bottom: 1px solid var(--management-rule);
+}
+
+#screen-data .management-backup-fold > #dataBackupCenter {
+  min-width: 0;
+  margin: 0;
+  padding: 12px;
+  border: 0;
+}

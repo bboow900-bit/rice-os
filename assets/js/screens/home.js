@@ -11,6 +11,7 @@
   let homeGroupFilter = "all";
   let expandedManagementFieldId = "";
   const expandedWaterMovementFields = new Set();
+  const expandedEvidenceFields = new Set();
   let homeCandidatesExpanded = false;
   let homeHarvestCompletedExpanded = false;
   const heatCache = new Map();
@@ -803,12 +804,26 @@
           ${renderDecisionProgressGrid(field, stage, waterManagement, criticalWater, date)}
         </button>
         ${renderHomeWaterShortcut(field, date)}
-        <div id="home-management-${U.attr(field.fieldId)}" class="home-management-compare" ${isExpanded ? "" : "hidden"}>
-          ${renderManagementComparison(field, stage, date)}
-          <button type="button" class="home-management-detail" data-home-open-field="${U.attr(field.fieldId)}">圃場の詳細を見る <span>›</span></button>
+        <div id="home-management-${U.attr(field.fieldId)}" class="home-progress-evidence" ${isExpanded ? "" : "hidden"}>
+          <details class="home-evidence-disclosure" data-home-evidence="${U.attr(field.fieldId)}" ${expandedEvidenceFields.has(field.fieldId) ? "open" : ""}>
+            <summary>表示の根拠</summary>
+            ${renderHomeProgressEvidence(field, date)}
+          </details>
+          <button type="button" class="home-year-compare" data-home-year-compare="${U.attr(field.fieldId)}">この圃場を「年の比較」で見る <span aria-hidden="true">›</span></button>
         </div>
       </article>
     `;
+  }
+
+  function renderHomeProgressEvidence(field, dateText) {
+    const heading = actualHeadingDate(field, dateText);
+    const panicle = panicleLogForYear(field.fieldId, cropYear(dateText), dateText);
+    const planting = plantingDateForYear(field.fieldId, cropYear(dateText));
+    const anchor = heading || panicle && panicle.date || planting;
+    const label = heading ? "出穂の記録" : panicle && panicle.date ? "幼穂の記録" : "田植えの記録";
+    const heat = homeStageHeat(field, dateText);
+    const note = harvestHeatContext(field, dateText).completed ? "積算は稲刈り日を終点としています。" : "見通しは記録を起点にした推定です。";
+    return `<dl><div><dt>${label}</dt><dd>${U.escapeHTML(anchor ? U.fd(anchor) : "未登録")}</dd></div><div><dt>積算の根拠</dt><dd>${U.escapeHTML(heat.note)}</dd></div></dl><p>${note}</p>`;
   }
 
   // A home card is read-only: four short facts from existing records, not a new data source.
@@ -1117,36 +1132,6 @@
         <p>${U.escapeHTML(focus.note)}</p>
         ${water.referenceNote ? `<p class="critical-water-window-note">${U.escapeHTML(water.referenceNote)}</p>` : ""}
       </section>
-    `;
-  }
-
-  function renderManagementComparison(field, stage, dateText) {
-    const year = cropYear(dateText);
-    const waterHistory = waterManagementHistory(field.fieldId, year, dateText);
-    const currentWater = waterHistory.filter((row) => !row.actualEndDate).at(-1) || waterHistory.at(-1) || null;
-    const waterReference = waterReferenceText(field, currentWater, waterHistory, dateText);
-    const managementTypes = [
-      { key: "fertilizer", label: "追肥", icon: "肥", tone: "fertilizer", matcher: /追肥|穂肥/ },
-      { key: "protection", label: "防除", icon: "防", tone: "protection", matcher: /防除|殺菌|殺虫/, exclude: /除草/ },
-      { key: "herbicide", label: "除草剤", icon: "除", tone: "herbicide", matcher: /除草|除草剤/ }
-    ];
-    const previousYear = String(Number(year) - 1);
-    const workRows = managementTypes.map((type) => {
-      const work = latestManagementWork(field.fieldId, year, type.matcher, type.exclude);
-      const previous = latestManagementWork(field.fieldId, previousYear, type.matcher, type.exclude);
-      const info = managementWorkText(field, year, work, previous);
-      return `<div class="home-management-row ${U.attr(type.tone)}"><span class="home-management-icon">${U.escapeHTML(type.icon)}</span><b>${U.escapeHTML(type.label)}</b><span>${U.escapeHTML(info.current)}</span><small>${U.escapeHTML(info.previous)}</small></div>`;
-    }).join("");
-    const focus = criticalWaterWindowFor(field, dateText);
-    const stageLabel = focus.active
-      ? `${focus.phase}（${focus.certainty || "推定"}）`
-      : (stage.current ? `${stage.current.label}（${homeStageEvidenceLabel(stage)}）` : "生育記録待ち");
-    return `
-      <div class="home-management-head"><b>${U.escapeHTML(stageLabel)}の管理記録</b><small>${U.escapeHTML(focus.active ? `${focus.anchorLabel} / ${focus.observation}` : "今年実績を優先 / 比較は前年実績")}</small></div>
-      ${renderCriticalWaterWindow(field, dateText)}
-      <div class="home-management-row water"><span class="home-management-icon">水</span><b>${U.escapeHTML(currentWater ? waterKindLabel(currentWater.kind, currentWater) : "水管理")}</b><span>${U.escapeHTML(waterPeriodText(currentWater, dateText))}</span><small>${U.escapeHTML(`${waterReference.previousText}・${waterReference.comparison}`)}</small></div>
-      ${workRows}
-      <p class="home-management-guidance">地域の参考: ${U.escapeHTML(homeWaterGuidance(stageLabel))}</p>
     `;
   }
 
@@ -2225,6 +2210,11 @@
     root.dataset.boundHomeCalendar = "1";
     root.addEventListener("toggle", (event) => {
       if (event.target.matches("[data-home-harvest-completed]")) homeHarvestCompletedExpanded = event.target.open;
+      if (event.target.matches("[data-home-evidence]")) {
+        const fieldId = event.target.dataset.homeEvidence;
+        if (event.target.open) expandedEvidenceFields.add(fieldId);
+        else expandedEvidenceFields.delete(fieldId);
+      }
       if (event.target.matches("[data-home-water-movement]")) {
         const fieldId = event.target.dataset.homeWaterMovement;
         if (event.target.open) expandedWaterMovementFields.add(fieldId);
@@ -2327,6 +2317,14 @@
         const fieldId = managementToggle.dataset.homeToggleField || "";
         expandedManagementFieldId = expandedManagementFieldId === fieldId ? "" : fieldId;
         render();
+        return;
+      }
+      const comparison = event.target.closest("[data-home-year-compare]");
+      if (comparison && RiceOS.navigation) {
+        RiceOS.navigation.openField(comparison.dataset.homeYearCompare, {
+          originScreen: "home", destination: "annual-compare", season: cropYear(U.today()),
+          returnScrollY: window.scrollY
+        });
         return;
       }
       const fieldCard = event.target.closest("[data-home-open-field]");

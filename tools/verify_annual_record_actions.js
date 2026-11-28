@@ -81,8 +81,20 @@ assert(
   "Switching annual fields must clear transient detail and action state"
 );
 assert(
-  /The selector is a review filter, not a new navigation destination/.test(switchSection) && !/RiceOS\.navigation\.openField/.test(switchSection),
-  "Switching fields inside review must change the visible review without adding a route"
+  /The selector is a review filter, not a new navigation destination/.test(switchSection)
+    && /route\?\.options\?\.destination === "annual-compare"/.test(switchSection)
+    && /RiceOS\.navigation\.openField\(fieldId, \{ \.\.\.route\.options, season: reviewYearValue\(\), replace: true \}\)/.test(switchSection)
+    && (switchSection.match(/RiceOS\.navigation\.openField/g) || []).length === 1,
+  "Only the comparison route may replace its field target; ordinary review switching must not add a route"
+);
+assert(
+  /: renderTop\(rows\)\) \+ renderTimelineActionSheet\(\)/.test(annual),
+  "The action sheet must render outside the field-only branch, including the off-field hub"
+);
+assert(
+  /data-annual-record-detail-edit/.test(annual)
+    && /if \(recordDetail\) editRow\(recordDetail.kind, recordDetail.id\)/.test(annual),
+  "Off-field read-only detail must expose the existing record editor"
 );
 assert(
   /open\.dataset\.annualOpenField, \{[\s\S]*destination: "annual-history"[\s\S]*tab: "karte"/.test(annual),

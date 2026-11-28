@@ -31,11 +31,17 @@
     const date = info.lastJsonExportAt ? String(info.lastJsonExportAt).slice(0, 10) : "";
     const age = date ? U.daysBetween(date, U.today()) : null;
     const reminder = age === null ? "端末外へのバックアップを残しましょう" : Number.isFinite(age) && age >= 7 ? "前回のJSON出力から7日以上経過" : "JSONの保存先も確認しましょう";
+    const summary = U.$("managementBackupSummary");
+    if (summary) {
+      summary.textContent = date ? `最終JSON出力 ${U.fd(date)}` : "JSON出力：未実施";
+      summary.classList.toggle("is-warning", age === null || Number.isFinite(age) && age >= 7);
+    }
     host.innerHTML = `<div class="backup-center-heading"><div><small>データの保護</small><h3>田んぼの記録を、端末の外にも</h3></div><span>JSONの手動バックアップ</span></div><p>${U.escapeHTML(reminder)}</p><div class="backup-center-actions"><button type="button" class="primary" id="dataBackupShare" ${sharingBackup ? "disabled" : ""}>${sharingBackup ? "共有先を選択中…" : "端末外へ保存・共有"}</button><button type="button" class="secondary" id="dataBackupDownload">JSONダウンロード</button></div><p id="dataBackupMessage" class="backup-center-message" role="status">${U.escapeHTML(backupMessage)}</p><small>自動退避は同じブラウザ内です。端末故障・サイトデータ削除には、別端末やクラウドに保存したJSONが必要です。JSONには写真・メモも含まれます。</small>`;
     U.$("dataBackupDownload").onclick = downloadBackup;
     U.$("dataBackupShare").onclick = async () => {
       if (sharingBackup) return;
       sharingBackup = true;
+      if (U.$("managementBackupShare")) U.$("managementBackupShare").disabled = true;
       U.$("dataBackupShare").disabled = true;
       let result;
       try { result = await RiceOS.backupExport.share(state.data()); }
@@ -44,6 +50,15 @@
       backupMessage = result.message;
       renderBackupCenter(storage.info(state.data()));
     };
+    const quickShare = U.$("managementBackupShare");
+    if (quickShare) {
+      quickShare.disabled = sharingBackup;
+      quickShare.onclick = () => {
+        const fold = document.querySelector(".management-backup-fold");
+        if (fold) fold.open = true;
+        U.$("dataBackupShare").click();
+      };
+    }
   }
   const IMPORT_LABELS = {
     varieties: "栽培レシピ",
@@ -188,6 +203,7 @@
     const usage = status.usage === "" ? "不明" : sizeLabel(status.usage);
     const quota = status.quota === "" ? "不明" : sizeLabel(status.quota);
     const capacity = status.percent === "" ? "" : ` (${status.percent}%)`;
+    if (status.percent !== "" && status.percent >= 80 && U.$("dataDiagnostics")) U.$("dataDiagnostics").open = true;
     el.innerHTML = `<b>ブラウザ保存</b><span>${status.supported ? (status.persisted ? "永続保存: 取得済み" : "永続保存: 未取得またはブラウザ判断") : "永続保存API: 非対応"}</span><small>使用 ${U.escapeHTML(usage)} / 上限 ${U.escapeHTML(quota)}${U.escapeHTML(capacity)}</small>${status.percent !== "" && status.percent >= 80 ? "<strong>容量が少なくなっています。JSON保存を行ってください。</strong>" : ""}`;
   }
 
@@ -284,6 +300,14 @@
       });
     });
     document.querySelector('[data-action="export-json"]').addEventListener("click", downloadBackup);
+    const importOptions = U.$("dataImportOptions");
+    const importTrigger = document.querySelector('[data-action="open-data-import"]');
+    importTrigger.addEventListener("click", () => {
+      importOptions.open = !importOptions.open;
+    });
+    importOptions.addEventListener("toggle", () => {
+      importTrigger.setAttribute("aria-expanded", String(importOptions.open));
+    });
     document.querySelector('[data-action="export-csv"]').addEventListener("click", () => {
       storage.exportCsv(state.data());
     });

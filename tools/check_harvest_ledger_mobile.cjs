@@ -97,8 +97,6 @@ const UI = {
         const milling = (await data()).millingRecords.find(r => r.memo === "QA independent new milling");
         assert.ok(milling); assert.equal(milling.packages.reduce((n, p) => n + p.kg * p.bags, 0) + milling.looseKg, 185);
         await checkStock(305, 30); await preserved();
-        await click("#appBackButton");
-        if (!await page.locator(UI.ledger).count()) await click("#appBackButton");
         await page.locator(UI.ledger).waitFor();
         await click("#appBackButton");
         await page.locator("#screen-data.active").waitFor();
@@ -110,7 +108,7 @@ const UI = {
         assert.equal(await raw(), beforeCancel);
 
         stage = "shipment new save detail";
-        await click("#appBackButton"); await page.locator(UI.ledger).waitFor();
+        await page.locator(UI.ledger).waitFor();
         await click(UI.shipmentNew);
         await page.locator("#shipmentDate").fill("2027-01-02"); await page.locator("#shipmentSeason").fill("2026");
         await page.locator("#shipmentKind").selectOption("sale"); await page.locator("#shipmentRecipient").fill("QA independent buyer");
@@ -121,9 +119,11 @@ const UI = {
         assert.ok(gradeValue, "Grade control needs a nonblank option");
         if (await grade.evaluate(el => el.tagName === "SELECT")) await grade.selectOption(gradeValue); else await grade.fill(gradeValue);
         await page.locator("#shipmentMemo").fill("QA independent shipment"); await shot("shipment-form");
-        await click('#shipmentForm [type="submit"]'); await page.locator("[data-shipment-edit]").waitFor();
+        await click('#shipmentForm [type="submit"]'); await page.locator(UI.ledger).waitFor();
         const saved = (await data()).shipments.find(r => r.memo === "QA independent shipment");
         assert.ok(saved); assert.equal(saved.pricePer60Kg, 24000); assert.equal(saved.grade, gradeValue); assert.equal(saved.season, 2026);
+        await click(`[data-harvest-ledger-record="${saved.shipmentId}"]`);
+        await page.locator("[data-shipment-edit]").waitFor();
         assert.match(await page.locator(".shipment-detail").innerText(), /24,000/);
         assert.ok((await page.locator(".shipment-detail").innerText()).includes(gradeValue));
         await checkStock(305, 90); await preserved(); await shot("shipment-detail");
@@ -137,13 +137,17 @@ const UI = {
         const changedGrade = await page.locator(UI.grade).evaluate((el, old) => el.tagName === "SELECT" ? Array.from(el.options).find(o => o.value && o.value !== old)?.value : "QA grade 2", gradeValue);
         assert.ok(changedGrade, "Grade editor needs a second grade");
         if (await page.locator(UI.grade).evaluate(el => el.tagName === "SELECT")) await page.locator(UI.grade).selectOption(changedGrade); else await page.locator(UI.grade).fill(changedGrade);
-        await click('#shipmentForm [type="submit"]'); await page.locator("[data-shipment-edit]").waitFor();
+        await click('#shipmentForm [type="submit"]'); await page.locator(UI.ledger).waitFor();
+        await click(`[data-harvest-ledger-record="${saved.shipmentId}"]`);
+        await page.locator("[data-shipment-edit]").waitFor();
         const edited = (await data()).shipments.find(r => r.shipmentId === saved.shipmentId);
         assert.equal(edited.grade, changedGrade); assert.equal(edited.pricePer60Kg, 26000); assert.equal(edited.createdAt, saved.createdAt);
         assert.deepEqual(edited.packages, saved.packages); await checkStock(305, 90);
 
         stage = "master rate must not rewrite saved shipment";
-        await click("#appBackButton"); await click("[data-shipment-price-settings] > summary");
+        await click("#appBackButton"); await page.locator(UI.ledger).waitFor();
+        await click(".hl-more > summary"); await click("[data-harvest-ledger-shipments]");
+        await click("[data-shipment-price-settings] > summary");
         await page.locator("#shipmentPriceSeason").fill("2026"); await page.locator("#shipmentPriceRecipient").fill("QA independent buyer");
         await page.locator("#shipmentPriceRate").fill("30000"); await click("[data-shipment-price-save]");
         assert.deepEqual((await data()).shipments.find(r => r.shipmentId === saved.shipmentId), edited);
@@ -168,9 +172,11 @@ const UI = {
         await page.locator("[data-shipment-edit]").waitFor(); await click("[data-shipment-edit]");
         assert.equal(await page.locator("#shipmentGrade").inputValue(), "custom historical grade");
         assert.equal(await page.locator("#shipmentDestinationName").inputValue(), "historical destination");
-        await click('#shipmentForm [type="submit"]'); await page.locator("[data-shipment-edit]").waitFor();
+        await click('#shipmentForm [type="submit"]'); await page.locator(UI.ledger).waitFor();
+        await click('[data-harvest-ledger-record="qa-old-brown"]');
+        await page.locator("[data-shipment-edit]").waitFor();
         await preserved(); await checkStock(305, 30);
-        await click("#appBackButton"); await click("#appBackButton"); await page.locator(UI.ledger).waitFor();
+        await click("#appBackButton"); await page.locator(UI.ledger).waitFor();
 
         stage = "milling source CRUD cancel and back";
         await click(`[data-harvest-ledger-record="${milling.millingId}"]`);

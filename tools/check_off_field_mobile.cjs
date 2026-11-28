@@ -1,6 +1,6 @@
 "use strict";
 // Isolated browser storage; never connects to the user's browser profile.
-const { chromium } = require(process.env.PLAYWRIGHT_MODULE || "C:/Users/Keisuke/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright");
+const { chromium, devices } = require(process.env.PLAYWRIGHT_MODULE || "C:/Users/Keisuke/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright");
 const path = require("node:path");
 const fs = require("node:fs");
 const os = require("node:os");
@@ -8,8 +8,8 @@ const assert = require("node:assert/strict");
 (async () => {
   const browser = await chromium.launch({ headless: true, executablePath: process.env.CHROME_EXE || "C:/Program Files/Google/Chrome/Application/chrome.exe" });
   try {
-    for (const width of [390,360]) {
-    const context = await browser.newContext({viewport: {width,height:844},isMobile:true,hasTouch:true});
+    for (const width of process.argv.includes('--android') ? [412,360] : [390,360]) {
+    const context = await browser.newContext({...(process.argv.includes('--android') ? devices['Pixel 7'] : {}),deviceScaleFactor:1,viewport: {width,height:844},isMobile:true,hasTouch:true,serviceWorkers:"block"});
     const page = await context.newPage();
     const errors = [];
     page.on("pageerror", error => errors.push(error.message));
@@ -20,7 +20,13 @@ const assert = require("node:assert/strict");
     const saved = () => page.evaluate(() => JSON.parse(localStorage.getItem("rice_os_v8_stable")));
     const nav = async name => {
       await page.locator(`.nav-item[data-screen="${name}"]:visible`).click();
-      if (name === 'annual') await page.locator('[data-annual-hub-view="work"]').click();
+      if (name === 'annual') await page.locator('[data-annual-hub-view="fields"]').click();
+    };
+    const archiveRecord = async id => {
+      await nav('annual');
+      const archive = page.locator('#screen-annual [data-annual-work-list]');
+      if (!await archive.evaluate(el => el.open)) await archive.locator(':scope > summary').click();
+      return archive.locator(`[data-annual-record-open-id="${id}"]`);
     };
     const open = async () => { await nav("home"); await page.locator("[data-home-quick-record]").click(); };
     if (process.argv.includes('--visual')) {
@@ -54,17 +60,35 @@ const assert = require("node:assert/strict");
     let data=await saved();
     let work=data.fieldWorks.find(w=>w.memo==='QA off-field');
     assert.ok(work); assert.equal(work.targetScope,'offField'); assert.deepEqual(work.fieldIds,[]); assert.deepEqual(work.batchFieldIds,[]);
-    await nav('annual');
-    await page.locator('[data-annual-work-scope="offField"]').click();
-    if (!await page.locator('[data-annual-work-list]').evaluate(el=>el.open)) await page.locator('.annual-work-archive summary').click();
-    assert.ok((await page.locator('.annual-work-archive').innerText()).includes('QA off-field'));
-    const row=page.locator('.annual-work-archive article').filter({hasText:'QA off-field'});
-    await row.getByRole('button',{name:'編集',exact:true}).click();
+    const beforeReview = await saved();
+    const row = await archiveRecord(work.workId);
+    await row.click();
+    assert.match(await page.locator('.annual-record-detail').innerText(),/QA off-field/);
+    assert.deepEqual(await saved(), beforeReview, 'Opening the archive/detail must not save records');
+    await page.locator('[data-annual-record-detail-edit]').click();
     assert.equal(await page.locator('#fwTargetScope').inputValue(),'offField');
     if (!await page.locator('#fwMemo').isVisible()) await page.locator('#fieldWorkForm summary').filter({hasText:'写真・メモ'}).click();
     await page.locator('#fwMemo').fill('QA off-field edited');
     await page.locator('#fieldWorkForm button[type="submit"]').click();
     assert.equal((await saved()).fieldWorks.find(w=>w.workId===work.workId).memo,'QA off-field edited');
+    const contextRow = await archiveRecord(work.workId);
+    const beforeContextEdit = await saved();
+    await contextRow.scrollIntoViewIfNeeded();
+    const touchBox = await contextRow.boundingBox();
+    await page.evaluate(()=>{window.qaTouchEvents=[];for(const type of ['pointerdown','pointermove','pointercancel','pointerleave','contextmenu'])document.querySelector('#annualTimeline').addEventListener(type,e=>window.qaTouchEvents.push({type,pointerType:e.pointerType,x:e.clientX,y:e.clientY,target:e.target.closest('[data-annual-record-open-kind]')?.dataset.annualRecordOpenId}),true);});
+    const touch = await context.newCDPSession(page);
+    await touch.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:touchBox.x+touchBox.width/2,y:touchBox.y+touchBox.height/2}]});
+    await page.waitForTimeout(700);
+    await touch.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
+    await touch.detach();
+    if(!await page.locator('[data-annual-record-action="edit"]').count()) {
+      console.log('TOUCH_DIAGNOSTIC',JSON.stringify({touchBox,events:await page.evaluate(()=>window.qaTouchEvents)}));
+      await page.screenshot({path:path.join(out,`long-press-failure-${width}.png`)});
+    }
+    await page.locator('[data-annual-record-action="edit"]').click();
+    assert.equal(await page.locator('#fwTargetScope').inputValue(),'offField');
+    await page.locator('#appBackButton').click();
+    assert.deepEqual(await saved(),beforeContextEdit,'Opening and leaving the context-menu editor must not save');
     await open();
     await page.locator('[data-sheet-add="schedule"]').click();
     await page.locator('#sheetScheduleTargetMode').selectOption('offField');
@@ -92,16 +116,20 @@ const assert = require("node:assert/strict");
     assert.equal(await page.locator('#fwCustomName').inputValue(),'QA custom');
     await page.locator('#fieldWorkForm button[type="submit"]').click();
     assert.ok((await saved()).schedules.find(s=>s.scheduleId===customPlan.scheduleId).completedByWorkId);
-    await nav('annual');
-    await page.locator('[data-annual-work-scope="offField"]').click();
-    if (!await page.locator('[data-annual-work-list]').evaluate(el=>el.open)) await page.locator('.annual-work-archive summary').click();
-    const del=page.locator(`[data-annual-action="delete"][data-id="${work.workId}"]`);
+    await (await archiveRecord(work.workId)).click({button:'right'});
+    const del=page.locator('[data-annual-record-action="delete"]');
+    const beforeDelete = await saved();
     page.once('dialog',dialog=>dialog.dismiss());
     await del.click();
-    assert.ok((await saved()).fieldWorks.find(w=>w.workId===work.workId),'Cancel leaves record unchanged');
+    assert.deepEqual(await saved(),beforeDelete,'Cancel leaves all records unchanged');
+    await (await archiveRecord(work.workId)).click({button:'right'});
     page.once('dialog',dialog=>dialog.accept());
     await del.click();
     assert.ok(!(await saved()).fieldWorks.find(w=>w.workId===work.workId),'Delete removes only selected record');
+    const expected = {...beforeDelete,fieldWorks:beforeDelete.fieldWorks.filter(w=>w.workId!==work.workId)};
+    const afterDelete = await saved();
+    delete expected.meta; delete afterDelete.meta;
+    assert.deepEqual(afterDelete,expected,'Delete must preserve all unrelated records');
     await open();
     await page.locator('[data-sheet-add="work"]').click();
     await page.locator('#sheetTargetMode').selectOption('group');

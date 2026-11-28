@@ -1,4 +1,8 @@
 /* Fields-tab management list only. Keep renderer-supplied stage colors. */
+#screen-fields .field-hub-groups button[data-field-group-open] small {
+  font-size: 12px;
+  line-height: 1.5;
+}
 #screen-fields .field-hub-list { padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
 #screen-fields .field-hub-card.field-wc.field-master-card[hidden] { display: none; }
 #screen-fields .field-master-heading,
@@ -281,4 +285,157 @@
 @media (hover: hover) {
   #screen-fields .field-master-card > .field-master-edit:hover > span,
   #screen-fields .field-master-heading button:hover { background: #edf3e3; }
+}
+
+/* Detail and settings retain their markup, stage colors and input behavior. */
+#screen-fields :is(.field-hub-detail, .field-hub-settings) {
+  --field-wc-mincho: "Yu Mincho", "Hiragino Mincho ProN", "Noto Serif CJK JP", serif;
+  --field-wc-gothic: "Yu Gothic", "Hiragino Kaku Gothic ProN", "Meiryo", sans-serif;
+  min-width: 0;
+  gap: 10px;
+  padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px));
+  color: #173f27;
+  font: 400 14px/1.6 var(--field-wc-gothic);
+}
+#screen-fields :is(.field-hub-detail, .field-hub-settings) :is(h3, h4, b, small, p, label, summary) {
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-overflow: clip;
+}
+#screen-fields :is(.field-hub-detail, .field-hub-settings) .field-hub-detail-head {
+  gap: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #cbd9c5;
+}
+#screen-fields :is(.field-hub-detail, .field-hub-settings) .field-hub-detail-head h3 {
+  box-sizing: border-box;
+  min-width: 0;
+  padding-right: 12px;
+  overflow: visible;
+  word-break: normal;
+  overflow-wrap: anywhere;
+  font: 600 22px/1.4 var(--field-wc-mincho);
+}
+#screen-fields :is(.field-hub-detail, .field-hub-settings) .field-hub-detail-head :is(span, small) {
+  font: 400 12px/1.6 var(--field-wc-gothic);
+}
+#screen-fields :is(.field-hub-detail, .field-hub-settings) button {
+  box-sizing: border-box;
+  min-height: 44px;
+  border-radius: 6px;
+  font-family: var(--field-wc-gothic);
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+#screen-fields :is(.field-hub-detail, .field-hub-settings) .field-hub-back {
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+}
+body:has(#appBackButton:not(.hidden)) #screen-fields :is(.field-hub-detail, .field-hub-settings) .field-hub-back {
+  visibility: hidden;
+  pointer-events: none;
+}
+#screen-fields .field-hub-detail-head > button[data-field-view="settings"] {
+  flex: 0 0 auto;
+  min-width: 44px;
+  padding: 6px 10px;
+  font-size: 12px;
+}
+#screen-fields .field-hub-detail .field-hub-now { padding: 8px; border-radius: 8px; }
+#screen-fields .field-hub-detail .field-hub-now > :is(img, span) { border-radius: 8px; }
+#screen-fields .field-hub-detail .field-hub-now b { font: 600 18px/1.5 var(--field-wc-gothic); }
+#screen-fields .field-hub-detail .field-hub-now :is(small, p) { font: 400 12px/1.6 var(--field-wc-gothic); }
+#screen-fields .field-hub-detail :is(.field-hub-master-card, .field-hub-settings-link) {
+  padding: 0;
+  border: 0;
+  border-block: 1px solid #cbd9c5;
+  border-radius: 0;
+  background: #fffef9;
+  box-shadow: none;
+}
+#screen-fields .field-hub-detail .field-hub-master-card-head { flex-wrap: wrap; padding: 8px 10px; }
+#screen-fields .field-hub-detail :is(.field-hub-master-card-head > b, .field-herbicide-detail h4) {
+  margin: 0;
+  font: 600 16px/1.5 var(--field-wc-mincho);
+}
+#screen-fields .field-hub-detail .field-hub-master-card-head > span { font-size: 12px; }
+#screen-fields .field-hub-detail .field-hub-master-grid { grid-template-columns: minmax(0, 1fr); gap: 0; padding: 0 10px 4px; }
+#screen-fields .field-hub-detail .field-hub-master-grid > span {
+  display: grid;
+  grid-template-columns: 86px minmax(0, 1fr);
+  align-items: baseline;
+  gap: 8px;
+  padding: 6px 0;
+  border-top: 1px solid #d5dfcf;
+  border-radius: 0;
+  background: transparent;
+}
+#screen-fields .field-hub-detail .field-hub-master-grid small { color: #52634f; font: 400 12px/1.6 var(--field-wc-gothic); }
+#screen-fields .field-hub-detail .field-hub-master-grid b { margin: 0; font: 500 14px/1.6 var(--field-wc-gothic); }
+#screen-fields .field-hub-detail .field-hub-settings-link { padding: 8px 10px; }
+#screen-fields .field-hub-detail .field-hub-settings-link b { font-size: 14px; }
+#screen-fields .field-hub-detail .field-hub-settings-link span { font-size: 12px; }
+#screen-fields .field-hub-detail .field-management-current { padding: 8px 10px; border-radius: 8px; }
+#screen-fields .field-hub-detail .field-management-current :is(b, small) { overflow: visible; }
+#screen-fields .field-hub-detail .field-management-current b { font-size: 14px; }
+#screen-fields .field-hub-detail .field-management-current :is(span, small, p) { font-size: 12px; }
+#screen-fields .field-hub-detail .critical-water-window { min-width: 0; border-radius: 8px; }
+#screen-fields .field-hub-detail .critical-water-window :is(span, b, small, p) {
+  min-width: 0;
+  max-height: none;
+  overflow: visible;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-overflow: clip;
+  font: 400 12px/1.6 var(--field-wc-gothic);
+}
+#screen-fields .field-hub-detail .critical-water-window > strong {
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  font: 600 18px/1.6 var(--field-wc-gothic);
+}
+#screen-fields .field-hub-detail .critical-water-window-head { flex-wrap: wrap; align-items: baseline; }
+#screen-fields .field-hub-detail .critical-water-window-head b { border-radius: 4px; }
+#screen-fields .field-hub-detail .critical-water-window-facts span { border-radius: 4px; }
+#screen-fields .field-hub-detail .critical-water-window-water {
+  grid-template-columns: minmax(0, 1fr);
+  padding: 6px 0;
+  border: 0;
+  border-block: 1px solid rgba(60, 139, 172, .18);
+  border-radius: 0;
+  background: transparent;
+}
+#screen-fields .field-hub-detail .critical-water-window-water small { grid-column: 1; }
+#screen-fields .field-hub-detail .field-history-link { min-height: 44px !important; font-size: 14px; }
+#screen-fields .field-hub-settings .form-section {
+  border: 1px solid #cbd9c5;
+  border-radius: 8px;
+  background: #fffef9;
+  box-shadow: none;
+}
+#screen-fields .field-hub-settings .form-section > summary {
+  box-sizing: border-box;
+  min-height: 44px;
+  padding: 10px;
+  font: 600 16px/1.5 var(--field-wc-mincho);
+}
+#screen-fields .field-hub-settings .form-grid { min-width: 0; gap: 10px; }
+#screen-fields .field-hub-settings label { font: 500 14px/1.6 var(--field-wc-gothic); }
+#screen-fields .field-hub-settings :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea) {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  min-height: 44px;
+  border-radius: 6px;
+  font: 400 16px/1.5 var(--field-wc-gothic);
+}
+#screen-fields .field-hub-settings .hint-text { font: 400 12px/1.6 var(--field-wc-gothic); }
+@media (max-width: 599px) {
+  #screen-fields .field-hub-settings .form-grid.inline-grid { grid-template-columns: minmax(0, 1fr); }
+  #screen-fields .field-hub-detail .field-management-current { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+  #screen-fields .field-hub-detail .field-management-current p { max-width: none; text-align: left; }
 }

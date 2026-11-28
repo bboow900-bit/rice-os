@@ -2955,10 +2955,6 @@
   }
 
   .annual-menu-button {
-    width: 34px !important;
-    min-width: 34px !important;
-    height: 40px !important;
-    min-height: 40px !important;
     color: #1d281d !important;
     font-size: 22px !important;
   }
@@ -13737,10 +13733,6 @@ label {
   }
 
   .annual-menu-button {
-    width: 34px !important;
-    min-width: 34px !important;
-    height: 34px !important;
-    min-height: 34px !important;
     color: #141c15 !important;
     font-size: 22px !important;
     font-weight: 800 !important;
@@ -14024,17 +14016,6 @@ label {
     font-size: 12.5px !important;
     font-weight: 800 !important;
     text-align: center !important;
-  }
-
-  #screen-annual .annual-menu-button {
-    width: 31px !important;
-    min-width: 31px !important;
-    height: 31px !important;
-    min-height: 31px !important;
-    color: #111914 !important;
-    font-size: 21px !important;
-    font-weight: 850 !important;
-    line-height: 1 !important;
   }
 
   #screen-annual .annual-summary-board {
@@ -14671,13 +14652,6 @@ label {
   #screen-annual.annual-detail-mode .annual-target-card > .annual-edit-grid {
     display: none !important;
   }
-}
-.system-settings-trigger {
-  width: 44px;
-  min-width: 44px;
-  padding: 0;
-  font-size: 22px;
-  line-height: 1;
 }
 .common-master-grid {
   display: grid;
@@ -15568,3 +15542,20 @@ button.hp-trend-row:hover, button.hp-trend-row:focus-visible { background: #edf5
 #fwTimingReview p { font-size: 13px; line-height: 1.7; overflow-wrap: anywhere; }
 #fwTimingReview label { display: block; margin: 12px 0; }
 #fwTimingReview textarea { width: 100%; box-sizing: border-box; }
+
+/* Existing master screens: audit fixes scoped to their small controls. */
+#screen-machines .machine-head > button[data-machine-exit],
+#screen-machines .machine-head > button[data-machine-back],
+#screen-machines .machine-head > button[data-machine-detail-back],
+#screen-notices .screen-head > button[data-action="enable-notifications"] {
+  min-width: 44px;
+  min-height: 44px;
+}
+#screen-transplanter-settings .ts-details > summary,
+#screen-transplanter-settings .ts-profile > details > summary {
+  min-height: 44px;
+  box-sizing: border-box;
+}
+#screen-herbicide p.hm-label-note {
+  font-size: 12px;
+}

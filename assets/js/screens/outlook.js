@@ -108,7 +108,7 @@
 
   function milestoneContent(outlook, next) {
     return `<span class="outlook-preview-stage">${next.afterHeading ? "出穂確認済み" : U.escapeHTML(stageLabel(outlook))}</span>
-      <span>${U.escapeHTML(next.label)}</span><strong class="outlook-preview-date">${U.escapeHTML(next.date)}</strong>
+      <span>${U.escapeHTML(next.label)}</span><strong class="outlook-preview-date${next.date === "記録不足" ? " is-missing" : ""}">${U.escapeHTML(next.date)}</strong>
       ${next.harvestActual ? "" : `<span class="outlook-confidence ${U.attr(outlook.confidence.key)}">信頼度：${U.escapeHTML(outlook.confidence.label)}</span>`}`;
   }
 
@@ -207,7 +207,7 @@
     return `
       <section class="outlook-detail">
         <div class="screen-head outlook-detail-head outlook-watercolor-head">
-          <div><p class="eyebrow">${U.escapeHTML(varietyName(outlook.field))}</p><h2>${U.escapeHTML(outlook.field.name)}の見通し</h2></div>
+          <div><p class="eyebrow"><span>見通し</span><span>${U.escapeHTML(varietyName(outlook.field))}</span></p><h2>${U.escapeHTML(outlook.field.name)}</h2></div>
           <img src="assets/images/annual-story/schedule-harvest.png" alt="" decoding="async">
         </div>
         <div class="outlook-next-hero"><div>${milestoneContent(outlook, nextMilestone(outlook))}</div>${outlookArt(outlook)}</div>

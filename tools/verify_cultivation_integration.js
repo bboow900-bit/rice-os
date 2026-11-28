@@ -91,10 +91,11 @@ vm.runInContext(read("screens/outlook").replace("  function render(options)",
   "  RiceOS.testOutlook = { detail, fieldCard, weatherKey };\n  function render(options)"), c);
 row = R.outlook.forField("a");
 const card = R.testOutlook.fieldCard(row), detail = R.testOutlook.detail(row);
-for (const label of ["幼穂形成目安", "出穂目安", "追肥参考時期"]) { assert(card.includes(label)); assert(detail.includes(label)); }
+for (const label of ["幼穂形成目安", "出穂目安", "追肥参考時期"]) assert(detail.includes(label));
+assert(card.includes('data-outlook-field="a"'), "Compact card must still open this field's detailed evidence");
 assert(detail.includes("data-outlook-cultivation-evidence")); assert(detail.includes("1年 / 1圃場"));
-assert(detail.includes("ばらつき")); assert(card.includes("推定"));
-assert(card.includes("現場記録")); assert(card.includes("出穂期（現地判断）")); assert(card.includes("生育推定:"));
+assert(detail.includes("ばらつき")); assert(detail.includes("推定"));
+assert(detail.includes("現場記録")); assert(detail.includes("出穂期（現地判断）")); assert(detail.includes("生育推定:"));
 assert.equal(R.agro.seasonStageForField("a", "2026-05-02").outlookStage.current.key, "establishment", "stage index starts at one");
 const firstKey = R.testOutlook.weatherKey(null, U.today());
 const masterOnly = plain(S.data()); masterOnly.varieties[0].topDressingDaysBeforeHeading = 10;

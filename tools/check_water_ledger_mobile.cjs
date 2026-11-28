@@ -16,10 +16,25 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE||"C:/Users/Keisuke/.cache
     return {a,b,group,today,year,moveDate:day(1)};
    });
    const raw=()=>page.evaluate(()=>localStorage.getItem(RiceOS.schema.STORE_KEY));
-   const manage=async dry=>{await page.locator('.nav-item[data-screen="data"]:visible').click();await page.locator(dry?'[data-jump-screen="irrigation"][data-water-type="dry"]':'[data-jump-screen="irrigation"]:not([data-water-type])').click();};
+   const homeInput=async()=>{
+    await page.locator('.nav-item[data-screen="home"]:visible').click();
+    await page.locator('[data-home-quick-record]').click();
+    await page.locator('[data-sheet-add="water"]').click();
+    await page.locator('#sheetTargetMode').selectOption('field');
+    await page.locator('#sheetField').selectOption(fixture.a);
+    await page.locator('#sheetOpenRecord').click();
+    await page.locator('[data-sheet-water-type="intermittent"]:visible').click();
+    await page.locator('#screen-irrigation.active').waitFor();
+   };
+   const ledger=async dry=>{
+    await homeInput();
+    // Home opens input. The retained ledger has no management-top entry;
+    // exercise its list/detail states through its public API after a real route.
+    await page.evaluate(type=>RiceOS.screens.irrigation.enterLedger(type),dry?'dry':'');
+   };
    const view=async v=>assert.equal(await page.locator("#screen-irrigation").getAttribute("data-water-view"),v);
-   await manage(true);await view("list");assert.equal(await page.locator('[data-water-ledger-type]').inputValue(),"dry");assert.equal(await page.locator('[data-water-open="irrigation"]').count(),0);
-   await page.locator('#appBackButton').click();await page.locator('#screen-data.active').waitFor();await manage(false);await view("list");
+   await ledger(true);await view("list");assert.equal(await page.locator('[data-water-ledger-type]').inputValue(),"dry");assert.equal(await page.locator('[data-water-open="irrigation"]').count(),0);
+   await page.locator('#appBackButton').click();await page.locator('#screen-home.active').waitFor();await ledger(false);await view("list");
    assert.equal(await page.locator('#waterActionGrid').isVisible(),false);assert.equal(await page.locator('#waterEditForm').isVisible(),false);assert.equal(await page.locator('#waterHistory').isVisible(),true);
    const beforeRead=await raw();await page.locator('[data-water-open="irrigation"][data-id="qa-water"]').click();await view("detail");assert.equal(await page.locator('#waterLedgerDetail input,#waterLedgerDetail select,#waterLedgerDetail textarea').count(),0);assert.equal(await page.locator('#waterLedgerDetail .water-movement-timeline').count(),1);assert.equal(await raw(),beforeRead);
    await page.locator('[data-water-edit="irrigation"]').click();await view("edit");assert.equal(await page.locator('#waterActionGrid').isVisible(),false);await page.locator('#waterEditMemo').fill('cancelled');await page.locator('[data-water-cancel-edit]').click();await view("detail");assert.equal(await raw(),beforeRead);
@@ -29,9 +44,13 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE||"C:/Users/Keisuke/.cache
    await page.locator('[data-water-ledger-back]').click();await page.locator('[data-water-ledger-new]').click();await view("input");assert.equal(await page.locator('#waterHistory').isVisible(),false);await page.locator('#waterTargetMode').selectOption('group');await page.locator('#waterGroup').selectOption(fixture.group);await page.locator('#waterDate').fill(fixture.today);await page.locator('#waterDate').dispatchEvent('change');approve=true;await page.locator('[data-water-action="intermittent-start"]').click();approve=false;
    const active=await page.evaluate(ids=>RiceOS.state.data().irrigations.filter(r=>ids.includes(r.fieldId)&&r.startDate===RiceOS.utils.today()&&!r.actualEndDate),[fixture.a,fixture.b]);assert.equal(active.length,2);assert.equal(active[0].batchId,active[1].batchId);
    await page.locator('#waterDate').fill(fixture.moveDate);await page.locator('#waterDate').dispatchEvent('change');approve=true;await page.locator('[data-water-movement="intermittent-drain"]').click();approve=false;assert.equal(await page.evaluate(ids=>RiceOS.state.data().irrigations.filter(r=>ids.includes(r.fieldId)&&r.method==='間断灌水'&&r.startDate===RiceOS.utils.today()&&!r.actualEndDate).every(r=>r.waterMovements.at(-1).phase==='drain'),[fixture.a,fixture.b]),true);
-   const beforeBack=await raw();await page.locator('#appBackButton').click();await view('list');assert.equal(await raw(),beforeBack);await page.locator('#appBackButton').click();await page.locator('#screen-data.active').waitFor();
-   await page.evaluate(f=>{RiceOS.app.openInput('irrigation','home');RiceOS.screens.irrigation.prefillFields(f.today,[f.a,f.b],'intermittent');},fixture);await view('input');assert.equal(await page.locator('#waterTargetMode').inputValue(),'group');assert.equal(await page.evaluate(()=>RiceOS.screens.irrigation.canHandleBack()),false);await page.locator('#appBackButton').click();await page.locator('#screen-home.active').waitFor();
-   await page.evaluate(()=>{RiceOS.app.openInput('irrigation','annual');RiceOS.screens.irrigation.editIrrigation('qa-water');});await view('edit');await page.locator('[data-water-cancel-edit]').click();await page.locator('#screen-annual.active').waitFor();
+   const beforeBack=await raw();await page.locator('#appBackButton').click();await view('list');assert.equal(await raw(),beforeBack);await page.locator('#appBackButton').click();await page.locator('#screen-home.active').waitFor();
+   await homeInput();await page.evaluate(f=>RiceOS.screens.irrigation.prefillFields(f.today,[f.a,f.b],'intermittent'),fixture);await view('input');assert.equal(await page.locator('#waterTargetMode').inputValue(),'group');assert.equal(await page.evaluate(()=>RiceOS.screens.irrigation.canHandleBack()),false);await page.locator('#appBackButton').click();await page.locator('#screen-home.active').waitFor();
+   await page.locator('.nav-item[data-screen="annual"]:visible').click();await page.locator('#annualYear').selectOption(fixture.year);
+   await page.locator(`[data-annual-hub-open-field="${fixture.a}"]`).click();
+   await page.locator('.annual-history-filter > summary').click();await page.locator('[data-annual-history-category="water"]').click();
+   await page.locator('[data-annual-flow-menu-id="qa-water"]').click();await page.locator('[data-annual-record-action="edit"]').click();
+   await view('edit');const beforeAnnualCancel=await raw();await page.locator('[data-water-cancel-edit]').click();await page.locator('#screen-annual.active').waitFor();assert.equal(await raw(),beforeAnnualCancel);
    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>document.documentElement.clientWidth),false);assert.deepEqual(errors,[]);console.log(`PASS water ledger ${width}: exclusive views, readonly movement, cancel/failure, legacy adoption, group movement, origin back`);
   } finally {await context.close();}
  }} finally {await browser.close();}

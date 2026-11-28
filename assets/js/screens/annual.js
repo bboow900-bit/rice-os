@@ -961,7 +961,6 @@
     return `
       <div class="annual-v2-top">
         <header class="annual-pop-heading"><div><p class="annual-pop-kicker">一年を振り返る</p><h2>${yearValue() === "all" ? "これまでの記録" : Number(yearValue()) === Number(U.today().slice(0, 4)) ? "今年の記録" : `${U.escapeHTML(yearValue())}年の記録`}</h2></div><img class="annual-pop-rice" src="assets/images/ui-pop/harvest-rice.png" width="144" height="144" alt="" decoding="async"></header>
-        <button type="button" class="annual-shipment-entry annual-harvest-entry" data-annual-harvest-ledger><img src="assets/images/light-icons/rice-sack.png" alt=""><span><b>収穫・出荷</b><small>収量・販売額・お米の行き先を振り返る</small></span><span aria-hidden="true">›</span></button>
         <div class="annual-hub-tools"><button type="button" data-annual-hub-notes aria-expanded="${hubNotesOpen}" aria-controls="annualHubNotes">来年メモ</button></div>
         ${renderCropYearClosure()}
         <div class="annual-hub-nav" role="group" aria-label="振り返りの表示">
@@ -996,7 +995,7 @@
         ${renderWorkTimingReviews(null, Number(yearValue() === "all" ? new Date().getFullYear() : yearValue()))}
         ${renderSettingExperiments(null, Number(yearValue() === "all" ? new Date().getFullYear() : yearValue()))}
         <div id="annualHubNotes"${hubNotesOpen ? "" : " hidden"}>${hubNotesOpen ? renderNextSeasonIdeas() : ""}</div>
-        ${renderAnnualFab()}
+        <button type="button" class="annual-shipment-entry annual-harvest-entry" data-annual-harvest-ledger><img src="assets/images/light-icons/rice-sack.png" alt=""><span><b>収穫・出荷</b><small>収量・販売額・お米の行き先を振り返る</small></span><span aria-hidden="true">›</span></button>
       </div>
     `;
   }
@@ -2464,7 +2463,6 @@
           <button type="button" class="annual-detail-menu" aria-label="メニュー">…</button>
         </div>
         ${selectedTab === "water" ? renderTabs(field) : renderYearCompare(field)}
-        ${renderAnnualFab(field.fieldId)}
       </div>
     `;
   }
@@ -2787,6 +2785,7 @@
         ${harvestSnapshot}
         ${memo ? `<section class="annual-record-detail-section"><h3>メモ</h3><p class="annual-record-detail-memo">${U.escapeHTML(memo)}</p></section>` : ""}
         ${photos.length ? `<section class="annual-record-detail-section"><h3>写真</h3><div class="annual-record-detail-photos">${photos.map((photo) => `<img src="${U.attr(photo)}" alt="${U.escapeHTML(title)}の記録写真">`).join("")}</div></section>` : ""}
+        ${!field && (kind === "fieldWork" && row.targetScope === "offField" || kind === "other") ? '<button type="button" class="secondary" data-annual-record-detail-edit>編集する</button>' : ""}
         ${isLegacyWater ? '<p class="annual-record-detail-legacy">旧作業記録から確認できる水管理候補です。元作業の実績は変更していません。</p><button type="button" class="secondary annual-record-detail-water" data-annual-record-detail-open-water>水管理の記録を開く</button>' : ""}
       </section>
     `;
@@ -2802,12 +2801,6 @@
     render();
     window.scrollTo({ top: 0, behavior: "smooth" });
     return true;
-  }
-
-  function renderAnnualFab(fieldId) {
-    return `
-      <button type="button" class="annual-fab" data-annual-fab="${U.attr(fieldId || "")}" aria-label="記録を追加">+</button>
-    `;
   }
 
   function renderOptions() {
@@ -2937,7 +2930,7 @@
     if (materialReviewView && (!field || materialReviewView.fieldId !== field.fieldId || materialReviewView.year !== String(reviewYearValue()))) materialReviewView = null;
     if (screen) screen.classList.toggle("annual-detail-mode", Boolean(field || fieldlessMilling));
     if (screen) screen.classList.toggle("annual-material-review-mode", Boolean(materialReviewView && !recordDetail));
-    U.$("annualTimeline").innerHTML = fieldlessMilling ? renderAnnualRecordDetail(null,recordDetail) : field ? `${renderAnnualFieldSwitcher(field)}${recordDetail ? renderAnnualRecordDetail(field, recordDetail) : materialReviewView && RiceOS.materialReview ? RiceOS.materialReview.renderDetail(field, reviewYearValue(), materialReviewView) : renderFieldDetail(field)}${renderTimelineActionSheet()}` : renderTop(rows);
+    U.$("annualTimeline").innerHTML = (fieldlessMilling ? renderAnnualRecordDetail(null,recordDetail) : field ? `${renderAnnualFieldSwitcher(field)}${recordDetail ? renderAnnualRecordDetail(field, recordDetail) : materialReviewView && RiceOS.materialReview ? RiceOS.materialReview.renderDetail(field, reviewYearValue(), materialReviewView) : renderFieldDetail(field)}` : renderTop(rows)) + renderTimelineActionSheet();
     renderSortOptions();
     if (RiceOS.app && RiceOS.app.syncBackButton) RiceOS.app.syncBackButton();
   }
@@ -2946,7 +2939,7 @@
     if (kind === "milling" && RiceOS.screens.results?.editMillingRecord) {
       const origin = { fieldId: selectedFieldId, tab: selectedTab, review: reviewView,
         year: yearValue(), fromHub: compareFromHub, filter: compareFilter, top: topView, detail: recordDetail };
-      if (RiceOS.navigation) RiceOS.navigation.clear();
+      if (RiceOS.navigation && RiceOS.navigation.current()?.options?.destination !== "annual-compare") RiceOS.navigation.clear();
       selectedFieldId = origin.fieldId;
       selectedTab = origin.tab;
       reviewView = origin.review;
@@ -3228,6 +3221,26 @@
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
+  function openComparison(fieldId) {
+    if (!state.field(fieldId)) return false;
+    materialReviewView = null;
+    selectedFieldId = fieldId;
+    selectedTab = "karte";
+    reviewView = "compare";
+    topView = "compare";
+    compareFromHub = true;
+    compareFilter = "work";
+    recordDetail = null;
+    expandedFlowRecord = "";
+    timelineActionRecord = null;
+    waterEditDraft = null;
+    seasonNoteDraft = null;
+    render();
+    if (RiceOS.app?.syncBackButton) RiceOS.app.syncBackButton();
+    window.scrollTo({ top: 0, behavior: "instant" });
+    return true;
+  }
+
   function openPerformanceEvidence(kind, id, fieldId, year) {
     const field = state.field(fieldId), value = Number(year);
     if ((!field && (fieldId || kind !== "milling")) || !Number.isInteger(value) || value < 1900 || value > 2200 || !annualRecordTarget(field || null,kind,id)) return false;
@@ -3245,6 +3258,13 @@
   function switchFieldWithinAnnual(fieldId) {
     if (!fieldId || fieldId === selectedFieldId || !state.field(fieldId)) return false;
     if (!discardMaterialReviewEditor()) return false;
+    if (reviewView === "compare" && !recordDetail) {
+      const route = RiceOS.navigation?.current();
+      if (route?.options?.destination === "annual-compare") {
+        return RiceOS.navigation.openField(fieldId, { ...route.options, season: reviewYearValue(), replace: true });
+      }
+      return openComparison(fieldId);
+    }
     if (materialReviewView) materialReviewView = { fieldId, year: String(reviewYearValue()), selectorYear: yearValue(), tab: materialReviewView.tab, editor: null };
     compareFromHub = false;
     // The selector is a review filter, not a new navigation destination.
@@ -3300,7 +3320,7 @@
     const work = state.data().fieldWorks.find((row) => row.workId === workId && (row.fieldIds || []).includes(fieldId));
     if (!work) return;
     const origin = { fieldId, tab: selectedTab, review: reviewView, year: yearValue(), fromHub: compareFromHub, filter: compareFilter, top: topView };
-    if (RiceOS.navigation && RiceOS.navigation.clear) RiceOS.navigation.clear();
+    if (RiceOS.navigation && RiceOS.navigation.clear && RiceOS.navigation.current()?.options?.destination !== "annual-compare") RiceOS.navigation.clear();
     selectedFieldId = origin.fieldId; selectedTab = origin.tab; reviewView = origin.review;
     compareFromHub = origin.fromHub; compareFilter = origin.filter; topView = origin.top;
     U.$("annualYear").value = origin.year;
@@ -3500,20 +3520,7 @@
       }
       const hubCompare = event.target.closest("[data-annual-hub-compare-field]");
       if (hubCompare) {
-        const id = hubCompare.dataset.annualHubCompareField;
-        if (!state.field(id)) return;
-        selectedFieldId = id;
-        selectedTab = "karte";
-        reviewView = "compare";
-        compareFromHub = true;
-        compareFilter = "work";
-        recordDetail = null;
-        expandedFlowRecord = "";
-        timelineActionRecord = null;
-        waterEditDraft = null;
-        seasonNoteDraft = null;
-        render();
-        window.scrollTo({ top: 0, behavior: "smooth" });
+        openComparison(hubCompare.dataset.annualHubCompareField);
         return;
       }
       const hubField = event.target.closest("[data-annual-hub-open-field]");
@@ -3581,6 +3588,10 @@
         handleBack();
         return;
       }
+      if (event.target.closest("[data-annual-record-detail-edit]")) {
+        if (recordDetail) editRow(recordDetail.kind, recordDetail.id);
+        return;
+      }
       if (event.target.closest("[data-annual-record-detail-open-water]")) {
         recordDetail = null;
         selectedTab = "water";
@@ -3609,6 +3620,10 @@
         return;
       }
       if (event.target.closest("[data-annual-close-compare]")) {
+        if (RiceOS.navigation?.current()?.options?.destination === "annual-compare") {
+          RiceOS.app.back();
+          return;
+        }
         if (compareFromHub) {
           closeFieldDetail();
           window.scrollTo({ top: 0, behavior: "smooth" });
@@ -3632,6 +3647,8 @@
       const recordAction = event.target.closest("[data-annual-record-action]");
       if (recordAction) {
         const actionName = recordAction.dataset.annualRecordAction;
+        // A long-press release can click the backdrop that was just rendered.
+        if (actionName === "cancel" && recordAction.classList.contains("annual-record-action-backdrop") && Date.now() < suppressTimelineOpenUntil) return;
         if (actionName === "cancel" && recordAction.classList.contains("annual-record-action-backdrop") && event.target !== recordAction) return;
         const record = timelineActionRecord;
         if (actionName === "cancel" || !record) {
@@ -3778,11 +3795,6 @@
       if (event.target.closest("[data-annual-water-cancel]")) {
         waterEditDraft = null;
         render();
-        return;
-      }
-      const fab = event.target.closest("[data-annual-fab]");
-      if (fab) {
-        openAdd(fab.dataset.annualFab);
         return;
       }
       const harvestConfirm = event.target.closest("[data-annual-harvest-confirm]");
@@ -4016,6 +4028,8 @@
     render,
     bind,
     openField,
+    openComparison,
+    isComparisonRoot: () => reviewView === "compare" && !recordDetail && !expandedFlowRecord && !materialReviewView && !closureDraft,
     openPerformanceEvidence,
     openWaterEditor,
     handleBack,

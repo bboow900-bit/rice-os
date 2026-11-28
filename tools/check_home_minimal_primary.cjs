@@ -4,7 +4,7 @@ const path=require('node:path'),os=require('node:os'),assert=require('node:asser
 const {chromium}=require('C:/Users/Keisuke/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
 (async()=>{
  const browser=await chromium.launch({headless:true,executablePath:'C:/Program Files/Google/Chrome/Application/chrome.exe'});
- try{for(const width of [360,390,1280]){
+ try{for(const width of process.argv[2] ? process.argv[2].split(',').map(Number) : [360,390,1280]){
   const context=await browser.newContext({viewport:{width,height:1000},serviceWorkers:'block'});
   try{
    const page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));await page.clock.setFixedTime(new Date('2026-08-03T03:00:00Z'));
@@ -56,6 +56,7 @@ const {chromium}=require('C:/Users/Keisuke/.cache/codex-runtimes/codex-primary-r
    assert(summaryBoxes[2].y>summaryBoxes[0].y);
    assert(summaryBoxes.every(r=>r.h>=44));
    await first.evaluate(el=>el.scrollIntoView({block:'start',behavior:'instant'}));
+   assert((await first.boundingBox()).height<403,'Normal card must be shorter than the previous 403px sample');
    await first.screenshot({path:path.join(os.tmpdir(),'rice-home-minimal-card-'+width+'.png')});
    await page.evaluate(()=>window.scrollTo({top:0,behavior:'instant'}));
    await page.screenshot({path:path.join(os.tmpdir(),'rice-home-minimal-'+width+'.png')});
@@ -66,14 +67,53 @@ const {chromium}=require('C:/Users/Keisuke/.cache/codex-runtimes/codex-primary-r
    await page.locator('#appBackButton').click();
    await page.locator('#screen-home.active').waitFor();
    await first.locator('[data-home-toggle-field]').click();assert.equal(await first.locator('[data-home-toggle-field]').getAttribute('aria-expanded'),'true');
-   const clippedDetails=await first.locator('.home-management-head b,.home-management-head small,.home-management-row > b,.home-management-row > span,.home-management-row > small,.critical-water-window p').evaluateAll(nodes=>nodes.filter(el=>el.getClientRects().length&&(el.scrollWidth>el.clientWidth+1||el.scrollHeight>el.clientHeight+2||getComputedStyle(el).textOverflow==='ellipsis'||!['none','0','auto'].includes(getComputedStyle(el).webkitLineClamp))).map(el=>el.textContent.trim()));
+   const evidence=first.locator('.home-evidence-disclosure');
+   assert.equal(await evidence.getAttribute('open'),null,'Evidence is collapsed by default');
+   assert.equal(await evidence.locator('dl').isVisible(),false);
+   assert.equal(await first.locator('[data-home-year-compare]').isVisible(),true,'Comparison stays accessible with evidence closed');
+   await evidence.locator('summary').click();
+   await page.waitForTimeout(50);
+   await page.evaluate(()=>RiceOS.screens.home.render());
+   assert.equal(await evidence.locator('dl').isVisible(),true,'Evidence opening survives redraw');
+   const clippedDetails=await first.locator('.home-progress-evidence h3,.home-progress-evidence dt,.home-progress-evidence dd,.home-progress-evidence p').evaluateAll(nodes=>nodes.filter(el=>el.getClientRects().length&&(el.scrollWidth>el.clientWidth+1||el.scrollHeight>el.clientHeight+2||getComputedStyle(el).textOverflow==='ellipsis'||!['none','0','auto'].includes(getComputedStyle(el).webkitLineClamp))).map(el=>el.textContent.trim()));
    assert.deepEqual(clippedDetails,[],'Expanded details must wrap and remain fully readable');
+   await evidence.locator('summary').click();
+   await first.evaluate(el=>el.scrollIntoView({block:'start',behavior:'instant'}));
+   assert((await first.boundingBox()).height<500,'Default expanded card stays compact with evidence collapsed');
    await first.screenshot({path:path.join(os.tmpdir(),'rice-home-typography-expanded-'+width+'.png')});
    assert.equal(await page.evaluate(()=>localStorage.getItem(RiceOS.schema.STORE_KEY)),saved);
-   await first.locator('[data-home-open-field]').click();
-   await page.locator('#screen-fields.active').waitFor();
+   assert.equal(await first.locator('.home-management-row,.critical-water-window').count(),0,'Home must not duplicate historical management comparisons');
+   await first.locator('[data-home-year-compare]').click();
+   const returnPosition=await page.evaluate(()=>RiceOS.navigation.current().options.returnScrollY);
+   await page.locator('#screen-annual.active .annual-compare-experience').waitFor();
+   assert.equal(await page.locator('#annualYear').inputValue(),'2026');
+   assert.match(await page.locator('.annual-compare-experience-head h3').innerText(),/開パ 下/);
    await page.locator('#appBackButton').click();
    await page.locator('#screen-home.active').waitFor();
+   await page.waitForTimeout(100);
+   assert.equal(await page.locator('[data-home-group-filter]').inputValue(),fixture.g);
+   assert.equal(await first.locator('[data-home-toggle-field]').getAttribute('aria-expanded'),'true');
+   assert(Math.abs(await page.evaluate(()=>window.scrollY)-returnPosition)<2,'Comparison must restore Home scroll position');
+   await first.locator('[data-home-year-compare]').click();
+   await page.locator('.annual-compare-experience').waitFor();
+   await page.locator('.annual-compare-more > summary').click();
+   await page.locator('.annual-compare-record[data-annual-record-open-id]:visible').first().click();
+   await page.locator('.annual-record-detail').waitFor();
+   await page.locator('#appBackButton').click();
+   await page.locator('#screen-annual.active .annual-compare-experience').waitFor();
+   await page.locator('[data-annual-close-compare]').click();
+   await page.locator('#screen-home.active').waitFor();
+   await first.locator('[data-home-year-compare]').click();
+   await page.locator('.annual-compare-experience').waitFor();
+   await page.locator('[data-annual-field-switch]').selectOption(fixture.ids[1]);
+   await page.locator('.annual-compare-experience').waitFor();
+   assert.match(await page.locator('.annual-compare-experience-head h3').innerText(),/亀石 右下/);
+   assert.equal(await page.evaluate(()=>RiceOS.navigation.current().fieldId),fixture.ids[1]);
+   assert.equal(await page.locator('#annualYear').inputValue(),'2026');
+   await page.locator('#appBackButton').click();
+   await page.locator('#screen-home.active').waitFor();
+   assert.equal(await page.evaluate(()=>RiceOS.navigation.openField('missing-field',{destination:'annual-compare',originScreen:'home'})),false);
+   assert.equal(await page.locator('#screen-home.active').count(),1,'Invalid comparison target must not change screens');
    assert.equal(await page.evaluate(()=>localStorage.getItem(RiceOS.schema.STORE_KEY)),saved,'Detail round trip must not mutate farm data');
    await first.locator('[data-home-toggle-field]').click();
    await page.evaluate(ids=>{

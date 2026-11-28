@@ -57,7 +57,7 @@ assert(/const start = heading \? postHeadingThermalStart\(heading\) : planting;/
 assert(/出穂翌日から/.test(home), "Home must state the official post-heading accumulation anchor");
 assert(/取得済み日別気温 \+ 7日予報 \+ 前年同時期/.test(home), "Home must not label mixed forecast data as actual measurements");
 assert(/fetchDailyRange\(planting, addDays\(U\.today\(\), -1\), location\)/.test(home), "Confirmed heat data must end yesterday, leaving today in the forecast layer");
-assert(/\$\{renderCriticalWaterWindow\(field, dateText\)\}/.test(home), "Home expanded cards must render the water reference beside management records");
+assert(/data-home-year-compare/.test(home) && !/function renderManagementComparison/.test(home), "Home must link to annual comparison instead of duplicating historical comparisons");
 assert(/現在の実績/.test(fields) && /照合の目安/.test(fields), "Field detail must show actual water records separately from the reference");
 
 console.log("PASS growth evidence semantics");
